@@ -1,9 +1,11 @@
+import { UserRole } from '@cms-ng/shared';
+
 export interface User {
   id: string;
   email: string;
   name: string;
   avatar?: string;
-  role: string;
+  role: UserRole;
 }
 
 export interface AuthState {
@@ -22,5 +24,5 @@ export interface RegisterCredentials {
   email: string;
   name: string;
   password: string;
-  role?: string;
+  role?: UserRole;
 }

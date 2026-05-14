@@ -1,13 +1,17 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AuthState, User } from '@/types/auth';
+import { UserRole } from '@cms-ng/shared';
 import { login as loginApi, register as registerApi, getCurrentUser, logoutClient } from '@/lib/auth-api';
 
 interface AuthStore extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, name: string, password: string, role?: string) => Promise<void>;
+  register: (email: string, name: string, password: string, role?: UserRole) => Promise<void>;
   fetchUser: () => Promise<void>;
   logout: () => void;
+  isEditor: () => boolean;
+  isAdmin: () => boolean;
+  isReporter: () => boolean;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -62,6 +66,10 @@ export const useAuthStore = create<AuthStore>()(
         logoutClient();
         set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
       },
+
+      isEditor: () => get().user?.role === UserRole.EDITOR || get().user?.role === UserRole.ADMIN,
+      isAdmin: () => get().user?.role === UserRole.ADMIN,
+      isReporter: () => get().user?.role === UserRole.REPORTER,
     }),
     {
       name: 'auth-storage',

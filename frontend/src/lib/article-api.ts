@@ -32,7 +32,9 @@ export interface CreateArticleInput {
   tags?: string[];
 }
 
-export interface UpdateArticleInput extends Partial<CreateArticleInput> {}
+export interface UpdateArticleInput extends Partial<CreateArticleInput> {
+  editorId?: string;
+}
 
 export async function getArticles(storyId?: string): Promise<Article[]> {
   const res = await api.get('/articles', { params: { storyId } });

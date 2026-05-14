@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
-import { ArticleStatus } from '@cms-ng/shared';
+import { ArticleStatus, UserRole } from '@cms-ng/shared';
 import {
   RewriteTextDto,
   ExpandTextDto,
@@ -46,7 +46,6 @@ export class ArticlesService {
       },
     });
 
-    // Create first version snapshot
     await this.prisma.articleVersion.create({
       data: {
         articleId: article.id,
@@ -59,14 +58,51 @@ export class ArticlesService {
     return this.serializeArticle(article);
   }
 
-  async findAll(filters: { authorId?: string; storyId?: string }) {
-    const where: any = {};
-    if (filters.authorId) where.authorId = filters.authorId;
-    if (filters.storyId) where.storyId = filters.storyId;
+  async findAll(
+    user: { userId: string; role: string },
+    filters: { storyId?: string },
+  ) {
+    let where: any = {};
+
+    if (user.role === UserRole.REPORTER) {
+      where.authorId = user.userId;
+    } else if (user.role === UserRole.EDITOR) {
+      where = {
+        OR: [
+          { authorId: user.userId },
+          { editorId: user.userId },
+          { status: { in: [ArticleStatus.PENDING_REVIEW, ArticleStatus.IN_REVIEW, ArticleStatus.REVISION] } },
+        ],
+      };
+    }
+    // ADMIN sees everything
+
+    if (filters.storyId) {
+      where = { ...where, storyId: filters.storyId };
+    }
 
     const articles = await this.prisma.article.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+        editor: { select: { id: true, name: true, email: true } },
+        story: { select: { id: true, title: true } },
+      },
+    });
+    return articles.map((a) => this.serializeArticle(a));
+  }
+
+  async getReviewQueue(editorId: string) {
+    const articles = await this.prisma.article.findMany({
+      where: {
+        status: { in: [ArticleStatus.PENDING_REVIEW, ArticleStatus.IN_REVIEW] },
+        OR: [
+          { editorId: editorId },
+          { editorId: null },
+        ],
+      },
+      orderBy: [{ updatedAt: 'desc' }],
       include: {
         author: { select: { id: true, name: true, email: true } },
         editor: { select: { id: true, name: true, email: true } },
@@ -90,12 +126,9 @@ export class ArticlesService {
     return this.serializeArticle(article);
   }
 
-  async update(id: string, authorId: string, dto: UpdateArticleDto) {
+  async update(id: string, dto: UpdateArticleDto) {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
-    if (existing.authorId !== authorId) {
-      throw new ForbiddenException('You can only edit your own articles');
-    }
 
     const newVersion = existing.version + 1;
 
@@ -107,6 +140,7 @@ export class ArticlesService {
         content: dto.content,
         excerpt: dto.excerpt,
         status: dto.status,
+        editorId: dto.editorId,
         tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
         version: newVersion,
       },
@@ -117,7 +151,6 @@ export class ArticlesService {
       },
     });
 
-    // Save version snapshot if content changed
     if (dto.content || dto.title) {
       await this.prisma.articleVersion.create({
         data: {
@@ -132,20 +165,120 @@ export class ArticlesService {
     return this.serializeArticle(article);
   }
 
-  async remove(id: string, authorId: string) {
+  async remove(id: string) {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
-    if (existing.authorId !== authorId) {
-      throw new ForbiddenException('You can only delete your own articles');
-    }
     await this.prisma.article.delete({ where: { id } });
     return { success: true };
   }
 
+  async verifyAccess(id: string, user: { userId: string; role: string }) {
+    const article = await this.prisma.article.findUnique({
+      where: { id },
+      select: { authorId: true, editorId: true },
+    });
+    if (!article) throw new NotFoundException('Article not found');
+
+    const canAccess =
+      user.role === UserRole.ADMIN ||
+      article.authorId === user.userId ||
+      article.editorId === user.userId;
+
+    if (!canAccess) {
+      throw new ForbiddenException('You do not have permission to modify this article');
+    }
+  }
+
+  async assignEditor(id: string, editorId: string) {
+    const article = await this.prisma.article.findUnique({ where: { id } });
+    if (!article) throw new NotFoundException('Article not found');
+
+    const editor = await this.prisma.user.findUnique({
+      where: { id: editorId },
+      select: { role: true },
+    });
+    if (!editor) throw new NotFoundException('Editor not found');
+    if (editor.role !== UserRole.EDITOR && editor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Assigned user is not an editor');
+    }
+
+    const updated = await this.prisma.article.update({
+      where: { id },
+      data: { editorId },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+        editor: { select: { id: true, name: true, email: true } },
+        story: { select: { id: true, title: true } },
+      },
+    });
+    return this.serializeArticle(updated);
+  }
+
+  async submitReview(
+    id: string,
+    editorId: string,
+    decision: 'APPROVE' | 'REVISION',
+    comment?: string,
+  ) {
+    const article = await this.prisma.article.findUnique({
+      where: { id },
+      select: { id: true, status: true, editorId: true },
+    });
+    if (!article) throw new NotFoundException('Article not found');
+
+    if (
+      article.editorId &&
+      article.editorId !== editorId &&
+      // Allow admin override
+      !(await this.isAdmin(editorId))
+    ) {
+      throw new ForbiddenException('This article is assigned to another editor');
+    }
+
+    let newStatus: ArticleStatus;
+    if (decision === 'APPROVE') {
+      newStatus = ArticleStatus.APPROVED;
+    } else {
+      newStatus = ArticleStatus.REVISION;
+    }
+
+    const updated = await this.prisma.article.update({
+      where: { id },
+      data: {
+        status: newStatus,
+        editorId: editorId,
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+        editor: { select: { id: true, name: true, email: true } },
+        story: { select: { id: true, title: true } },
+      },
+    });
+
+    // TODO: store review comment in a separate ReviewComment table
+    return {
+      article: this.serializeArticle(updated),
+      decision,
+      comment: comment || null,
+    };
+  }
+
+  private async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role === UserRole.ADMIN;
+  }
+
   // ===== AI Operations =====
-  async aiRewrite(id: string, authorId: string, dto: RewriteTextDto) {
-    await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.rewriteText(authorId, id, {
+  async aiRewrite(
+    id: string,
+    user: { userId: string; role: string },
+    dto: RewriteTextDto,
+  ) {
+    await this.verifyAccess(id, user);
+    const result = await this.aiService.rewriteText(user.userId, id, {
       text: dto.text,
       instruction: dto.instruction,
       style: dto.style,
@@ -153,35 +286,51 @@ export class ArticlesService {
     return { result };
   }
 
-  async aiExpand(id: string, authorId: string, dto: ExpandTextDto) {
-    await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.expandText(authorId, id, {
+  async aiExpand(
+    id: string,
+    user: { userId: string; role: string },
+    dto: ExpandTextDto,
+  ) {
+    await this.verifyAccess(id, user);
+    const result = await this.aiService.expandText(user.userId, id, {
       text: dto.text,
       instruction: dto.instruction,
     });
     return { result };
   }
 
-  async aiCondense(id: string, authorId: string, dto: CondenseTextDto) {
-    await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.condenseText(authorId, id, {
+  async aiCondense(
+    id: string,
+    user: { userId: string; role: string },
+    dto: CondenseTextDto,
+  ) {
+    await this.verifyAccess(id, user);
+    const result = await this.aiService.condenseText(user.userId, id, {
       text: dto.text,
       maxLength: dto.maxLength,
     });
     return { result };
   }
 
-  async aiPolish(id: string, authorId: string, dto: PolishTextDto) {
-    await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.polishText(authorId, id, {
+  async aiPolish(
+    id: string,
+    user: { userId: string; role: string },
+    dto: PolishTextDto,
+  ) {
+    await this.verifyAccess(id, user);
+    const result = await this.aiService.polishText(user.userId, id, {
       text: dto.text,
     });
     return { result };
   }
 
-  async aiHeadlines(id: string, authorId: string, dto: GenerateHeadlinesDto) {
-    const article = await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.generateHeadlines(authorId, id, {
+  async aiHeadlines(
+    id: string,
+    user: { userId: string; role: string },
+    dto: GenerateHeadlinesDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.generateHeadlines(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
@@ -190,9 +339,13 @@ export class ArticlesService {
     return { headlines: result };
   }
 
-  async aiExcerpt(id: string, authorId: string, dto: GenerateExcerptDto) {
-    const article = await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.generateExcerpt(authorId, id, {
+  async aiExcerpt(
+    id: string,
+    user: { userId: string; role: string },
+    dto: GenerateExcerptDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.generateExcerpt(user.userId, id, {
       title: article.title,
       content: article.content,
       maxLength: dto.maxLength,
@@ -200,9 +353,13 @@ export class ArticlesService {
     return { excerpt: result };
   }
 
-  async aiChat(id: string, authorId: string, dto: ChatWithAIDto) {
-    const article = await this.verifyArticleAccess(id, authorId);
-    const result = await this.aiService.chatWithAI(authorId, id, {
+  async aiChat(
+    id: string,
+    user: { userId: string; role: string },
+    dto: ChatWithAIDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.chatWithAI(user.userId, id, {
       messages: dto.messages,
       articleContext: {
         title: article.title,
@@ -213,7 +370,10 @@ export class ArticlesService {
     return { reply: result };
   }
 
-  private async verifyArticleAccess(id: string, authorId: string) {
+  private async verifyAccessAndGet(
+    id: string,
+    user: { userId: string; role: string },
+  ) {
     const article = await this.prisma.article.findUnique({
       where: { id },
       include: {
@@ -223,8 +383,12 @@ export class ArticlesService {
       },
     });
     if (!article) throw new NotFoundException('Article not found');
-    if (article.authorId !== authorId) {
-      throw new ForbiddenException('You can only edit your own articles');
+    if (
+      user.role !== UserRole.ADMIN &&
+      article.authorId !== user.userId &&
+      article.editorId !== user.userId
+    ) {
+      throw new ForbiddenException('You do not have permission to access this article');
     }
     return article;
   }

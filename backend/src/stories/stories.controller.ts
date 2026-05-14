@@ -6,17 +6,16 @@ import {
   Delete,
   Body,
   Param,
-  Query,
-  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { StoriesService } from './stories.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '@cms-ng/shared';
 
 @Controller('stories')
-@UseGuards(JwtAuthGuard)
 export class StoriesController {
   constructor(private storiesService: StoriesService) {}
 
@@ -26,23 +25,46 @@ export class StoriesController {
   }
 
   @Get()
-  findAll(@CurrentUser('userId') reporterId: string, @Query('all') all?: string) {
-    // Editors/admins can pass ?all=true to see all stories
-    return this.storiesService.findAll(all === 'true' ? undefined : reporterId);
+  findAll(@CurrentUser() user: { userId: string; role: string }) {
+    return this.storiesService.findAll(user);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.storiesService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+    const story = await this.storiesService.findOne(id);
+    // Only author, assigned editor, or admin can view
+    const canAccess =
+      user.role === UserRole.ADMIN ||
+      story.reporterId === user.userId ||
+      story.editorId === user.userId;
+    if (!canAccess) {
+      throw new ForbiddenException('You do not have permission to view this story');
+    }
+    return story;
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateStoryDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateStoryDto,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    await this.storiesService.verifyAccess(id, user);
     return this.storiesService.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+    await this.storiesService.verifyAccess(id, user);
     return this.storiesService.remove(id);
+  }
+
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @Patch(':id/assign-editor')
+  async assignEditor(
+    @Param('id') id: string,
+    @Body('editorId') editorId: string,
+  ) {
+    return this.storiesService.assignEditor(id, editorId);
   }
 }
