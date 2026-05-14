@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01创作大脑 - 项目进度仪表盘</title>
+  <style>
+    :root {
+      --bg: #0f0f11;
+      --surface: #18181b;
+      --surface-2: #232329;
+      --border: #2e2e36;
+      --text: #e4e4e7;
+      --text-2: #a1a1aa;
+      --text-3: #71717a;
+      --accent: #8b5cf6;
+      --accent-dim: #7c3aed33;
+      --success: #22c55e;
+      --success-dim: #22c55e22;
+      --warn: #f59e0b;
+      --warn-dim: #f59e0b22;
+      --danger: #ef4444;
+      --danger-dim: #ef444422;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px 24px;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    header { margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+    header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    header .subtitle { color: var(--text-2); margin-top: 6px; font-size: 15px; }
+    header .updated { color: var(--text-3); margin-top: 4px; font-size: 12px; }
+
+    .section { margin-bottom: 36px; }
+    .section-title {
+      font-size: 14px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::before {
+      content: ""; display: inline-block; width: 4px; height: 16px;
+      border-radius: 2px; background: var(--accent);
+    }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; margin-bottom: 12px;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .card-title { font-size: 16px; font-weight: 600; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500;
+    }
+    .badge-done { background: var(--success-dim); color: var(--success); }
+    .badge-todo { background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); }
+    .badge-warn { background: var(--warn-dim); color: var(--warn); }
+    .badge-danger { background: var(--danger-dim); color: var(--danger); }
+
+    .feature-list { list-style: none; }
+    .feature-list li {
+      padding: 6px 0; color: var(--text-2); font-size: 14px;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .feature-list li::before {
+      content: "check"; flex-shrink: 0; margin-top: 1px;
+      font-family: "Material Icons", sans-serif; font-size: 16px;
+      color: var(--success);
+    }
+    .feature-list li.pending::before {
+      content: "radio_button_unchecked"; color: var(--text-3);
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .metric { text-align: center; padding: 16px; }
+    .metric-value { font-size: 32px; font-weight: 700; color: var(--accent); }
+    .metric-label { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+
+    .next-actions { background: var(--accent-dim); border: 1px solid var(--accent); }
+    .next-actions .card-title { color: var(--accent); }
+    .action-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .action-item:last-child { border-bottom: none; }
+    .action-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .action-body { flex: 1; }
+    .action-title { font-size: 14px; font-weight: 500; }
+    .action-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+    .tech-debt-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .tech-debt-item:last-child { border-bottom: none; }
+    .priority-dot {
+      width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex-shrink: 0;
+    }
+    .p0 { background: var(--danger); box-shadow: 0 0 8px var(--danger-dim); }
+    .p1 { background: var(--warn); }
+    .p2 { background: var(--text-3); }
+
+    .roadmap-phase {
+      padding: 12px 16px; border-left: 3px solid var(--border);
+      margin-bottom: 8px; background: var(--surface-2);
+      border-radius: 0 8px 8px 0;
+    }
+    .roadmap-phase.active { border-left-color: var(--accent); }
+    .roadmap-phase.done { border-left-color: var(--success); }
+    .phase-name { font-size: 14px; font-weight: 600; }
+    .phase-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+    .model-diagram {
+      font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+      font-size: 12px; color: var(--text-3); line-height: 1.8;
+      background: var(--surface-2); padding: 16px; border-radius: 8px;
+      overflow-x: auto;
+    }
+    .model-diagram .entity { color: var(--accent); font-weight: 600; }
+    .model-diagram .relation { color: var(--text-2); }
+
+    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 12px; text-align: center; }
+  </style>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>01创作大脑 <span style="color:var(--text-3);font-weight:400;">CMS-NG</span></h1>
+      <div class="subtitle">AI驱动内容创作系统 · 香港01媒体</div>
+      <div class="updated">进度更新于：2026/05/14 · 当前阶段：MVP核心功能已完成</div>
+    </header>
+
+    <!-- 核心指标 -->
+    <div class="section">
+      <div class="section-title">项目概况</div>
+      <div class="card grid-2">
+        <div class="metric">
+          <div class="metric-value">3/3</div>
+          <div class="metric-label">核心模块已完成</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">6</div>
+          <div class="metric-label">数据表</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">35</div>
+          <div class="metric-label">后端 TS 文件</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">20</div>
+          <div class="metric-label">前端 TSX/TS 文件</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 下一步行动 -->
+    <div class="section">
+      <div class="section-title">下次会话从这里开始</div>
+      <div class="card next-actions">
+        <div class="card-header">
+          <div class="card-title">最紧迫的三件事</div>
+          <span class="badge badge-danger">立即执行</span>
+        </div>
+        <div class="action-item">
+          <div class="action-num">1</div>
+          <div class="action-body">
+            <div class="action-title">配置真实 Kimi API Key</div>
+            <div class="action-desc">当前所有AI功能返回fallback/mock结果。需替换 backend/.env 中的 KIMI_API_KEY 并验证端到端</div>
+          </div>
+        </div>
+        <div class="action-item">
+          <div class="action-num">2</div>
+          <div class="action-body">
+            <div class="action-title">接入 Git 版本控制</div>
+            <div class="action-desc">项目尚未初始化git。执行 git init，建立main分支，添加 .gitignore，做第一次提交</div>
+          </div>
+        </div>
+        <div class="action-item">
+          <div class="action-num">3</div>
+          <div class="action-body">
+            <div class="action-title">补充后端单元测试</div>
+            <div class="action-desc">核心模块（auth、articles、stories、ai services）缺少测试覆盖。优先补Jest单元测试</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 已完成功能 -->
+    <div class="section">
+      <div class="section-title">已完成功能</div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">模块一：记者工作台</div>
+          <span class="badge badge-done">已完成</span>
+        </div>
+        <ul class="feature-list">
+          <li>用户注册/登录（JWT + Bearer Token）</li>
+          <li>选题（Story）CRUD：创建、分配编辑、优先级、标签</li>
+          <li>稿件（Article）CRUD：标题、副标题、正文、摘要</li>
+          <li>状态工作流：草稿 → 采写中 → 待审核 → 审核中 → 已通过 → 已发布 → 已归档</li>
+          <li>稿件版本历史（ArticleVersion）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">模块二：选题中心</div>
+          <span class="badge badge-done">已完成</span>
+        </div>
+        <ul class="feature-list">
+          <li>热点话题（TrendingTopic）手动录入与管理</li>
+          <li>热点状态：OPEN / ADOPTED / ARCHIVED</li>
+          <li>AI选题推荐（调用Kimi，基于记者专长生成3-5个建议）</li>
+          <li>热点 → 选题一键采纳</li>
+          <li>热度评分、来源追踪、标签系统</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">模块三：AI协作创作</div>
+          <span class="badge badge-done">已完成</span>
+        </div>
+        <ul class="feature-list">
+          <li>快速文本AI：选中文本 → 浮动菜单（改写/扩写/精简/润色）</li>
+          <li>AI结果面板：替换 / 插入 / 取消</li>
+          <li>标题实验室：一键生成多风格标题建议（带采用按钮）</li>
+          <li>AI摘要生成：基于正文自动生成稿件摘要</li>
+          <li>AI创作助手：侧边栏对话式AI，支持快捷提问</li>
+          <li>AI操作审计：所有调用记录到 AIOperation 表</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 数据模型 -->
+    <div class="section">
+      <div class="section-title">数据模型</div>
+      <div class="card">
+        <div class="model-diagram">
+<span class="entity">User</span> <span class="relation">──1:N──→</span> <span class="entity">Story</span> <span class="relation">──1:N──→</span> <span class="entity">Article</span> <span class="relation">──1:N──→</span> <span class="entity">ArticleVersion</span>
+<span class="entity">User</span> <span class="relation">──1:N──→</span> <span class="entity">AIOperation</span> <span class="relation">←──────</span> <span class="entity">Article</span>
+<span class="entity">TrendingTopic</span> <span class="relation">（独立，可选关联 Story）</span>
+
+<span class="relation">状态枚举：</span>
+  ArticleStatus: DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → REVISION → APPROVED → PUBLISHED → ARCHIVED
+  UserRole: REPORTER / EDITOR / ADMIN
+  TopicStatus: OPEN / ADOPTED / ARCHIVED
+        </div>
+      </div>
+    </div>
+
+    <!-- 技术债务 -->
+    <div class="section">
+      <div class="section-title">技术债务</div>
+      <div class="card">
+        <div class="tech-debt-item">
+          <div class="priority-dot p0"></div>
+          <div>
+            <div style="font-size:14px;font-weight:500;">Kimi API Key 为占位符</div>
+            <div style="font-size:12px;color:var(--text-3);">AI功能返回fallback，无法验证prompt质量</div>
+          </div>
+        </div>
+        <div class="tech-debt-item">
+          <div class="priority-dot p1"></div>
+          <div>
+            <div style="font-size:14px;font-weight:500;">无单元测试覆盖</div>
+            <div style="font-size:12px;color:var(--text-3);">3个模块已完成，核心逻辑缺乏Jest测试保护</div>
+          </div>
+        </div>
+        <div class="tech-debt-item">
+          <div class="priority-dot p1"></div>
+          <div>
+            <div style="font-size:14px;font-weight:500;">未接入 Git 版本控制</div>
+            <div style="font-size:12px;color:var(--text-3);">无协作/回滚/分支管理能力</div>
+          </div>
+        </div>
+        <div class="tech-debt-item">
+          <div class="priority-dot p2"></div>
+          <div>
+            <div style="font-size:14px;font-weight:500;">AI调用无频次限制</div>
+            <div style="font-size:12px;color:var(--text-3);">存在API滥用或意外高额费用风险</div>
+          </div>
+        </div>
+        <div class="tech-debt-item">
+          <div class="priority-dot p2"></div>
+          <div>
+            <div style="font-size:14px;font-weight:500;">前端无错误边界</div>
+            <div style="font-size:12px;color:var(--text-3);">异常可能导致白屏，需加Error Boundary</div>
+          </div>
+        </div>
+        <div class="tech-debt-item">
+          <div class="priority-dot p2"></div>
+          <div>
+            <div style="font-size:14px;font-weight:500;">textarea AI菜单位置不精确</div>
+            <div style="font-size:12px;color:var(--text-3);">当前基于textarea整体定位，非精确光标位置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 后续路线图 -->
+    <div class="section">
+      <div class="section-title">后续路线图</div>
+      <div class="roadmap-phase done">
+        <div class="phase-name">Phase 1-3: MVP核心功能</div>
+        <div class="phase-desc">记者工作台 + 选题中心 + AI协作创作 · 已完成</div>
+      </div>
+      <div class="roadmap-phase active">
+        <div class="phase-name">Phase 4: 质量加固</div>
+        <div class="phase-desc">Git接入 + 单元测试 + 真实API Key + AI限流 + 错误边界</div>
+      </div>
+      <div class="roadmap-phase">
+        <div class="phase-name">Phase 5: 审核工作流</div>
+        <div class="phase-desc">编辑审核页面 + 批注/修订模式 + 审核历史</div>
+      </div>
+      <div class="roadmap-phase">
+        <div class="phase-name">Phase 6: 发布与分发</div>
+        <div class="phase-desc">多平台发布 + 定时发布 + 发布数据回流</div>
+      </div>
+      <div class="roadmap-phase">
+        <div class="phase-name">Phase 7: 高级AI</div>
+        <div class="phase-desc">全文续写/自动成稿 + 多轮对话式写作 + AI图片生成</div>
+      </div>
+    </div>
+
+    <!-- 关键文件速查 -->
+    <div class="section">
+      <div class="section-title">关键文件速查</div>
+      <div class="card">
+        <div class="model-diagram">
+backend/prisma/schema.prisma          # 数据库模型
+backend/src/ai/ai.service.ts          # AI服务（Kimi API封装）
+backend/src/articles/                 # 稿件模块（controller + service + dto）
+backend/src/stories/                  # 选题模块
+backend/src/trending-topics/          # 热点话题模块
+backend/src/auth/                     # 认证模块（JWT）
+
+frontend/src/app/dashboard/articles/[id]/page.tsx   # 稿件编辑器（含所有AI功能）
+frontend/src/lib/article-api.ts        # 前端API客户端
+frontend/src/lib/api.ts                # Axios实例 + 拦截器
+frontend/src/store/auth-store.ts       # 认证状态（Zustand）
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      此文档由 Claude Code 生成 · 用于会话间状态同步<br>
+      建议每次重大进展后手动更新，或让Claude自动重写
+    </footer>
+  </div>
+</body>
+</html>

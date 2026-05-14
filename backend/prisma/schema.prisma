@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  avatar       String?
+  role         UserRole  @default(REPORTER)
+  department  String?
+  expertise   String    @default("[]")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  stories     Story[]   @relation("ReporterStories")
+  editedStories Story[] @relation("EditorStories")
+  articles    Article[] @relation("AuthorArticles")
+  editedArticles Article[] @relation("EditorArticles")
+  aiOperations AIOperation[]
+
+  @@map("users")
+}
+
+model Story {
+  id          String        @id @default(uuid())
+  title       String
+  description String?       @db.Text
+  angle       String?
+  status      ArticleStatus @default(DRAFT)
+  priority    Int           @default(0)
+  tags        String        @default("[]")
+  deadline    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  reporterId  String
+  reporter    User          @relation("ReporterStories", fields: [reporterId], references: [id])
+  editorId    String?
+  editor      User?         @relation("EditorStories", fields: [editorId], references: [id])
+  articles    Article[]
+
+  @@map("stories")
+}
+
+model Article {
+  id          String        @id @default(uuid())
+  title       String
+  subtitle    String?
+  content     String        @db.LongText
+  excerpt     String?       @db.Text
+  status      ArticleStatus @default(DRAFT)
+  tags        String        @default("[]")
+  platforms   String        @default("[]")
+  coverImage  String?
+  aiGeneratedParts String   @default("[]")
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  publishedAt DateTime?
+
+  // Relations
+  storyId     String
+  story       Story         @relation(fields: [storyId], references: [id])
+  authorId    String
+  author      User          @relation("AuthorArticles", fields: [authorId], references: [id])
+  editorId    String?
+  editor      User?         @relation("EditorArticles", fields: [editorId], references: [id])
+  versions    ArticleVersion[]
+  aiOperations AIOperation[]
+
+  @@map("articles")
+}
+
+model ArticleVersion {
+  id        String   @id @default(uuid())
+  content   String   @db.LongText
+  title     String
+  version   Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("article_versions")
+}
+
+model AIOperation {
+  id          String    @id @default(uuid())
+  agentType   AgentType
+  action      String
+  prompt      String    @db.Text
+  result      String?   @db.Text
+  model       String
+  tokensUsed  Int?
+  durationMs  Int
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  articleId   String?
+  article     Article?  @relation(fields: [articleId], references: [id])
+  createdBy   String
+  user        User      @relation(fields: [createdBy], references: [id])
+
+  @@map("ai_operations")
+}
+
+enum UserRole {
+  REPORTER
+  EDITOR
+  ADMIN
+}
+
+enum ArticleStatus {
+  DRAFT
+  WRITING
+  AI_OPTIMIZING
+  PENDING_REVIEW
+  IN_REVIEW
+  REVISION
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AgentType {
+  STORY
+  RESEARCH
+  WRITING
+  EDITOR
+  REVIEW
+  VISUAL
+  DISTRIBUTE
+}
+
+enum TopicStatus {
+  OPEN
+  ADOPTED
+  ARCHIVED
+}
+
+model TrendingTopic {
+  id              String      @id @default(uuid())
+  title           String
+  description     String?     @db.Text
+  source          String?
+  heatScore       Int         @default(0)
+  tags            String      @default("[]")
+  status          TopicStatus @default(OPEN)
+  suggestedAngles String?     @db.Text
+  createdBy       String
+  adoptedStoryId  String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("trending_topics")
+}
