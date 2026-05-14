@@ -9,8 +9,11 @@ import {
   deleteTopic,
   getAISuggestions,
   adoptTopic,
+  getGoogleTrends,
+  importGoogleTrend,
   type TrendingTopic,
   type StorySuggestion,
+  type GoogleTrendItem,
 } from '@/lib/topic-api';
 import {
   Plus,
@@ -22,6 +25,8 @@ import {
   Lightbulb,
   CheckCircle,
   X,
+  TrendingUp,
+  Globe,
 } from 'lucide-react';
 
 export default function StoryHubPage() {
@@ -34,6 +39,13 @@ export default function StoryHubPage() {
   const [suggestions, setSuggestions] = useState<StorySuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [adoptingId, setAdoptingId] = useState<string | null>(null);
+
+  // Google Trends state
+  const [googleTrends, setGoogleTrends] = useState<GoogleTrendItem[]>([]);
+  const [showGoogleTrends, setShowGoogleTrends] = useState(false);
+  const [googleTrendsLoading, setGoogleTrendsLoading] = useState(false);
+  const [selectedGeo, setSelectedGeo] = useState('HK');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('24h');
 
   // Create form state
   const [newTitle, setNewTitle] = useState('');
@@ -115,6 +127,30 @@ export default function StoryHubPage() {
     }
   }
 
+  async function handleGetGoogleTrends() {
+    setGoogleTrendsLoading(true);
+    setShowGoogleTrends(true);
+    setShowAISuggestions(false);
+    setSelectedTopic(null);
+    try {
+      const data = await getGoogleTrends(selectedGeo, selectedTimeRange);
+      setGoogleTrends(data);
+    } catch {
+      setGoogleTrends([]);
+    } finally {
+      setGoogleTrendsLoading(false);
+    }
+  }
+
+  async function handleImportGoogleTrend(item: GoogleTrendItem) {
+    try {
+      await importGoogleTrend(item);
+      await loadTopics();
+    } catch {
+      // ignore
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -150,6 +186,54 @@ export default function StoryHubPage() {
             )}
             AI 推荐选题
           </button>
+
+          {/* Google Trends 筛选器 */}
+          <div className="mt-3 space-y-2">
+            <div className="flex gap-2">
+              <div className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 flex-1">
+                <Globe className="h-3 w-3 text-zinc-400" />
+                <select
+                  value={selectedGeo}
+                  onChange={(e) => setSelectedGeo(e.target.value)}
+                  className="bg-transparent text-xs text-zinc-700 outline-none w-full"
+                >
+                  <option value="">全球</option>
+                  <option value="HK">香港</option>
+                  <option value="TW">台湾</option>
+                  <option value="US">美国</option>
+                  <option value="GB">英国</option>
+                  <option value="JP">日本</option>
+                  <option value="KR">韩国</option>
+                  <option value="CN">中国</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 flex-1">
+                <select
+                  value={selectedTimeRange}
+                  onChange={(e) => setSelectedTimeRange(e.target.value)}
+                  className="bg-transparent text-xs text-zinc-700 outline-none w-full"
+                >
+                  <option value="4h">最近4小时</option>
+                  <option value="24h">最近24小时</option>
+                  <option value="48h">最近48小时</option>
+                  <option value="7d">最近7天</option>
+                  <option value="30d">最近30天</option>
+                </select>
+              </div>
+            </div>
+            <button
+              onClick={handleGetGoogleTrends}
+              disabled={googleTrendsLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+            >
+              {googleTrendsLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <TrendingUp className="h-4 w-4" />
+              )}
+              Google Trends 热点
+            </button>
+          </div>
         </div>
 
         {showCreateForm && (
@@ -208,13 +292,14 @@ export default function StoryHubPage() {
 
         <div className="flex-1 overflow-auto">
           {topics.map((topic) => (
-            <button
+            <div
               key={topic.id}
               onClick={() => {
                 setSelectedTopic(topic);
                 setShowAISuggestions(false);
+                setShowGoogleTrends(false);
               }}
-              className={`w-full text-left p-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors ${
+              className={`w-full text-left p-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors cursor-pointer ${
                 selectedTopic?.id === topic.id ? 'bg-zinc-50' : ''
               }`}
             >
@@ -246,7 +331,7 @@ export default function StoryHubPage() {
                   <Trash2 className="h-3 w-3" />
                 </button>
               </div>
-            </button>
+            </div>
           ))}
           {topics.length === 0 && (
             <div className="p-8 text-center">
@@ -257,9 +342,18 @@ export default function StoryHubPage() {
         </div>
       </div>
 
-      {/* Right panel - Detail or AI Suggestions */}
+      {/* Right panel - Detail or AI Suggestions or Google Trends */}
       <div className="flex-1 bg-zinc-50 p-8 overflow-auto">
-        {showAISuggestions ? (
+        {showGoogleTrends ? (
+          <GoogleTrendsPanel
+            trends={googleTrends}
+            loading={googleTrendsLoading}
+            onImport={handleImportGoogleTrend}
+            onClose={() => setShowGoogleTrends(false)}
+            geo={selectedGeo}
+            timeRange={selectedTimeRange}
+          />
+        ) : showAISuggestions ? (
           <AIRecommendationsPanel
             suggestions={suggestions}
             loading={suggestionsLoading}
@@ -420,6 +514,104 @@ function AIRecommendationsPanel({
                     <Plus className="h-3 w-3" />
                   )}
                   采纳
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoogleTrendsPanel({
+  trends,
+  loading,
+  onImport,
+  onClose,
+  geo,
+  timeRange,
+}: {
+  trends: GoogleTrendItem[];
+  loading: boolean;
+  onImport: (item: GoogleTrendItem) => void;
+  onClose: () => void;
+  geo: string;
+  timeRange: string;
+}) {
+  const geoLabel: Record<string, string> = {
+    '': '全球',
+    HK: '香港',
+    TW: '台湾',
+    US: '美国',
+    GB: '英国',
+    JP: '日本',
+    KR: '韩国',
+    CN: '中国',
+  };
+  const timeLabel: Record<string, string> = {
+    '4h': '最近4小时',
+    '24h': '最近24小时',
+    '48h': '最近48小时',
+    '7d': '最近7天',
+    '30d': '最近30天',
+  };
+
+  return (
+    <div className="max-w-2xl">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-orange-600" />
+          <h2 className="text-xl font-semibold">Google Trends 热点</h2>
+          <span className="text-xs text-zinc-400">
+            {geoLabel[geo] || geo} · {timeLabel[timeRange] || timeRange}
+          </span>
+        </div>
+        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+        </div>
+      ) : trends.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
+          <p className="text-zinc-500">暂无数据，请稍后重试</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {trends.map((item, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-zinc-200 bg-white p-5 hover:shadow-sm transition-shadow"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-medium text-zinc-900">{item.title}</h3>
+                    <span className="rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-600">
+                      热度 {item.heatScore}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-600">{item.description}</p>
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {item.tags.slice(0, 5).map((tag, j) => (
+                        <span key={j} className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => onImport(item)}
+                  className="shrink-0 flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+                >
+                  <Plus className="h-3 w-3" />
+                  导入系统
                 </button>
               </div>
             </div>

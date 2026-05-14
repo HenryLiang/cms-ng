@@ -24,6 +24,20 @@ export interface StorySuggestion {
   reason: string;
 }
 
+export interface GoogleTrendItem {
+  title: string;
+  description: string;
+  source: string;
+  heatScore: number;
+  tags: string[];
+  articles?: {
+    title: string;
+    source: string;
+    snippet: string;
+    url: string;
+  }[];
+}
+
 export interface CreateTopicInput {
   title: string;
   description?: string;
@@ -66,5 +80,17 @@ export async function getAISuggestions(): Promise<StorySuggestion[]> {
 
 export async function adoptTopic(topicId: string): Promise<{ storyId: string; topicId: string }> {
   const res = await api.post(`/trending-topics/${topicId}/adopt`);
+  return res.data;
+}
+
+export async function getGoogleTrends(geo: string, timeRange: string): Promise<GoogleTrendItem[]> {
+  const res = await api.get('/trending-topics/google-trends', {
+    params: { geo, timeRange },
+  });
+  return res.data;
+}
+
+export async function importGoogleTrend(data: GoogleTrendItem): Promise<TrendingTopic> {
+  const res = await api.post('/trending-topics/import-google-trend', data);
   return res.data;
 }

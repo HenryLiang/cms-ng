@@ -4,6 +4,7 @@ import { AIService } from '../ai/ai.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
+import Parser from 'rss-parser';
 
 @Injectable()
 export class TrendingTopicsService {
@@ -121,6 +122,110 @@ export class TrendingTopicsService {
     });
 
     return { storyId: story.id, topicId };
+  }
+
+  async fetchGoogleTrends(geo: string, _timeRange: string) {
+    try {
+      const parser = new Parser({
+        customFields: {
+          item: ['ht:approx_traffic', 'ht:picture', 'ht:picture_source', 'ht:news_item'],
+        },
+      });
+
+      const feedUrl = `https://trends.google.com/trending/rss?geo=${geo || 'HK'}`;
+      const feed = await parser.parseURL(feedUrl);
+
+      return (feed.items || []).map((item: any) => {
+        const traffic = item['ht:approx_traffic'] || '';
+        const articles = this.normalizeNewsItems(item['ht:news_item']);
+        const firstNews = articles[0];
+        const snippet = firstNews?.snippet;
+        const description = snippet || firstNews?.title || item.contentSnippet || item.title || '';
+
+        return {
+          title: item.title || '',
+          description,
+          source: 'google-trends',
+          heatScore: this.parseTrafficToScore(traffic),
+          tags: [],
+          articles: articles.slice(0, 3),
+        };
+      });
+    } catch (error: any) {
+      throw new Error(`Google Trends 获取失败: ${error.message}`);
+    }
+  }
+
+  async importFromGoogleTrends(userId: string, data: any) {
+    const topic = await this.prisma.trendingTopic.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        source: 'google-trends',
+        heatScore: data.heatScore ?? 50,
+        tags: JSON.stringify(data.tags ?? []),
+        status: 'OPEN',
+        createdBy: userId,
+      },
+    });
+    return this.serializeTopic(topic);
+  }
+
+  private normalizeNewsItems(newsItemField: any): { title: string; source: string; snippet: string; url: string }[] {
+    if (!newsItemField) return [];
+    // rss-parser merges multiple <ht:news_item> siblings into a single object with array properties
+    const isMergedFormat =
+      typeof newsItemField === 'object' &&
+      !Array.isArray(newsItemField) &&
+      Array.isArray(newsItemField['ht:news_item_title']);
+
+    if (isMergedFormat) {
+      const titles = newsItemField['ht:news_item_title'] || [];
+      const snippets = newsItemField['ht:news_item_snippet'] || [];
+      const urls = newsItemField['ht:news_item_url'] || [];
+      const sources = newsItemField['ht:news_item_source'] || [];
+      const count = Math.max(titles.length, snippets.length, urls.length, sources.length);
+      const articles = [];
+      for (let i = 0; i < count; i++) {
+        const title = titles[i] || '';
+        const snippet = snippets[i] || '';
+        articles.push({
+          title,
+          source: sources[i] || '',
+          snippet: snippet || title,
+          url: urls[i] || '',
+        });
+      }
+      return articles;
+    }
+
+    // Single news item as object
+    if (typeof newsItemField === 'object' && !Array.isArray(newsItemField)) {
+      const title = newsItemField['ht:news_item_title'] || '';
+      return [{
+        title,
+        source: newsItemField['ht:news_item_source'] || '',
+        snippet: newsItemField['ht:news_item_snippet'] || title,
+        url: newsItemField['ht:news_item_url'] || '',
+      }];
+    }
+
+    return [];
+  }
+
+  private parseTrafficToScore(traffic: string): number {
+    if (!traffic) return 50;
+    const num = parseInt(traffic.replace(/[^0-9]/g, ''), 10);
+    if (num >= 50000) return 98;
+    if (num >= 20000) return 95;
+    if (num >= 10000) return 90;
+    if (num >= 5000) return 85;
+    if (num >= 2000) return 80;
+    if (num >= 1000) return 75;
+    if (num >= 500) return 70;
+    if (num >= 200) return 65;
+    if (num >= 100) return 60;
+    return 50;
   }
 
   private serializeTopic(topic: any) {
