@@ -27,8 +27,8 @@ export class AIService {
     private prisma: PrismaService,
   ) {
     this.apiKey = this.config.get<string>('KIMI_API_KEY') || '';
-    this.apiBase = this.config.get<string>('KIMI_API_BASE') || 'https://api.moonshot.cn/v1';
-    this.model = this.config.get<string>('KIMI_MODEL') || 'moonshot-v1-8k';
+    this.apiBase = this.config.get<string>('KIMI_API_BASE') || 'https://api.kimi.com/coding/v1';
+    this.model = this.config.get<string>('KIMI_MODEL') || 'kimi-for-coding';
   }
 
   async generateStorySuggestions(
