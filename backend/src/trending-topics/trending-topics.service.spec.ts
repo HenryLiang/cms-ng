@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { TrendingTopicsService } from './trending-topics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
@@ -112,7 +112,7 @@ describe('TrendingTopicsService', () => {
       prisma.trendingTopic.findUnique.mockResolvedValue(mockTopic());
       prisma.trendingTopic.update.mockResolvedValue(mockTopic({ tags: '["updated"]' }));
 
-      const result = await service.update('topic-id', { tags: ['updated'] } as any);
+      const result = await service.update('topic-id', { tags: ['updated'] } as any, 'user-id', 'REPORTER');
 
       expect(prisma.trendingTopic.update).toHaveBeenCalledWith({
         where: { id: 'topic-id' },
@@ -124,7 +124,13 @@ describe('TrendingTopicsService', () => {
     it('should throw NotFoundException when topic not found', async () => {
       prisma.trendingTopic.findUnique.mockResolvedValue(null);
 
-      await expect(service.update('nonexistent', {})).rejects.toThrow(NotFoundException);
+      await expect(service.update('nonexistent', {}, 'user-id', 'REPORTER')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when user is not owner or admin', async () => {
+      prisma.trendingTopic.findUnique.mockResolvedValue(mockTopic({ createdBy: 'other-user' }));
+
+      await expect(service.update('topic-id', { title: 'Hacked' } as any, 'user-id', 'REPORTER')).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -133,7 +139,7 @@ describe('TrendingTopicsService', () => {
       prisma.trendingTopic.findUnique.mockResolvedValue(mockTopic());
       prisma.trendingTopic.delete.mockResolvedValue(mockTopic());
 
-      const result = await service.remove('topic-id');
+      const result = await service.remove('topic-id', 'user-id', 'REPORTER');
 
       expect(prisma.trendingTopic.delete).toHaveBeenCalledWith({ where: { id: 'topic-id' } });
       expect(result.success).toBe(true);
@@ -142,7 +148,13 @@ describe('TrendingTopicsService', () => {
     it('should throw NotFoundException when topic not found', async () => {
       prisma.trendingTopic.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('nonexistent', 'user-id', 'REPORTER')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when user is not owner or admin', async () => {
+      prisma.trendingTopic.findUnique.mockResolvedValue(mockTopic({ createdBy: 'other-user' }));
+
+      await expect(service.remove('topic-id', 'user-id', 'REPORTER')).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -212,6 +224,12 @@ describe('TrendingTopicsService', () => {
       prisma.trendingTopic.findUnique.mockResolvedValue(null);
 
       await expect(service.adoptTopic('nonexistent', 'user-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when topic is already adopted', async () => {
+      prisma.trendingTopic.findUnique.mockResolvedValue(mockTopic({ status: 'ADOPTED', adoptedStoryId: 'existing-story-id' }));
+
+      await expect(service.adoptTopic('topic-id', 'user-id')).rejects.toThrow(BadRequestException);
     });
   });
 });
