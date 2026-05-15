@@ -18,6 +18,7 @@ import {
   type HeadlineOption,
   type ChatMessage,
 } from '@/lib/article-api';
+import { getEditors } from '@/lib/users-api';
 import {
   ArrowLeft,
   Trash2,
@@ -78,6 +79,12 @@ export default function ArticleEditorPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Submit for review modal
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [editors, setEditors] = useState<{ id: string; name: string }[]>([]);
+  const [selectedEditor, setSelectedEditor] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   useEffect(() => {
     loadArticle();
   }, [articleId]);
@@ -119,6 +126,31 @@ export default function ArticleEditorPage() {
     if (!confirm('确定要删除这篇稿件吗？此操作不可恢复。')) return;
     await deleteArticle(articleId);
     router.push('/dashboard/articles');
+  }
+
+  async function handleOpenSubmitModal() {
+    setShowSubmitModal(true);
+    setSelectedEditor('');
+    try {
+      const data = await getEditors();
+      setEditors(data);
+    } catch {
+      setEditors([]);
+    }
+  }
+
+  async function handleConfirmSubmit() {
+    setSubmittingReview(true);
+    try {
+      await updateArticle(articleId, {
+        status: 'PENDING_REVIEW',
+        editorId: selectedEditor || undefined,
+      });
+      setShowSubmitModal(false);
+      await loadArticle();
+    } finally {
+      setSubmittingReview(false);
+    }
   }
 
   // ===== Text Selection Detection =====
@@ -354,7 +386,7 @@ export default function ArticleEditorPage() {
             保存
           </button>
           <button
-            onClick={() => handleSave('PENDING_REVIEW')}
+            onClick={handleOpenSubmitModal}
             disabled={saving}
             className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >
@@ -414,6 +446,58 @@ export default function ArticleEditorPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Submit for Review Modal */}
+      {showSubmitModal && (
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-20">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">提交审核</h3>
+              <button onClick={() => setShowSubmitModal(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-zinc-500">
+              提交后稿件将进入待审核状态，编辑将进行审核。
+            </p>
+            <div className="mb-4">
+              <label className="mb-2 block text-sm font-medium text-zinc-700">选择审核编辑（可选）</label>
+              <select
+                value={selectedEditor}
+                onChange={(e) => setSelectedEditor(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+              >
+                <option value="">自动分配</option>
+                {editors.map((editor) => (
+                  <option key={editor.id} value={editor.id}>
+                    {editor.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowSubmitModal(false)}
+                className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                disabled={submittingReview}
+                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {submittingReview ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                确认提交
+              </button>
+            </div>
           </div>
         </div>
       )}

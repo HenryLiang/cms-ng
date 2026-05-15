@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { StoriesModule } from './stories/stories.module';
 import { ArticlesModule } from './articles/articles.module';
 import { AIModule } from './ai/ai.module';
@@ -14,6 +15,7 @@ import { TrendingTopicsModule } from './trending-topics/trending-topics.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
+    UsersModule,
     StoriesModule,
     ArticlesModule,
     AIModule,

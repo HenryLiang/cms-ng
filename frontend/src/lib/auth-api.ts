@@ -1,5 +1,6 @@
 import { api } from './api';
 import { LoginCredentials, RegisterCredentials, User } from '@/types/auth';
+import { UserRole } from '@cms-ng/shared';
 
 interface AuthResponse {
   user: User;

@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useProtectedRoute } from '@/hooks/use-protected-route';
 import { useAuthStore } from '@/store/auth-store';
-import { LogOut, LayoutDashboard, FileText, Lightbulb } from 'lucide-react';
+import { UserRole } from '@cms-ng/shared';
+import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck } from 'lucide-react';
 
-const navItems = [
-  { href: '/dashboard', label: '工作台', icon: LayoutDashboard },
-  { href: '/dashboard/articles', label: '我的稿件', icon: FileText },
-  { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb },
+const allNavItems = [
+  { href: '/dashboard', label: '工作台', icon: LayoutDashboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+  { href: '/dashboard/articles', label: '我的稿件', icon: FileText, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+  { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, roles: [UserRole.EDITOR, UserRole.ADMIN] },
+  { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +19,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, logout } = useAuthStore();
   const isLoading = useAuthStore((state) => state.isLoading);
   const pathname = usePathname();
+
+  const navItems = allNavItems.filter((item) =>
+    user?.role ? item.roles.includes(user.role as UserRole) : false
+  );
+
+  const roleLabel = {
+    [UserRole.REPORTER]: '记者',
+    [UserRole.EDITOR]: '编辑',
+    [UserRole.ADMIN]: '管理员',
+  }[user?.role as UserRole] || '';
 
   if (isLoading) {
     return (
@@ -57,6 +69,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="text-sm">
               <p className="font-medium text-zinc-900">{user?.name}</p>
               <p className="text-zinc-500">{user?.email}</p>
+              {roleLabel && (
+                <span className="inline-block mt-1 rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                  {roleLabel}
+                </span>
+              )}
             </div>
             <button
               onClick={logout}

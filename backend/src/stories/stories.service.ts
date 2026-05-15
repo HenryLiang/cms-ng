@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
-import { ArticleStatus } from '@cms-ng/shared';
+import { ArticleStatus, UserRole } from '@cms-ng/shared';
 
 @Injectable()
 export class StoriesService {
@@ -29,8 +29,22 @@ export class StoriesService {
     return this.serializeStory(story);
   }
 
-  async findAll(reporterId?: string) {
-    const where = reporterId ? { reporterId } : {};
+  async findAll(user: { userId: string; role: string }) {
+    let where: any = {};
+
+    if (user.role === UserRole.REPORTER) {
+      where = { reporterId: user.userId };
+    } else if (user.role === UserRole.EDITOR) {
+      where = {
+        OR: [
+          { reporterId: user.userId },
+          { editorId: user.userId },
+          { status: { in: [ArticleStatus.PENDING_REVIEW, ArticleStatus.IN_REVIEW, ArticleStatus.REVISION] } },
+        ],
+      };
+    }
+    // ADMIN sees everything (no where clause)
+
     const stories = await this.prisma.story.findMany({
       where,
       orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
@@ -90,6 +104,48 @@ export class StoriesService {
     if (!existing) throw new NotFoundException('Story not found');
     await this.prisma.story.delete({ where: { id } });
     return { success: true };
+  }
+
+  async verifyAccess(id: string, user: { userId: string; role: string }) {
+    const story = await this.prisma.story.findUnique({
+      where: { id },
+      select: { reporterId: true, editorId: true },
+    });
+    if (!story) throw new NotFoundException('Story not found');
+
+    const canAccess =
+      user.role === UserRole.ADMIN ||
+      story.reporterId === user.userId ||
+      story.editorId === user.userId;
+
+    if (!canAccess) {
+      throw new ForbiddenException('You do not have permission to modify this story');
+    }
+  }
+
+  async assignEditor(id: string, editorId: string) {
+    const story = await this.prisma.story.findUnique({ where: { id } });
+    if (!story) throw new NotFoundException('Story not found');
+
+    const editor = await this.prisma.user.findUnique({
+      where: { id: editorId },
+      select: { role: true },
+    });
+    if (!editor) throw new NotFoundException('Editor not found');
+    if (editor.role !== UserRole.EDITOR && editor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Assigned user is not an editor');
+    }
+
+    const updated = await this.prisma.story.update({
+      where: { id },
+      data: { editorId },
+      include: {
+        reporter: { select: { id: true, name: true, email: true } },
+        editor: { select: { id: true, name: true, email: true } },
+        _count: { select: { articles: true } },
+      },
+    });
+    return this.serializeStory(updated);
   }
 
   private serializeStory(story: any) {

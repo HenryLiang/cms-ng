@@ -7,7 +7,7 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ArticlesService } from './articles.service';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -21,11 +21,11 @@ import {
   GenerateExcerptDto,
   ChatWithAIDto,
 } from './dto/ai-operations.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '@cms-ng/shared';
 
 @Controller('articles')
-@UseGuards(JwtAuthGuard)
 export class ArticlesController {
   constructor(private articlesService: ArticlesService) {}
 
@@ -36,96 +36,127 @@ export class ArticlesController {
 
   @Get()
   findAll(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Query('storyId') storyId?: string,
-    @Query('all') all?: string,
   ) {
-    return this.articlesService.findAll({
-      authorId: all === 'true' ? undefined : authorId,
-      storyId,
-    });
+    return this.articlesService.findAll(user, { storyId });
+  }
+
+  @Get('review-queue')
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  getReviewQueue(@CurrentUser('userId') editorId: string) {
+    return this.articlesService.getReviewQueue(editorId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.articlesService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+    const article = await this.articlesService.findOne(id);
+    const canAccess =
+      user.role === UserRole.ADMIN ||
+      article.authorId === user.userId ||
+      article.editorId === user.userId;
+    if (!canAccess) {
+      throw new ForbiddenException('You do not have permission to view this article');
+    }
+    return article;
   }
 
   @Patch(':id')
-  update(
-    @CurrentUser('userId') authorId: string,
+  async update(
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: UpdateArticleDto,
   ) {
-    return this.articlesService.update(id, authorId, dto);
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@CurrentUser('userId') authorId: string, @Param('id') id: string) {
-    return this.articlesService.remove(id, authorId);
+  async remove(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.remove(id);
+  }
+
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @Patch(':id/assign-editor')
+  async assignEditor(
+    @Param('id') id: string,
+    @Body('editorId') editorId: string,
+  ) {
+    return this.articlesService.assignEditor(id, editorId);
+  }
+
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @Patch(':id/review')
+  async submitReview(
+    @Param('id') id: string,
+    @CurrentUser('userId') editorId: string,
+    @Body() body: { decision: 'APPROVE' | 'REVISION'; comment?: string },
+  ) {
+    return this.articlesService.submitReview(id, editorId, body.decision, body.comment);
   }
 
   // ===== AI Operations =====
   @Post(':id/ai-rewrite')
   aiRewrite(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: RewriteTextDto,
   ) {
-    return this.articlesService.aiRewrite(id, authorId, dto);
+    return this.articlesService.aiRewrite(id, user, dto);
   }
 
   @Post(':id/ai-expand')
   aiExpand(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: ExpandTextDto,
   ) {
-    return this.articlesService.aiExpand(id, authorId, dto);
+    return this.articlesService.aiExpand(id, user, dto);
   }
 
   @Post(':id/ai-condense')
   aiCondense(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: CondenseTextDto,
   ) {
-    return this.articlesService.aiCondense(id, authorId, dto);
+    return this.articlesService.aiCondense(id, user, dto);
   }
 
   @Post(':id/ai-polish')
   aiPolish(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: PolishTextDto,
   ) {
-    return this.articlesService.aiPolish(id, authorId, dto);
+    return this.articlesService.aiPolish(id, user, dto);
   }
 
   @Post(':id/ai-headlines')
   aiHeadlines(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: GenerateHeadlinesDto,
   ) {
-    return this.articlesService.aiHeadlines(id, authorId, dto);
+    return this.articlesService.aiHeadlines(id, user, dto);
   }
 
   @Post(':id/ai-excerpt')
   aiExcerpt(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: GenerateExcerptDto,
   ) {
-    return this.articlesService.aiExcerpt(id, authorId, dto);
+    return this.articlesService.aiExcerpt(id, user, dto);
   }
 
   @Post(':id/ai-chat')
   aiChat(
-    @CurrentUser('userId') authorId: string,
+    @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
     @Body() dto: ChatWithAIDto,
   ) {
-    return this.articlesService.aiChat(id, authorId, dto);
+    return this.articlesService.aiChat(id, user, dto);
   }
 }
