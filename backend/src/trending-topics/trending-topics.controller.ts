@@ -55,13 +55,22 @@ export class TrendingTopicsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateTopicDto) {
-    return this.topicsService.update(id, dto);
+  update(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateTopicDto,
+  ) {
+    return this.topicsService.update(id, dto, userId, role);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.topicsService.remove(id);
+  remove(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Param('id') id: string,
+  ) {
+    return this.topicsService.remove(id, userId, role);
   }
 
   @Post(':id/adopt')

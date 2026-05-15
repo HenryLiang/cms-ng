@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
+import { UserRole } from '@cms-ng/shared';
 import Parser from 'rss-parser';
 
 @Injectable()
@@ -43,9 +44,12 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
-  async update(id: string, dto: UpdateTopicDto) {
+  async update(id: string, dto: UpdateTopicDto, userId: string, userRole: string) {
     const existing = await this.prisma.trendingTopic.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Topic not found');
+    if (userRole !== UserRole.ADMIN && existing.createdBy !== userId) {
+      throw new ForbiddenException('You do not have permission to update this topic');
+    }
 
     const topic = await this.prisma.trendingTopic.update({
       where: { id },
@@ -61,9 +65,12 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
-  async remove(id: string) {
+  async remove(id: string, userId: string, userRole: string) {
     const existing = await this.prisma.trendingTopic.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Topic not found');
+    if (userRole !== UserRole.ADMIN && existing.createdBy !== userId) {
+      throw new ForbiddenException('You do not have permission to delete this topic');
+    }
     await this.prisma.trendingTopic.delete({ where: { id } });
     return { success: true };
   }
@@ -99,6 +106,9 @@ export class TrendingTopicsService {
       where: { id: topicId },
     });
     if (!topic) throw new NotFoundException('Topic not found');
+    if (topic.status === 'ADOPTED') {
+      throw new BadRequestException('Topic has already been adopted');
+    }
 
     // Create a Story from the topic
     const story = await this.prisma.story.create({
