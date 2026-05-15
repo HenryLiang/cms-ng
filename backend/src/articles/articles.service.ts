@@ -400,6 +400,57 @@ export class ArticlesService {
     return article;
   }
 
+  async getVersions(articleId: string) {
+    const versions = await this.prisma.articleVersion.findMany({
+      where: { articleId },
+      orderBy: { version: 'desc' },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        createdAt: true,
+      },
+    });
+    return versions;
+  }
+
+  async rollback(id: string, versionNumber: number) {
+    const version = await this.prisma.articleVersion.findFirst({
+      where: { articleId: id, version: versionNumber },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+
+    const existing = await this.prisma.article.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Article not found');
+
+    const newVersion = existing.version + 1;
+
+    const article = await this.prisma.article.update({
+      where: { id },
+      data: {
+        title: version.title,
+        content: version.content,
+        version: newVersion,
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+        editor: { select: { id: true, name: true, email: true } },
+        story: { select: { id: true, title: true } },
+      },
+    });
+
+    await this.prisma.articleVersion.create({
+      data: {
+        articleId: id,
+        title: article.title,
+        content: article.content,
+        version: newVersion,
+      },
+    });
+
+    return this.serializeArticle(article);
+  }
+
   private serializeArticle(article: any) {
     return {
       ...article,

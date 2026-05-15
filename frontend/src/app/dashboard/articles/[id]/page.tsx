@@ -7,6 +7,8 @@ import {
   getArticle,
   updateArticle,
   deleteArticle,
+  getArticleVersions,
+  rollbackArticle,
   aiRewrite,
   aiExpand,
   aiCondense,
@@ -15,6 +17,7 @@ import {
   aiExcerpt,
   aiChat,
   type Article,
+  type ArticleVersion,
   type HeadlineOption,
   type ChatMessage,
 } from '@/lib/article-api';
@@ -38,6 +41,7 @@ import {
   PenTool,
   ChevronRight,
   SendHorizonal,
+  History,
 } from 'lucide-react';
 
 export default function ArticleEditorPage() {
@@ -84,6 +88,12 @@ export default function ArticleEditorPage() {
   const [editors, setEditors] = useState<{ id: string; name: string }[]>([]);
   const [selectedEditor, setSelectedEditor] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Version history
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<ArticleVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
 
   useEffect(() => {
     loadArticle();
@@ -150,6 +160,32 @@ export default function ArticleEditorPage() {
       await loadArticle();
     } finally {
       setSubmittingReview(false);
+    }
+  }
+
+  // ===== Version History =====
+  async function handleOpenVersions() {
+    setShowVersions(true);
+    setVersionsLoading(true);
+    try {
+      const data = await getArticleVersions(articleId);
+      setVersions(data);
+    } catch {
+      setVersions([]);
+    } finally {
+      setVersionsLoading(false);
+    }
+  }
+
+  async function handleRollback(version: number) {
+    if (!confirm(`确定要回滚到版本 v${version} 吗？当前内容将被覆盖。`)) return;
+    setRollingBack(true);
+    try {
+      await rollbackArticle(articleId, version);
+      setShowVersions(false);
+      await loadArticle();
+    } finally {
+      setRollingBack(false);
     }
   }
 
@@ -378,6 +414,13 @@ export default function ArticleEditorPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleOpenVersions}
+            className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <History className="h-4 w-4" />
+            版本历史
+          </button>
+          <button
             onClick={() => handleSave()}
             disabled={saving}
             className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
@@ -498,6 +541,63 @@ export default function ArticleEditorPage() {
                 确认提交
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Version History Modal */}
+      {showVersions && (
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-20">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-zinc-600" />
+                <h3 className="text-lg font-semibold">版本历史</h3>
+              </div>
+              <button onClick={() => setShowVersions(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {versionsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
+                <p className="text-zinc-500">暂无版本历史</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {versions.map((v) => (
+                  <div
+                    key={v.id}
+                    className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                          v{v.version}
+                        </span>
+                        <span className="text-sm font-medium text-zinc-900">{v.title}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {new Date(v.createdAt).toLocaleString('zh-CN')}
+                      </p>
+                    </div>
+                    {v.version !== article?.version && (
+                      <button
+                        onClick={() => handleRollback(v.version)}
+                        disabled={rollingBack}
+                        className="flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        回滚
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

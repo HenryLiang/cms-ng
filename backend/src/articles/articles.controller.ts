@@ -77,6 +77,32 @@ export class ArticlesController {
     return this.articlesService.remove(id);
   }
 
+  @Get(':id/versions')
+  async getVersions(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    const article = await this.articlesService.findOne(id);
+    const canAccess =
+      user.role === UserRole.ADMIN ||
+      article.authorId === user.userId ||
+      article.editorId === user.userId;
+    if (!canAccess) {
+      throw new ForbiddenException('You do not have permission to view this article');
+    }
+    return this.articlesService.getVersions(id);
+  }
+
+  @Post(':id/rollback/:version')
+  async rollback(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Param('version') version: string,
+  ) {
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.rollback(id, parseInt(version, 10));
+  }
+
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
   @Patch(':id/assign-editor')
   async assignEditor(

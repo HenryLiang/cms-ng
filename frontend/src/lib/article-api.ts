@@ -60,6 +60,24 @@ export async function deleteArticle(id: string): Promise<void> {
   await api.delete(`/articles/${id}`);
 }
 
+// ===== Version History =====
+export interface ArticleVersion {
+  id: string;
+  version: number;
+  title: string;
+  createdAt: string;
+}
+
+export async function getArticleVersions(id: string): Promise<ArticleVersion[]> {
+  const res = await api.get(`/articles/${id}/versions`);
+  return res.data;
+}
+
+export async function rollbackArticle(id: string, version: number): Promise<Article> {
+  const res = await api.post(`/articles/${id}/rollback/${version}`);
+  return res.data;
+}
+
 // ===== AI Operations =====
 export async function aiRewrite(
   id: string,
