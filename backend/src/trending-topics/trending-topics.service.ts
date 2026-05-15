@@ -6,6 +6,7 @@ import { UpdateTopicDto } from './dto/update-topic.dto';
 import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
 import { UserRole } from '@cms-ng/shared';
 import Parser from 'rss-parser';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 @Injectable()
 export class TrendingTopicsService {
@@ -136,10 +137,17 @@ export class TrendingTopicsService {
 
   async fetchGoogleTrends(geo: string, _timeRange: string) {
     try {
+      const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+      const requestOptions: any = {};
+      if (proxyUrl) {
+        requestOptions.agent = new HttpsProxyAgent(proxyUrl);
+      }
+
       const parser = new Parser({
         customFields: {
           item: ['ht:approx_traffic', 'ht:picture', 'ht:picture_source', 'ht:news_item'],
         },
+        requestOptions,
       });
 
       const feedUrl = `https://trends.google.com/trending/rss?geo=${geo || 'HK'}`;
