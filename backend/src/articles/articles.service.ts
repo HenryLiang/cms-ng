@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -235,6 +235,13 @@ export class ArticlesService {
       throw new ForbiddenException('This article is assigned to another editor');
     }
 
+    if (decision !== 'APPROVE' && decision !== 'REVISION') {
+      throw new BadRequestException('Decision must be APPROVE or REVISION');
+    }
+
+    if (decision === 'REVISION' && (!comment || !comment.trim())) {
+      throw new BadRequestException('Comment is required for revision');
+    }
     let newStatus: ArticleStatus;
     if (decision === 'APPROVE') {
       newStatus = ArticleStatus.APPROVED;
