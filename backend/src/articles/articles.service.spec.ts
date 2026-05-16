@@ -108,10 +108,10 @@ describe('ArticlesService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all articles', async () => {
+    it('should return all articles for admin', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
 
-      const result = await service.findAll({});
+      const result = await service.findAll({ userId: 'admin-id', role: 'ADMIN' }, {});
 
       expect(prisma.article.findMany).toHaveBeenCalledWith({
         where: {},
@@ -121,14 +121,26 @@ describe('ArticlesService', () => {
       expect(result).toHaveLength(1);
     });
 
-    it('should filter by authorId and storyId', async () => {
+    it('should filter by storyId', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
 
-      await service.findAll({ authorId: 'author-id', storyId: 'story-id' });
+      await service.findAll({ userId: 'author-id', role: 'ADMIN' }, { storyId: 'story-id' });
 
       expect(prisma.article.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { authorId: 'author-id', storyId: 'story-id' },
+          where: { storyId: 'story-id' },
+        }),
+      );
+    });
+
+    it('should restrict reporter to own articles', async () => {
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+
+      await service.findAll({ userId: 'author-id', role: 'REPORTER' }, {});
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { authorId: 'author-id' },
         }),
       );
     });
@@ -160,7 +172,7 @@ describe('ArticlesService', () => {
       prisma.article.update.mockResolvedValue(mockArticle({ version: 2, content: 'Updated' }));
       prisma.articleVersion.create.mockResolvedValue({ id: 'v2' });
 
-      const result = await service.update('article-id', 'author-id', { content: 'Updated' } as any);
+      const result = await service.update('article-id', { content: 'Updated' } as any);
 
       expect(prisma.article.update).toHaveBeenCalledWith({
         where: { id: 'article-id' },
@@ -175,7 +187,7 @@ describe('ArticlesService', () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.article.update.mockResolvedValue(mockArticle());
 
-      await service.update('article-id', 'author-id', { status: 'PUBLISHED' } as any);
+      await service.update('article-id', { status: 'PUBLISHED' } as any);
 
       expect(prisma.articleVersion.create).not.toHaveBeenCalled();
     });
@@ -183,22 +195,16 @@ describe('ArticlesService', () => {
     it('should throw NotFoundException when article not found', async () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
-      await expect(service.update('nonexistent', 'author-id', {})).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw ForbiddenException when author mismatch', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
-
-      await expect(service.update('article-id', 'author-id', {})).rejects.toThrow(ForbiddenException);
+      await expect(service.update('nonexistent', {})).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('remove', () => {
-    it('should delete article when author matches', async () => {
+    it('should delete article when found', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.article.delete.mockResolvedValue(mockArticle());
 
-      const result = await service.remove('article-id', 'author-id');
+      const result = await service.remove('article-id');
 
       expect(prisma.article.delete).toHaveBeenCalledWith({ where: { id: 'article-id' } });
       expect(result.success).toBe(true);
@@ -207,17 +213,13 @@ describe('ArticlesService', () => {
     it('should throw NotFoundException when article not found', async () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent', 'author-id')).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw ForbiddenException when author mismatch', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
-
-      await expect(service.remove('article-id', 'author-id')).rejects.toThrow(ForbiddenException);
+      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('AI operations', () => {
+    const mockUser = { userId: 'author-id', role: 'REPORTER' };
+
     beforeEach(() => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
     });
@@ -225,7 +227,7 @@ describe('ArticlesService', () => {
     it('aiRewrite should call aiService.rewriteText', async () => {
       aiService.rewriteText.mockResolvedValue('Rewritten');
 
-      const result = await service.aiRewrite('article-id', 'author-id', { text: 'Hello' } as any);
+      const result = await service.aiRewrite('article-id', mockUser, { text: 'Hello' } as any);
 
       expect(aiService.rewriteText).toHaveBeenCalledWith('author-id', 'article-id', expect.any(Object));
       expect(result.result).toBe('Rewritten');
@@ -234,7 +236,7 @@ describe('ArticlesService', () => {
     it('aiExpand should call aiService.expandText', async () => {
       aiService.expandText.mockResolvedValue('Expanded');
 
-      const result = await service.aiExpand('article-id', 'author-id', { text: 'Hello' } as any);
+      const result = await service.aiExpand('article-id', mockUser, { text: 'Hello' } as any);
 
       expect(result.result).toBe('Expanded');
     });
@@ -242,7 +244,7 @@ describe('ArticlesService', () => {
     it('aiCondense should call aiService.condenseText', async () => {
       aiService.condenseText.mockResolvedValue('Short');
 
-      const result = await service.aiCondense('article-id', 'author-id', { text: 'Hello' } as any);
+      const result = await service.aiCondense('article-id', mockUser, { text: 'Hello' } as any);
 
       expect(result.result).toBe('Short');
     });
@@ -250,7 +252,7 @@ describe('ArticlesService', () => {
     it('aiPolish should call aiService.polishText', async () => {
       aiService.polishText.mockResolvedValue('Polished');
 
-      const result = await service.aiPolish('article-id', 'author-id', { text: 'Hello' } as any);
+      const result = await service.aiPolish('article-id', mockUser, { text: 'Hello' } as any);
 
       expect(result.result).toBe('Polished');
     });
@@ -258,7 +260,7 @@ describe('ArticlesService', () => {
     it('aiHeadlines should call aiService.generateHeadlines', async () => {
       aiService.generateHeadlines.mockResolvedValue([{ title: 'H1', style: 's', reasoning: 'r' }]);
 
-      const result = await service.aiHeadlines('article-id', 'author-id', {} as any);
+      const result = await service.aiHeadlines('article-id', mockUser, {} as any);
 
       expect(result.headlines).toHaveLength(1);
     });
@@ -266,7 +268,7 @@ describe('ArticlesService', () => {
     it('aiExcerpt should call aiService.generateExcerpt', async () => {
       aiService.generateExcerpt.mockResolvedValue('Excerpt');
 
-      const result = await service.aiExcerpt('article-id', 'author-id', {} as any);
+      const result = await service.aiExcerpt('article-id', mockUser, {} as any);
 
       expect(result.excerpt).toBe('Excerpt');
     });
@@ -274,7 +276,7 @@ describe('ArticlesService', () => {
     it('aiChat should call aiService.chatWithAI', async () => {
       aiService.chatWithAI.mockResolvedValue('Reply');
 
-      const result = await service.aiChat('article-id', 'author-id', { messages: [] } as any);
+      const result = await service.aiChat('article-id', mockUser, { messages: [] } as any);
 
       expect(result.reply).toBe('Reply');
     });
@@ -282,7 +284,213 @@ describe('ArticlesService', () => {
     it('should throw ForbiddenException for AI ops when author mismatch', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
 
-      await expect(service.aiRewrite('article-id', 'author-id', { text: 'Hello' } as any)).rejects.toThrow(ForbiddenException);
+      await expect(service.aiRewrite('article-id', mockUser, { text: 'Hello' } as any)).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('verifyAccess', () => {
+    it('should allow admin access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'admin-id', role: 'ADMIN' })).resolves.toBeUndefined();
+    });
+
+    it('should allow author access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'author-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'author-id', role: 'REPORTER' })).resolves.toBeUndefined();
+    });
+
+    it('should allow editor access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'editor-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'editor-id', role: 'EDITOR' })).resolves.toBeUndefined();
+    });
+
+    it('should throw NotFoundException when article not found', async () => {
+      prisma.article.findUnique.mockResolvedValue(null);
+
+      await expect(service.verifyAccess('nonexistent', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when no access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'another-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('getReviewQueue', () => {
+    it('should return articles with PENDING_REVIEW or IN_REVIEW status', async () => {
+      prisma.article.findMany.mockResolvedValue([mockArticle({ status: 'PENDING_REVIEW' })]);
+
+      const result = await service.getReviewQueue('editor-id');
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: ['PENDING_REVIEW', 'IN_REVIEW'] },
+            OR: [{ editorId: 'editor-id' }, { editorId: null }],
+          }),
+        }),
+      );
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('assignEditor', () => {
+    it('should assign editor to article', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle());
+      prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+      prisma.article.update.mockResolvedValue(mockArticle({ editorId: 'editor-id' }));
+
+      const result = await service.assignEditor('article-id', 'editor-id');
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'editor-id' },
+        select: { role: true },
+      });
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { editorId: 'editor-id' },
+        }),
+      );
+      expect(result.editorId).toBe('editor-id');
+    });
+
+    it('should throw NotFoundException when article not found', async () => {
+      prisma.article.findUnique.mockResolvedValue(null);
+
+      await expect(service.assignEditor('nonexistent', 'editor-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when editor not found', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle());
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.assignEditor('article-id', 'bad-editor')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when user is not an editor', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle());
+      prisma.user.findUnique.mockResolvedValue({ role: 'REPORTER' });
+
+      await expect(service.assignEditor('article-id', 'reporter-id')).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('submitReview', () => {
+    it('should APPROVE article', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'IN_REVIEW', editorId: 'editor-id' });
+      prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'APPROVED', editorId: 'editor-id' }));
+
+      const result = await service.submitReview('article-id', 'editor-id', 'APPROVE');
+
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'APPROVED' }),
+        }),
+      );
+      expect(result.decision).toBe('APPROVE');
+      expect(result.comment).toBeNull();
+    });
+
+    it('should REVISION article with comment', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'IN_REVIEW', editorId: 'editor-id' });
+      prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'REVISION', editorId: 'editor-id' }));
+
+      const result = await service.submitReview('article-id', 'editor-id', 'REVISION', 'Needs work');
+
+      expect(result.decision).toBe('REVISION');
+      expect(result.comment).toBe('Needs work');
+    });
+
+    it('should allow admin override for assigned article', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'IN_REVIEW', editorId: 'editor-id' });
+      prisma.user.findUnique.mockResolvedValue({ role: 'ADMIN' });
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'APPROVED' }));
+
+      const result = await service.submitReview('article-id', 'admin-id', 'APPROVE');
+
+      expect(result.decision).toBe('APPROVE');
+    });
+
+    it('should throw ForbiddenException when editor is assigned to another', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'IN_REVIEW', editorId: 'other-editor' });
+      prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+
+      await expect(service.submitReview('article-id', 'editor-id', 'APPROVE')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException for invalid decision', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'IN_REVIEW', editorId: null });
+
+      await expect(service.submitReview('article-id', 'editor-id', 'INVALID' as any)).rejects.toThrow('Decision must be APPROVE or REVISION');
+    });
+
+    it('should throw BadRequestException for REVISION without comment', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'IN_REVIEW', editorId: null });
+
+      await expect(service.submitReview('article-id', 'editor-id', 'REVISION')).rejects.toThrow('Comment is required for revision');
+    });
+
+    it('should throw NotFoundException when article not found', async () => {
+      prisma.article.findUnique.mockResolvedValue(null);
+
+      await expect(service.submitReview('nonexistent', 'editor-id', 'APPROVE')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getVersions', () => {
+    it('should return versions ordered by version desc', async () => {
+      prisma.articleVersion.findMany.mockResolvedValue([{ version: 2 }, { version: 1 }]);
+
+      const result = await service.getVersions('article-id');
+
+      expect(prisma.articleVersion.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { articleId: 'article-id' },
+          orderBy: { version: 'desc' },
+        }),
+      );
+      expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('rollback', () => {
+    it('should rollback to version and create new version snapshot', async () => {
+      prisma.articleVersion.findFirst.mockResolvedValue({ id: 'v1', version: 1, title: 'Old Title', content: 'Old Content' });
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ version: 3 }));
+      prisma.article.update.mockResolvedValue(mockArticle({ version: 4, title: 'Old Title', content: 'Old Content' }));
+      prisma.articleVersion.create.mockResolvedValue({ id: 'v4' });
+
+      const result = await service.rollback('article-id', 1);
+
+      expect(prisma.articleVersion.findFirst).toHaveBeenCalledWith({
+        where: { articleId: 'article-id', version: 1 },
+      });
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'Old Title', content: 'Old Content', version: 4 }),
+        }),
+      );
+      expect(prisma.articleVersion.create).toHaveBeenCalled();
+      expect(result.version).toBe(4);
+    });
+
+    it('should throw NotFoundException when version not found', async () => {
+      prisma.articleVersion.findFirst.mockResolvedValue(null);
+
+      await expect(service.rollback('article-id', 99)).rejects.toThrow('Version not found');
+    });
+
+    it('should throw NotFoundException when article not found', async () => {
+      prisma.articleVersion.findFirst.mockResolvedValue({ id: 'v1', version: 1, title: 'T', content: 'C' });
+      prisma.article.findUnique.mockResolvedValue(null);
+
+      await expect(service.rollback('article-id', 1)).rejects.toThrow(NotFoundException);
     });
   });
 });

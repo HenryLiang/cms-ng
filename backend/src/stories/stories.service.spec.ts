@@ -70,13 +70,13 @@ describe('StoriesService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all stories ordered by priority', async () => {
+    it('should return all stories ordered by priority for admin', async () => {
       prisma.story.findMany.mockResolvedValue([
         mockStory({ id: 's1', priority: 2 }),
         mockStory({ id: 's2', priority: 1 }),
       ]);
 
-      const result = await service.findAll();
+      const result = await service.findAll({ userId: 'admin-id', role: 'ADMIN' });
 
       expect(prisma.story.findMany).toHaveBeenCalledWith({
         where: {},
@@ -86,10 +86,10 @@ describe('StoriesService', () => {
       expect(result).toHaveLength(2);
     });
 
-    it('should filter by reporterId when provided', async () => {
+    it('should filter by reporterId for reporter role', async () => {
       prisma.story.findMany.mockResolvedValue([mockStory()]);
 
-      await service.findAll('user-id');
+      await service.findAll({ userId: 'user-id', role: 'REPORTER' });
 
       expect(prisma.story.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { reporterId: 'user-id' } }),

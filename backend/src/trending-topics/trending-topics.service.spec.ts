@@ -1,3 +1,7 @@
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { TrendingTopicsService } from './trending-topics.service';

@@ -73,6 +73,27 @@ describe('AuthService', () => {
       await expect(service.register(dto)).rejects.toThrow(ConflictException);
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
+
+    it('should allow registration without optional role', async () => {
+      const dtoNoRole = { email: 'new@example.com', name: 'Test', password: 'password123' };
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 'user-id',
+        email: dtoNoRole.email,
+        name: dtoNoRole.name,
+        role: undefined,
+        createdAt: new Date(),
+      });
+
+      const result = await service.register(dtoNoRole as any);
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ role: undefined }),
+        }),
+      );
+      expect(result.accessToken).toBe('test_jwt_token');
+    });
   });
 
   describe('login', () => {
