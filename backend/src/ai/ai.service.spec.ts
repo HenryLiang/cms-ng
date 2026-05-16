@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { AIService } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
@@ -14,6 +15,9 @@ describe('AIService', () => {
   let config: { get: jest.Mock };
 
   beforeEach(async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     prisma = createMockPrismaService();
     config = {
       get: jest.fn((key: string) => {

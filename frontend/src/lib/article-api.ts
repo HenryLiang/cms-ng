@@ -1,4 +1,5 @@
 import { api } from './api';
+import { FactCheckResult, FactCheckFinding } from '@cms-ng/shared';
 
 type ArticleStatus = 'DRAFT' | 'WRITING' | 'AI_OPTIMIZING' | 'PENDING_REVIEW' | 'IN_REVIEW' | 'REVISION' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -138,5 +139,12 @@ export interface DraftResult {
 
 export async function aiGenerateDraft(id: string, instruction?: string): Promise<DraftResult> {
   const res = await api.post(`/articles/${id}/ai-draft`, { instruction });
+  return res.data;
+}
+
+
+
+export async function aiFactCheck(id: string): Promise<FactCheckResult> {
+  const res = await api.post(`/articles/${id}/ai-fact-check`);
   return res.data;
 }

@@ -1,3 +1,5 @@
+import { FactCheckInput, FactCheckFinding, FactCheckResult } from '@cms-ng/shared';
+
 export interface RewriteTextInput {
   text: string;
   instruction?: string;
@@ -66,3 +68,5 @@ export interface DraftResult {
   subtitle?: string;
   content: string;
 }
+
+
