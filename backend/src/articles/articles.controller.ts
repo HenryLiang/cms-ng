@@ -21,6 +21,7 @@ import {
   GenerateExcerptDto,
   ChatWithAIDto,
   GenerateDraftDto,
+  FactCheckDto,
 } from './dto/ai-operations.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -194,5 +195,14 @@ export class ArticlesController {
     @Body() dto: GenerateDraftDto,
   ) {
     return this.articlesService.aiGenerateDraft(id, user, dto);
+  }
+
+  @Post(':id/ai-fact-check')
+  aiFactCheck(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: FactCheckDto,
+  ) {
+    return this.articlesService.aiFactCheck(id, user, dto);
   }
 }

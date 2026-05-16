@@ -66,3 +66,22 @@ export interface DraftResult {
   subtitle?: string;
   content: string;
 }
+
+export interface FactCheckFinding {
+  type: 'fact' | 'inconsistency' | 'dispute' | 'source_needed' | 'risk';
+  text: string;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+}
+
+export interface FactCheckResult {
+  score: number;
+  summary: string;
+  findings: FactCheckFinding[];
+}
+
+export interface FactCheckInput {
+  title: string;
+  subtitle?: string;
+  content: string;
+}

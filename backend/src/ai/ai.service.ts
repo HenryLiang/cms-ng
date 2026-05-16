@@ -15,6 +15,8 @@ import {
   ChatMessage,
   GenerateDraftInput,
   DraftResult,
+  FactCheckInput,
+  FactCheckResult,
 } from './dto/writing-operations.dto';
 
 @Injectable()
@@ -543,6 +545,123 @@ ${input.instruction ? '额外要求：' + input.instruction : ''}
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<(?!\/?(?:p|h2|h3|ul|ol|li|blockquote|strong|em|br)\b)[^>]*>/gi, '');
+  }
+
+  // ===== 事实核查 =====
+  async factCheck(
+    userId: string,
+    articleId: string | undefined,
+    input: FactCheckInput,
+  ): Promise<FactCheckResult> {
+    const startTime = Date.now();
+
+    const prompt = `请对以下新闻稿件进行事实核查分析。
+
+稿件标题：${input.title}
+${input.subtitle ? '副标题：' + input.subtitle : ''}
+正文内容：
+${input.content.replace(/<[^>]+>/g, '').slice(0, 3000)}
+
+请从以下几个方面进行分析：
+1. 事实性陈述标注：找出文中涉及的人名、地名、时间、数据等事实性陈述
+2. 一致性检查：检查全文内部是否存在逻辑矛盾（如前面说"10人"后面说"12人"）
+3. 来源建议：对每一处关键事实，建议最可靠的核实来源
+4. 风险提示：标出可能存在法律风险、隐私风险或表述不当的地方
+5. 争议标注：对有争议或多方不同说法的信息进行标注
+
+请输出以下 JSON 格式：
+{
+  "score": 85,
+  "summary": "总体评估摘要",
+  "findings": [
+    {
+      "type": "fact",
+      "text": "原文片段",
+      "message": "AI 提示信息",
+      "severity": "info"
+    }
+  ]
+}
+
+severity 取值说明：
+- info：提示性信息，无需修改
+- warning：需要注意，建议核实
+- critical：必须修改的问题
+
+type 取值说明：
+- fact：事实性陈述
+- inconsistency：内部不一致
+- dispute：存在争议
+- source_needed：需要补充来源
+- risk：风险提示`;
+
+    try {
+      const response = await axios.post(
+        `${this.apiBase}/chat/completions`,
+        {
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: '你是一位资深新闻事实核查专家，擅长识别稿件中的事实性问题和风险。请用繁体中文回答。输出必须是有效的 JSON 格式。',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: this.getTemperature(0.3),
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 45000,
+        },
+      );
+
+      const content = response.data.choices[0]?.message?.content || '';
+      const parsed = JSON.parse(content);
+      const result: FactCheckResult = {
+        score: Math.min(100, Math.max(0, parsed.score ?? 50)),
+        summary: parsed.summary || '已完成事实核查分析',
+        findings: Array.isArray(parsed.findings) ? parsed.findings : [],
+      };
+
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'fact_check',
+          prompt,
+          result: JSON.stringify(result),
+          model: this.model,
+          tokensUsed: response.data.usage?.total_tokens,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+
+      return result;
+    } catch (error: any) {
+      this.logger.error('Fact check failed:', error.message);
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'fact_check',
+          prompt,
+          result: JSON.stringify({ error: error.message }),
+          model: this.model,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+      return {
+        score: 0,
+        summary: '事实核查服务暂时不可用，请稍后重试',
+        findings: [],
+      };
+    }
   }
 
   // ===== 通用文本 AI 调用 =====

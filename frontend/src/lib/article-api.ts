@@ -140,3 +140,21 @@ export async function aiGenerateDraft(id: string, instruction?: string): Promise
   const res = await api.post(`/articles/${id}/ai-draft`, { instruction });
   return res.data;
 }
+
+export interface FactCheckFinding {
+  type: 'fact' | 'inconsistency' | 'dispute' | 'source_needed' | 'risk';
+  text: string;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+}
+
+export interface FactCheckResult {
+  score: number;
+  summary: string;
+  findings: FactCheckFinding[];
+}
+
+export async function aiFactCheck(id: string): Promise<FactCheckResult> {
+  const res = await api.post(`/articles/${id}/ai-fact-check`);
+  return res.data;
+}

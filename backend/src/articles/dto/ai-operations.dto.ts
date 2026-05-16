@@ -68,3 +68,5 @@ export class GenerateDraftDto {
   @IsOptional()
   instruction?: string;
 }
+
+export class FactCheckDto {}

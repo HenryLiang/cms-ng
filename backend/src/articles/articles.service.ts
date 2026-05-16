@@ -13,6 +13,7 @@ import {
   GenerateExcerptDto,
   ChatWithAIDto,
   GenerateDraftDto,
+  FactCheckDto,
 } from './dto/ai-operations.dto';
 
 @Injectable()
@@ -399,6 +400,20 @@ export class ArticlesService {
       instruction: dto.instruction,
     });
 
+    return result;
+  }
+
+  async aiFactCheck(
+    id: string,
+    user: { userId: string; role: string },
+    _dto: FactCheckDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.factCheck(user.userId, id, {
+      title: article.title,
+      subtitle: article.subtitle || undefined,
+      content: article.content,
+    });
     return result;
   }
 
