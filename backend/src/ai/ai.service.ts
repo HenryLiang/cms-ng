@@ -13,6 +13,8 @@ import {
   GenerateExcerptInput,
   ChatInput,
   ChatMessage,
+  GenerateDraftInput,
+  DraftResult,
 } from './dto/writing-operations.dto';
 
 @Injectable()
@@ -21,6 +23,7 @@ export class AIService {
   private readonly apiKey: string;
   private readonly apiBase: string;
   private readonly model: string;
+  private readonly defaultTemperature: number;
 
   constructor(
     private config: ConfigService,
@@ -29,6 +32,11 @@ export class AIService {
     this.apiKey = this.config.get<string>('KIMI_API_KEY') || '';
     this.apiBase = this.config.get<string>('KIMI_API_BASE') || 'https://api.kimi.com/coding/v1';
     this.model = this.config.get<string>('KIMI_MODEL') || 'kimi-for-coding';
+    this.defaultTemperature = this.model === 'kimi-k2.6' ? 1 : undefined as any;
+  }
+
+  private getTemperature(preferred: number): number {
+    return this.defaultTemperature ?? preferred;
   }
 
   async generateStorySuggestions(
@@ -53,7 +61,7 @@ export class AIService {
             },
             { role: 'user', content: prompt },
           ],
-          temperature: 0.7,
+          temperature: this.getTemperature(0.7),
           response_format: { type: 'json_object' },
         },
         {
@@ -219,7 +227,7 @@ ${input.content.slice(0, 500)}
             },
             { role: 'user', content: prompt },
           ],
-          temperature: 0.8,
+          temperature: this.getTemperature(0.8),
           response_format: { type: 'json_object' },
         },
         {
@@ -299,7 +307,7 @@ ${input.content.slice(0, 2000)}
             },
             { role: 'user', content: prompt },
           ],
-          temperature: 0.5,
+          temperature: this.getTemperature(0.5),
         },
         {
           headers: {
@@ -381,7 +389,7 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
         {
           model: this.model,
           messages,
-          temperature: 0.7,
+          temperature: this.getTemperature(0.7),
         },
         {
           headers: {
@@ -427,6 +435,112 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
     }
   }
 
+  // ===== 初稿生成 =====
+  async generateDraft(
+    userId: string,
+    articleId: string | undefined,
+    input: GenerateDraftInput,
+  ): Promise<DraftResult> {
+    const startTime = Date.now();
+
+    const tagsStr = input.storyTags.join(', ') || '未指定';
+    const prompt = `请根据以下选题信息，生成一篇完整的新闻稿件初稿。
+
+选题标题：${input.storyTitle}
+${input.storyDescription ? '选题描述：' + input.storyDescription : ''}
+${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
+相关标签：${tagsStr}
+${input.currentTitle ? '当前稿件标题（可参考）：' + input.currentTitle : ''}
+${input.currentSubtitle ? '当前副标题（可参考）：' + input.currentSubtitle : ''}
+${input.instruction ? '额外要求：' + input.instruction : ''}
+
+要求：
+1. 生成一个吸引读者的标题
+2. 生成一个概括性的副标题
+3. 正文内容结构清晰，包含导语、主体段落、结尾
+4. 使用繁体中文
+5. 正文使用 HTML 格式，仅使用以下标签：p, h2, h3, ul, ol, li, blockquote, strong, em
+6. 不要输出任何解释文字，只输出 JSON 格式
+
+请输出以下 JSON 格式：
+{
+  "title": "稿件标题",
+  "subtitle": "副标题",
+  "content": "<p>导语段落...</p><h2>小标题</h2><p>正文...</p>"
+}`;
+
+    try {
+      const response = await axios.post(
+        `${this.apiBase}/chat/completions`,
+        {
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: '你是一位资深新闻记者，擅长根据选题快速生成高质量的稿件初稿。请用繁体中文回答。输出必须是有效的 JSON 格式。',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: this.getTemperature(0.7),
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 180000,
+        },
+      );
+
+      const content = response.data.choices[0]?.message?.content || '';
+      const parsed = JSON.parse(content);
+      const result: DraftResult = {
+        title: parsed.title || input.currentTitle || input.storyTitle,
+        subtitle: parsed.subtitle,
+        content: this.sanitizeDraftHTML(parsed.content || ''),
+      };
+
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'generate_draft',
+          prompt,
+          result: JSON.stringify(result),
+          model: this.model,
+          tokensUsed: response.data.usage?.total_tokens,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+
+      return result;
+    } catch (error: any) {
+      this.logger.error('Draft generation failed:', error.message);
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'generate_draft',
+          prompt,
+          result: JSON.stringify({ error: error.message }),
+          model: this.model,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+      throw error;
+    }
+  }
+
+  private sanitizeDraftHTML(html: string): string {
+    return html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<(?!\/?(?:p|h2|h3|ul|ol|li|blockquote|strong|em|br)\b)[^>]*>/gi, '');
+  }
+
   // ===== 通用文本 AI 调用 =====
   private async callTextAI(
     userId: string,
@@ -449,7 +563,7 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
             },
             { role: 'user', content: prompt },
           ],
-          temperature: 0.6,
+          temperature: this.getTemperature(0.6),
         },
         {
           headers: {

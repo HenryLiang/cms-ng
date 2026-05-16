@@ -129,3 +129,14 @@ export async function aiChat(id: string, messages: ChatMessage[]): Promise<strin
   const res = await api.post(`/articles/${id}/ai-chat`, { messages });
   return res.data.reply;
 }
+
+export interface DraftResult {
+  title: string;
+  subtitle?: string;
+  content: string;
+}
+
+export async function aiGenerateDraft(id: string, instruction?: string): Promise<DraftResult> {
+  const res = await api.post(`/articles/${id}/ai-draft`, { instruction });
+  return res.data;
+}

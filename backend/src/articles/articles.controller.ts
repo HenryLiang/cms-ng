@@ -20,6 +20,7 @@ import {
   GenerateHeadlinesDto,
   GenerateExcerptDto,
   ChatWithAIDto,
+  GenerateDraftDto,
 } from './dto/ai-operations.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -184,5 +185,14 @@ export class ArticlesController {
     @Body() dto: ChatWithAIDto,
   ) {
     return this.articlesService.aiChat(id, user, dto);
+  }
+
+  @Post(':id/ai-draft')
+  aiDraft(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: GenerateDraftDto,
+  ) {
+    return this.articlesService.aiGenerateDraft(id, user, dto);
   }
 }

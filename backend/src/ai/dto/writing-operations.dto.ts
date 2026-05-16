@@ -50,3 +50,19 @@ export interface ChatInput {
     content: string;
   };
 }
+
+export interface GenerateDraftInput {
+  storyTitle: string;
+  storyDescription?: string;
+  storyAngle?: string;
+  storyTags: string[];
+  currentTitle?: string;
+  currentSubtitle?: string;
+  instruction?: string;
+}
+
+export interface DraftResult {
+  title: string;
+  subtitle?: string;
+  content: string;
+}

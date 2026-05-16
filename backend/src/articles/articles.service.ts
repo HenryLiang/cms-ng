@@ -12,6 +12,7 @@ import {
   GenerateHeadlinesDto,
   GenerateExcerptDto,
   ChatWithAIDto,
+  GenerateDraftDto,
 } from './dto/ai-operations.dto';
 
 @Injectable()
@@ -375,6 +376,30 @@ export class ArticlesService {
       },
     });
     return { reply: result };
+  }
+
+  async aiGenerateDraft(
+    id: string,
+    user: { userId: string; role: string },
+    dto: GenerateDraftDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const story = await this.prisma.story.findUnique({
+      where: { id: article.storyId },
+    });
+    if (!story) throw new NotFoundException('Story not found');
+
+    const result = await this.aiService.generateDraft(user.userId, id, {
+      storyTitle: story.title,
+      storyDescription: story.description || undefined,
+      storyAngle: story.angle || undefined,
+      storyTags: JSON.parse(story.tags || '[]'),
+      currentTitle: article.title,
+      currentSubtitle: article.subtitle || undefined,
+      instruction: dto.instruction,
+    });
+
+    return result;
   }
 
   private async verifyAccessAndGet(

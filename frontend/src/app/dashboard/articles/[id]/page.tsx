@@ -16,12 +16,15 @@ import {
   aiHeadlines,
   aiExcerpt,
   aiChat,
+  aiGenerateDraft,
   type Article,
   type ArticleVersion,
   type HeadlineOption,
   type ChatMessage,
+  type DraftResult,
 } from '@/lib/article-api';
 import { getEditors } from '@/lib/users-api';
+import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
 import {
   ArrowLeft,
   Trash2,
@@ -66,7 +69,8 @@ export default function ArticleEditorPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState('');
   const [showAIResult, setShowAIResult] = useState(false);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichTextEditorRef>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // Headline Lab state
   const [showHeadlines, setShowHeadlines] = useState(false);
@@ -75,6 +79,11 @@ export default function ArticleEditorPage() {
 
   // AI Excerpt state
   const [excerptLoading, setExcerptLoading] = useState(false);
+
+  // AI Draft Generation state
+  const [showDraftPreview, setShowDraftPreview] = useState(false);
+  const [draftResult, setDraftResult] = useState<DraftResult | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
 
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -191,29 +200,35 @@ export default function ArticleEditorPage() {
 
   // ===== Text Selection Detection =====
   const handleTextSelection = useCallback(() => {
-    const textarea = contentRef.current;
-    if (!textarea) return;
+    const editor = editorRef.current?.editor;
+    const container = editorContainerRef.current;
+    if (!editor || !container) return;
 
-    // For textarea, use selectionStart/End instead of window.getSelection()
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value.substring(start, end).trim();
+    const { from, to } = editor.state.selection;
+    if (from === to) {
+      if (!showAIResult && !aiLoading) {
+        setShowAIMenu(false);
+        setShowAIResult(false);
+        selectedTextRef.current = '';
+      }
+      return;
+    }
 
+    const text = editor.state.doc.textBetween(from, to).trim();
     if (text.length > 0) {
-      // Position menu near the textarea center (exact position in textarea is hard,
-      // so we use a reasonable position based on the textarea bounds)
-      const rect = textarea.getBoundingClientRect();
-      setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + 40 });
+      const coords = editor.view.coordsAtPos(from);
+      const containerRect = container.getBoundingClientRect();
+      setSelectionPos({
+        x: coords.left - containerRect.left,
+        y: coords.top - containerRect.top,
+      });
       setSelectedText(text);
       setShowAIMenu(true);
-      // Only reset result panel if this is a new/different selection
       if (text !== selectedTextRef.current) {
         setShowAIResult(false);
       }
       selectedTextRef.current = text;
     } else if (!showAIResult && !aiLoading) {
-      // Only hide if we're not showing a result panel or loading
-      // (prevents mouseup on AI buttons from closing the menu)
       setShowAIMenu(false);
       setShowAIResult(false);
       selectedTextRef.current = '';
@@ -258,27 +273,15 @@ export default function ArticleEditorPage() {
 
   function applyAIResult(mode: 'replace' | 'insert') {
     if (!aiResult) return;
-    const textarea = contentRef.current;
-    if (!textarea) return;
+    const editor = editorRef.current?.editor;
+    if (!editor) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const before = content.slice(0, start);
-    const after = content.slice(end);
+    const { from, to } = editor.state.selection;
 
     if (mode === 'replace') {
-      setContent(before + aiResult + after);
-      // Restore focus and set cursor position
-      requestAnimationFrame(() => {
-        textarea.focus();
-        const newPos = start + aiResult.length;
-        textarea.setSelectionRange(newPos, newPos);
-      });
+      editor.chain().focus().deleteRange({ from, to }).insertContent(aiResult).run();
     } else {
-      setContent(before + '\n\n' + aiResult + '\n\n' + after);
-      requestAnimationFrame(() => {
-        textarea.focus();
-      });
+      editor.chain().focus().insertContent('\n\n' + aiResult + '\n\n').run();
     }
 
     setShowAIMenu(false);
@@ -316,6 +319,33 @@ export default function ArticleEditorPage() {
     } finally {
       setExcerptLoading(false);
     }
+  }
+
+  // ===== AI Draft Generation =====
+  async function handleGenerateDraft() {
+    setDraftLoading(true);
+    try {
+      const result = await aiGenerateDraft(articleId);
+      setDraftResult(result);
+      setShowDraftPreview(true);
+    } catch {
+      alert('初稿生成失败，请稍后重试');
+    } finally {
+      setDraftLoading(false);
+    }
+  }
+
+  function applyDraft(mode: 'replace' | 'insert') {
+    if (!draftResult) return;
+    if (mode === 'replace') {
+      setTitle(draftResult.title);
+      setSubtitle(draftResult.subtitle || '');
+      setContent(draftResult.content);
+    } else {
+      setContent((prev) => prev + '\n\n' + draftResult.content);
+    }
+    setShowDraftPreview(false);
+    setDraftResult(null);
   }
 
   // ===== AI Chat =====
@@ -370,7 +400,7 @@ export default function ArticleEditorPage() {
     );
   }
 
-  const wordCount = content.trim().length;
+  const wordCount = content.replace(/<[^>]+>/g, '').trim().length;
 
   return (
     <div className="flex h-full flex-col">
@@ -602,10 +632,65 @@ export default function ArticleEditorPage() {
         </div>
       )}
 
+      {/* AI Draft Preview Modal */}
+      {showDraftPreview && draftResult && (
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-10">
+          <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-purple-600" />
+                <h3 className="text-lg font-semibold">AI 生成初稿</h3>
+              </div>
+              <button onClick={() => setShowDraftPreview(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto space-y-4 pr-2">
+              <div>
+                <label className="text-xs font-medium text-zinc-500">标题</label>
+                <p className="text-base font-semibold text-zinc-900">{draftResult.title}</p>
+              </div>
+              {draftResult.subtitle && (
+                <div>
+                  <label className="text-xs font-medium text-zinc-500">副标题</label>
+                  <p className="text-base text-zinc-700">{draftResult.subtitle}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-zinc-500">正文</label>
+                <DraftPreview content={draftResult.content} />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-zinc-100">
+              <button
+                onClick={() => setShowDraftPreview(false)}
+                className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => applyDraft('insert')}
+                className="flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                <Plus className="h-4 w-4" />
+                插入到末尾
+              </button>
+              <button
+                onClick={() => applyDraft('replace')}
+                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+              >
+                <Check className="h-4 w-4" />
+                替换当前内容
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Editor */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-auto bg-white relative">
-          <div className="mx-auto max-w-3xl p-8">
+        <div ref={editorContainerRef} className="flex-1 overflow-hidden bg-white relative flex flex-col">
+          <div className="mx-auto max-w-3xl w-full px-8 pt-8">
             <input
               type="text"
               value={subtitle}
@@ -613,11 +698,12 @@ export default function ArticleEditorPage() {
               className="mb-4 w-full bg-transparent text-lg text-zinc-600 outline-none"
               placeholder="副标题（可选）"
             />
-            <textarea
-              ref={contentRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[60vh] w-full resize-none bg-transparent text-base leading-relaxed text-zinc-800 outline-none"
+          </div>
+          <div className="flex-1 min-h-0 mx-auto max-w-3xl w-full px-8 pb-8">
+            <RichTextEditor
+              ref={editorRef}
+              content={content}
+              onChange={setContent}
               placeholder="开始写作..."
             />
           </div>
@@ -759,6 +845,18 @@ export default function ArticleEditorPage() {
               <h3 className="text-sm font-medium text-zinc-900">快速操作</h3>
               <div className="mt-2 space-y-2">
                 <button
+                  onClick={handleGenerateDraft}
+                  disabled={draftLoading}
+                  className="flex w-full items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                >
+                  {draftLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  AI 生成初稿
+                </button>
+                <button
                   onClick={() => handleSave('DRAFT')}
                   className="flex w-full items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
                 >
@@ -850,6 +948,19 @@ export default function ArticleEditorPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function DraftPreview({ content }: { content: string }) {
+  const sanitized = content
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<(?!\/?(?:p|h2|h3|ul|ol|li|blockquote|strong|em|br)\b)[^>]*>/gi, '');
+  return (
+    <div
+      className="prose prose-zinc max-w-none mt-1 rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+    />
   );
 }
 

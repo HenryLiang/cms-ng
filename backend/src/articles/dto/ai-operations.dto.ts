@@ -62,3 +62,9 @@ export class ChatWithAIDto {
   @Type(() => ChatMessageDto)
   messages: ChatMessageDto[];
 }
+
+export class GenerateDraftDto {
+  @IsString()
+  @IsOptional()
+  instruction?: string;
+}
