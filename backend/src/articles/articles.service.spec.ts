@@ -16,6 +16,7 @@ describe('ArticlesService', () => {
     generateHeadlines: jest.Mock;
     generateExcerpt: jest.Mock;
     chatWithAI: jest.Mock;
+    generateDraft: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -28,6 +29,7 @@ describe('ArticlesService', () => {
       generateHeadlines: jest.fn(),
       generateExcerpt: jest.fn(),
       chatWithAI: jest.fn(),
+      generateDraft: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -279,6 +281,39 @@ describe('ArticlesService', () => {
       const result = await service.aiChat('article-id', mockUser, { messages: [] } as any);
 
       expect(result.reply).toBe('Reply');
+    });
+
+    it('aiGenerateDraft should call aiService.generateDraft with story context', async () => {
+      prisma.story.findUnique.mockResolvedValue({
+        id: 'story-id',
+        title: 'Story Title',
+        description: 'Story Desc',
+        angle: 'Story Angle',
+        tags: '["tag1"]',
+      });
+      aiService.generateDraft.mockResolvedValue({
+        title: 'Draft Title',
+        subtitle: 'Draft Subtitle',
+        content: '<p>Draft content</p>',
+      });
+
+      const result = await service.aiGenerateDraft('article-id', mockUser, { instruction: 'Write intro' } as any);
+
+      expect(aiService.generateDraft).toHaveBeenCalledWith('author-id', 'article-id', expect.objectContaining({
+        storyTitle: 'Story Title',
+        storyDescription: 'Story Desc',
+        storyAngle: 'Story Angle',
+        storyTags: ['tag1'],
+        currentTitle: 'Test Article',
+        instruction: 'Write intro',
+      }));
+      expect(result.title).toBe('Draft Title');
+    });
+
+    it('aiGenerateDraft should throw NotFoundException when story not found', async () => {
+      prisma.story.findUnique.mockResolvedValue(null);
+
+      await expect(service.aiGenerateDraft('article-id', mockUser, {} as any)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException for AI ops when author mismatch', async () => {

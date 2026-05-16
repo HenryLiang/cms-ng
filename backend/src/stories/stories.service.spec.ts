@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { StoriesService } from './stories.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
@@ -154,6 +154,80 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('verifyAccess', () => {
+    it('should allow admin access', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id' }));
+
+      await expect(service.verifyAccess('story-id', { userId: 'admin-id', role: 'ADMIN' })).resolves.toBeUndefined();
+    });
+
+    it('should allow reporter access', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'user-id' }));
+
+      await expect(service.verifyAccess('story-id', { userId: 'user-id', role: 'REPORTER' })).resolves.toBeUndefined();
+    });
+
+    it('should allow editor access', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id', editorId: 'editor-id' }));
+
+      await expect(service.verifyAccess('story-id', { userId: 'editor-id', role: 'EDITOR' })).resolves.toBeUndefined();
+    });
+
+    it('should throw NotFoundException when story not found', async () => {
+      prisma.story.findUnique.mockResolvedValue(null);
+
+      await expect(service.verifyAccess('nonexistent', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when no access', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id', editorId: 'another-id' }));
+
+      await expect(service.verifyAccess('story-id', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('assignEditor', () => {
+    it('should assign editor to story', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+      prisma.story.update.mockResolvedValue(mockStory({ editorId: 'editor-id' }));
+
+      const result = await service.assignEditor('story-id', 'editor-id');
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'editor-id' },
+        select: { role: true },
+      });
+      expect(prisma.story.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { editorId: 'editor-id' },
+          include: expect.any(Object),
+        }),
+      );
+      expect(result.editorId).toBe('editor-id');
+    });
+
+    it('should throw NotFoundException when story not found', async () => {
+      prisma.story.findUnique.mockResolvedValue(null);
+
+      await expect(service.assignEditor('nonexistent', 'editor-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when editor not found', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.assignEditor('story-id', 'bad-editor')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when user is not an editor', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.user.findUnique.mockResolvedValue({ role: 'REPORTER' });
+
+      await expect(service.assignEditor('story-id', 'reporter-id')).rejects.toThrow(ForbiddenException);
     });
   });
 });

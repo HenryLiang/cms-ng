@@ -16,7 +16,7 @@ import {
   Undo,
   Redo,
 } from 'lucide-react';
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle, useEffect } from 'react';
 
 export interface RichTextEditorRef {
   editor: Editor | null;
@@ -47,6 +47,12 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
       onChange(editor.getHTML());
     },
   });
+
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content, false);
+    }
+  }, [content, editor]);
 
   useImperativeHandle(ref, () => ({
     editor,

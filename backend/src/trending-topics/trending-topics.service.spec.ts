@@ -2,12 +2,20 @@ jest.mock('https-proxy-agent', () => ({
   HttpsProxyAgent: jest.fn(),
 }));
 
+jest.mock('rss-parser', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    parseURL: jest.fn(),
+  })),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { TrendingTopicsService } from './trending-topics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
+import Parser from 'rss-parser';
 
 describe('TrendingTopicsService', () => {
   let service: TrendingTopicsService;
@@ -234,6 +242,183 @@ describe('TrendingTopicsService', () => {
       prisma.trendingTopic.findUnique.mockResolvedValue(mockTopic({ status: 'ADOPTED', adoptedStoryId: 'existing-story-id' }));
 
       await expect(service.adoptTopic('topic-id', 'user-id')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('fetchGoogleTrends', () => {
+    const MockedParser = Parser as unknown as jest.Mock;
+
+    beforeEach(() => {
+      MockedParser.mockClear();
+    });
+
+    it('should parse merged-format news items and map to topics', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [{
+          title: 'Trend 1',
+          contentSnippet: 'Snippet',
+          'ht:approx_traffic': '50,000+',
+          'ht:news_item': {
+            'ht:news_item_title': ['News 1', 'News 2'],
+            'ht:news_item_snippet': ['Snippet 1', 'Snippet 2'],
+            'ht:news_item_url': ['http://a.com', 'http://b.com'],
+            'ht:news_item_source': ['Source A', 'Source B'],
+          },
+        }],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchGoogleTrends('HK', 'today');
+
+      expect(mockParseURL).toHaveBeenCalledWith('https://trends.google.com/trending/rss?geo=HK');
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('Trend 1');
+      expect(result[0].heatScore).toBe(98);
+      expect(result[0].articles).toHaveLength(2);
+      expect(result[0].articles[0].title).toBe('News 1');
+    });
+
+    it('should handle single news item format', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [{
+          title: 'Trend 2',
+          'ht:approx_traffic': '5,000+',
+          'ht:news_item': {
+            'ht:news_item_title': 'Single News',
+            'ht:news_item_snippet': 'Single Snippet',
+            'ht:news_item_url': 'http://single.com',
+            'ht:news_item_source': 'Single Source',
+          },
+        }],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchGoogleTrends('US', 'week');
+
+      expect(result[0].articles).toHaveLength(1);
+      expect(result[0].articles[0].title).toBe('Single News');
+      expect(result[0].heatScore).toBe(85);
+    });
+
+    it('should default geo to HK when empty', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({ items: [] });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      await service.fetchGoogleTrends('', 'today');
+
+      expect(mockParseURL).toHaveBeenCalledWith('https://trends.google.com/trending/rss?geo=HK');
+    });
+
+    it('should return empty array when feed has no items', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({ items: [] });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchGoogleTrends('HK', 'today');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw error when RSS parser fails', async () => {
+      const mockParseURL = jest.fn().mockRejectedValue(new Error('Network timeout'));
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      await expect(service.fetchGoogleTrends('HK', 'today')).rejects.toThrow('Google Trends 获取失败');
+    });
+  });
+
+  describe('parseTrafficToScore (private)', () => {
+    it('should return 50 for empty traffic', () => {
+      expect((service as any).parseTrafficToScore('')).toBe(50);
+    });
+
+    it('should return 98 for 50,000+', () => {
+      expect((service as any).parseTrafficToScore('50,000+')).toBe(98);
+    });
+
+    it('should return 95 for 20,000+', () => {
+      expect((service as any).parseTrafficToScore('20,000+')).toBe(95);
+    });
+
+    it('should return 90 for 10,000+', () => {
+      expect((service as any).parseTrafficToScore('10,000+')).toBe(90);
+    });
+
+    it('should return 85 for 5,000+', () => {
+      expect((service as any).parseTrafficToScore('5,000+')).toBe(85);
+    });
+
+    it('should return 80 for 2,000+', () => {
+      expect((service as any).parseTrafficToScore('2,000+')).toBe(80);
+    });
+
+    it('should return 75 for 1,000+', () => {
+      expect((service as any).parseTrafficToScore('1,000+')).toBe(75);
+    });
+
+    it('should return 70 for 500+', () => {
+      expect((service as any).parseTrafficToScore('500+')).toBe(70);
+    });
+
+    it('should return 65 for 200+', () => {
+      expect((service as any).parseTrafficToScore('200+')).toBe(65);
+    });
+
+    it('should return 60 for 100+', () => {
+      expect((service as any).parseTrafficToScore('100+')).toBe(60);
+    });
+
+    it('should return 50 for low traffic', () => {
+      expect((service as any).parseTrafficToScore('50+')).toBe(50);
+    });
+  });
+
+  describe('normalizeNewsItems (private)', () => {
+    it('should return empty array for null input', () => {
+      expect((service as any).normalizeNewsItems(null)).toEqual([]);
+    });
+
+    it('should return empty array for undefined input', () => {
+      expect((service as any).normalizeNewsItems(undefined)).toEqual([]);
+    });
+
+    it('should handle merged format with array properties', () => {
+      const input = {
+        'ht:news_item_title': ['Title 1', 'Title 2'],
+        'ht:news_item_snippet': ['Snippet 1', 'Snippet 2'],
+        'ht:news_item_url': ['http://a.com', 'http://b.com'],
+        'ht:news_item_source': ['Source A', 'Source B'],
+      };
+      const result = (service as any).normalizeNewsItems(input);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        title: 'Title 1',
+        snippet: 'Snippet 1',
+        url: 'http://a.com',
+        source: 'Source A',
+      });
+    });
+
+    it('should handle single object format', () => {
+      const input = {
+        'ht:news_item_title': 'Single Title',
+        'ht:news_item_snippet': 'Single Snippet',
+        'ht:news_item_url': 'http://single.com',
+        'ht:news_item_source': 'Single Source',
+      };
+      const result = (service as any).normalizeNewsItems(input);
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('Single Title');
+    });
+
+    it('should use title as snippet fallback when snippet is empty', () => {
+      const input = {
+        'ht:news_item_title': 'Title Only',
+        'ht:news_item_snippet': '',
+        'ht:news_item_url': 'http://x.com',
+        'ht:news_item_source': '',
+      };
+      const result = (service as any).normalizeNewsItems(input);
+      expect(result[0].snippet).toBe('Title Only');
     });
   });
 });
