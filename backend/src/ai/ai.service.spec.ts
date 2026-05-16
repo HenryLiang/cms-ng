@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+
 import { AIService } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
@@ -210,4 +211,51 @@ describe('AIService', () => {
       expect(result).toContain('暂时无法回答');
     });
   });
+
+  describe('generateDraft', () => {
+    it('should return parsed draft on success', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        title: 'Draft Title',
+        subtitle: 'Draft Subtitle',
+        content: '<p>Draft content</p>',
+      })));
+
+      const result = await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: ['tag1'],
+        currentTitle: 'Current Title',
+      });
+
+      expect(result.title).toBe('Draft Title');
+      expect(result.subtitle).toBe('Draft Subtitle');
+      expect(result.content).toBe('<p>Draft content</p>');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should return fallback on API failure', async () => {
+      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+
+      const result = await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+        currentTitle: 'Current Title',
+      });
+
+      expect(result.title).toBe('Current Title');
+      expect(result.content).toContain('暫時不可用');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should use storyTitle as fallback title when currentTitle missing', async () => {
+      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+
+      const result = await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+      });
+
+      expect(result.title).toBe('Story Title');
+    });
+  });
+
 });

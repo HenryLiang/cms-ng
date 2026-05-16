@@ -530,7 +530,11 @@ ${input.instruction ? '额外要求：' + input.instruction : ''}
           createdBy: userId,
         },
       });
-      throw error;
+      return {
+        title: input.currentTitle || input.storyTitle,
+        subtitle: '',
+        content: '<p>AI 初稿生成暫時不可用，請稍後重試。</p>',
+      };
     }
   }
 
