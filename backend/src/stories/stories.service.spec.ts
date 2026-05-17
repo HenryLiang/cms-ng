@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { StoriesService } from './stories.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AIService } from '../ai/ai.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 
 describe('StoriesService', () => {
@@ -15,6 +16,12 @@ describe('StoriesService', () => {
       providers: [
         StoriesService,
         { provide: PrismaService, useValue: prisma },
+        {
+          provide: AIService,
+          useValue: {
+            generateResearchKit: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -186,6 +193,59 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id', editorId: 'another-id' }));
 
       await expect(service.verifyAccess('story-id', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('generateResearchKit', () => {
+    it('should return research kit for existing story', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '["tag1"]' }));
+      const aiService = (service as any).aiService;
+      aiService.generateResearchKit.mockResolvedValue({
+        timeline: [{ date: '2024-01-01', event: 'E1' }],
+        people: [{ name: 'P1', role: 'R1' }],
+        data: [{ label: 'L1', value: 'V1' }],
+        opinions: [{ source: 'S1', viewpoint: 'V1' }],
+      });
+
+      const result = await service.generateResearchKit('user-id', 'story-id');
+
+      expect(prisma.story.findUnique).toHaveBeenCalledWith({ where: { id: 'story-id' } });
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith('user-id', expect.objectContaining({
+        storyTitle: 'Test Story',
+        storyDescription: 'Desc',
+        storyTags: ['tag1'],
+      }));
+      expect(result.timeline).toHaveLength(1);
+    });
+
+    it('should pass angle when present', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ angle: 'Angle', tags: '[]' }));
+      const aiService = (service as any).aiService;
+      aiService.generateResearchKit.mockResolvedValue({ timeline: [], people: [], data: [], opinions: [] });
+
+      await service.generateResearchKit('user-id', 'story-id');
+
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith('user-id', expect.objectContaining({
+        storyAngle: 'Angle',
+      }));
+    });
+
+    it('should handle empty tags string', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '' }));
+      const aiService = (service as any).aiService;
+      aiService.generateResearchKit.mockResolvedValue({ timeline: [], people: [], data: [], opinions: [] });
+
+      await service.generateResearchKit('user-id', 'story-id');
+
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith('user-id', expect.objectContaining({
+        storyTags: [],
+      }));
+    });
+
+    it('should throw NotFoundException when story not found', async () => {
+      prisma.story.findUnique.mockResolvedValue(null);
+
+      await expect(service.generateResearchKit('user-id', 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 

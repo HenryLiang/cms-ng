@@ -577,6 +577,7 @@
             <div class="nav-section-title">附录</div>
             <ul class="nav-list">
                 <li><a href="#glossary">术语表</a></li>
+                <li><a href="#data-sources">附录C：热点数据源规划</a></li>
                 <li><a href="#changelog">变更记录</a></li>
             </ul>
         </div>
@@ -592,7 +593,7 @@
                 <span>📄 产品需求文档</span>
                 <span>🏢 香港01</span>
                 <span>📅 2025年5月</span>
-                <span>🔖 v1.0 Draft</span>
+                <span>🔖 v1.1</span>
             </div>
         </div>
 
@@ -971,12 +972,50 @@
                 <h3>5.2 核心功能</h3>
 
                 <h4>5.2.1 热点雷达 (Trending Radar)</h4>
-                <p>实时聚合多源热点数据的可视化面板：</p>
+                <p>实时聚合多源热点数据的可视化面板。数据源按优先级分四级接入（详见<a href="#data-sources">附录C</a>），确保香港01记者掌握最全面、最及时的热点信息：</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>优先级</th>
+                            <th>数据层</th>
+                            <th>代表源</th>
+                            <th>覆盖维度</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="tag tag-red">P0</span></td>
+                            <td>核心信源</td>
+                            <td>Google Trends、新华网、路透、BBC、联合早报</td>
+                            <td>香港本地热搜、涉港政策、全球财经、国际政治</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-orange">P1</span></td>
+                            <td>扩展信源</td>
+                            <td>NewsAPI、澎湃新闻、卫报、RSSHub社交、36氪</td>
+                            <td>全网聚合、深度调查、社交热点、科技商业</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-green">P2</span></td>
+                            <td>补充信源</td>
+                            <td>德国之声、环球网、中国政府网</td>
+                            <td>欧洲视角、国际热点、权威政策原文</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-gray">P3</span></td>
+                            <td>评估中</td>
+                            <td>微博热搜API、头条热榜、CNN</td>
+                            <td>国内社交舆情、算法热点、美国视角</td>
+                        </tr>
+                    </tbody>
+                </table>
+
                 <ul>
-                    <li><strong>数据来源</strong>：香港本地新闻、社交媒体趋势（FB/IG/X）、Google Trends、论坛热帖等</li>
                     <li><strong>热度指标</strong>：AI计算综合热度分数，显示趋势方向（上升/下降/平稳）</li>
                     <li><strong>竞争度分析</strong>：标注已有多少家媒体跟进报道，提示"独家机会"或"红海提醒"</li>
                     <li><strong>关联推荐</strong>：点击一个热点，AI推荐相关的延伸选题角度</li>
+                    <li><strong>信源标签</strong>：每条热点标注来源类型（官方/国际/社交/聚合），方便记者判断可信度</li>
                 </ul>
 
                 <h4>5.2.2 AI选题推荐 (AI Story Suggestions)</h4>
@@ -2090,6 +2129,12 @@
                     </thead>
                     <tbody>
                         <tr>
+                            <td>v1.1</td>
+                            <td>2025-05-17</td>
+                            <td>新增附录C：热点数据源规划与接入路线图；更新5.2.1热点雷达数据源分级矩阵；补充20+外部信源优先级评估</td>
+                            <td>产品技术团队</td>
+                        </tr>
+                        <tr>
                             <td>v1.0</td>
                             <td>2025-05-13</td>
                             <td>初版PRD，包含产品概述、核心功能模块、技术架构、MVP范围</td>
@@ -2097,6 +2142,369 @@
                         </tr>
                     </tbody>
                 </table>
+            </section>
+
+            <!-- 附录C：热点数据源规划与接入路线图 -->
+            <section id="data-sources">
+                <h2>附录C：热点数据源规划与接入路线图</h2>
+                <p><span class="tag tag-red">战略级补充</span> <span class="tag tag-purple">直接影响选题中心核心价值</span></p>
+
+                <h3>C.1 优先级排序原则</h3>
+                <p>作为香港01媒体，数据源选择遵循以下权重：</p>
+                <ol>
+                    <li><strong>涉港相关性（40%）</strong>：与香港本地政治、经济、社会直接相关的内容优先</li>
+                    <li><strong>权威可信度（25%）</strong>：官方、主流媒体优先于社交媒体</li>
+                    <li><strong>接入成本（20%）</strong>：免费RSS/API优先，付费/认证源次后</li>
+                    <li><strong>更新频率（15%）</strong>：实时/分钟级优先于小时级</li>
+                </ol>
+
+                <div class="warning-box">
+                    <p><strong>版权与合规声明</strong></p>
+                    <p style="margin-top:8px">所有RSS数据源仅用于热点标题/摘要聚合与选题发现，不存储全文内容。引用原文需跳转至原站。API接入需遵守各平台Terms of Service。</p>
+                </div>
+
+                <h3>C.2 P0 — 核心信源（立即接入）</h3>
+                <p>已接入或免费公开RSS，与香港01报道范围高度相关，零额外成本。</p>
+                <table>
+                    <thead>
+                        <tr><th>排名</th><th>数据源</th><th>类型</th><th>接入方式</th><th>频率</th><th>香港01价值</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td><strong>Google Trends RSS</strong></td>
+                            <td>搜索趋势</td>
+                            <td>公开RSS（已接入）</td>
+                            <td>实时</td>
+                            <td>香港本地热搜、多地区对比（HK/CN/US/GB/TW）</td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td><strong>新华网 RSS</strong></td>
+                            <td>国内权威</td>
+                            <td>公开RSS：xinhuanet.com/politics/news_politics.xml</td>
+                            <td>分钟级</td>
+                            <td>涉港政策首发、中央对港政策、大湾区新闻</td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td><strong>路透 Reuters RSS</strong></td>
+                            <td>国际主流</td>
+                            <td>公开RSS：reutersagency.com/feed/?taxonomy=best-topics</td>
+                            <td>秒级</td>
+                            <td>香港国际金融中心地位，全球财经突发</td>
+                        </tr>
+                        <tr>
+                            <td>4</td>
+                            <td><strong>BBC News RSS</strong></td>
+                            <td>国际主流</td>
+                            <td>公开RSS：feeds.bbci.co.uk/news/world/rss.xml</td>
+                            <td>分钟级</td>
+                            <td>全球政治文化，香港读者国际视野</td>
+                        </tr>
+                        <tr>
+                            <td>5</td>
+                            <td><strong>联合早报 RSS</strong></td>
+                            <td>国际中文</td>
+                            <td>公开RSS（中文站底部）</td>
+                            <td>小时级</td>
+                            <td>中立中文国际视角，东南亚视角补充</td>
+                        </tr>
+                        <tr>
+                            <td>6</td>
+                            <td><strong>人民网 RSS</strong></td>
+                            <td>国内权威</td>
+                            <td>公开RSS：people.com.cn/rss/politics.xml</td>
+                            <td>5-15分钟</td>
+                            <td>权威评论、时政解读、涉港报道</td>
+                        </tr>
+                        <tr>
+                            <td>7</td>
+                            <td><strong>香港政府新闻网</strong></td>
+                            <td>香港本地</td>
+                            <td>公开RSS</td>
+                            <td>小时级</td>
+                            <td>香港政策首发、政府发布会、官方公告</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>C.3 P1 — 扩展信源（近期接入）</h3>
+                <p>免费RSS或有限免费API，覆盖深度报道、社交热点、科技商业等补充维度。</p>
+                <table>
+                    <thead>
+                        <tr><th>排名</th><th>数据源</th><th>类型</th><th>接入方式</th><th>频率</th><th>成本</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>7</td>
+                            <td><strong>NewsAPI.org</strong></td>
+                            <td>通用聚合</td>
+                            <td>免费API：newsapi.org/v2（100次/天）</td>
+                            <td>按需</td>
+                            <td>免费额度有限，开发验证用</td>
+                        </tr>
+                        <tr>
+                            <td>8</td>
+                            <td><strong>澎湃新闻 RSS</strong></td>
+                            <td>国内深度</td>
+                            <td>公开RSS（站内"订阅-RSS"）</td>
+                            <td>分钟级</td>
+                            <td>免费</td>
+                        </tr>
+                        <tr>
+                            <td>9</td>
+                            <td><strong>卫报 The Guardian API</strong></td>
+                            <td>国际深度</td>
+                            <td>免费API：content.guardianapis.com（非商用）</td>
+                            <td>按需</td>
+                            <td>免费（非商用）</td>
+                        </tr>
+                        <tr>
+                            <td>10</td>
+                            <td><strong>RSSHub — 知乎热榜</strong></td>
+                            <td>社交聚合</td>
+                            <td>RSSHub：/zhihu/hot</td>
+                            <td>15-30分钟</td>
+                            <td>免费</td>
+                        </tr>
+                        <tr>
+                            <td>11</td>
+                            <td><strong>RSSHub — 微博热搜</strong></td>
+                            <td>社交聚合</td>
+                            <td>RSSHub：/weibo/hot</td>
+                            <td>5分钟</td>
+                            <td>免费</td>
+                        </tr>
+                        <tr>
+                            <td>12</td>
+                            <td><strong>央视新闻 RSS</strong></td>
+                            <td>国内视频</td>
+                            <td>公开RSS：cctv.com/program/rss/02/01/index.xml</td>
+                            <td>分钟级</td>
+                            <td>免费</td>
+                        </tr>
+                        <tr>
+                            <td>13</td>
+                            <td><strong>36氪 RSS</strong></td>
+                            <td>科技商业</td>
+                            <td>公开RSS（站内提供科技/创投RSS）</td>
+                            <td>15分钟</td>
+                            <td>免费</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>C.4 P2 — 补充信源（中期接入）</h3>
+                <p>特定场景有价值，但更新频率较低或覆盖维度已有部分重叠。</p>
+                <table>
+                    <thead>
+                        <tr><th>数据源</th><th>类型</th><th>接入方式</th><th>适用场景</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>德国之声 DW 中文</strong></td>
+                            <td>国际中文</td>
+                            <td>公开RSS（DW中文站）</td>
+                            <td>欧洲视角、国际政治深度分析</td>
+                        </tr>
+                        <tr>
+                            <td><strong>环球网 RSS</strong></td>
+                            <td>国内国际</td>
+                            <td>公开RSS（网站底部频道RSS）</td>
+                            <td>国际热点、涉华报道</td>
+                        </tr>
+                        <tr>
+                            <td><strong>中国政府网 RSS</strong></td>
+                            <td>国内政策</td>
+                            <td>公开RSS（站内"RSS订阅"）</td>
+                            <td>最权威政策原文、国务院发布会</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Bing News API</strong></td>
+                            <td>聚合API</td>
+                            <td>Azure按量付费</td>
+                            <td>实体识别、话题聚类（需预算评估）</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>C.5 P3 — 评估中信源（待决策）</h3>
+                <p>高接入成本或中立性存疑，需编辑部评估后再决定是否接入。</p>
+                <table>
+                    <thead>
+                        <tr><th>数据源</th><th>类型</th><th>接入方式</th><th>顾虑</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>微博热搜 API</strong></td>
+                            <td>国内社交</td>
+                            <td>需开发者认证（AppKey+Secret），高频付费</td>
+                            <td>接入成本高，RSSHub微博热搜可作为免费替代</td>
+                        </tr>
+                        <tr>
+                            <td><strong>头条/抖音热榜 API</strong></td>
+                            <td>算法推荐</td>
+                            <td>需企业/媒体认证</td>
+                            <td>认证门槛高，下沉舆情与香港01受众匹配度待验证</td>
+                        </tr>
+                        <tr>
+                            <td><strong>RT 中文（今日俄罗斯）</strong></td>
+                            <td>国际中文</td>
+                            <td>公开RSS</td>
+                            <td>中立性存疑，需编辑部评估是否纳入</td>
+                        </tr>
+                        <tr>
+                            <td><strong>CNN RSS</strong></td>
+                            <td>美国主流</td>
+                            <td>公开RSS</td>
+                            <td>美国视角，与BBC/路透覆盖重叠度高</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>C.6 必须补充的香港本地数据源</h3>
+                <p>以下信源未在用户提供的清单中，但对香港01<strong>至关重要</strong>，需单独开发接入：</p>
+                <table>
+                    <thead>
+                        <tr><th>数据源</th><th>类型</th><th>接入方式</th><th>紧急程度</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>LIHKG（连登）</strong></td>
+                            <td>香港本地论坛</td>
+                            <td>需爬虫/RSSHub</td>
+                            <td><span class="tag tag-red">高</span> — 香港本地舆情风向标</td>
+                        </tr>
+                        <tr>
+                            <td><strong>香港高登</strong></td>
+                            <td>香港本地论坛</td>
+                            <td>需爬虫/RSSHub</td>
+                            <td><span class="tag tag-orange">中</span> — 补充本地青年舆情</td>
+                        </tr>
+                        <tr>
+                            <td><strong>香港电台 RTHK</strong></td>
+                            <td>香港公共广播</td>
+                            <td>公开RSS</td>
+                            <td><span class="tag tag-red">高</span> — 香港本地新闻权威源</td>
+                        </tr>
+                        <tr>
+                            <td><strong>南华早报 SCMP</strong></td>
+                            <td>香港英文媒体</td>
+                            <td>公开RSS/需订阅</td>
+                            <td><span class="tag tag-orange">中</span> — 竞争对手监测+国际视角</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Facebook Trending（香港）</strong></td>
+                            <td>香港社交趋势</td>
+                            <td>Meta API（需申请）</td>
+                            <td><span class="tag tag-orange">中</span> — 已在PRD 5.2.1提及</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>C.7 技术接入规范</h3>
+
+                <h4>C.7.1 统一数据格式</h4>
+                <p>所有数据源接入后需标准化为统一JSON结构：</p>
+                <div class="model-diagram" style="margin:16px 0;">
+{
+  "source": "xinhua-rss",
+  "sourceName": "新华网",
+  "sourceType": "official",     // official / international / social / aggregate
+  "title": "...",
+  "description": "...",
+  "url": "...",
+  "publishedAt": "2025-05-17T08:00:00Z",
+  "heatScore": 85,              // 统一热度分 0-100
+  "trend": "rising",            // rising / falling / stable
+  "tags": ["政治", "香港"],
+  "language": "zh-CN",          // zh-CN / zh-TW / en
+  "region": "mainland",         // hk / mainland / international / global
+  "rawData": { ... }            // 原始数据保留
+}
+                </div>
+
+                <h4>C.7.2 推荐接入架构</h4>
+                <div class="flow-step">
+                    <div class="flow-number">1</div>
+                    <div class="flow-content">
+                        <h4>RSS 源直接拉取</h4>
+                        <p>新华网、路透、BBC、联合早报、人民网等公开RSS → rss-parser 库定时拉取</p>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">2</div>
+                    <div class="flow-content">
+                        <h4>RSSHub 兜底聚合</h4>
+                        <p>知乎热榜、微博热搜、澎湃新闻等无官方RSS → RSSHub 公共实例或自建 Docker 生成标准RSS</p>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">3</div>
+                    <div class="flow-content">
+                        <h4>API 聚合层</h4>
+                        <p>NewsAPI.org、卫报API、Google Trends → 统一封装为内部服务，按配额调度</p>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">4</div>
+                    <div class="flow-content">
+                        <h4>AI 去重与热度计算</h4>
+                        <p>不同来源的同一事件去重 → AI计算综合热度分 → 按记者专长标签匹配推荐</p>
+                    </div>
+                </div>
+
+                <h4>C.7.3 更新频率与调度策略</h4>
+                <table>
+                    <thead>
+                        <tr><th>数据源类型</th><th>拉取频率</th><th>调度方式</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>实时/秒级（路透、突发）</td>
+                            <td>每2分钟</td>
+                            <td>NestJS Cron + Bull Queue</td>
+                        </tr>
+                        <tr>
+                            <td>分钟级（新华网、BBC、澎湃）</td>
+                            <td>每5分钟</td>
+                            <td>NestJS Cron</td>
+                        </tr>
+                        <tr>
+                            <td>小时级（联合早报、政府网）</td>
+                            <td>每30分钟</td>
+                            <td>NestJS Cron</td>
+                        </tr>
+                        <tr>
+                            <td>API聚合（NewsAPI）</td>
+                            <td>每15分钟（受配额限制）</td>
+                            <td>配额感知的限流调度</td>
+                        </tr>
+                        <tr>
+                            <td>社交/RSSHub（知乎、微博）</td>
+                            <td>每5-10分钟</td>
+                            <td>NestJS Cron</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>C.8 最小可行接入方案（立即启动）</h3>
+                <div class="success-box">
+                    <p><strong>Week 1 目标：覆盖 95% 核心热点</strong></p>
+                    <ol style="margin-top:8px">
+                        <li>保留已接入的 Google Trends RSS（HK/CN/TW/US/GB）</li>
+                        <li>新增 新华网 RSS + 人民网 RSS（涉港政策+权威评论）</li>
+                        <li>新增 路透 RSS + BBC RSS（全球财经+国际政治）</li>
+                        <li>新增 联合早报 RSS（中文国际视角）</li>
+                        <li>新增 RSSHub 知乎热榜 + 微博热搜（国内社交舆情）</li>
+                        <li>NewsAPI.org 作为兜底补漏（每日100次免费额度）</li>
+                    </ol>
+                    <p style="margin-top:8px"><strong>技术栈</strong>：rss-parser + RSSHub + NewsAPI SDK，统一封装在 backend/src/trending-topics/ 下</p>
+                </div>
             </section>
 
             <!-- 页脚 -->

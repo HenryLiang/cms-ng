@@ -14,6 +14,7 @@ import {
   ChatWithAIDto,
   GenerateDraftDto,
   FactCheckDto,
+  ReviewReportDto,
 } from './dto/ai-operations.dto';
 
 @Injectable()
@@ -410,6 +411,20 @@ export class ArticlesService {
   ) {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.factCheck(user.userId, id, {
+      title: article.title,
+      subtitle: article.subtitle || undefined,
+      content: article.content,
+    });
+    return result;
+  }
+
+  async aiReview(
+    id: string,
+    user: { userId: string; role: string },
+    _dto: ReviewReportDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.generateReviewReport(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,

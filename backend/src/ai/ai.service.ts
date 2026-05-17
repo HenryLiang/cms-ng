@@ -17,6 +17,10 @@ import {
   DraftResult,
   FactCheckInput,
   FactCheckResult,
+  ResearchKitInput,
+  ResearchKitResult,
+  ReviewReportInput,
+  ReviewReportResult,
 } from './dto/writing-operations.dto';
 
 @Injectable()
@@ -71,7 +75,7 @@ export class AIService {
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 30000,
+          timeout: 300000,
         },
       );
 
@@ -237,7 +241,7 @@ ${input.content.slice(0, 500)}
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 30000,
+          timeout: 300000,
         },
       );
 
@@ -316,7 +320,7 @@ ${input.content.slice(0, 2000)}
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 30000,
+          timeout: 300000,
         },
       );
 
@@ -398,7 +402,7 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 30000,
+          timeout: 300000,
         },
       );
 
@@ -491,7 +495,7 @@ ${input.instruction ? '额外要求：' + input.instruction : ''}
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 180000,
+          timeout: 300000,
         },
       );
 
@@ -615,7 +619,7 @@ type 取值说明：
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 45000,
+          timeout: 300000,
         },
       );
 
@@ -664,6 +668,248 @@ type 取值说明：
     }
   }
 
+  // ===== 智能资料搜集 =====
+  async generateResearchKit(
+    userId: string,
+    input: ResearchKitInput,
+  ): Promise<ResearchKitResult> {
+    const startTime = Date.now();
+
+    const tagsStr = input.storyTags.join(', ') || '未指定';
+    const prompt = `请为以下新闻选题搜集并整理背景资料，生成结构化资料包。
+
+选题标题：${input.storyTitle}
+${input.storyDescription ? '选题描述：' + input.storyDescription : ''}
+${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
+相关标签：${tagsStr}
+
+请从以下几个方面整理资料：
+1. 事件时间线：按时间顺序列出关键事件节点
+2. 关键人物：涉及的主要人物及其背景、立场
+3. 核心数据：相关统计数据、调查结果
+4. 各方观点：不同立场的观点和评论
+
+请输出以下 JSON 格式：
+{
+  "timeline": [
+    { "date": "YYYY-MM-DD", "event": "事件描述", "source": "来源（可选）" }
+  ],
+  "people": [
+    { "name": "姓名", "role": "角色", "background": "背景简介（可选）" }
+  ],
+  "data": [
+    { "label": "数据标签", "value": "数据值", "source": "来源（可选）" }
+  ],
+  "opinions": [
+    { "source": "观点来源", "viewpoint": "观点内容", "stance": "立场（可选）" }
+  ]
+}
+
+注意：
+- 所有内容使用繁体中文
+- 如果某类信息无法获取，返回空数组
+- 不要编造不存在的信息，仅基于你的知识提供分析框架和已知信息`;
+
+    try {
+      const response = await axios.post(
+        `${this.apiBase}/chat/completions`,
+        {
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: '你是一位资深新闻研究员，擅长快速搜集和整理背景资料。请用繁体中文回答。输出必须是有效的 JSON 格式。',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: this.getTemperature(0.4),
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 300000,
+        },
+      );
+
+      const content = response.data.choices[0]?.message?.content || '';
+      const parsed = JSON.parse(content);
+      const result: ResearchKitResult = {
+        timeline: Array.isArray(parsed.timeline) ? parsed.timeline : [],
+        people: Array.isArray(parsed.people) ? parsed.people : [],
+        data: Array.isArray(parsed.data) ? parsed.data : [],
+        opinions: Array.isArray(parsed.opinions) ? parsed.opinions : [],
+      };
+
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'RESEARCH',
+          action: 'generate_research_kit',
+          prompt,
+          result: JSON.stringify(result),
+          model: this.model,
+          tokensUsed: response.data.usage?.total_tokens,
+          durationMs: Date.now() - startTime,
+          createdBy: userId,
+        },
+      });
+
+      return result;
+    } catch (error: any) {
+      this.logger.error('Research kit generation failed:', error.message);
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'RESEARCH',
+          action: 'generate_research_kit',
+          prompt,
+          result: JSON.stringify({ error: error.message }),
+          model: this.model,
+          durationMs: Date.now() - startTime,
+          createdBy: userId,
+        },
+      });
+      return {
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      };
+    }
+  }
+
+  // ===== AI 预审报告 =====
+  async generateReviewReport(
+    userId: string,
+    articleId: string | undefined,
+    input: ReviewReportInput,
+  ): Promise<ReviewReportResult> {
+    const startTime = Date.now();
+
+    const prompt = `请对以下新闻稿件进行综合性质量预审评估。
+
+稿件标题：${input.title}
+${input.subtitle ? '副标题：' + input.subtitle : ''}
+正文内容：
+${input.content.replace(/<[^>]+>/g, '').slice(0, 2000)}
+
+请从以下五个维度进行评估，每个维度给出 0-100 的分数和简要评语：
+
+1. **结构完整性**：文章结构是否清晰，段落衔接是否流畅，是否具备完整的新闻要素（导语、主体、结尾）
+2. **语言表达**：用词是否准确，语句是否通顺，是否存在语法错误或歧义表述
+3. **可读性**：段落长度是否适中，信息密度是否合理，读者阅读体验如何
+4. **新闻价值**：选题角度是否新颖，信息是否有时效性，是否具有公共关注度
+5. **专业性**：术语使用是否恰当，数据引用是否规范，行业背景是否准确
+
+请输出以下 JSON 格式：
+{
+  "overallScore": 78,
+  "summary": "总体评估摘要，100字以内",
+  "dimensions": [
+    {
+      "name": "结构完整性",
+      "score": 80,
+      "maxScore": 100,
+      "comment": "该维度评语"
+    }
+  ],
+  "suggestions": [
+    {
+      "dimension": "结构完整性",
+      "priority": "high",
+      "suggestion": "具体改进建议"
+    }
+  ]
+}
+
+priority 取值说明：
+- high：重要问题，建议优先修改
+- medium：一般问题，建议考虑改进
+- low：轻微问题，可酌情优化
+
+注意：请用繁体中文回答，给出建设性、具体可执行的改进建议。`;
+
+    try {
+      const response = await axios.post(
+        `${this.apiBase}/chat/completions`,
+        {
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: '你是一位资深新闻总编辑，擅长稿件质量评估和编辑指导。请用繁体中文回答。输出必须是有效的 JSON 格式。',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: this.getTemperature(0.4),
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 300000,
+        },
+      );
+
+      const content = response.data.choices[0]?.message?.content || '';
+      const parsed = JSON.parse(content);
+      const result: ReviewReportResult = {
+        overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
+        summary: parsed.summary || '已完成稿件质量预审评估',
+        dimensions: Array.isArray(parsed.dimensions) ? parsed.dimensions.map((d: any) => ({
+          name: d.name || '未知维度',
+          score: Math.min(100, Math.max(0, d.score ?? 50)),
+          maxScore: d.maxScore || 100,
+          comment: d.comment || '',
+        })) : [],
+        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map((s: any) => ({
+          dimension: s.dimension || '综合',
+          priority: ['high', 'medium', 'low'].includes(s.priority) ? s.priority : 'medium',
+          suggestion: s.suggestion || '',
+        })) : [],
+      };
+
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'review_report',
+          prompt,
+          result: JSON.stringify(result),
+          model: this.model,
+          tokensUsed: response.data.usage?.total_tokens,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+
+      return result;
+    } catch (error: any) {
+      this.logger.error('Review report generation failed:', error.message);
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'review_report',
+          prompt,
+          result: JSON.stringify({ error: error.message }),
+          model: this.model,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+      return {
+        overallScore: 0,
+        summary: '预审报告生成失败，请稍后重试',
+        dimensions: [],
+        suggestions: [],
+      };
+    }
+  }
+
   // ===== 通用文本 AI 调用 =====
   private async callTextAI(
     userId: string,
@@ -693,7 +939,7 @@ type 取值说明：
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 30000,
+          timeout: 300000,
         },
       );
 

@@ -24,6 +24,8 @@ describe('ArticlesController', () => {
     aiHeadlines: jest.Mock;
     aiExcerpt: jest.Mock;
     aiChat: jest.Mock;
+    aiFactCheck: jest.Mock;
+    aiReview: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -46,6 +48,8 @@ describe('ArticlesController', () => {
       aiHeadlines: jest.fn(),
       aiExcerpt: jest.fn(),
       aiChat: jest.fn(),
+      aiFactCheck: jest.fn(),
+      aiReview: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -224,6 +228,8 @@ describe('ArticlesController', () => {
     { name: 'aiHeadlines', method: 'aiHeadlines' as const, dto: { count: 3 } },
     { name: 'aiExcerpt', method: 'aiExcerpt' as const, dto: { maxLength: 100 } },
     { name: 'aiChat', method: 'aiChat' as const, dto: { messages: [] } },
+    { name: 'aiFactCheck', method: 'aiFactCheck' as const, dto: {} },
+    { name: 'aiReview', method: 'aiReview' as const, dto: {} },
   ];
 
   aiTests.forEach(({ name, method, dto }) => {

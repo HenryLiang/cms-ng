@@ -67,4 +67,13 @@ export class StoriesController {
   ) {
     return this.storiesService.assignEditor(id, editorId);
   }
+
+  @Post(':id/research')
+  async generateResearchKit(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    await this.storiesService.verifyAccess(id, user);
+    return this.storiesService.generateResearchKit(user.userId, id);
+  }
 }

@@ -55,3 +55,40 @@ export async function updateStory(id: string, data: UpdateStoryInput): Promise<S
 export async function deleteStory(id: string): Promise<void> {
   await api.delete(`/stories/${id}`);
 }
+
+export interface ResearchKitTimelineEvent {
+  date: string;
+  event: string;
+  source?: string;
+}
+
+export interface ResearchKitPerson {
+  name: string;
+  role: string;
+  background?: string;
+}
+
+export interface ResearchKitDataPoint {
+  label: string;
+  value: string;
+  source?: string;
+}
+
+export interface ResearchKitOpinion {
+  source: string;
+  viewpoint: string;
+  stance?: string;
+}
+
+export interface ResearchKitResult {
+  timeline: ResearchKitTimelineEvent[];
+  people: ResearchKitPerson[];
+  data: ResearchKitDataPoint[];
+  opinions: ResearchKitOpinion[];
+  relatedArticles?: string[];
+}
+
+export async function generateResearchKit(storyId: string): Promise<ResearchKitResult> {
+  const res = await api.post(`/stories/${storyId}/research`);
+  return res.data;
+}

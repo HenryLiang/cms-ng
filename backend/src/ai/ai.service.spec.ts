@@ -261,4 +261,354 @@ describe('AIService', () => {
     });
   });
 
+  describe('factCheck', () => {
+    it('should return fact-check result with score and findings on success', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        score: 85,
+        summary: 'Overall assessment summary',
+        findings: [
+          { type: 'fact', text: 'Fact A', message: 'Check this', severity: 'info' },
+          { type: 'risk', text: 'Risk B', message: 'Be careful', severity: 'warning' },
+        ],
+      })));
+
+      const result = await service.factCheck('user-id', 'article-id', {
+        title: 'Test Article',
+        content: '<p>Article content</p>',
+      });
+
+      expect(result.score).toBe(85);
+      expect(result.summary).toBe('Overall assessment summary');
+      expect(result.findings).toHaveLength(2);
+      expect(result.findings[0].type).toBe('fact');
+      expect(result.findings[1].severity).toBe('warning');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should clamp score to 0-100 range', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        score: 150,
+        summary: 'Test',
+        findings: [],
+      })));
+
+      const resultHigh = await service.factCheck('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(resultHigh.score).toBe(100);
+
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        score: -20,
+        summary: 'Test',
+        findings: [],
+      })));
+
+      const resultLow = await service.factCheck('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(resultLow.score).toBe(0);
+    });
+
+    it('should default score to 50 when missing', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        summary: 'No score provided',
+        findings: [],
+      })));
+
+      const result = await service.factCheck('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.score).toBe(50);
+    });
+
+    it('should handle findings that are not an array', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        score: 70,
+        summary: 'Test',
+        findings: null,
+      })));
+
+      const result = await service.factCheck('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.findings).toEqual([]);
+    });
+
+    it('should return fallback on API failure', async () => {
+      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+
+      const result = await service.factCheck('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.score).toBe(0);
+      expect(result.summary).toContain('暂时不可用');
+      expect(result.findings).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should strip HTML tags from content before sending to AI', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        score: 80,
+        summary: 'Good',
+        findings: [],
+      })));
+
+      await service.factCheck('user-id', 'article-id', {
+        title: 'Test',
+        content: '<p>Paragraph 1</p><p>Paragraph 2</p>',
+      });
+
+      const callArgs = mockedAxios.post.mock.calls[0];
+      const requestBody = callArgs[1];
+      const prompt = requestBody.messages[1].content;
+      expect(prompt).not.toContain('<p>');
+      expect(prompt).toContain('Paragraph 1');
+    });
+  });
+
+  describe('generateReviewReport', () => {
+    it('should return parsed review report on success', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: 78,
+        summary: 'Structure is clear, language is fluent',
+        dimensions: [
+          { name: 'Structure', score: 80, maxScore: 100, comment: 'Good structure' },
+          { name: 'Language', score: 75, maxScore: 100, comment: 'Fluent' },
+        ],
+        suggestions: [
+          { dimension: 'Structure', priority: 'high', suggestion: 'Add more background' },
+          { dimension: 'Language', priority: 'medium', suggestion: 'Simplify sentences' },
+        ],
+      })));
+
+      const result = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test Article',
+        content: 'Article content',
+      });
+
+      expect(result.overallScore).toBe(78);
+      expect(result.summary).toBe('Structure is clear, language is fluent');
+      expect(result.dimensions).toHaveLength(2);
+      expect(result.dimensions[0].name).toBe('Structure');
+      expect(result.dimensions[0].score).toBe(80);
+      expect(result.suggestions).toHaveLength(2);
+      expect(result.suggestions[0].priority).toBe('high');
+      expect(result.suggestions[0].suggestion).toBe('Add more background');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should clamp overallScore to 0-100', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: 150,
+        summary: 'Test high',
+        dimensions: [],
+        suggestions: [],
+      })));
+
+      const resultHigh = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(resultHigh.overallScore).toBe(100);
+
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: -10,
+        summary: 'Test low',
+        dimensions: [],
+        suggestions: [],
+      })));
+
+      const resultLow = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(resultLow.overallScore).toBe(0);
+    });
+
+    it('should clamp each dimension score to 0-100', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: 50,
+        summary: 'Test',
+        dimensions: [
+          { name: 'Over', score: 200, maxScore: 100, comment: '' },
+          { name: 'Under', score: -50, maxScore: 100, comment: '' },
+        ],
+        suggestions: [],
+      })));
+
+      const result = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.dimensions[0].score).toBe(100);
+      expect(result.dimensions[1].score).toBe(0);
+    });
+
+    it('should validate suggestion priority to high/medium/low', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: 50,
+        summary: 'Test',
+        dimensions: [],
+        suggestions: [
+          { dimension: 'A', priority: 'invalid', suggestion: 'S1' },
+          { dimension: 'B', priority: 'high', suggestion: 'S2' },
+          { dimension: 'C', priority: null, suggestion: 'S3' },
+        ],
+      })));
+
+      const result = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.suggestions[0].priority).toBe('medium');
+      expect(result.suggestions[1].priority).toBe('high');
+      expect(result.suggestions[2].priority).toBe('medium');
+    });
+
+    it('should return fallback on API failure', async () => {
+      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+
+      const result = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(0);
+      expect(result.summary).toContain('失败');
+      expect(result.dimensions).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should handle non-array dimensions and suggestions', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: 60,
+        summary: 'Test',
+        dimensions: null,
+        suggestions: 'invalid',
+      })));
+
+      const result = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.dimensions).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+    });
+
+    it('should strip HTML tags from content before sending to AI', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        overallScore: 80,
+        summary: 'Good',
+        dimensions: [],
+        suggestions: [],
+      })));
+
+      await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: '<p>Paragraph 1</p><p>Paragraph 2</p>',
+      });
+
+      const callArgs = mockedAxios.post.mock.calls[0];
+      const requestBody = callArgs[1];
+      const prompt = requestBody.messages[1].content;
+      expect(prompt).not.toContain('<p>');
+      expect(prompt).toContain('Paragraph 1');
+    });
+  });
+
+  describe('generateResearchKit', () => {
+    it('should return research kit with all four dimensions on success', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
+        people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
+        data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
+        opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
+      })));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Story Title',
+        storyDescription: 'Story Description',
+        storyAngle: 'Story Angle',
+        storyTags: ['tag1', 'tag2'],
+      });
+
+      expect(result.timeline).toHaveLength(1);
+      expect(result.people).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
+      expect(result.opinions).toHaveLength(1);
+      expect(result.timeline[0].date).toBe('2024-01-01');
+      expect(result.people[0].name).toBe('Person A');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should handle missing optional fields in input', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      })));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+      });
+
+      expect(result.timeline).toEqual([]);
+      expect(result.people).toEqual([]);
+      expect(result.data).toEqual([]);
+      expect(result.opinions).toEqual([]);
+    });
+
+    it('should return empty arrays for non-array response fields', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        timeline: null,
+        people: 'invalid',
+        data: undefined,
+        opinions: [{ source: 'S', viewpoint: 'V' }],
+      })));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Story Title',
+        storyTags: ['tag1'],
+      });
+
+      expect(result.timeline).toEqual([]);
+      expect(result.people).toEqual([]);
+      expect(result.data).toEqual([]);
+      expect(result.opinions).toHaveLength(1);
+    });
+
+    it('should return fallback on API failure', async () => {
+      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Story Title',
+        storyTags: ['tag1'],
+      });
+
+      expect(result.timeline).toEqual([]);
+      expect(result.people).toEqual([]);
+      expect(result.data).toEqual([]);
+      expect(result.opinions).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+  });
+
 });

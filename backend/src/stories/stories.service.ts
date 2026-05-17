@@ -1,12 +1,17 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AIService } from '../ai/ai.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { ArticleStatus, UserRole } from '@cms-ng/shared';
+import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 
 @Injectable()
 export class StoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private aiService: AIService,
+  ) {}
 
   async create(reporterId: string, dto: CreateStoryDto) {
     const story = await this.prisma.story.create({
@@ -146,6 +151,20 @@ export class StoriesService {
       },
     });
     return this.serializeStory(updated);
+  }
+
+  async generateResearchKit(userId: string, storyId: string): Promise<ResearchKitResult> {
+    const story = await this.prisma.story.findUnique({ where: { id: storyId } });
+    if (!story) throw new NotFoundException('Story not found');
+
+    const tags = JSON.parse(story.tags || '[]') as string[];
+
+    return this.aiService.generateResearchKit(userId, {
+      storyTitle: story.title,
+      storyDescription: story.description || undefined,
+      storyAngle: story.angle || undefined,
+      storyTags: tags,
+    });
   }
 
   private serializeStory(story: any) {

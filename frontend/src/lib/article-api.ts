@@ -158,3 +158,28 @@ export async function aiFactCheck(id: string): Promise<FactCheckResult> {
   const res = await api.post(`/articles/${id}/ai-fact-check`);
   return res.data;
 }
+
+export interface ReviewDimension {
+  name: string;
+  score: number;
+  maxScore: number;
+  comment: string;
+}
+
+export interface ReviewSuggestion {
+  dimension: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestion: string;
+}
+
+export interface ReviewReportResult {
+  overallScore: number;
+  summary: string;
+  dimensions: ReviewDimension[];
+  suggestions: ReviewSuggestion[];
+}
+
+export async function aiReviewReport(id: string): Promise<ReviewReportResult> {
+  const res = await api.post(`/articles/${id}/ai-review`);
+  return res.data;
+}

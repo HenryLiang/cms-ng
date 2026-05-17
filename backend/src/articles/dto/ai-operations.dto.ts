@@ -70,3 +70,5 @@ export class GenerateDraftDto {
 }
 
 export class FactCheckDto {}
+
+export class ReviewReportDto {}

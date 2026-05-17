@@ -13,6 +13,7 @@ describe('StoriesController', () => {
     remove: jest.Mock;
     verifyAccess: jest.Mock;
     assignEditor: jest.Mock;
+    generateResearchKit: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -24,6 +25,7 @@ describe('StoriesController', () => {
       remove: jest.fn(),
       verifyAccess: jest.fn(),
       assignEditor: jest.fn(),
+      generateResearchKit: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -129,6 +131,34 @@ describe('StoriesController', () => {
 
       expect(storiesService.assignEditor).toHaveBeenCalledWith('story-id', 'editor-id');
       expect(result.editorId).toBe('editor-id');
+    });
+  });
+
+  describe('generateResearchKit', () => {
+    it('should verify access and call generateResearchKit', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
+      storiesService.generateResearchKit.mockResolvedValue({
+        timeline: [], people: [], data: [], opinions: [],
+      });
+
+      const result = await controller.generateResearchKit('story-id', mockUser);
+
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
+      expect(storiesService.generateResearchKit).toHaveBeenCalledWith('user-id', 'story-id');
+      expect(result.timeline).toEqual([]);
+    });
+
+    it('should allow admin to generate research kit', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
+      storiesService.generateResearchKit.mockResolvedValue({
+        timeline: [{ date: '2024-01-01', event: 'E1' }],
+        people: [], data: [], opinions: [],
+      });
+
+      const result = await controller.generateResearchKit('story-id', mockAdmin);
+
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockAdmin);
+      expect(result.timeline).toHaveLength(1);
     });
   });
 });

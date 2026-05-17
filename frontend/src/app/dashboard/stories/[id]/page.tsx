@@ -3,9 +3,31 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getStory, updateStory, deleteStory, type Story } from '@/lib/story-api';
+import {
+  getStory,
+  updateStory,
+  deleteStory,
+  generateResearchKit,
+  type Story,
+  type ResearchKitResult,
+} from '@/lib/story-api';
 import { getArticles, createArticle, type Article } from '@/lib/article-api';
-import { ArrowLeft, Plus, Trash2, FileText, Loader2, Save } from 'lucide-react';
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  FileText,
+  Loader2,
+  Save,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Users,
+  BarChart3,
+  MessageSquare,
+} from 'lucide-react';
+import ResearchKitPanel from '@/components/research-kit-panel';
 
 export default function StoryDetailPage() {
   const router = useRouter();
@@ -17,6 +39,12 @@ export default function StoryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Research kit state
+  const [researchKit, setResearchKit] = useState<ResearchKitResult | null>(null);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [showResearchPanel, setShowResearchPanel] = useState(false);
+  const [activeResearchTab, setActiveResearchTab] = useState<'timeline' | 'people' | 'data' | 'opinions'>('timeline');
 
   // Edit form state
   const [title, setTitle] = useState('');
@@ -72,6 +100,33 @@ export default function StoryDetailPage() {
     });
     await loadData();
   }
+
+  async function handleGenerateResearchKit() {
+    setResearchLoading(true);
+    setShowResearchPanel(true);
+    try {
+      const result = await generateResearchKit(storyId);
+      setResearchKit(result);
+    } catch {
+      alert('资料搜集失败，请稍后重试');
+    } finally {
+      setResearchLoading(false);
+    }
+  }
+
+  const hasResearchData = researchKit && (
+    researchKit.timeline.length > 0 ||
+    researchKit.people.length > 0 ||
+    researchKit.data.length > 0 ||
+    researchKit.opinions.length > 0
+  );
+
+  const researchTabs = [
+    { key: 'timeline' as const, label: '事件时间线', icon: Clock, count: researchKit?.timeline.length ?? 0 },
+    { key: 'people' as const, label: '关键人物', icon: Users, count: researchKit?.people.length ?? 0 },
+    { key: 'data' as const, label: '核心数据', icon: BarChart3, count: researchKit?.data.length ?? 0 },
+    { key: 'opinions' as const, label: '各方观点', icon: MessageSquare, count: researchKit?.opinions.length ?? 0 },
+  ];
 
   if (loading) {
     return (
@@ -201,6 +256,38 @@ export default function StoryDetailPage() {
             )}
           </div>
         </div>
+
+        {/* AI Research Kit */}
+        {showResearchPanel && (
+          <ResearchKitPanel
+            researchKit={researchKit}
+            loading={researchLoading}
+            onGenerate={handleGenerateResearchKit}
+            onClose={() => setShowResearchPanel(false)}
+          />
+        )}
+        {!showResearchPanel && (
+          <div className="mb-6 rounded-lg border border-zinc-200 bg-white">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-zinc-500" />
+                <h2 className="text-sm font-medium text-zinc-900">AI 资料搜集</h2>
+                <span className="text-xs text-zinc-400">基于选题信息生成结构化背景资料</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowResearchPanel(true);
+                  handleGenerateResearchKit();
+                }}
+                disabled={researchLoading}
+                className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+              >
+                <BookOpen className="h-4 w-4" />
+                生成资料包
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-medium">相关稿件</h2>

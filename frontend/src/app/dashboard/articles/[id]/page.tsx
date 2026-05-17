@@ -18,15 +18,19 @@ import {
   aiChat,
   aiGenerateDraft,
   aiFactCheck,
+  aiReviewReport,
   type Article,
   type ArticleVersion,
   type HeadlineOption,
   type ChatMessage,
   type DraftResult,
   type FactCheckResult,
+  type ReviewReportResult,
 } from '@/lib/article-api';
 import { getEditors } from '@/lib/users-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
+import FactCheckPanel from '@/components/fact-check-panel';
+import ReviewReportPanel from '@/components/review-report-panel';
 import {
   ArrowLeft,
   Trash2,
@@ -48,6 +52,9 @@ import {
   SendHorizonal,
   History,
   ShieldCheck,
+  ClipboardCheck,
+  Target,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function ArticleEditorPage() {
@@ -92,6 +99,11 @@ export default function ArticleEditorPage() {
   const [showFactCheck, setShowFactCheck] = useState(false);
   const [factCheckResult, setFactCheckResult] = useState<FactCheckResult | null>(null);
   const [factCheckLoading, setFactCheckLoading] = useState(false);
+
+  // AI Review Report state
+  const [showReviewReport, setShowReviewReport] = useState(false);
+  const [reviewReportResult, setReviewReportResult] = useState<ReviewReportResult | null>(null);
+  const [reviewReportLoading, setReviewReportLoading] = useState(false);
 
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -367,6 +379,20 @@ export default function ArticleEditorPage() {
       alert('事实核查失败，请稍后重试');
     } finally {
       setFactCheckLoading(false);
+    }
+  }
+
+  // ===== AI Review Report =====
+  async function handleReviewReport() {
+    setReviewReportLoading(true);
+    try {
+      const result = await aiReviewReport(articleId);
+      setReviewReportResult(result);
+      setShowReviewReport(true);
+    } catch {
+      alert('预审报告生成失败，请稍后重试');
+    } finally {
+      setReviewReportLoading(false);
     }
   }
 
@@ -891,6 +917,18 @@ export default function ArticleEditorPage() {
                   AI 事实核查
                 </button>
                 <button
+                  onClick={handleReviewReport}
+                  disabled={reviewReportLoading}
+                  className="flex w-full items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                >
+                  {reviewReportLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ClipboardCheck className="h-4 w-4" />
+                  )}
+                  AI 预审报告
+                </button>
+                <button
                   onClick={() => handleSave('DRAFT')}
                   className="flex w-full items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
                 >
@@ -902,54 +940,18 @@ export default function ArticleEditorPage() {
 
             {/* Fact Check Result Panel */}
             {showFactCheck && factCheckResult && (
-              <div className="rounded-lg border border-amber-200 bg-white overflow-hidden">
-                <div className="flex items-center justify-between border-b border-amber-100 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm font-medium text-zinc-900">事实核查报告</span>
-                  </div>
-                  <button onClick={() => setShowFactCheck(false)} className="text-zinc-400 hover:text-zinc-600">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="p-3 space-y-3 max-h-80 overflow-auto">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-2xl font-bold ${
-                      factCheckResult.score >= 80 ? 'text-emerald-600' :
-                      factCheckResult.score >= 50 ? 'text-amber-600' : 'text-red-600'
-                    }`}>
-                      {factCheckResult.score}
-                    </div>
-                    <div className="text-xs text-zinc-500">可信度评分 / 100</div>
-                  </div>
-                  <p className="text-sm text-zinc-700">{factCheckResult.summary}</p>
-                  {factCheckResult.findings.length > 0 && (
-                    <div className="space-y-2">
-                      {factCheckResult.findings.map((f, i) => (
-                        <div key={i} className="rounded-md border border-zinc-100 p-2.5">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                              f.severity === 'critical' ? 'bg-red-50 text-red-700' :
-                              f.severity === 'warning' ? 'bg-amber-50 text-amber-700' :
-                              'bg-blue-50 text-blue-700'
-                            }`}>
-                              {f.severity === 'critical' ? '严重' : f.severity === 'warning' ? '警告' : '提示'}
-                            </span>
-                            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
-                              {f.type === 'fact' ? '事实' :
-                               f.type === 'inconsistency' ? '不一致' :
-                               f.type === 'dispute' ? '争议' :
-                               f.type === 'source_needed' ? '需核实' : '风险'}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium text-zinc-800 mb-1">{f.text}</p>
-                          <p className="text-xs text-zinc-500">{f.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <FactCheckPanel
+                result={factCheckResult}
+                onClose={() => setShowFactCheck(false)}
+              />
+            )}
+
+            {/* Review Report Result Panel */}
+            {showReviewReport && reviewReportResult && (
+              <ReviewReportPanel
+                result={reviewReportResult}
+                onClose={() => setShowReviewReport(false)}
+              />
             )}
           </div>
 
