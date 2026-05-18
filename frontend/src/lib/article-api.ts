@@ -183,3 +183,28 @@ export async function aiReviewReport(id: string): Promise<ReviewReportResult> {
   const res = await api.post(`/articles/${id}/ai-review`);
   return res.data;
 }
+
+export interface SEOKeyword {
+  keyword: string;
+  searchVolume: 'high' | 'medium' | 'low';
+}
+
+export interface SEOSuggestion {
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestion: string;
+}
+
+export interface SEOResult {
+  overallScore: number;
+  readabilityScore: number;
+  optimizedTitle: { title: string; reasoning: string }[];
+  metaDescription: string;
+  keywords: SEOKeyword[];
+  suggestions: SEOSuggestion[];
+}
+
+export async function aiOptimizeSEO(id: string): Promise<SEOResult> {
+  const res = await api.post(`/articles/${id}/ai-seo`);
+  return res.data;
+}

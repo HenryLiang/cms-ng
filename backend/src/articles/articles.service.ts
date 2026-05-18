@@ -15,6 +15,7 @@ import {
   GenerateDraftDto,
   FactCheckDto,
   ReviewReportDto,
+  OptimizeSEODto,
 } from './dto/ai-operations.dto';
 
 @Injectable()
@@ -425,6 +426,20 @@ export class ArticlesService {
   ) {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.generateReviewReport(user.userId, id, {
+      title: article.title,
+      subtitle: article.subtitle || undefined,
+      content: article.content,
+    });
+    return result;
+  }
+
+  async aiOptimizeSEO(
+    id: string,
+    user: { userId: string; role: string },
+    _dto: OptimizeSEODto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.optimizeSEO(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,

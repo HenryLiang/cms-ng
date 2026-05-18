@@ -151,3 +151,29 @@ export interface ReviewReportInput {
   subtitle?: string;
   content: string;
 }
+
+export interface SEOKeyword {
+  keyword: string;
+  searchVolume: 'high' | 'medium' | 'low';
+}
+
+export interface SEOSuggestion {
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestion: string;
+}
+
+export interface SEOResult {
+  overallScore: number;
+  readabilityScore: number;
+  optimizedTitle: { title: string; reasoning: string }[];
+  metaDescription: string;
+  keywords: SEOKeyword[];
+  suggestions: SEOSuggestion[];
+}
+
+export interface OptimizeSEOInput {
+  title: string;
+  subtitle?: string;
+  content: string;
+}

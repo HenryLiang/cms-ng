@@ -21,6 +21,8 @@ import {
   ResearchKitResult,
   ReviewReportInput,
   ReviewReportResult,
+  OptimizeSEOInput,
+  SEOResult,
 } from './dto/writing-operations.dto';
 
 @Injectable()
@@ -63,7 +65,7 @@ export class AIService {
             {
               role: 'system',
               content:
-                '你是一位资深新闻编辑，擅长为记者发掘有价值的选题。请用繁体中文回答。输出必须是有效的 JSON 数组格式，不要包含任何其他文字。',
+                '你是一位资深新闻编辑，擅长为记者发掘有价值的选题。请用繁体中文回答。输出必须是有效的 JSON 对象格式，包含 suggestions 字段，不要包含任何其他文字。',
             },
             { role: 'user', content: prompt },
           ],
@@ -950,6 +952,155 @@ priority 取值说明：
         overallScore: 0,
         summary: '预审报告生成失败，请稍后重试',
         dimensions: [],
+        suggestions: [],
+      };
+    }
+  }
+
+  async optimizeSEO(
+    userId: string,
+    articleId: string | undefined,
+    input: OptimizeSEOInput,
+  ): Promise<SEOResult> {
+    const startTime = Date.now();
+
+    const prompt = `你是一位资深新闻SEO专家，精通Google搜索算法和中文内容优化。
+
+请对以下新闻稿件进行全面的SEO分析，并给出优化建议。针对香港01媒体场景，关键词需考虑繁简体中文搜索习惯。
+
+稿件标题：${input.title}
+${input.subtitle ? '副标题：' + input.subtitle : ''}
+正文内容：
+${input.content.replace(/<[^>]+>/g, '').slice(0, 3000)}
+
+请输出以下 JSON 格式：
+{
+  "overallScore": 78,
+  "readabilityScore": 82,
+  "optimizedTitle": [
+    {
+      "title": "优化后的标题1",
+      "reasoning": "推荐理由"
+    }
+  ],
+  "metaDescription": "适合搜索引擎摘要的元描述，120字以内",
+  "keywords": [
+    {
+      "keyword": "核心关键词",
+      "searchVolume": "high"
+    }
+  ],
+  "suggestions": [
+    {
+      "category": "标题优化",
+      "priority": "high",
+      "suggestion": "具体优化建议"
+    }
+  ]
+}
+
+字段说明：
+- overallScore: 综合SEO评分（0-100）
+- readabilityScore: 可读性评分（0-100）
+- optimizedTitle: AI建议的优化标题，1-3个选项，每个包含标题和推荐理由
+- metaDescription: 建议的元描述，适合搜索引擎摘要，120字以内
+- keywords: 提取的核心关键词列表，每个包含关键词和搜索热度评估（high/medium/low）
+- suggestions: 具体优化建议列表，按优先级分类（high/medium/low）
+
+priority 取值说明：
+- high：重要问题，建议优先修改
+- medium：一般问题，建议考虑改进
+- low：轻微问题，可酌情优化
+
+注意：请用繁体中文回答。optimizedTitle 中的标题应当多样化，使用不同角度或风格。keywords 应当包含香港读者常用的搜索词。`;
+
+    try {
+      const response = await axios.post(
+        `${this.apiBase}/chat/completions`,
+        {
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: '你是一位资深新闻SEO专家，精通Google搜索算法和中文内容优化。请用繁体中文回答。输出必须是有效的 JSON 格式。',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: this.getTemperature(0.4),
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 300000,
+        },
+      );
+
+      const content = response.data.choices[0]?.message?.content || '';
+      const parsed = JSON.parse(content);
+
+      const result: SEOResult = {
+        overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
+        readabilityScore: Math.min(100, Math.max(0, parsed.readabilityScore ?? 50)),
+        optimizedTitle: Array.isArray(parsed.optimizedTitle)
+          ? parsed.optimizedTitle.map((t: any) => ({
+              title: t.title || '',
+              reasoning: t.reasoning || '',
+            })).filter((t: any) => t.title)
+          : [],
+        metaDescription: parsed.metaDescription || '',
+        keywords: Array.isArray(parsed.keywords)
+          ? parsed.keywords.map((k: any) => ({
+              keyword: k.keyword || '',
+              searchVolume: ['high', 'medium', 'low'].includes(k.searchVolume) ? k.searchVolume : 'medium',
+            })).filter((k: any) => k.keyword)
+          : [],
+        suggestions: Array.isArray(parsed.suggestions)
+          ? parsed.suggestions.map((s: any) => ({
+              category: s.category || '綜合',
+              priority: ['high', 'medium', 'low'].includes(s.priority) ? s.priority : 'medium',
+              suggestion: s.suggestion || '',
+            })).filter((s: any) => s.suggestion)
+          : [],
+      };
+
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'optimize_seo',
+          prompt,
+          result: JSON.stringify(result),
+          model: this.model,
+          tokensUsed: response.data.usage?.total_tokens,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+
+      return result;
+    } catch (error: any) {
+      this.logger.error('SEO optimization failed:', error.message);
+      await this.prisma.aIOperation.create({
+        data: {
+          agentType: 'WRITING',
+          action: 'optimize_seo',
+          prompt,
+          result: JSON.stringify({ error: error.message }),
+          model: this.model,
+          durationMs: Date.now() - startTime,
+          articleId,
+          createdBy: userId,
+        },
+      });
+      return {
+        overallScore: 0,
+        readabilityScore: 0,
+        optimizedTitle: [],
+        metaDescription: '',
+        keywords: [],
         suggestions: [],
       };
     }

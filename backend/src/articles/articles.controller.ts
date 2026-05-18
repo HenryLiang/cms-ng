@@ -23,6 +23,7 @@ import {
   GenerateDraftDto,
   FactCheckDto,
   ReviewReportDto,
+  OptimizeSEODto,
 } from './dto/ai-operations.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -214,5 +215,14 @@ export class ArticlesController {
     @Body() dto: ReviewReportDto,
   ) {
     return this.articlesService.aiReview(id, user, dto);
+  }
+
+  @Post(':id/ai-seo')
+  aiOptimizeSEO(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: OptimizeSEODto,
+  ) {
+    return this.articlesService.aiOptimizeSEO(id, user, dto);
   }
 }

@@ -19,6 +19,7 @@ import {
   aiGenerateDraft,
   aiFactCheck,
   aiReviewReport,
+  aiOptimizeSEO,
   type Article,
   type ArticleVersion,
   type HeadlineOption,
@@ -26,11 +27,13 @@ import {
   type DraftResult,
   type FactCheckResult,
   type ReviewReportResult,
+  type SEOResult,
 } from '@/lib/article-api';
 import { getEditors } from '@/lib/users-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
 import FactCheckPanel from '@/components/fact-check-panel';
 import ReviewReportPanel from '@/components/review-report-panel';
+import SEOPanel from '@/components/seo-panel';
 import {
   ArrowLeft,
   Trash2,
@@ -56,6 +59,7 @@ import {
   ClipboardCheck,
   Target,
   AlertTriangle,
+  TrendingUp,
 } from 'lucide-react';
 
 export default function ArticleEditorPage() {
@@ -106,6 +110,11 @@ export default function ArticleEditorPage() {
   const [showReviewReport, setShowReviewReport] = useState(false);
   const [reviewReportResult, setReviewReportResult] = useState<ReviewReportResult | null>(null);
   const [reviewReportLoading, setReviewReportLoading] = useState(false);
+
+  // AI SEO state
+  const [showSEO, setShowSEO] = useState(false);
+  const [seoResult, setSeoResult] = useState<SEOResult | null>(null);
+  const [seoLoading, setSeoLoading] = useState(false);
 
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -397,6 +406,20 @@ export default function ArticleEditorPage() {
       alert('预审报告生成失败，请稍后重试');
     } finally {
       setReviewReportLoading(false);
+    }
+  }
+
+  // ===== AI SEO =====
+  async function handleOptimizeSEO() {
+    setSeoLoading(true);
+    try {
+      const result = await aiOptimizeSEO(articleId);
+      setSeoResult(result);
+      setShowSEO(true);
+    } catch {
+      alert('SEO 分析失败，请稍后重试');
+    } finally {
+      setSeoLoading(false);
     }
   }
 
@@ -943,6 +966,18 @@ export default function ArticleEditorPage() {
                   AI 预审报告
                 </button>
                 <button
+                  onClick={handleOptimizeSEO}
+                  disabled={seoLoading}
+                  className="flex w-full items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  {seoLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <TrendingUp className="h-4 w-4" />
+                  )}
+                  AI SEO优化
+                </button>
+                <button
                   onClick={() => handleSave('DRAFT')}
                   className="flex w-full items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
                 >
@@ -965,6 +1000,15 @@ export default function ArticleEditorPage() {
               <ReviewReportPanel
                 result={reviewReportResult}
                 onClose={() => setShowReviewReport(false)}
+              />
+            )}
+
+            {/* SEO Result Panel */}
+            {showSEO && seoResult && (
+              <SEOPanel
+                result={seoResult}
+                onClose={() => setShowSEO(false)}
+                onApplyTitle={(newTitle) => setTitle(newTitle)}
               />
             )}
           </div>
