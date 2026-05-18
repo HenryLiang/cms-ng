@@ -11,6 +11,7 @@ import {
 import { StoriesService } from './stories.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
+import { GenerateDraftFromResearchKitDto } from './dto/generate-draft.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@cms-ng/shared';
@@ -75,5 +76,21 @@ export class StoriesController {
   ) {
     await this.storiesService.verifyAccess(id, user);
     return this.storiesService.generateResearchKit(user.userId, id);
+  }
+
+  @Post(':id/draft')
+  async generateDraftFromResearchKit(
+    @Param('id') id: string,
+    @Body() dto: GenerateDraftFromResearchKitDto,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    await this.storiesService.verifyAccess(id, user);
+    const article = await this.storiesService.generateDraftFromResearchKit(
+      user.userId,
+      id,
+      dto.researchKit,
+      dto.instruction,
+    );
+    return { article };
   }
 }

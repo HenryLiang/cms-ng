@@ -59,6 +59,7 @@ export interface GenerateDraftInput {
   currentTitle?: string;
   currentSubtitle?: string;
   instruction?: string;
+  researchKit?: ResearchKitResult;
 }
 
 export interface DraftResult {

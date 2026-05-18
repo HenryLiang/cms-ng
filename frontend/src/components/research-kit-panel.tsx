@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Loader2, X, Clock, Users, BarChart3, MessageSquare } from 'lucide-react';
+import { BookOpen, Loader2, X, Clock, Users, BarChart3, MessageSquare, Sparkles } from 'lucide-react';
 import type { ResearchKitResult } from '@/lib/story-api';
 
 interface ResearchKitPanelProps {
@@ -7,9 +7,18 @@ interface ResearchKitPanelProps {
   loading: boolean;
   onGenerate: () => void;
   onClose: () => void;
+  onGenerateDraft?: () => void;
+  draftLoading?: boolean;
 }
 
-export default function ResearchKitPanel({ researchKit, loading, onGenerate, onClose }: ResearchKitPanelProps) {
+export default function ResearchKitPanel({
+  researchKit,
+  loading,
+  onGenerate,
+  onClose,
+  onGenerateDraft,
+  draftLoading,
+}: ResearchKitPanelProps) {
   const [activeTab, setActiveTab] = useState<'timeline' | 'people' | 'data' | 'opinions'>('timeline');
 
   const hasData = researchKit && (
@@ -35,6 +44,20 @@ export default function ResearchKitPanel({ researchKit, loading, onGenerate, onC
           <span className="text-xs text-zinc-400">基于选题信息生成结构化背景资料</span>
         </div>
         <div className="flex items-center gap-2">
+          {onGenerateDraft && hasData && (
+            <button
+              onClick={onGenerateDraft}
+              disabled={draftLoading}
+              className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {draftLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {draftLoading ? '撰寫中...' : '基於資料生成初稿'}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="rounded-md p-1 text-zinc-400 hover:text-zinc-600"

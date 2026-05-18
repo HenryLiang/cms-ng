@@ -4,7 +4,7 @@ import { StoriesController } from './stories.controller';
 import { AIModule } from '../ai/ai.module';
 
 @Module({
-  imports: [AIModule],
+  imports: [AIModule, ArticlesModule],
   controllers: [StoriesController],
   providers: [StoriesService],
 })

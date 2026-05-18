@@ -450,6 +450,50 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
     const startTime = Date.now();
 
     const tagsStr = input.storyTags.join(', ') || '未指定';
+
+    // Build research kit section if available
+    let researchKitSection = '';
+    if (input.researchKit) {
+      const rk = input.researchKit;
+      const lines: string[] = [];
+
+      if (rk.timeline?.length) {
+        lines.push('【事件時間線】');
+        rk.timeline.forEach((e) => {
+          lines.push(`- ${e.date}：${e.event}${e.source ? `（來源：${e.source}）` : ''}`);
+        });
+        lines.push('');
+      }
+
+      if (rk.people?.length) {
+        lines.push('【關鍵人物】');
+        rk.people.forEach((p) => {
+          lines.push(`- ${p.name}（${p.role}）${p.background ? `：${p.background}` : ''}`);
+        });
+        lines.push('');
+      }
+
+      if (rk.data?.length) {
+        lines.push('【核心數據】');
+        rk.data.forEach((d) => {
+          lines.push(`- ${d.label}：${d.value}${d.source ? `（來源：${d.source}）` : ''}`);
+        });
+        lines.push('');
+      }
+
+      if (rk.opinions?.length) {
+        lines.push('【各方觀點】');
+        rk.opinions.forEach((o) => {
+          lines.push(`- ${o.source}${o.stance ? `（${o.stance}）` : ''}：${o.viewpoint}`);
+        });
+        lines.push('');
+      }
+
+      if (lines.length) {
+        researchKitSection = lines.join('\n');
+      }
+    }
+
     const prompt = `请根据以下选题信息，生成一篇完整的新闻稿件初稿。
 
 选题标题：${input.storyTitle}
@@ -459,6 +503,7 @@ ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
 ${input.currentTitle ? '当前稿件标题（可参考）：' + input.currentTitle : ''}
 ${input.currentSubtitle ? '当前副标题（可参考）：' + input.currentSubtitle : ''}
 ${input.instruction ? '额外要求：' + input.instruction : ''}
+${researchKitSection ? '\n【已搜集背景資料】\n\n' + researchKitSection : ''}
 
 要求：
 1. 生成一个吸引读者的标题
@@ -467,7 +512,7 @@ ${input.instruction ? '额外要求：' + input.instruction : ''}
 4. 使用繁体中文
 5. 正文使用 HTML 格式，仅使用以下标签：p, h2, h3, ul, ol, li, blockquote, strong, em
 6. 不要输出任何解释文字，只输出 JSON 格式
-
+${researchKitSection ? '7. 请充分利用上述背景资料撰写初稿，确保引用准确、观点平衡\n' : ''}
 请输出以下 JSON 格式：
 {
   "title": "稿件标题",

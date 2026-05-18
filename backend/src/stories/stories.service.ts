@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
+import { ArticlesService } from '../articles/articles.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { ArticleStatus, UserRole } from '@cms-ng/shared';
@@ -11,6 +12,7 @@ export class StoriesService {
   constructor(
     private prisma: PrismaService,
     private aiService: AIService,
+    private articlesService: ArticlesService,
   ) {}
 
   async create(reporterId: string, dto: CreateStoryDto) {
@@ -165,6 +167,45 @@ export class StoriesService {
       storyAngle: story.angle || undefined,
       storyTags: tags,
     });
+  }
+
+  async generateDraftFromResearchKit(
+    userId: string,
+    storyId: string,
+    researchKit: ResearchKitResult,
+    instruction?: string,
+  ) {
+    const story = await this.prisma.story.findUnique({ where: { id: storyId } });
+    if (!story) throw new NotFoundException('Story not found');
+
+    const tags = JSON.parse(story.tags || '[]') as string[];
+
+    // 1. Generate draft using AI with research kit
+    const draft = await this.aiService.generateDraft(userId, undefined, {
+      storyTitle: story.title,
+      storyDescription: story.description || undefined,
+      storyAngle: story.angle || undefined,
+      storyTags: tags,
+      instruction,
+      researchKit,
+    });
+
+    // 2. Create article from draft
+    const article = await this.articlesService.create(userId, {
+      storyId,
+      title: draft.title,
+      subtitle: draft.subtitle,
+      content: draft.content,
+      status: ArticleStatus.WRITING,
+    });
+
+    // 3. Update story status to WRITING
+    await this.prisma.story.update({
+      where: { id: storyId },
+      data: { status: ArticleStatus.WRITING },
+    });
+
+    return article;
   }
 
   private serializeStory(story: any) {

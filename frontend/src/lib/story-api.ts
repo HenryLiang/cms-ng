@@ -92,3 +92,12 @@ export async function generateResearchKit(storyId: string): Promise<ResearchKitR
   const res = await api.post(`/stories/${storyId}/research`);
   return res.data;
 }
+
+export async function generateDraftFromResearchKit(
+  storyId: string,
+  researchKit: ResearchKitResult,
+  instruction?: string,
+): Promise<{ article: { id: string; title: string } }> {
+  const res = await api.post(`/stories/${storyId}/draft`, { researchKit, instruction });
+  return res.data;
+}
