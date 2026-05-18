@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { TrendingTopicsController } from './trending-topics.controller';
 import { TrendingTopicsService } from './trending-topics.service';
 
@@ -69,12 +70,22 @@ describe('TrendingTopicsController', () => {
 
   describe('findOne', () => {
     it('should return topic by id', async () => {
-      topicsService.findOne.mockResolvedValue({ id: 't1' });
+      topicsService.findOne.mockResolvedValue({ id: '550e8400-e29b-41d4-a716-446655440000' });
 
-      const result = await controller.findOne('t1');
+      const result = await controller.findOne('550e8400-e29b-41d4-a716-446655440000');
 
-      expect(topicsService.findOne).toHaveBeenCalledWith('t1');
-      expect(result.id).toBe('t1');
+      expect(topicsService.findOne).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000');
+      expect(result.id).toBe('550e8400-e29b-41d4-a716-446655440000');
+    });
+
+    it('should throw BadRequestException for unknown source names', () => {
+      expect(() => controller.findOne('nonexistent')).toThrow(BadRequestException);
+      expect(() => controller.findOne('nonexistent')).toThrow('Unknown data source: nonexistent');
+    });
+
+    it('should throw BadRequestException for known source keys', () => {
+      expect(() => controller.findOne('bbc')).toThrow(BadRequestException);
+      expect(() => controller.findOne('bbc')).toThrow("Invalid topic ID: 'bbc' is a data source name");
     });
   });
 
@@ -113,20 +124,20 @@ describe('TrendingTopicsController', () => {
 
   describe('fetchGoogleTrends', () => {
     it('should call fetchGoogleTrends with defaults', async () => {
-      topicsService.fetchGoogleTrends.mockResolvedValue([{ title: 'Trend' }]);
+      topicsService.fetchGoogleTrends.mockResolvedValue({ items: [{ title: 'Trend' }], total: 1, page: 1, limit: 10, totalPages: 1 });
 
       const result = await controller.fetchGoogleTrends({ geo: '', timeRange: '' } as any);
 
-      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith('HK', '24h');
-      expect(result).toHaveLength(1);
+      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith('HK', '24h', 1, 10);
+      expect(result.items).toHaveLength(1);
     });
 
     it('should pass query params', async () => {
-      topicsService.fetchGoogleTrends.mockResolvedValue([]);
+      topicsService.fetchGoogleTrends.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
 
       await controller.fetchGoogleTrends({ geo: 'US', timeRange: '7d' } as any);
 
-      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith('US', '7d');
+      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith('US', '7d', 1, 10);
     });
   });
 

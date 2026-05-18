@@ -10,6 +10,7 @@ import {
   getAISuggestions,
   adoptTopic,
   getGoogleTrends,
+  getNewsBySource,
   importGoogleTrend,
   type TrendingTopic,
   type StorySuggestion,
@@ -27,6 +28,9 @@ import {
   X,
   TrendingUp,
   Globe,
+  Newspaper,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function StoryHubPage() {
@@ -40,12 +44,22 @@ export default function StoryHubPage() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [adoptingId, setAdoptingId] = useState<string | null>(null);
 
-  // Google Trends state
-  const [googleTrends, setGoogleTrends] = useState<GoogleTrendItem[]>([]);
-  const [showGoogleTrends, setShowGoogleTrends] = useState(false);
-  const [googleTrendsLoading, setGoogleTrendsLoading] = useState(false);
+  // News source state
+  const [newsSourceItems, setNewsSourceItems] = useState<GoogleTrendItem[]>([]);
+  const [activeNewsSource, setActiveNewsSource] = useState<string | null>(null);
+  const [newsSourceLoading, setNewsSourceLoading] = useState(false);
   const [selectedGeo, setSelectedGeo] = useState('HK');
   const [selectedTimeRange, setSelectedTimeRange] = useState('24h');
+  const [newsPage, setNewsPage] = useState(1);
+  const [newsPagination, setNewsPagination] = useState({ total: 0, totalPages: 1, limit: 10 });
+
+  const NEWS_SOURCES = [
+    { key: 'google-trends', label: 'Google Trends', icon: TrendingUp },
+    { key: 'sina', label: '新浪新闻', icon: Newspaper },
+    { key: 'people', label: '人民网', icon: Newspaper },
+    { key: 'bbc', label: 'BBC', icon: Newspaper },
+    { key: 'chinanews', label: '中国新闻网', icon: Newspaper },
+  ] as const;
 
   // Create form state
   const [newTitle, setNewTitle] = useState('');
@@ -127,22 +141,36 @@ export default function StoryHubPage() {
     }
   }
 
-  async function handleGetGoogleTrends() {
-    setGoogleTrendsLoading(true);
-    setShowGoogleTrends(true);
+  async function handleLoadNewsSource(sourceKey: string, page = 1) {
+    setNewsSourceLoading(true);
+    setActiveNewsSource(sourceKey);
     setShowAISuggestions(false);
     setSelectedTopic(null);
+    setNewsPage(page);
     try {
-      const data = await getGoogleTrends(selectedGeo, selectedTimeRange);
-      setGoogleTrends(data);
+      if (sourceKey === 'google-trends') {
+        const res = await getGoogleTrends(selectedGeo, selectedTimeRange, page, 10);
+        setNewsSourceItems(res.items);
+        setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+      } else {
+        const res = await getNewsBySource(sourceKey, page, 10);
+        setNewsSourceItems(res.items);
+        setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+      }
     } catch {
-      setGoogleTrends([]);
+      setNewsSourceItems([]);
+      setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
     } finally {
-      setGoogleTrendsLoading(false);
+      setNewsSourceLoading(false);
     }
   }
 
-  async function handleImportGoogleTrend(item: GoogleTrendItem) {
+  async function handlePageChange(page: number) {
+    if (!activeNewsSource || page < 1 || page > newsPagination.totalPages) return;
+    await handleLoadNewsSource(activeNewsSource, page);
+  }
+
+  async function handleImportNewsItem(item: GoogleTrendItem) {
     try {
       await importGoogleTrend(item);
       await loadTopics();
@@ -187,52 +215,68 @@ export default function StoryHubPage() {
             AI 推荐选题
           </button>
 
-          {/* Google Trends 筛选器 */}
-          <div className="mt-3 space-y-2">
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 flex-1">
-                <Globe className="h-3 w-3 text-zinc-400" />
-                <select
-                  value={selectedGeo}
-                  onChange={(e) => setSelectedGeo(e.target.value)}
-                  className="bg-transparent text-xs text-zinc-700 outline-none w-full"
-                >
-                  <option value="">全球</option>
-                  <option value="HK">香港</option>
-                  <option value="TW">台湾</option>
-                  <option value="US">美国</option>
-                  <option value="GB">英国</option>
-                  <option value="JP">日本</option>
-                  <option value="KR">韩国</option>
-                  <option value="CN">中国</option>
-                </select>
+          {/* 数据源标签切换 */}
+          <div className="mt-3">
+            <p className="text-xs text-zinc-400 mb-2">外部数据源</p>
+            {activeNewsSource === 'google-trends' && (
+              <div className="flex gap-2 mb-2">
+                <div className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 flex-1">
+                  <Globe className="h-3 w-3 text-zinc-400" />
+                  <select
+                    value={selectedGeo}
+                    onChange={(e) => setSelectedGeo(e.target.value)}
+                    className="bg-transparent text-xs text-zinc-700 outline-none w-full"
+                  >
+                    <option value="">全球</option>
+                    <option value="HK">香港</option>
+                    <option value="TW">台湾</option>
+                    <option value="US">美国</option>
+                    <option value="GB">英国</option>
+                    <option value="JP">日本</option>
+                    <option value="KR">韩国</option>
+                    <option value="CN">中国</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 flex-1">
+                  <select
+                    value={selectedTimeRange}
+                    onChange={(e) => setSelectedTimeRange(e.target.value)}
+                    className="bg-transparent text-xs text-zinc-700 outline-none w-full"
+                  >
+                    <option value="4h">最近4小时</option>
+                    <option value="24h">最近24小时</option>
+                    <option value="48h">最近48小时</option>
+                    <option value="7d">最近7天</option>
+                    <option value="30d">最近30天</option>
+                  </select>
+                </div>
               </div>
-              <div className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 flex-1">
-                <select
-                  value={selectedTimeRange}
-                  onChange={(e) => setSelectedTimeRange(e.target.value)}
-                  className="bg-transparent text-xs text-zinc-700 outline-none w-full"
-                >
-                  <option value="4h">最近4小时</option>
-                  <option value="24h">最近24小时</option>
-                  <option value="48h">最近48小时</option>
-                  <option value="7d">最近7天</option>
-                  <option value="30d">最近30天</option>
-                </select>
-              </div>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {NEWS_SOURCES.map((source) => {
+                const Icon = source.icon;
+                const isActive = activeNewsSource === source.key;
+                return (
+                  <button
+                    key={source.key}
+                    onClick={() => handleLoadNewsSource(source.key)}
+                    disabled={newsSourceLoading}
+                    className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      isActive
+                        ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                        : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {newsSourceLoading && isActive ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Icon className="h-3 w-3" />
+                    )}
+                    {source.label}
+                  </button>
+                );
+              })}
             </div>
-            <button
-              onClick={handleGetGoogleTrends}
-              disabled={googleTrendsLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
-            >
-              {googleTrendsLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <TrendingUp className="h-4 w-4" />
-              )}
-              Google Trends 热点
-            </button>
           </div>
         </div>
 
@@ -297,7 +341,8 @@ export default function StoryHubPage() {
               onClick={() => {
                 setSelectedTopic(topic);
                 setShowAISuggestions(false);
-                setShowGoogleTrends(false);
+                setActiveNewsSource(null);
+                setNewsPage(1);
               }}
               className={`w-full text-left p-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors cursor-pointer ${
                 selectedTopic?.id === topic.id ? 'bg-zinc-50' : ''
@@ -342,16 +387,21 @@ export default function StoryHubPage() {
         </div>
       </div>
 
-      {/* Right panel - Detail or AI Suggestions or Google Trends */}
+      {/* Right panel - Detail or AI Suggestions or News Source */}
       <div className="flex-1 bg-zinc-50 p-8 overflow-auto">
-        {showGoogleTrends ? (
-          <GoogleTrendsPanel
-            trends={googleTrends}
-            loading={googleTrendsLoading}
-            onImport={handleImportGoogleTrend}
-            onClose={() => setShowGoogleTrends(false)}
+        {activeNewsSource ? (
+          <NewsSourcePanel
+            sourceKey={activeNewsSource}
+            items={newsSourceItems}
+            loading={newsSourceLoading}
+            onImport={handleImportNewsItem}
+            onClose={() => setActiveNewsSource(null)}
             geo={selectedGeo}
             timeRange={selectedTimeRange}
+            page={newsPage}
+            totalPages={newsPagination.totalPages}
+            total={newsPagination.total}
+            onPageChange={handlePageChange}
           />
         ) : showAISuggestions ? (
           <AIRecommendationsPanel
@@ -524,21 +574,42 @@ function AIRecommendationsPanel({
   );
 }
 
-function GoogleTrendsPanel({
-  trends,
+function NewsSourcePanel({
+  sourceKey,
+  items,
   loading,
   onImport,
   onClose,
   geo,
   timeRange,
+  page,
+  totalPages,
+  total,
+  onPageChange,
 }: {
-  trends: GoogleTrendItem[];
+  sourceKey: string;
+  items: GoogleTrendItem[];
   loading: boolean;
   onImport: (item: GoogleTrendItem) => void;
   onClose: () => void;
   geo: string;
   timeRange: string;
+  page: number;
+  totalPages: number;
+  total: number;
+  onPageChange: (page: number) => void;
 }) {
+  const sourceConfig = {
+    'google-trends': { label: 'Google Trends', color: 'text-orange-600', icon: TrendingUp },
+    'sina': { label: '新浪新闻', color: 'text-red-600', icon: Newspaper },
+    'people': { label: '人民网', color: 'text-blue-600', icon: Newspaper },
+    'bbc': { label: 'BBC', color: 'text-indigo-600', icon: Newspaper },
+    'chinanews': { label: '中国新闻网', color: 'text-emerald-600', icon: Newspaper },
+  };
+
+  const config = sourceConfig[sourceKey as keyof typeof sourceConfig] || { label: sourceKey, color: 'text-zinc-600', icon: Newspaper };
+  const Icon = config.icon;
+
   const geoLabel: Record<string, string> = {
     '': '全球',
     HK: '香港',
@@ -557,15 +628,19 @@ function GoogleTrendsPanel({
     '30d': '最近30天',
   };
 
+  const showMeta = sourceKey === 'google-trends';
+
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-orange-600" />
-          <h2 className="text-xl font-semibold">Google Trends 热点</h2>
-          <span className="text-xs text-zinc-400">
-            {geoLabel[geo] || geo} · {timeLabel[timeRange] || timeRange}
-          </span>
+          <Icon className={`h-5 w-5 ${config.color}`} />
+          <h2 className="text-xl font-semibold">{config.label}</h2>
+          {showMeta && (
+            <span className="text-xs text-zinc-400">
+              {geoLabel[geo] || geo} · {timeLabel[timeRange] || timeRange}
+            </span>
+          )}
         </div>
         <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
           <X className="h-5 w-5" />
@@ -574,15 +649,15 @@ function GoogleTrendsPanel({
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
         </div>
-      ) : trends.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
           <p className="text-zinc-500">暂无数据，请稍后重试</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {trends.map((item, i) => (
+          {items.map((item, i) => (
             <div
               key={i}
               className="rounded-lg border border-zinc-200 bg-white p-5 hover:shadow-sm transition-shadow"
@@ -616,6 +691,33 @@ function GoogleTrendsPanel({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-zinc-200">
+          <div className="text-sm text-zinc-500">
+            共 {total} 条，第 {page}/{totalPages} 页
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              上一页
+            </button>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= totalPages}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              下一页
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

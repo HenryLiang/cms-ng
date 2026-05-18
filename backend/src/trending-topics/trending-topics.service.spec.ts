@@ -271,11 +271,11 @@ describe('TrendingTopicsService', () => {
       const result = await service.fetchGoogleTrends('HK', 'today');
 
       expect(mockParseURL).toHaveBeenCalledWith('https://trends.google.com/trending/rss?geo=HK');
-      expect(result).toHaveLength(1);
-      expect(result[0].title).toBe('Trend 1');
-      expect(result[0].heatScore).toBe(98);
-      expect(result[0].articles).toHaveLength(2);
-      expect(result[0].articles[0].title).toBe('News 1');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].title).toBe('Trend 1');
+      expect(result.items[0].heatScore).toBe(98);
+      expect(result.items[0].articles).toHaveLength(2);
+      expect(result.items[0].articles[0].title).toBe('News 1');
     });
 
     it('should handle single news item format', async () => {
@@ -295,9 +295,9 @@ describe('TrendingTopicsService', () => {
 
       const result = await service.fetchGoogleTrends('US', 'week');
 
-      expect(result[0].articles).toHaveLength(1);
-      expect(result[0].articles[0].title).toBe('Single News');
-      expect(result[0].heatScore).toBe(85);
+      expect(result.items[0].articles).toHaveLength(1);
+      expect(result.items[0].articles[0].title).toBe('Single News');
+      expect(result.items[0].heatScore).toBe(85);
     });
 
     it('should default geo to HK when empty', async () => {
@@ -309,13 +309,15 @@ describe('TrendingTopicsService', () => {
       expect(mockParseURL).toHaveBeenCalledWith('https://trends.google.com/trending/rss?geo=HK');
     });
 
-    it('should return empty array when feed has no items', async () => {
+    it('should return empty paginated result when feed has no items', async () => {
       const mockParseURL = jest.fn().mockResolvedValue({ items: [] });
       MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
 
       const result = await service.fetchGoogleTrends('HK', 'today');
 
-      expect(result).toEqual([]);
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(1);
     });
 
     it('should throw error when RSS parser fails', async () => {

@@ -135,42 +135,139 @@ export class TrendingTopicsService {
     return { storyId: story.id, topicId };
   }
 
-  async fetchGoogleTrends(geo: string, _timeRange: string) {
+  private readonly RSS_FEEDS = [
+    { key: 'google-trends', url: 'https://trends.google.com/trending/rss?geo=HK', isGoogle: true },
+    { key: 'sina', url: 'https://rss.sina.com.cn/news/china/focus15.xml', isGoogle: false },
+    { key: 'people', url: 'http://www.people.com.cn/rss/politics.xml', isGoogle: false },
+    { key: 'bbc', url: 'http://feeds.bbci.co.uk/news/rss.xml', isGoogle: false },
+    { key: 'chinanews', url: 'http://www.chinanews.com/rss/scroll-news.xml', isGoogle: false },
+  ];
+
+  async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
+    const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+    const requestOptions: any = {};
+    if (proxyUrl) {
+      requestOptions.agent = new HttpsProxyAgent(proxyUrl);
+    }
+
+    const results = await Promise.allSettled(
+      this.RSS_FEEDS.map(async (feed) => {
+        try {
+          if (feed.isGoogle) {
+            return await this.fetchSingleGoogleTrends(feed.url.replace('HK', geo || 'HK'), requestOptions);
+          }
+          return await this.fetchSingleRSS(feed, requestOptions);
+        } catch (err: any) {
+          return [] as any[];
+        }
+      }),
+    );
+
+    const allItems: any[] = [];
+    results.forEach((r) => {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        allItems.push(...r.value);
+      }
+    });
+
+    // Deduplicate by title similarity (exact match)
+    const seen = new Set<string>();
+    const deduped = allItems.filter((item) => {
+      const key = item.title?.trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return this.paginate(deduped, page, limit);
+  }
+
+  private async fetchSingleGoogleTrends(feedUrl: string, requestOptions: any) {
+    const parser = new Parser({
+      customFields: {
+        item: ['ht:approx_traffic', 'ht:picture', 'ht:picture_source', 'ht:news_item'],
+      },
+      requestOptions,
+    });
+    const feed = await parser.parseURL(feedUrl);
+    return (feed.items || []).map((item: any) => {
+      const traffic = item['ht:approx_traffic'] || '';
+      const articles = this.normalizeNewsItems(item['ht:news_item']);
+      const firstNews = articles[0];
+      const snippet = firstNews?.snippet;
+      const description = snippet || firstNews?.title || item.contentSnippet || item.title || '';
+      return {
+        title: item.title || '',
+        description,
+        source: 'google-trends',
+        heatScore: this.parseTrafficToScore(traffic),
+        tags: [],
+        articles: articles.slice(0, 3),
+      };
+    });
+  }
+
+  private paginate(items: any[], page: number, limit: number) {
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    return {
+      items: items.slice(start, end),
+      total: items.length,
+      page,
+      limit,
+      totalPages: Math.ceil(items.length / limit) || 1,
+    };
+  }
+
+  private async fetchSingleRSS(feed: { key: string; url: string }, requestOptions: any) {
+    const parser = new Parser({ requestOptions });
+    const rssFeed = await parser.parseURL(feed.url);
+    return (rssFeed.items || []).map((item: any) => ({
+      title: item.title || '',
+      description: item.contentSnippet || item.summary || item.title || '',
+      source: feed.key,
+      heatScore: 50,
+      tags: [],
+      articles: item.link ? [{ title: item.title || '', source: feed.key, snippet: item.contentSnippet || '', url: item.link }] : [],
+    }));
+  }
+
+  async fetchGoogleTrends(geo: string, _timeRange: string, page = 1, limit = 10) {
     try {
       const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
       const requestOptions: any = {};
       if (proxyUrl) {
         requestOptions.agent = new HttpsProxyAgent(proxyUrl);
       }
-
-      const parser = new Parser({
-        customFields: {
-          item: ['ht:approx_traffic', 'ht:picture', 'ht:picture_source', 'ht:news_item'],
-        },
-        requestOptions,
-      });
-
-      const feedUrl = `https://trends.google.com/trending/rss?geo=${geo || 'HK'}`;
-      const feed = await parser.parseURL(feedUrl);
-
-      return (feed.items || []).map((item: any) => {
-        const traffic = item['ht:approx_traffic'] || '';
-        const articles = this.normalizeNewsItems(item['ht:news_item']);
-        const firstNews = articles[0];
-        const snippet = firstNews?.snippet;
-        const description = snippet || firstNews?.title || item.contentSnippet || item.title || '';
-
-        return {
-          title: item.title || '',
-          description,
-          source: 'google-trends',
-          heatScore: this.parseTrafficToScore(traffic),
-          tags: [],
-          articles: articles.slice(0, 3),
-        };
-      });
+      const items = await this.fetchSingleGoogleTrends(`https://trends.google.com/trending/rss?geo=${geo || 'HK'}`, requestOptions);
+      return this.paginate(items, page, limit);
     } catch (error: any) {
       throw new Error(`Google Trends 获取失败: ${error.message}`);
+    }
+  }
+
+  async fetchNewsBySource(sourceKey: string, page = 1, limit = 10) {
+    const feed = this.RSS_FEEDS.find((f) => f.key === sourceKey);
+    if (!feed) {
+      throw new BadRequestException(`未知的数据源: ${sourceKey}`);
+    }
+
+    const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+    const requestOptions: any = {};
+    if (proxyUrl) {
+      requestOptions.agent = new HttpsProxyAgent(proxyUrl);
+    }
+
+    try {
+      let items;
+      if (feed.isGoogle) {
+        items = await this.fetchSingleGoogleTrends(feed.url, requestOptions);
+      } else {
+        items = await this.fetchSingleRSS(feed, requestOptions);
+      }
+      return this.paginate(items, page, limit);
+    } catch (error: any) {
+      throw new Error(`${sourceKey} 获取失败: ${error.message}`);
     }
   }
 

@@ -38,6 +38,14 @@ export interface GoogleTrendItem {
   }[];
 }
 
+export interface PaginatedNewsResponse {
+  items: GoogleTrendItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface CreateTopicInput {
   title: string;
   description?: string;
@@ -83,9 +91,25 @@ export async function adoptTopic(topicId: string): Promise<{ storyId: string; to
   return res.data;
 }
 
-export async function getGoogleTrends(geo: string, timeRange: string): Promise<GoogleTrendItem[]> {
+export async function getGoogleTrends(
+  geo: string,
+  timeRange: string,
+  page = 1,
+  limit = 10,
+): Promise<PaginatedNewsResponse> {
   const res = await api.get('/trending-topics/google-trends', {
-    params: { geo, timeRange },
+    params: { geo, timeRange, page, limit },
+  });
+  return res.data;
+}
+
+export async function getNewsBySource(
+  source: string,
+  page = 1,
+  limit = 10,
+): Promise<PaginatedNewsResponse> {
+  const res = await api.get(`/trending-topics/${source}`, {
+    params: { page, limit },
   });
   return res.data;
 }
