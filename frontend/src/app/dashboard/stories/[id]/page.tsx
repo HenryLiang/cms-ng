@@ -8,6 +8,7 @@ import {
   updateStory,
   deleteStory,
   generateResearchKit,
+  generateDraftFromResearchKit,
   type Story,
   type ResearchKitResult,
 } from '@/lib/story-api';
@@ -26,6 +27,7 @@ import {
   Users,
   BarChart3,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import ResearchKitPanel from '@/components/research-kit-panel';
 
@@ -45,6 +47,10 @@ export default function StoryDetailPage() {
   const [researchLoading, setResearchLoading] = useState(false);
   const [showResearchPanel, setShowResearchPanel] = useState(false);
   const [activeResearchTab, setActiveResearchTab] = useState<'timeline' | 'people' | 'data' | 'opinions'>('timeline');
+
+  // Draft generation state
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftInstruction, setDraftInstruction] = useState('');
 
   // Edit form state
   const [title, setTitle] = useState('');
