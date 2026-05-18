@@ -3,6 +3,7 @@ import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { StoriesService } from './stories.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
+import { ArticlesService } from '../articles/articles.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 
 describe('StoriesService', () => {
@@ -20,6 +21,13 @@ describe('StoriesService', () => {
           provide: AIService,
           useValue: {
             generateResearchKit: jest.fn(),
+            generateDraft: jest.fn(),
+          },
+        },
+        {
+          provide: ArticlesService,
+          useValue: {
+            create: jest.fn(),
           },
         },
       ],
@@ -288,6 +296,103 @@ describe('StoriesService', () => {
       prisma.user.findUnique.mockResolvedValue({ role: 'REPORTER' });
 
       await expect(service.assignEditor('story-id', 'reporter-id')).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('generateDraftFromResearchKit', () => {
+    it('should generate draft, create article, and update story status', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '["politics"]' }));
+      const aiService = (service as any).aiService;
+      aiService.generateDraft.mockResolvedValue({
+        title: 'Draft Title',
+        subtitle: 'Draft Subtitle',
+        content: '<p>Draft content</p>',
+      });
+      const articlesService = (service as any).articlesService;
+      articlesService.create.mockResolvedValue({ id: 'article-id', title: 'Draft Title' });
+      prisma.story.update.mockResolvedValue(mockStory({ status: 'WRITING' }));
+
+      const researchKit = {
+        timeline: [{ date: '2024-01-01', event: 'E1' }],
+        people: [{ name: 'P1', role: 'R1' }],
+        data: [{ label: 'L1', value: 'V1' }],
+        opinions: [{ source: 'S1', viewpoint: 'V1' }],
+      };
+
+      const result = await service.generateDraftFromResearchKit('user-id', 'story-id', researchKit, 'instruction');
+
+      expect(prisma.story.findUnique).toHaveBeenCalledWith({ where: { id: 'story-id' } });
+      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, {
+        storyTitle: 'Test Story',
+        storyDescription: 'Desc',
+        storyAngle: undefined,
+        storyTags: ['politics'],
+        instruction: 'instruction',
+        researchKit,
+      });
+      expect(articlesService.create).toHaveBeenCalledWith('user-id', {
+        storyId: 'story-id',
+        title: 'Draft Title',
+        subtitle: 'Draft Subtitle',
+        content: '<p>Draft content</p>',
+        status: 'WRITING',
+      });
+      expect(prisma.story.update).toHaveBeenCalledWith({
+        where: { id: 'story-id' },
+        data: { status: 'WRITING' },
+      });
+      expect(result.id).toBe('article-id');
+    });
+
+    it('should throw NotFoundException when story not found', async () => {
+      prisma.story.findUnique.mockResolvedValue(null);
+
+      await expect(service.generateDraftFromResearchKit('user-id', 'nonexistent', {} as any)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should handle empty tags string', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '' }));
+      const aiService = (service as any).aiService;
+      aiService.generateDraft.mockResolvedValue({ title: 'T', content: '<p>C</p>' });
+      const articlesService = (service as any).articlesService;
+      articlesService.create.mockResolvedValue({ id: 'a1' });
+      prisma.story.update.mockResolvedValue(mockStory());
+
+      await service.generateDraftFromResearchKit('user-id', 'story-id', {} as any);
+
+      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, expect.objectContaining({
+        storyTags: [],
+      }));
+    });
+
+    it('should pass story angle when present', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory({ angle: 'Angle', tags: '[]' }));
+      const aiService = (service as any).aiService;
+      aiService.generateDraft.mockResolvedValue({ title: 'T', content: '<p>C</p>' });
+      const articlesService = (service as any).articlesService;
+      articlesService.create.mockResolvedValue({ id: 'a1' });
+      prisma.story.update.mockResolvedValue(mockStory());
+
+      await service.generateDraftFromResearchKit('user-id', 'story-id', {} as any);
+
+      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, expect.objectContaining({
+        storyAngle: 'Angle',
+      }));
+    });
+
+    it('should work without instruction', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      const aiService = (service as any).aiService;
+      aiService.generateDraft.mockResolvedValue({ title: 'T', content: '<p>C</p>' });
+      const articlesService = (service as any).articlesService;
+      articlesService.create.mockResolvedValue({ id: 'a1' });
+      prisma.story.update.mockResolvedValue(mockStory());
+
+      await service.generateDraftFromResearchKit('user-id', 'story-id', {} as any);
+
+      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, expect.objectContaining({
+        instruction: undefined,
+      }));
     });
   });
 });

@@ -21,12 +21,6 @@ import {
   Loader2,
   Save,
   BookOpen,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Users,
-  BarChart3,
-  MessageSquare,
   Sparkles,
 } from 'lucide-react';
 import ResearchKitPanel from '@/components/research-kit-panel';
@@ -46,7 +40,6 @@ export default function StoryDetailPage() {
   const [researchKit, setResearchKit] = useState<ResearchKitResult | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [showResearchPanel, setShowResearchPanel] = useState(false);
-  const [activeResearchTab, setActiveResearchTab] = useState<'timeline' | 'people' | 'data' | 'opinions'>('timeline');
 
   // Draft generation state
   const [draftLoading, setDraftLoading] = useState(false);
@@ -120,19 +113,24 @@ export default function StoryDetailPage() {
     }
   }
 
+  async function handleGenerateDraft() {
+    if (!researchKit) return;
+    setDraftLoading(true);
+    try {
+      const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction);
+      router.push(`/dashboard/articles/${article.id}`);
+    } catch {
+      alert('初稿生成失败，请稍后重试');
+      setDraftLoading(false);
+    }
+  }
+
   const hasResearchData = researchKit && (
     researchKit.timeline.length > 0 ||
     researchKit.people.length > 0 ||
     researchKit.data.length > 0 ||
     researchKit.opinions.length > 0
   );
-
-  const researchTabs = [
-    { key: 'timeline' as const, label: '事件时间线', icon: Clock, count: researchKit?.timeline.length ?? 0 },
-    { key: 'people' as const, label: '关键人物', icon: Users, count: researchKit?.people.length ?? 0 },
-    { key: 'data' as const, label: '核心数据', icon: BarChart3, count: researchKit?.data.length ?? 0 },
-    { key: 'opinions' as const, label: '各方观点', icon: MessageSquare, count: researchKit?.opinions.length ?? 0 },
-  ];
 
   if (loading) {
     return (
@@ -270,7 +268,20 @@ export default function StoryDetailPage() {
             loading={researchLoading}
             onGenerate={handleGenerateResearchKit}
             onClose={() => setShowResearchPanel(false)}
+            onGenerateDraft={handleGenerateDraft}
+            draftLoading={draftLoading}
           />
+        )}
+        {showResearchPanel && hasResearchData && (
+          <div className="mb-6">
+            <textarea
+              value={draftInstruction}
+              onChange={(e) => setDraftInstruction(e.target.value)}
+              rows={2}
+              className="w-full text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-zinc-400"
+              placeholder="对初稿的特殊要求，如：侧重民生角度、增加专家观点、控制字数在2000字以内..."
+            />
+          </div>
         )}
         {!showResearchPanel && (
           <div className="mb-6 rounded-lg border border-zinc-200 bg-white">

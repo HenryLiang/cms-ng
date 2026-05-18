@@ -14,6 +14,7 @@ describe('StoriesController', () => {
     verifyAccess: jest.Mock;
     assignEditor: jest.Mock;
     generateResearchKit: jest.Mock;
+    generateDraftFromResearchKit: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -26,6 +27,7 @@ describe('StoriesController', () => {
       verifyAccess: jest.fn(),
       assignEditor: jest.fn(),
       generateResearchKit: jest.fn(),
+      generateDraftFromResearchKit: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -159,6 +161,44 @@ describe('StoriesController', () => {
 
       expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockAdmin);
       expect(result.timeline).toHaveLength(1);
+    });
+  });
+
+  describe('generateDraftFromResearchKit', () => {
+    it('should verify access and return article', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
+      storiesService.generateDraftFromResearchKit.mockResolvedValue({ id: 'article-id', title: 'Draft' });
+
+      const dto = {
+        researchKit: { timeline: [], people: [], data: [], opinions: [] },
+        instruction: '侧重民生角度',
+      };
+      const result = await controller.generateDraftFromResearchKit('story-id', dto as any, mockUser);
+
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
+      expect(storiesService.generateDraftFromResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        'story-id',
+        dto.researchKit,
+        dto.instruction,
+      );
+      expect(result.article.id).toBe('article-id');
+    });
+
+    it('should work without instruction', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
+      storiesService.generateDraftFromResearchKit.mockResolvedValue({ id: 'article-id' });
+
+      const dto = { researchKit: { timeline: [], people: [], data: [], opinions: [] } };
+      const result = await controller.generateDraftFromResearchKit('story-id', dto as any, mockUser);
+
+      expect(storiesService.generateDraftFromResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        'story-id',
+        dto.researchKit,
+        undefined,
+      );
+      expect(result.article.id).toBe('article-id');
     });
   });
 });

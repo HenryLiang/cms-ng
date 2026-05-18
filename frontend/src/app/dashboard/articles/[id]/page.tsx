@@ -43,6 +43,7 @@ import {
   MessageSquare,
   X,
   Check,
+  CheckCircle2,
   Plus,
   Type,
   Scissors,
@@ -65,6 +66,7 @@ export default function ArticleEditorPage() {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
@@ -156,6 +158,8 @@ export default function ArticleEditorPage() {
         status: status as any,
       });
       await loadArticle();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } finally {
       setSaving(false);
     }
@@ -452,6 +456,16 @@ export default function ArticleEditorPage() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Save success toast */}
+      {saveSuccess && article && (
+        <div className="absolute top-16 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-2.5 shadow-lg transition-opacity duration-300">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <span className="text-sm font-medium text-emerald-800">
+            保存成功，当前版本 v{article.version}
+          </span>
+        </div>
+      )}
+
       {/* Top bar */}
       <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-3">
         <div className="flex items-center gap-4">

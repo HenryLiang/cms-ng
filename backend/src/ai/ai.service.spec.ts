@@ -259,6 +259,142 @@ describe('AIService', () => {
 
       expect(result.title).toBe('Story Title');
     });
+
+    it('should inject formatted research kit into prompt', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        title: 'Draft Title',
+        content: '<p>Content</p>',
+      })));
+
+      const researchKit = {
+        timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
+        people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
+        data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
+        opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
+      };
+
+      await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: ['tag1'],
+        researchKit,
+      });
+
+      const callArgs = mockedAxios.post.mock.calls[0];
+      const prompt = callArgs[1].messages[1].content;
+      expect(prompt).toContain('【事件時間線】');
+      expect(prompt).toContain('2024-01-01：Event 1（來源：Source 1）');
+      expect(prompt).toContain('【關鍵人物】');
+      expect(prompt).toContain('Person A（Role A）：Background A');
+      expect(prompt).toContain('【核心數據】');
+      expect(prompt).toContain('Label 1：Value 1（來源：Source 1）');
+      expect(prompt).toContain('【各方觀點】');
+      expect(prompt).toContain('Source A（Stance A）：Viewpoint A');
+      expect(prompt).toContain('请充分利用上述背景资料撰写初稿');
+    });
+
+    it('should skip empty research kit sections in prompt', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        title: 'Draft Title',
+        content: '<p>Content</p>',
+      })));
+
+      await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+        researchKit: {
+          timeline: [],
+          people: [{ name: 'P1', role: 'R1' }],
+          data: [],
+          opinions: [],
+        },
+      });
+
+      const callArgs = mockedAxios.post.mock.calls[0];
+      const prompt = callArgs[1].messages[1].content;
+      expect(prompt).not.toContain('【事件時間線】');
+      expect(prompt).not.toContain('【核心數據】');
+      expect(prompt).not.toContain('【各方觀點】');
+      expect(prompt).toContain('【關鍵人物】');
+    });
+
+    it('should use instruction in prompt when provided', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        title: 'Draft Title',
+        content: '<p>Content</p>',
+      })));
+
+      await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+        instruction: '侧重民生角度',
+      });
+
+      const callArgs = mockedAxios.post.mock.calls[0];
+      const prompt = callArgs[1].messages[1].content;
+      expect(prompt).toContain('额外要求：侧重民生角度');
+    });
+
+    it('should sanitize HTML in draft content', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        title: 'Draft Title',
+        content: '<p>Safe</p><script>alert("xss")</script><style>body{color:red}</style><iframe src="evil"></iframe>',
+      })));
+
+      const result = await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+      });
+
+      expect(result.content).toBe('<p>Safe</p>');
+    });
+
+    it('should fallback to currentTitle when AI returns no title', async () => {
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        subtitle: 'Sub',
+        content: '<p>C</p>',
+      })));
+
+      const result = await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+        currentTitle: 'Current Title',
+      });
+
+      expect(result.title).toBe('Current Title');
+    });
+  });
+
+  describe('sanitizeDraftHTML', () => {
+    it('should keep allowed tags', () => {
+      const html = '<p>Text</p><h2>Heading</h3><ul><li>Item</li></ul><ol><li>Num</li></ol><blockquote>Quote</blockquote><strong>Bold</strong><em>Italic</em><br>';
+      const result = (service as any).sanitizeDraftHTML(html);
+      expect(result).toBe(html);
+    });
+
+    it('should remove script tags and content', () => {
+      const result = (service as any).sanitizeDraftHTML('<p>Safe</p><script>alert("xss")</script>');
+      expect(result).toBe('<p>Safe</p>');
+    });
+
+    it('should remove style tags and content', () => {
+      const result = (service as any).sanitizeDraftHTML('<p>Safe</p><style>body{color:red}</style>');
+      expect(result).toBe('<p>Safe</p>');
+    });
+
+    it('should remove disallowed tags but keep their text content', () => {
+      const result = (service as any).sanitizeDraftHTML('<p>Safe</p><div>Bad</div><span>Bad</span><iframe src="evil"></iframe>');
+      expect(result).toBe('<p>Safe</p>BadBad');
+    });
+
+    it('should preserve attributes on allowed tags', () => {
+      const result = (service as any).sanitizeDraftHTML('<p onclick="evil()" class="foo">Text</p>');
+      expect(result).toBe('<p onclick="evil()" class="foo">Text</p>');
+    });
+
+    it('should handle empty string', () => {
+      const result = (service as any).sanitizeDraftHTML('');
+      expect(result).toBe('');
+    });
   });
 
   describe('factCheck', () => {
