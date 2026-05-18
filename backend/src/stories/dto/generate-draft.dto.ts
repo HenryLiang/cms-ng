@@ -1,8 +1,8 @@
-import { IsOptional, IsString } from 'class-validator';
-import { ResearchKitResult } from '../../ai/dto/writing-operations.dto';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class GenerateDraftFromResearchKitDto {
-  researchKit: ResearchKitResult;
+  @IsNotEmpty()
+  researchKit: any;
 
   @IsOptional()
   @IsString()
