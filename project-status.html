@@ -175,7 +175,7 @@
     <header>
       <h1>01创作大脑 <span style="color:var(--text-3);font-weight:400;">CMS-NG</span></h1>
       <div class="subtitle">AI驱动内容创作系统 · 香港01媒体 · PRD合规进度追踪</div>
-      <div class="updated">进度更新于：2026/05/14 · 当前阶段：MVP功能开发中</div>
+      <div class="updated">进度更新于：2026/05/17 · 当前阶段：MVP功能开发中</div>
     </header>
 
     <!-- 核心指标 -->
@@ -183,9 +183,9 @@
       <div class="section-title">项目概况</div>
       <div class="card grid-4">
         <div class="metric">
-          <div class="metric-value" style="color:var(--warn);">45%</div>
+          <div class="metric-value" style="color:var(--warn);">55%</div>
           <div class="metric-label">MVP功能完成度</div>
-          <div class="progress-bar"><div class="progress-fill fill-warn" style="width:45%"></div></div>
+          <div class="progress-bar"><div class="progress-fill fill-warn" style="width:55%"></div></div>
         </div>
         <div class="metric">
           <div class="metric-value">6</div>
@@ -220,15 +220,15 @@
         <div class="action-item">
           <div class="action-num">2</div>
           <div class="action-body">
-            <div class="action-title">实现编辑审核台基础功能</div>
-            <div class="action-desc">MVP中P1优先级：编辑看板、稿件批注、通过/退回操作。当前编辑角色无专属界面</div>
+            <div class="action-title">接入P0核心数据源（新华网+路透+联合早报）</div>
+            <div class="action-desc">PRD v1.1 Appendix C 规划的P0信源尚有3个未接入。当前架构（RSS_FEEDS数组+fetchSingleRSS）支持同构扩展，预计3个源各1小时可完成</div>
           </div>
         </div>
         <div class="action-item">
           <div class="action-num">3</div>
           <div class="action-body">
-            <div class="action-title">接入角色权限控制</div>
-            <div class="action-desc">UserRole(REPORTER/EDITOR/ADMIN)已在Schema定义，但前后端均未实现RBAC权限拦截</div>
+            <div class="action-title">稿件批注功能</div>
+            <div class="action-desc">P1优先级。编辑可在文章正文上添加inline批注，记者侧可见并回复。当前审核流程已通，但退回意见和正文脱节</div>
           </div>
         </div>
       </div>
@@ -289,8 +289,8 @@
           <tr><th style="width:30%">PRD功能</th><th style="width:45%">实现状态</th><th style="width:25%">完成度</th></tr>
           <tr>
             <td>热点雷达</td>
-            <td>⚠️ Google Trends RSS集成完成（8地区/5时间范围）。缺少FB/IG/X/论坛等多源聚合、竞争度分析、趋势图</td>
-            <td><span class="badge badge-partial">40%</span></td>
+            <td>✅ 5个RSS源并行聚合（Google Trends 8地区、新浪、人民网、BBC、中国新闻网），支持去重分页。待接入：新华网、路透、联合早报、RSSHub社交、NewsAPI</td>
+            <td><span class="badge badge-partial">55%</span></td>
           </tr>
           <tr>
             <td>AI选题推荐</td>
@@ -320,13 +320,13 @@
           <tr><th style="width:30%">PRD功能</th><th style="width:45%">实现状态</th><th style="width:25%">完成度</th></tr>
           <tr>
             <td>智能资料搜集</td>
-            <td>❌ 未开始（结构化资料包：时间线/人物/数据/观点/可信度标注）</td>
-            <td><span class="badge badge-todo">0%</span></td>
+            <td>✅ 已完成。基于选题生成四维度结构化资料包（时间线/人物/数据/观点），前端展示+一键采用</td>
+            <td><span class="badge badge-done">100%</span></td>
           </tr>
           <tr>
             <td>初稿生成</td>
-            <td>❌ 未开始（大纲确认→全文生成、风格选择、引用标注）</td>
-            <td><span class="badge badge-todo">0%</span></td>
+            <td>✅ 已完成。基于选题上下文生成完整初稿，含引用标注、风格选择</td>
+            <td><span class="badge badge-done">100%</span></td>
           </tr>
           <tr>
             <td>标题实验室</td>
@@ -340,8 +340,8 @@
           </tr>
           <tr>
             <td>事实核查助手</td>
-            <td>❌ 未开始（自动事实标注、来源建议、一致性检查）</td>
-            <td><span class="badge badge-todo">0%</span></td>
+            <td>✅ 已完成。5维度分析（事实/一致性/来源/风险/争议），置信度评分+可视化展示</td>
+            <td><span class="badge badge-done">100%</span></td>
           </tr>
           <tr>
             <td>AI快捷菜单</td>
@@ -365,19 +365,19 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">模块四：编辑审核台 <span style="color:var(--text-3);font-size:12px;font-weight:400;">P1</span></div>
-          <span class="badge badge-todo">未开始</span>
+          <span class="badge badge-partial">部分完成</span>
         </div>
         <table class="compliance-table">
           <tr><th style="width:30%">PRD功能</th><th style="width:45%">实现状态</th><th style="width:25%">完成度</th></tr>
           <tr>
             <td>AI预审报告</td>
-            <td>❌ 未开始（质量评分/风险提示/优化建议）</td>
-            <td><span class="badge badge-todo">0%</span></td>
+            <td>✅ 已完成。五维度评分（事实/来源/风险/争议/一致性）+ 改进建议，整体0-100分</td>
+            <td><span class="badge badge-done">100%</span></td>
           </tr>
           <tr>
             <td>看板式审核</td>
-            <td>❌ 未开始（编辑专属看板、按紧急程度排序）</td>
-            <td><span class="badge badge-todo">0%</span></td>
+            <td>✅ 已完成。编辑专属审核队列，按紧急程度排序，支持通过/退回操作</td>
+            <td><span class="badge badge-done">100%</span></td>
           </tr>
           <tr>
             <td>版本对比与批注</td>

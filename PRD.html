@@ -555,6 +555,15 @@
         </div>
 
         <div class="nav-section">
+            <div class="nav-section-title">扩展模块</div>
+            <ul class="nav-list">
+                <li><a href="#visual-studio">AI视觉素材工厂</a></li>
+                <li><a href="#video-studio">视频内容处理</a></li>
+                <li><a href="#agent-ecosystem">个性化智能体生态</a></li>
+            </ul>
+        </div>
+
+        <div class="nav-section">
             <div class="nav-section-title">设计与流程</div>
             <ul class="nav-list">
                 <li><a href="#workflows">核心流程</a></li>
@@ -1426,11 +1435,307 @@
                 </ul>
             </section>
 
-            <!-- 10. 核心流程 -->
-            <section id="workflows">
-                <h2>10. 核心流程设计</h2>
+            <!-- 10. AI视觉素材工厂 -->
+            <section id="visual-studio">
+                <h2>10. 模块七：AI视觉素材工厂 (AI Visual Studio)</h2>
+                <p><span class="tag tag-gray">P2</span> <span class="tag tag-orange">扩展模块</span></p>
 
-                <h3>10.1 标准内容生产流程</h3>
+                <h3>10.1 功能概述</h3>
+                <p>AI视觉素材工厂是面向视觉设计和社交媒体运营的AI驱动内容生产模块。它解决编辑团队在制作OG图、社交配图、数据图表等视觉素材时效率低、工具分散的问题，目标是让非设计人员也能快速产出专业级视觉内容，减少对外部设计软件的依赖。</p>
+
+                <div class="info-box">
+                    <p><strong>定位：</strong>取代Photoshop基础功能的模板化快速制图工具，集成在CMS内部，支持一键批量生成适配多平台的视觉素材。</p>
+                </div>
+
+                <h3>10.2 OG图智能生成</h3>
+                <p>基于文章标题和内容，AI自动生成适配不同平台的Open Graph图片：</p>
+                <ul>
+                    <li><strong>多比例批量生成</strong>：一次生成多种比例（1:1 / 1.91:1 / 4:5等），适配Facebook、Twitter、LinkedIn等不同平台</li>
+                    <li><strong>无水印输出</strong>：所有生成图片为品牌级无水印高清图</li>
+                    <li><strong>模板仿作</strong>：上传现有OG图模板，AI学习其配色、排版、字体风格，生成风格一致的新图</li>
+                    <li><strong>简繁双版本</strong>：同时生成繁体中文和简体中文版本，适配不同市场</li>
+                </ul>
+
+                <h3>10.3 社交图制作</h3>
+                <p>针对社交媒体平台特性，生成适配各渠道的配图：</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>平台</th>
+                            <th>格式</th>
+                            <th>AI能力</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Facebook</strong></td>
+                            <td>Feed图 / 封面图</td>
+                            <td>基于文章生成主视觉+文案排版</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Instagram</strong></td>
+                            <td>Feed方形图 / Stories竖图</td>
+                            <td>极简风格、视觉冲击力优先</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Threads</strong></td>
+                            <td>简洁文字图</td>
+                            <td>大字报风格、语录金句图</td>
+                        </tr>
+                        <tr>
+                            <td><strong>小红书</strong></td>
+                            <td>3:4竖图 / 多图拼接</td>
+                            <td>种草风格、emoji点缀、分点排版</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>10.4 Infographic与数据图表</h3>
+                <p>将文章中的数据和信息转化为可视化图表，丰富内容呈现：</p>
+                <ul>
+                    <li><strong>统计图表生成</strong>：基于文章数据自动生成柱状图、饼图、趋势图等，适配iPhone竖屏阅读体验</li>
+                    <li><strong>复杂数据图表</strong>：支持选举、楼市、金像奖等复杂场景的多维度数据可视化</li>
+                    <li><strong>信息图卡</strong>：将长文要点提炼为单张信息图卡，适合社交传播</li>
+                    <li><strong>故事性连环图卡</strong>：为深度报道生成连续多页的故事线配图</li>
+                </ul>
+
+                <div class="warning-box">
+                    <p><strong>技术挑战：</strong>当前AI生成图表放code入CMS存在渲染兼容性问题。建议采用服务端生成PNG/SVG图片方案，而非前端代码渲染。</p>
+                </div>
+
+                <h3>10.5 AI改图与修图</h3>
+                <p>集成基础图像编辑能力，满足日常改图需求：</p>
+                <ul>
+                    <li><strong>模板化改图</strong>：合并两张图片、在图上添加/修改中文字、加上Logo</li>
+                    <li><strong>字体与颜色调整</strong>：可转换字体、修改颜色、放大缩小、移动文字位置</li>
+                    <li><strong>AI智能修图</strong>：上传图片+指令，AI理解图片内容和需求后生成修改版（参考Gemini Vision + 生图工作流）</li>
+                    <li><strong>品质检测</strong>：上传社交图后AI自动检测是否合格，给出改进建议</li>
+                </ul>
+
+                <h3>10.6 文生图（Stock Photo）</h3>
+                <p>根据文章场景描述，生成定制化的配图素材：</p>
+                <ul>
+                    <li><strong>场景图生成</strong>：输入详细prompt生成符合文章主题的人物/场景图片</li>
+                    <li><strong>中文适配</strong>：选用能正确处理中文文字的文生图模型（当前GPT-Image-1表现最佳）</li>
+                    <li><strong>漫画/插画风格</strong>：支持定制风格的一次性批量生成（如故事性插画、人物漫画）</li>
+                </ul>
+
+                <h3>10.7 页面结构</h3>
+                <div class="wireframe">
+                    <div class="wireframe-text">
+                        <strong>AI视觉素材工厂 — 页面结构</strong><br><br>
+                        ┌─────────────────────────────────────────────────────────────┐<br>
+                        │ 顶部工具栏 [OG图 | 社交图 | 图表 | 改图 | 文生图]            │<br>
+                        ├─────────────────────────────────────────────────────────────┤<br>
+                        │ 左侧 — 素材类型选择                                           │<br>
+                        │  ┌──────────────────────────────────────────┐               │<br>
+                        │  │ 📐 OG图（多比例）                          │               │<br>
+                        │  │ 📱 社交图（FB/IG/Threads/小红书）           │               │<br>
+                        │  │ 📊 数据图表 / Infographic                   │               │<br>
+                        │  │ 🖼️  改图 / 修图                            │               │<br>
+                        │  │ ✨ 文生图（Stock Photo）                    │               │<br>
+                        │  └──────────────────────────────────────────┘               │<br>
+                        ├─────────────────────────────────────────────────────────────┤<br>
+                        │ 右侧 — 编辑与预览面板                                         │<br>
+                        │  ┌──────────────────────────────────────────┐               │<br>
+                        │  │ 输入：文章标题/内容/Prompt                  │               │<br>
+                        │  │ ─────────────────────────────────────    │               │<br>
+                        │  │ 🎨 AI生成预览（多张）                       │               │<br>
+                        │  │ [图1] [图2] [图3] [图4]                   │               │<br>
+                        │  │ ─────────────────────────────────────    │               │<br>
+                        │  │ [下载PNG] [下载JPG] [批量下载] [收藏模板]   │               │<br>
+                        │  └──────────────────────────────────────────┘               │<br>
+                        └─────────────────────────────────────────────────────────────┘
+                    </div>
+                </div>
+            </section>
+
+            <!-- 11. 视频内容处理 -->
+            <section id="video-studio">
+                <h2>11. 模块八：视频内容处理 (Video Studio)</h2>
+                <p><span class="tag tag-gray">P2</span> <span class="tag tag-orange">扩展模块</span></p>
+
+                <h3>11.1 功能概述</h3>
+                <p>视频内容处理模块服务于01的YouTube视频运营和多媒体内容生产。它打通文章与视频的内容流转，支持将深度报道转化为视频脚本，以及将外部视频内容转化为文章，提升跨媒介内容复用效率。</p>
+
+                <h3>11.2 文变片：文章转视频讲稿</h3>
+                <p>将一篇或多篇深度报道浓缩为适合YouTube拍摄的讲稿：</p>
+                <ul>
+                    <li><strong>多文章综合</strong>：选择多篇相关报道，AI综合分析后生成连贯的讲述脚本</li>
+                    <li><strong>时长控制</strong>：根据目标视频长度（如5分钟、10分钟）自动调整讲稿字数和节奏</li>
+                    <li><strong>风格定制</strong>：指定语气风格（紧张刺激、轻松幽默、严肃分析等）</li>
+                    <li><strong>字幕生成</strong>：基于讲稿自动生成SRT字幕文件，支持时间轴对齐</li>
+                    <li><strong>SEO优化</strong>：生成5条符合SEO原则的YouTube视频标题建议</li>
+                    <li><strong>小标题分段</strong>：在讲稿中插入小标题，方便视频分段制作</li>
+                </ul>
+
+                <h3>11.3 片变文：视频转文章</h3>
+                <p>将YouTube视频、音频文件转化为结构化新闻报道：</p>
+                <ul>
+                    <li><strong>YouTube链接转写</strong>：粘贴YouTube链接，AI提取音频并转录为文字</li>
+                    <li><strong>视频/音频文件转写</strong>：支持上传本地视频或音频文件进行转录</li>
+                    <li><strong>结构化改写</strong>：将转录文本改写成规范的新闻报道格式</li>
+                    <li><strong>金句提取</strong>：自动识别讲者关键语录，建议引用位置</li>
+                    <li><strong>输出规格</strong>：自动输出符合01编辑规范的文章（含SEO标题、小标题、引用标注）</li>
+                </ul>
+
+                <div class="info-box">
+                    <p><strong>输出标准示例：</strong></p>
+                    <ol style="margin-top: 8px;">
+                        <li>5条符合SEO原则的标题</li>
+                        <li>约2000字的正文，含适量小标题</li>
+                        <li>至少直接引述讲者5句金句</li>
+                        <li>白话文书写（非粤语书面语）</li>
+                        <li>配套OG图标题建议</li>
+                    </ol>
+                </div>
+
+                <h3>11.4 页面结构</h3>
+                <div class="wireframe">
+                    <div class="wireframe-text">
+                        <strong>视频内容处理 — 页面结构</strong><br><br>
+                        ┌─────────────────────────────────────────────────────────────┐<br>
+                        │ 顶部标签 [文变片 📝→🎬] [片变文 🎬→📝]                       │<br>
+                        ├─────────────────────────────────────────────────────────────┤<br>
+                        │                                                             │<br>
+                        │  文变片模式：                                                │<br>
+                        │  ┌──────────────────────────────────────────────────┐      │<br>
+                        │  │ 选择来源文章（可多选）                             │      │<br>
+                        │  │ [文章1] [文章2] [文章3] ...                       │      │<br>
+                        │  │ 目标时长：[5分钟 ▼]  风格：[紧张刺激 ▼]           │      │<br>
+                        │  │ [生成讲稿]                                         │      │<br>
+                        │  │ ─────────────────────────────────────────────    │      │<br>
+                        │  │ 📄 讲稿预览 + 🎬 字幕下载(SRT)                     │      │<br>
+                        │  └──────────────────────────────────────────────────┘      │<br>
+                        │                                                             │<br>
+                        │  片变文模式：                                                │<br>
+                        │  ┌──────────────────────────────────────────────────┐      │<br>
+                        │  │ 输入YouTube链接 或 上传视频/音频文件               │      │<br>
+                        │  │ [https://youtube.com/...]  [浏览文件...]          │      │<br>
+                        │  │ 目标字数：[2000字 ▼]                               │      │<br>
+                        │  │ [开始转写与改写]                                   │      │<br>
+                        │  │ ─────────────────────────────────────────────    │      │<br>
+                        │  │ 📰 改写后的文章预览 + ✏️ 编辑保存                  │      │<br>
+                        │  └──────────────────────────────────────────────────┘      │<br>
+                        └─────────────────────────────────────────────────────────────┘
+                    </div>
+                </div>
+            </section>
+
+            <!-- 12. 个性化智能体生态 -->
+            <section id="agent-ecosystem">
+                <h2>12. 模块九：个性化智能体生态 (Agent Ecosystem)</h2>
+                <p><span class="tag tag-gray">P3</span> <span class="tag tag-orange">探索性</span></p>
+
+                <h3>12.1 功能概述</h3>
+                <p>个性化智能体生态是面向C端用户和商业客户的探索性模块。它基于01的内容积累和专业数据，训练面向特定垂直领域的AI对话机器人，为付费会员或商业合作伙伴提供高价值的专业咨询服务。此模块属于长期商业化探索方向，前期以概念验证为主。</p>
+
+                <div class="warning-box">
+                    <p><strong>阶段定位：</strong>此为探索性、商业化导向的功能方向，非CMS核心编辑流程的组成部分。需独立评估市场需求、合规风险和ROI后决定是否投入开发。</p>
+                </div>
+
+                <h3>12.2 潜在场景</h3>
+
+                <h4>12.2.1 股市分析机器人</h4>
+                <ul>
+                    <li><strong>分析维度</strong>：技术面主导，基本面和消息面辅助</li>
+                    <li><strong>图表生成</strong>：根据用户指令生成个股/板块分析图表（如"生成NVDA分析图表"）</li>
+                    <li><strong>数据引用</strong>：引用实时行情和历史数据，标注数据来源</li>
+                    <li><strong>目标用户</strong>：证券、金融、银行、基金行业的付费用户</li>
+                </ul>
+
+                <h4>12.2.2 AI兽医顾问</h4>
+                <ul>
+                    <li><strong>专业背书</strong>：仅引述专业兽医学术论文及权威网站回答</li>
+                    <li><strong>品牌合作</strong>：可与Hills、Royal Canin、兽医集团、宠物保险等品牌合作</li>
+                    <li><strong>内容输出</strong>：提供宠物健康建议、营养方案、常见病症初步判断</li>
+                    <li><strong>免责声明</strong>：明确标注建议不能替代线下兽医诊断</li>
+                </ul>
+
+                <h4>12.2.3 风水命理/星座掌相</h4>
+                <ul>
+                    <li><strong>用户画像</strong>：面向对玄学文化感兴趣的泛娱乐用户</li>
+                    <li><strong>数据获取</strong>：通过互动获取用户详细个人信息（出生时间、地点等）</li>
+                    <li><strong>商业合作</strong>：与相关品牌合作推广</li>
+                    <li><strong>合规注意</strong>：需明确标注娱乐性质，避免医疗/投资建议误导</li>
+                </ul>
+
+                <h4>12.2.4 体育竞猜分析（估波）</h4>
+                <ul>
+                    <li><strong>数据整合</strong>：整合球队历史数据、球员状态、赔率走势</li>
+                    <li><strong>分析输出</strong>：提供赛事分析参考，非赌博建议</li>
+                    <li><strong>合作方</strong>：马会足智彩等体育数据合作方</li>
+                    <li><strong>合规框架</strong>：严格遵循香港赌博条例，仅提供数据分析</li>
+                </ul>
+
+                <h4>12.2.5 AI总编辑</h4>
+                <ul>
+                    <li><strong>站内内容策略</strong>：分析01历史内容表现，给出选题方向、内容策略建议</li>
+                    <li><strong>热点预判</strong>：基于全网数据预判即将爆发的话题</li>
+                    <li><strong>编辑决策辅助</strong>：为内容总监提供数据驱动的决策参考</li>
+                    <li><strong>差异化定位</strong>：区别于面向记者的选题智能体，面向管理层</li>
+                </ul>
+
+                <h3>12.3 商业化思考</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>模式</th>
+                            <th>对象</th>
+                            <th>变现方式</th>
+                            <th>优先级</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>付费会员</strong></td>
+                            <td>01现有付费用户</td>
+                            <td>订阅制，解锁专属智能体</td>
+                            <td>中</td>
+                        </tr>
+                        <tr>
+                            <td><strong>品牌合作</strong></td>
+                            <td>Hills、券商、宠物保险等</td>
+                            <td>联合运营，分成或年费</td>
+                            <td>高</td>
+                        </tr>
+                        <tr>
+                            <td><strong>B2B定制</strong></td>
+                            <td>企业客户</td>
+                            <td>基于01技术能力的定制开发</td>
+                            <td>低</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>12.4 页面结构</h3>
+                <div class="wireframe">
+                    <div class="wireframe-text">
+                        <strong>个性化智能体生态 — 页面结构（概念版）</strong><br><br>
+                        ┌─────────────────────────────────────────────────────────────┐<br>
+                        │ 顶部导航 [智能体广场] [我的智能体] [合作洽谈]                   │<br>
+                        ├─────────────────────────────────────────────────────────────┤<br>
+                        │ 智能体卡片网格                                               │<br>
+                        │  ┌────────────┐ ┌────────────┐ ┌────────────┐              │<br>
+                        │  │ 📈 股市分析 │ │ 🩺 AI兽医   │ │ 🔮 风水命理 │              │<br>
+                        │  │  机器人     │ │   顾问      │ │   专家      │              │<br>
+                        │  │ [体验]      │ │ [体验]      │ │ [体验]      │              │<br>
+                        │  └────────────┘ └────────────┘ └────────────┘              │<br>
+                        │  ┌────────────┐ ┌────────────┐ ┌────────────┐              │<br>
+                        │  │ ⚽ 估波分析 │ │ 🧠 AI总编辑 │ │ ➕ 更多...  │              │<br>
+                        │  │  专家       │ │            │ │            │              │<br>
+                        │  │ [体验]      │ │ [体验]      │ │            │              │<br>
+                        │  └────────────┘ └────────────┘ └────────────┘              │<br>
+                        └─────────────────────────────────────────────────────────────┘
+                    </div>
+                </div>
+            </section>
+
+            <!-- 13. 核心流程 -->
+            <section id="workflows">
+                <h2>13. 核心流程设计</h2>
+
+                <h3>13.1 标准内容生产流程</h3>
                 <p>从选题到发布的标准流程，展示人与AI在各环节的协作关系：</p>
 
                 <div class="flow-step">
@@ -1513,7 +1818,7 @@
                     </div>
                 </div>
 
-                <h3>10.2 突发新闻快速流程</h3>
+                <h3>13.2 突发新闻快速流程</h3>
                 <p>针对突发新闻的特殊流程，压缩标准流程，强调速度：</p>
                 <div class="info-box">
                     <p><strong>触发条件：</strong> 热点雷达检测到重大突发事件（如自然灾害、重大事故、政治事件）</p>
@@ -1530,9 +1835,9 @@
 
             <!-- 11. 界面设计 -->
             <section id="ui-design">
-                <h2>11. 界面设计原则</h2>
+                <h2>14. 界面设计原则</h2>
 
-                <h3>11.1 设计系统</h3>
+                <h3>14.1 设计系统</h3>
                 <div class="card-grid">
                     <div class="card">
                         <div class="card-icon" style="background: #dbeafe;">🎨</div>
@@ -1556,7 +1861,7 @@
                     </div>
                 </div>
 
-                <h3>11.2 AI元素视觉规范</h3>
+                <h3>14.2 AI元素视觉规范</h3>
                 <p>为了建立用户对AI的信任感和辨识度，AI相关的视觉元素需要统一规范：</p>
                 <ul>
                     <li><strong>AI头像/图标</strong>：统一的机器人头像，不同智能体用不同颜色区分（选题=蓝色、写作=绿色、审核=橙色）</li>
@@ -1565,7 +1870,7 @@
                     <li><strong>建议卡片</strong>：AI建议以卡片形式呈现，包含"接受 / 修改 / 拒绝"三个操作按钮</li>
                 </ul>
 
-                <h3>11.3 响应式设计</h3>
+                <h3>14.3 响应式设计</h3>
                 <p>系统主要面向桌面端使用（记者和编辑的核心工作场景），但需支持：</p>
                 <ul>
                     <li><strong>平板端</strong>：适配iPad等平板设备，支持触摸操作</li>
@@ -1575,9 +1880,9 @@
 
             <!-- 12. AI交互设计 -->
             <section id="ai-interaction">
-                <h2>12. AI交互设计详细规范</h2>
+                <h2>15. AI交互设计详细规范</h2>
 
-                <h3>12.1 记者-AI对话范式</h3>
+                <h3>15.1 记者-AI对话范式</h3>
                 <p>系统支持自然语言对话，但也提供结构化快捷指令，降低使用门槛：</p>
 
                 <h4>快捷指令面板 (Quick Commands)</h4>
@@ -1633,7 +1938,7 @@
                     </tbody>
                 </table>
 
-                <h3>12.2 AI建议的呈现方式</h3>
+                <h3>15.2 AI建议的呈现方式</h3>
                 <p>AI的建议必须以非侵入式、可控制的方式呈现：</p>
 
                 <h4>内联建议 (Inline Suggestions)</h4>
@@ -1652,7 +1957,7 @@
                     <li>支持"稍后再说"，将建议保存到待处理列表</li>
                 </ul>
 
-                <h3>12.3 AI错误处理</h3>
+                <h3>15.3 AI错误处理</h3>
                 <p>AI并非万能，系统需要优雅处理AI出错的情况：</p>
                 <table>
                     <thead>
@@ -1689,9 +1994,9 @@
 
             <!-- 13. 技术架构 -->
             <section id="tech-stack">
-                <h2>13. 技术架构</h2>
+                <h2>16. 技术架构</h2>
 
-                <h3>13.1 总体架构</h3>
+                <h3>16.1 总体架构</h3>
                 <div class="wireframe">
                     <div class="wireframe-text">
                         <strong>系统架构图</strong><br><br>
@@ -1738,7 +2043,7 @@
                     </div>
                 </div>
 
-                <h3>13.2 技术选型</h3>
+                <h3>16.2 技术选型</h3>
                 <table>
                     <thead>
                         <tr>
@@ -1801,7 +2106,7 @@
                     </tbody>
                 </table>
 
-                <h3>13.3 AI模型抽象层</h3>
+                <h3>16.3 AI模型抽象层</h3>
                 <p>为了未来能够灵活切换AI模型（如从Kimi切换到其他模型），系统设计统一的AI模型抽象层：</p>
 
                 <div class="info-box">
@@ -1816,7 +2121,7 @@
                     <p style="margin-top: 8px;">不同的模型提供商（Kimi、OpenAI、本地模型）实现同一接口，上层业务代码无感知切换。</p>
                 </div>
 
-                <h3>13.4 数据安全与隐私</h3>
+                <h3>16.4 数据安全与隐私</h3>
                 <ul>
                     <li><strong>内容加密</strong>：敏感稿件内容在传输和存储时加密</li>
                     <li><strong>API安全</strong>：AI模型API调用使用企业级密钥管理，定期轮换</li>
@@ -1826,11 +2131,11 @@
                 </ul>
             </section>
 
-            <!-- 14. MVP范围 -->
+            <!-- 17. MVP范围 -->
             <section id="mvp">
-                <h2>14. MVP范围（第一期）</h2>
+                <h2>17. MVP范围（第一期）</h2>
 
-                <h3>14.1 MVP目标</h3>
+                <h3>17.1 MVP目标</h3>
                 <p>第一期聚焦<strong>"记者工作台 + AI写作辅助"</strong>，在2-3个月内交付可用的最小可行产品，验证AI辅助创作的核心价值。</p>
 
                 <div class="success-box">
@@ -1842,7 +2147,7 @@
                     </ul>
                 </div>
 
-                <h3>14.2 MVP功能清单</h3>
+                <h3>17.2 MVP功能清单</h3>
                 <table>
                     <thead>
                         <tr>
@@ -1938,10 +2243,45 @@
                             </td>
                             <td><span class="tag tag-gray">P2</span></td>
                         </tr>
+                        <tr>
+                            <td><strong>AI视觉素材工厂</strong></td>
+                            <td>
+                                • 仅预留技术接口
+                            </td>
+                            <td>
+                                • OG图/社交图批量生成<br>
+                                • Infographic/数据图表<br>
+                                • AI改图/修图<br>
+                                • 文生图Stock Photo
+                            </td>
+                            <td><span class="tag tag-gray">P2</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>视频内容处理</strong></td>
+                            <td>
+                                • 仅预留技术接口
+                            </td>
+                            <td>
+                                • 文变片（文章转YouTube讲稿+字幕）<br>
+                                • 片变文（YouTube/音频转文章）</li>
+                            </td>
+                            <td><span class="tag tag-gray">P2</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>个性化智能体生态</strong></td>
+                            <td>
+                                • 无
+                            </td>
+                            <td>
+                                • 股市分析/兽医/风水/估波/AI总编辑等全部场景<br>
+                                • 需独立评估商业可行性和合规风险后启动
+                            </td>
+                            <td><span class="tag tag-gray">P3</span></td>
+                        </tr>
                     </tbody>
                 </table>
 
-                <h3>14.3 MVP技术范围</h3>
+                <h3>17.3 MVP技术范围</h3>
                 <ul>
                     <li><strong>前端</strong>：Next.js单页应用，支持看板、编辑器、AI面板</li>
                     <li><strong>后端</strong>：Node.js单体应用（非微服务），RESTful API</li>
@@ -1954,9 +2294,9 @@
                 </div>
             </section>
 
-            <!-- 15. 里程碑 -->
+            <!-- 18. 里程碑 -->
             <section id="roadmap">
-                <h2>15. 项目里程碑</h2>
+                <h2>18. 项目里程碑</h2>
 
                 <table>
                     <thead>
@@ -1998,24 +2338,32 @@
                             <td>全团队200人上线，启动二期功能</td>
                             <td>正式版系统 + 二期需求文档</td>
                         </tr>
+                        <tr>
+                            <td><strong>Phase 5</strong><br>扩展模块</td>
+                            <td>第25-36周</td>
+                            <td>开发AI视觉素材工厂和视频内容处理模块</td>
+                            <td>OG图生成、社交图、图表、视频讲稿、片变文</td>
+                        </tr>
                     </tbody>
                 </table>
 
-                <h3>15.1 二期功能展望（Phase 4后）</h3>
+                <h3>18.1 二期及扩展功能展望（Phase 4后）</h3>
                 <ul>
                     <li><strong>多智能体协作</strong>：多个AI智能体之间的协作与辩论机制</li>
                     <li><strong>深度知识库</strong>：企业知识图谱，支持复杂关联查询</li>
-                    <li><strong>视频内容AI</strong>：短视频脚本生成、自动剪辑建议</li>
+                    <li><strong>AI视觉素材工厂</strong>：OG图/社交图/图表/改图全链路（Phase 5）</li>
+                    <li><strong>视频内容处理</strong>：文变片讲稿、片变文转写、字幕生成（Phase 5）</li>
+                    <li><strong>个性化智能体生态</strong>：股市/兽医/风水/估波等垂直场景探索（P3/待定）</li>
                     <li><strong>预测分析</strong>：基于历史数据预测选题表现</li>
                     <li><strong>开放API</strong>：允许第三方工具接入AI能力</li>
                 </ul>
             </section>
 
-            <!-- 16. 非功能需求 -->
+            <!-- 19. 非功能需求 -->
             <section id="non-functional">
-                <h2>16. 非功能需求</h2>
+                <h2>19. 非功能需求</h2>
 
-                <h3>16.1 性能需求</h3>
+                <h3>19.1 性能需求</h3>
                 <table>
                     <thead>
                         <tr>
@@ -2048,7 +2396,7 @@
                     </tbody>
                 </table>
 
-                <h3>16.2 安全需求</h3>
+                <h3>19.2 安全需求</h3>
                 <ul>
                     <li><strong>身份认证</strong>：基于企业SSO的单点登录，支持2FA</li>
                     <li><strong>内容安全</strong>：AI生成内容必须经过人工审核，禁止自动发布</li>
@@ -2057,14 +2405,14 @@
                     <li><strong>API安全</strong>：LLM API调用使用专用密钥，定期轮换，监控异常调用</li>
                 </ul>
 
-                <h3>16.3 可扩展性</h3>
+                <h3>19.3 可扩展性</h3>
                 <ul>
                     <li><strong>水平扩展</strong>：系统设计支持水平扩展，用户量增长时可增加服务器</li>
                     <li><strong>模型切换</strong>：AI模型抽象层支持无感知切换不同LLM提供商</li>
                     <li><strong>插件机制</strong>：预留插件接口，未来可接入新的AI能力（如视频生成）</li>
                 </ul>
 
-                <h3>16.4 兼容性</h3>
+                <h3>19.4 兼容性</h3>
                 <ul>
                     <li><strong>浏览器</strong>：支持Chrome、Safari、Edge最新两个主版本</li>
                     <li><strong>设备</strong>：桌面端为主，平板端适配，移动端仅支持轻量操作</li>
@@ -2072,9 +2420,9 @@
                 </ul>
             </section>
 
-            <!-- 17. 术语表 -->
+            <!-- 20. 术语表 -->
             <section id="glossary">
-                <h2>17. 术语表</h2>
+                <h2>20. 术语表</h2>
                 <table>
                     <thead>
                         <tr>
@@ -2111,13 +2459,29 @@
                             <td><strong>MVP</strong></td>
                             <td>Minimum Viable Product，最小可行产品。指以最小成本验证核心假设的第一个可用版本。</td>
                         </tr>
+                        <tr>
+                            <td><strong>OG图 (Open Graph Image)</strong></td>
+                            <td>社交媒体上分享链接时显示的代表性图片。不同平台对OG图尺寸有不同要求（如Facebook 1.91:1、Instagram 1:1）。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Infographic</strong></td>
+                            <td>信息图表，将复杂数据或信息以可视化方式呈现的单张图片，常用于社交媒体传播和文章配图。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>文变片 / 片变文</strong></td>
+                            <td>文变片指将文章转化为视频讲稿/字幕；片变文指将YouTube视频或音频转录改写为文章。实现跨媒介内容复用。</td>
+                        </tr>
+                        <tr>
+                            <td><strong>智能体生态 (Agent Ecosystem)</strong></td>
+                            <td>面向特定垂直领域（如股市、兽医、风水）的个性化AI对话机器人集合，可独立运营或面向商业客户。</td>
+                        </tr>
                     </tbody>
                 </table>
             </section>
 
-            <!-- 18. 变更记录 -->
+            <!-- 21. 变更记录 -->
             <section id="changelog">
-                <h2>18. 变更记录</h2>
+                <h2>21. 变更记录</h2>
                 <table>
                     <thead>
                         <tr>
@@ -2128,6 +2492,12 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td>v1.2</td>
+                            <td>2026-05-18</td>
+                            <td>整合外部AI生产力工具评估需求：新增模块七「AI视觉素材工厂」（OG图/社交图/图表/改图/文生图）、模块八「视频内容处理」（文变片/片变文）、模块九「个性化智能体生态」（股市/兽医/风水/估波/AI总编辑）；更新MVP范围与里程碑规划，三个扩展模块标记为P2/P3低优先级</td>
+                            <td>产品技术团队</td>
+                        </tr>
                         <tr>
                             <td>v1.1</td>
                             <td>2025-05-17</td>
