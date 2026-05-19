@@ -77,8 +77,31 @@ model Article {
   editor      User?         @relation("EditorArticles", fields: [editorId], references: [id])
   versions    ArticleVersion[]
   aiOperations AIOperation[]
+  platformPublishes PlatformPublish[]
 
   @@map("articles")
+}
+
+model PlatformPublish {
+  id             String        @id @default(uuid())
+  articleId      String
+  article        Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  platform       String
+  status         PublishStatus @default(DRAFT)
+  adaptedTitle   String?
+  adaptedContent String?       @db.Text
+  adaptedExcerpt String?       @db.Text
+  adaptedTags    String        @default("[]")
+  coverImages    String        @default("[]")
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  publishedUrl   String?
+  notes          String?       @db.Text
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([articleId, platform])
+  @@map("platform_publishes")
 }
 
 model ArticleVersion {
@@ -141,6 +164,15 @@ enum AgentType {
   REVIEW
   VISUAL
   DISTRIBUTE
+}
+
+enum PublishStatus {
+  DRAFT
+  GENERATING
+  READY
+  SCHEDULED
+  PUBLISHED
+  FAILED
 }
 
 enum TopicStatus {

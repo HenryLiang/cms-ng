@@ -29,6 +29,21 @@ export enum Platform {
   FACEBOOK = 'FACEBOOK',
   INSTAGRAM = 'INSTAGRAM',
   X = 'X',
+  THREADS = 'THREADS',
+  LINKEDIN = 'LINKEDIN',
+  XIAOHONGSHU = 'XIAOHONGSHU',
+  YOUTUBE = 'YOUTUBE',
+  PUSH = 'PUSH',
+}
+
+// ===== 平台发布状态 =====
+export enum PublishStatus {
+  DRAFT = 'DRAFT',
+  GENERATING = 'GENERATING',
+  READY = 'READY',
+  SCHEDULED = 'SCHEDULED',
+  PUBLISHED = 'PUBLISHED',
+  FAILED = 'FAILED',
 }
 
 // ===== AI智能体类型 =====
@@ -90,6 +105,38 @@ export interface Article {
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
+}
+
+// ===== 平台发布记录 =====
+export interface PlatformPublish {
+  id: string;
+  articleId: string;
+  platform: Platform;
+  status: PublishStatus;
+  adaptedTitle?: string;
+  adaptedContent?: string;
+  adaptedExcerpt?: string;
+  adaptedTags: string[];
+  coverImages: string[];
+  scheduledAt?: Date;
+  publishedAt?: Date;
+  publishedUrl?: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ===== 平台元数据 =====
+export interface PlatformMetadata {
+  key: Platform;
+  name: string;
+  description: string;
+  maxTitleLength?: number;
+  maxContentLength?: number;
+  supportsImages: boolean;
+  supportsVideo: boolean;
+  aspectRatios: string[];
+  styleGuide: string;
 }
 
 // ===== AI操作记录 =====

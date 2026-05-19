@@ -55,6 +55,16 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    platformPublish: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      upsert: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+    },
     $connect: jest.fn(),
     $disconnect: jest.fn(),
   } as unknown as jest.Mocked<PrismaService>;

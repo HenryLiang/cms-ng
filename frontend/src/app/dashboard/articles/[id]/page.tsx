@@ -34,6 +34,7 @@ import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-e
 import FactCheckPanel from '@/components/fact-check-panel';
 import ReviewReportPanel from '@/components/review-report-panel';
 import SEOPanel from '@/components/seo-panel';
+import ChannelPanel from '@/components/channels/channel-panel';
 import {
   ArrowLeft,
   Trash2,
@@ -1012,6 +1013,9 @@ export default function ArticleEditorPage() {
               />
             )}
           </div>
+
+          {/* Platform Distribution */}
+          <ChannelPanel articleId={articleId} />
 
           {/* AI Chat Toggle */}
           <button

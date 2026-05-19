@@ -10,9 +10,10 @@ export function useProtectedRoute() {
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAuthStore();
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !hasHydrated) return;
 
     const isPublic = PUBLIC_ROUTES.includes(pathname);
 
@@ -23,5 +24,5 @@ export function useProtectedRoute() {
     if (isAuthenticated && isPublic) {
       router.replace('/dashboard');
     }
-  }, [isAuthenticated, isLoading, pathname, router]);
+  }, [isAuthenticated, isLoading, hasHydrated, pathname, router]);
 }
