@@ -12,6 +12,8 @@ interface AuthStore extends AuthState {
   isEditor: () => boolean;
   isAdmin: () => boolean;
   isReporter: () => boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -21,6 +23,8 @@ export const useAuthStore = create<AuthStore>()(
       accessToken: null,
       isAuthenticated: false,
       isLoading: false,
+      _hasHydrated: false,
+      setHasHydrated: (value) => set({ _hasHydrated: value }),
 
       login: async (email, password) => {
         set({ isLoading: true });
@@ -75,6 +79,9 @@ export const useAuthStore = create<AuthStore>()(
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ accessToken: state.accessToken, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

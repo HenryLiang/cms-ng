@@ -9,6 +9,7 @@ import { StoriesModule } from './stories/stories.module';
 import { ArticlesModule } from './articles/articles.module';
 import { AIModule } from './ai/ai.module';
 import { TrendingTopicsModule } from './trending-topics/trending-topics.module';
+import { ChannelsModule } from './channels/channels.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TrendingTopicsModule } from './trending-topics/trending-topics.module';
     ArticlesModule,
     AIModule,
     TrendingTopicsModule,
+    ChannelsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

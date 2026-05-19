@@ -18,6 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useProtectedRoute();
   const { user, logout } = useAuthStore();
   const isLoading = useAuthStore((state) => state.isLoading);
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const pathname = usePathname();
 
   const navItems = allNavItems.filter((item) =>
@@ -30,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     [UserRole.ADMIN]: '管理员',
   }[user?.role as UserRole] || '';
 
-  if (isLoading) {
+  if (!hasHydrated || isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
