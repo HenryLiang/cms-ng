@@ -1193,7 +1193,7 @@
                 </ul>
 
                 <h4>6.2.4 多平台改写 (Multi-platform Rewrite)</h4>
-                <p>一键将深度报道适配为多平台版本：</p>
+                <p>一键将深度报道适配为多平台版本。所有第三方平台均采用<strong>"AI改写 → 预览 → 保存 → 一键复制"</strong>模式，不做API自动发布（各平台API开放度有限，运营人工粘贴完成最后一公里）。</p>
 
                 <table>
                     <thead>
@@ -1201,6 +1201,7 @@
                             <th>平台</th>
                             <th>适配策略</th>
                             <th>输出格式</th>
+                            <th>发布方式</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1208,24 +1209,51 @@
                             <td><strong>官网/APP</strong></td>
                             <td>完整长文，保留所有细节和引用</td>
                             <td>HTML富文本 + 图片</td>
+                            <td>系统直接发布</td>
+                        </tr>
+                        <tr>
+                            <td><strong>小红书</strong></td>
+                            <td>种草风格改写，≤20字吸睛标题，≤1000字正文，emoji点缀，10个精准标签</td>
+                            <td>图文笔记文案 + 封面图提示词</td>
+                            <td>AI改写 → 预览 → 一键复制 → 人工粘贴</td>
+                        </tr>
+                        <tr>
+                            <td><strong>微信公众号</strong></td>
+                            <td>深度长文适配，优化导语和段落结构，生成摘要卡片</td>
+                            <td>富文本 + 封面图提示词</td>
+                            <td>AI改写 → 预览 → 一键复制 → 人工粘贴</td>
                         </tr>
                         <tr>
                             <td><strong>Facebook</strong></td>
                             <td>提炼核心观点，增加互动引导语，适配长帖格式</td>
-                            <td>图文帖 + 链接卡片</td>
+                            <td>图文帖文案 + 链接卡片</td>
+                            <td>AI改写 → 预览 → 一键复制 → 人工粘贴</td>
                         </tr>
                         <tr>
                             <td><strong>Instagram</strong></td>
-                            <td>极简文字+视觉为主，生成9宫格故事线</td>
-                            <td>图片+短文案</td>
+                            <td>极简文字+视觉为主，生成轮播故事线</td>
+                            <td>短文案 + 图片排序建议</td>
+                            <td>AI改写 → 预览 → 一键复制 → 人工粘贴</td>
+                        </tr>
+                        <tr>
+                            <td><strong>微博</strong></td>
+                            <td>短平快风格，突出话题性，生成#话题标签#</td>
+                            <td>≤5000字博文文案</td>
+                            <td>AI改写 → 预览 → 一键复制 → 人工粘贴</td>
                         </tr>
                         <tr>
                             <td><strong>即时推送</strong></td>
                             <td>一句话快讯，突出时间性和冲击力</td>
-                            <td>纯文本推送</td>
+                            <td>纯文本推送文案</td>
+                            <td>AI改写 → 预览 → 一键复制 → 人工粘贴</td>
                         </tr>
                     </tbody>
                 </table>
+
+                <div class="info-box">
+                    <p><strong>发布策略说明</strong></p>
+                    <p style="margin-top:8px">第三方平台（小红书、微信、FB、IG、微博等）均不提供稳定可靠的官方发布API，或API审核门槛极高。系统采用<strong>"AI辅助生产，人工完成最后一公里"</strong>策略：AI完成内容改写和格式适配，运营一键复制后手动粘贴到目标平台。此策略既保证了内容质量，又避免了API对接的复杂性和不稳定性。</p>
+                </div>
 
                 <h4>6.2.5 事实核查助手 (Fact-check Assistant)</h4>
                 <p>在写作和审核阶段自动进行事实核查：</p>
@@ -1355,37 +1383,46 @@
                 <p><span class="tag tag-green">第二优先</span></p>
 
                 <h3>8.1 功能概述</h3>
-                <p>多平台分发中心实现"一次创作，全平台覆盖"。它不仅是发布工具，更是AI驱动的"内容适配工厂"，自动将深度报道转化为适合不同平台的格式和风格。</p>
+                <p>多平台分发中心是AI驱动的"内容适配工厂"，自动将深度报道转化为适合不同平台的格式和风格。核心模式为<strong>"AI改写 → 平台预览 → 保存版本 → 一键复制 → 人工粘贴"</strong>。</p>
+
+                <div class="warning-box">
+                    <p><strong>关于自动发布</strong></p>
+                    <p style="margin-top:8px">第三方平台（小红书、微信、Facebook、Instagram、微博等）均不提供稳定可靠的官方发布API，或API审核门槛极高、权限受限。系统<strong>不做API自动发布</strong>，采用"AI辅助生产，人工完成最后一公里"策略。此策略既保证了内容质量与合规性，又避免了API对接的复杂性和账号风险。</p>
+                </div>
 
                 <h3>8.2 核心功能</h3>
 
-                <h4>8.2.1 平台适配预览 (Platform Preview)</h4>
-                <p>在发布前，并排预览内容在各平台的呈现效果：</p>
+                <h4>8.2.1 AI平台改写 (AI Platform Adaptation)</h4>
+                <p>审核通过后，为每个目标平台生成适配版本：</p>
                 <ul>
-                    <li>左侧：官网长文版预览</li>
-                    <li>中间：Facebook帖文预览（含缩略图）</li>
-                    <li>右侧：Instagram图文预览（9宫格/轮播）</li>
-                    <li>支持直接在各预览中编辑调整</li>
+                    <li><strong>一键生成</strong>：选择目标平台，AI自动改写标题、正文、标签</li>
+                    <li><strong>平台风格库</strong>：每个平台有预设的改写风格（种草风、短平快、长文深度等）</li>
+                    <li><strong>封面图提示词</strong>：AI生成适配该平台风格的封面图提示词，供设计师参考</li>
+                    <li><strong>多版本管理</strong>：同一稿件可保存多个平台的适配版本，独立管理</li>
                 </ul>
 
-                <h4>8.2.2 智能排程 (Smart Scheduling)</h4>
+                <h4>8.2.2 平台适配预览 (Platform Preview)</h4>
+                <p>在发布前，模拟各平台的呈现效果：</p>
                 <ul>
-                    <li><strong>最佳时间推荐</strong>：AI根据历史数据和各平台受众活跃时间，推荐最佳发布时间</li>
-                    <li><strong>突发模式</strong>：突发新闻标记为"立即发布"，跳过排程</li>
-                    <li><strong>批量排程</strong>：支持一次性排定一周的多平台发布计划</li>
+                    <li><strong>小红书预览</strong>：模拟手机端笔记样式（封面图+标题+正文+标签区）</li>
+                    <li><strong>微信公众号预览</strong>：模拟公众号文章样式（封面+标题+导语+正文）</li>
+                    <li><strong>Facebook预览</strong>：模拟帖文样式（缩略图+文案+链接卡片）</li>
+                    <li><strong>Instagram预览</strong>：模拟图文样式（图片+短文案）</li>
+                    <li>支持直接在预览中编辑调整标题和正文</li>
                 </ul>
 
-                <h4>8.2.3 一键发布 (One-Click Publish)</h4>
+                <h4>8.2.3 一键复制 (One-Click Copy)</h4>
                 <ul>
-                    <li>审核通过后，一键推送到已配置的所有平台</li>
-                    <li>支持定时发布：选择日期和时间自动发布</li>
-                    <li>发布失败时自动重试，并通知运营人员</li>
+                    <li><strong>复制文案</strong>：一键将标题+正文+标签复制到剪贴板，格式可直接粘贴到目标平台</li>
+                    <li><strong>复制封面提示词</strong>：复制AI生成的封面图提示词，供设计师使用</li>
+                    <li><strong>导出文本包</strong>：一次性导出所有平台的文案包（Markdown/TXT格式）</li>
+                    <li><strong>发布状态标记</strong>：运营粘贴发布后，手动标记为"已发布"</li>
                 </ul>
 
                 <h4>8.2.4 效果追踪 (Performance Tracking)</h4>
-                <p>发布后数据回流与分析：</p>
+                <p>发布后数据记录与分析（运营手动回填+AI分析）：</p>
                 <ul>
-                    <li><strong>实时数据</strong>：阅读量、点赞、评论、转发等核心指标</li>
+                    <li><strong>数据回填</strong>：运营手动录入各平台的阅读量、点赞、评论、收藏等核心指标</li>
                     <li><strong>AI分析</strong>：自动分析高表现内容的共同特征，生成优化建议</li>
                     <li><strong>对比分析</strong>：同一内容在不同平台的表现对比</li>
                     <li><strong>趋势报告</strong>：周报/月报自动生成，总结内容表现趋势</li>
@@ -2197,7 +2234,6 @@
                             </td>
                             <td>
                                 • 自动初稿生成<br>
-                                • 多平台改写<br>
                                 • 结构化资料包<br>
                                 • 采访提纲生成
                             </td>
@@ -2220,15 +2256,17 @@
                         <tr>
                             <td><strong>多平台分发</strong></td>
                             <td>
-                                • 手动发布到单一平台<br>
-                                • 发布状态记录
+                                • AI改写多平台版本（小红书/微信/微博/Facebook/Instagram）<br>
+                                • 平台预览与一键复制文案<br>
+                                • 发布状态标记（已复制/已发布）<br>
+                                • 官网直接发布
                             </td>
                             <td>
-                                • 多平台自动适配<br>
+                                • API自动发布到第三方平台（因平台限制，暂不支持）<br>
                                 • 智能排程<br>
-                                • 效果追踪
+                                • 效果数据自动回传
                             </td>
-                            <td><span class="tag tag-gray">P2</span></td>
+                            <td><span class="tag tag-orange">P1</span></td>
                         </tr>
                         <tr>
                             <td><strong>管理后台</strong></td>
@@ -2492,6 +2530,12 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td>v1.3</td>
+                            <td>2026-05-19</td>
+                            <td>重构「多平台分发」模块（第8章）：因第三方平台（小红书/微信/微博等）无开放API支持自动发布，改为「AI改写 → 平台预览 → 一键复制 → 人工粘贴」workflow；更新6.2.4多平台改写平台适配表（新增小红书/微信公众号/微博/Facebook/Instagram）；更新MVP范围表中多平台分发定义，优先级从P2提升至P1</td>
+                            <td>产品技术团队</td>
+                        </tr>
                         <tr>
                             <td>v1.2</td>
                             <td>2026-05-18</td>
