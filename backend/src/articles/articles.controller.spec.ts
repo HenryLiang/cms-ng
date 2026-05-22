@@ -117,24 +117,28 @@ describe('ArticlesController', () => {
 
   describe('findOne', () => {
     it('should return article when user is author', async () => {
+      articlesService.verifyAccess.mockResolvedValue(undefined);
       articlesService.findOne.mockResolvedValue(mockArticle({ authorId: 'author-id' }));
 
       const result = await controller.findOne('article-id', mockUser);
 
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(articlesService.findOne).toHaveBeenCalledWith('article-id');
       expect(result.id).toBe('article-id');
     });
 
     it('should return article when user is admin', async () => {
+      articlesService.verifyAccess.mockResolvedValue(undefined);
       articlesService.findOne.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
 
       const result = await controller.findOne('article-id', mockAdmin);
 
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockAdmin);
       expect(result.id).toBe('article-id');
     });
 
     it('should throw ForbiddenException when no access', async () => {
-      articlesService.findOne.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'another-id' }));
+      articlesService.verifyAccess.mockRejectedValue(new ForbiddenException());
 
       await expect(controller.findOne('article-id', mockUser)).rejects.toThrow(ForbiddenException);
     });
@@ -168,17 +172,18 @@ describe('ArticlesController', () => {
 
   describe('getVersions', () => {
     it('should return versions when user has access', async () => {
-      articlesService.findOne.mockResolvedValue(mockArticle());
+      articlesService.verifyAccess.mockResolvedValue(undefined);
       articlesService.getVersions.mockResolvedValue([{ version: 1 }]);
 
       const result = await controller.getVersions('article-id', mockUser);
 
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(articlesService.getVersions).toHaveBeenCalledWith('article-id');
       expect(result).toHaveLength(1);
     });
 
     it('should throw ForbiddenException when no access', async () => {
-      articlesService.findOne.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
+      articlesService.verifyAccess.mockRejectedValue(new ForbiddenException());
 
       await expect(controller.getVersions('article-id', mockUser)).rejects.toThrow(ForbiddenException);
     });

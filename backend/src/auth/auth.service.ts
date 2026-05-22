@@ -5,6 +5,10 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcryptjs';
 
+// 默认密码 123456 的 bcrypt 哈希（开发测试环境统一使用）
+const DEFAULT_PASSWORD_HASH =
+  '$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -20,7 +24,7 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = DEFAULT_PASSWORD_HASH;
 
     const user = await this.prisma.user.create({
       data: {

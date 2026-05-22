@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useProtectedRoute } from '@/hooks/use-protected-route';
+import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
 import { UserRole } from '@cms-ng/shared';
 import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck } from 'lucide-react';
@@ -16,6 +17,7 @@ const allNavItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   useProtectedRoute();
+  useRoleGuard();
   const { user, logout } = useAuthStore();
   const isLoading = useAuthStore((state) => state.isLoading);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);

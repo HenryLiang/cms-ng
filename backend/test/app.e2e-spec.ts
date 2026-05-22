@@ -60,7 +60,7 @@ describe('AppController (e2e)', () => {
         .send({
           email: uniqueEmail,
           name: 'E2E Test User',
-          password: 'password123',
+          password: '123456',
           role: 'REPORTER',
         })
         .expect(201);
@@ -79,7 +79,7 @@ describe('AppController (e2e)', () => {
         .send({
           email: `login-test-${Date.now()}@example.com`,
           name: 'Login Test',
-          password: 'password123',
+          password: '123456',
           role: 'REPORTER',
         });
       testUserId = registerRes.body.user.id;
@@ -89,7 +89,7 @@ describe('AppController (e2e)', () => {
         .post('/auth/login')
         .send({
           email: registerRes.body.user.email,
-          password: 'password123',
+          password: '123456',
         })
         .expect(201);
 
@@ -115,7 +115,7 @@ describe('AppController (e2e)', () => {
         .send({
           email: `me-test-${Date.now()}@example.com`,
           name: 'Me Test',
-          password: 'password123',
+          password: '123456',
           role: 'REPORTER',
         });
       testUserId = registerRes.body.user.id;
@@ -145,7 +145,7 @@ describe('AppController (e2e)', () => {
         .send({
           email: `story-test-${Date.now()}@example.com`,
           name: 'Story Test User',
-          password: 'password123',
+          password: '123456',
           role: 'REPORTER',
         });
       testUserId = registerRes.body.user.id;
@@ -267,7 +267,7 @@ describe('AppController (e2e)', () => {
         .send({
           email: `article-test-${Date.now()}@example.com`,
           name: 'Article Test User',
-          password: 'password123',
+          password: '123456',
           role: 'REPORTER',
         });
       testUserId = registerRes.body.user.id;

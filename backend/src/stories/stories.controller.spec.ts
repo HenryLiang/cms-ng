@@ -76,24 +76,28 @@ describe('StoriesController', () => {
 
   describe('findOne', () => {
     it('should return story when user is author', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
       storiesService.findOne.mockResolvedValue(mockStory({ reporterId: 'user-id' }));
 
       const result = await controller.findOne('story-id', mockUser);
 
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
       expect(storiesService.findOne).toHaveBeenCalledWith('story-id');
       expect(result.id).toBe('story-id');
     });
 
     it('should return story when user is admin', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
       storiesService.findOne.mockResolvedValue(mockStory({ reporterId: 'other-id' }));
 
       const result = await controller.findOne('story-id', mockAdmin);
 
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockAdmin);
       expect(result.id).toBe('story-id');
     });
 
     it('should throw ForbiddenException when user has no access', async () => {
-      storiesService.findOne.mockResolvedValue(mockStory({ reporterId: 'other-id', editorId: 'another-id' }));
+      storiesService.verifyAccess.mockRejectedValue(new ForbiddenException());
 
       await expect(controller.findOne('story-id', mockUser)).rejects.toThrow(ForbiddenException);
     });

@@ -10,7 +10,10 @@ describe('ChannelsController', () => {
     generateAdaptation: jest.Mock;
     updatePublish: jest.Mock;
     deletePublish: jest.Mock;
+    verifyAccess: jest.Mock;
   };
+
+  const mockUser = { userId: 'user-1', role: 'REPORTER' };
 
   beforeEach(async () => {
     service = {
@@ -19,6 +22,7 @@ describe('ChannelsController', () => {
       generateAdaptation: jest.fn(),
       updatePublish: jest.fn(),
       deletePublish: jest.fn(),
+      verifyAccess: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,8 +57,9 @@ describe('ChannelsController', () => {
       const mockPublishes = [{ id: 'p1', platform: 'FACEBOOK', status: 'READY' }];
       service.getPublishes.mockResolvedValue(mockPublishes);
 
-      const result = await controller.getPublishes('article-id');
+      const result = await controller.getPublishes('article-id', mockUser);
 
+      expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(service.getPublishes).toHaveBeenCalledWith('article-id');
       expect(result).toEqual(mockPublishes);
     });
@@ -65,10 +70,11 @@ describe('ChannelsController', () => {
       const mockResult = { id: 'p1', status: 'READY', adaptedTitle: 'Title' };
       service.generateAdaptation.mockResolvedValue(mockResult);
 
-      const result = await controller.generateAdaptation('user-1', 'article-id', {
+      const result = await controller.generateAdaptation(mockUser, 'article-id', {
         platform: 'FACEBOOK' as any,
       });
 
+      expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(service.generateAdaptation).toHaveBeenCalledWith(
         'user-1',
         'article-id',
@@ -81,11 +87,12 @@ describe('ChannelsController', () => {
     it('should pass custom prompt', async () => {
       service.generateAdaptation.mockResolvedValue({ id: 'p1' });
 
-      await controller.generateAdaptation('user-1', 'article-id', {
+      await controller.generateAdaptation(mockUser, 'article-id', {
         platform: 'XIAOHONGSHU' as any,
         customPrompt: 'Use more emojis',
       });
 
+      expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(service.generateAdaptation).toHaveBeenCalledWith(
         'user-1',
         'article-id',
@@ -100,11 +107,12 @@ describe('ChannelsController', () => {
       const mockResult = { id: 'p1', status: 'PUBLISHED' };
       service.updatePublish.mockResolvedValue(mockResult);
 
-      const result = await controller.updatePublish('article-id', 'publish-id', {
+      const result = await controller.updatePublish(mockUser, 'article-id', 'publish-id', {
         status: 'PUBLISHED' as any,
         publishedUrl: 'https://fb.com/post/1',
       });
 
+      expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(service.updatePublish).toHaveBeenCalledWith('article-id', 'publish-id', {
         status: 'PUBLISHED',
         publishedUrl: 'https://fb.com/post/1',
@@ -117,8 +125,9 @@ describe('ChannelsController', () => {
     it('should delete publish', async () => {
       service.deletePublish.mockResolvedValue({ deleted: true });
 
-      const result = await controller.deletePublish('article-id', 'publish-id');
+      const result = await controller.deletePublish(mockUser, 'article-id', 'publish-id');
 
+      expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(service.deletePublish).toHaveBeenCalledWith('article-id', 'publish-id');
       expect(result).toEqual({ deleted: true });
     });

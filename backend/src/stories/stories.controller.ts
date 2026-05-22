@@ -32,16 +32,8 @@ export class StoriesController {
 
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
-    const story = await this.storiesService.findOne(id);
-    // Only author, assigned editor, or admin can view
-    const canAccess =
-      user.role === UserRole.ADMIN ||
-      story.reporterId === user.userId ||
-      story.editorId === user.userId;
-    if (!canAccess) {
-      throw new ForbiddenException('You do not have permission to view this story');
-    }
-    return story;
+    await this.storiesService.verifyAccess(id, user);
+    return this.storiesService.findOne(id);
   }
 
   @Patch(':id')

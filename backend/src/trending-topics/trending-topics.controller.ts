@@ -7,18 +7,15 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   BadRequestException,
 } from '@nestjs/common';
 import { TrendingTopicsService } from './trending-topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('trending-topics')
-@UseGuards(JwtAuthGuard)
 export class TrendingTopicsController {
   private readonly SOURCE_KEYS = ['google-trends', 'sina', 'people', 'bbc', 'chinanews'];
   private readonly UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

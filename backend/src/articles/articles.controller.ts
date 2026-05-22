@@ -54,15 +54,8 @@ export class ArticlesController {
 
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
-    const article = await this.articlesService.findOne(id);
-    const canAccess =
-      user.role === UserRole.ADMIN ||
-      article.authorId === user.userId ||
-      article.editorId === user.userId;
-    if (!canAccess) {
-      throw new ForbiddenException('You do not have permission to view this article');
-    }
-    return article;
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.findOne(id);
   }
 
   @Patch(':id')
@@ -86,14 +79,7 @@ export class ArticlesController {
     @Param('id') id: string,
     @CurrentUser() user: { userId: string; role: string },
   ) {
-    const article = await this.articlesService.findOne(id);
-    const canAccess =
-      user.role === UserRole.ADMIN ||
-      article.authorId === user.userId ||
-      article.editorId === user.userId;
-    if (!canAccess) {
-      throw new ForbiddenException('You do not have permission to view this article');
-    }
+    await this.articlesService.verifyAccess(id, user);
     return this.articlesService.getVersions(id);
   }
 

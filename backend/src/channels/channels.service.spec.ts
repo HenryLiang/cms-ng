@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
@@ -471,6 +471,38 @@ describe('ChannelsService', () => {
       prisma.platformPublish.findFirst.mockResolvedValue(null);
 
       await expect(service.deletePublish('article-id', 'nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('verifyAccess', () => {
+    it('should allow admin access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'admin-id', role: 'ADMIN' })).resolves.toBeUndefined();
+    });
+
+    it('should allow author access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'user-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'user-id', role: 'REPORTER' })).resolves.toBeUndefined();
+    });
+
+    it('should allow assigned editor access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'editor-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'editor-id', role: 'EDITOR' })).resolves.toBeUndefined();
+    });
+
+    it('should throw NotFoundException when article not found', async () => {
+      prisma.article.findUnique.mockResolvedValue(null);
+
+      await expect(service.verifyAccess('nonexistent', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when user has no access', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'another-id' }));
+
+      await expect(service.verifyAccess('article-id', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(ForbiddenException);
     });
   });
 });

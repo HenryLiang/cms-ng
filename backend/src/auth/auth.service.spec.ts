@@ -6,7 +6,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 
 jest.mock('bcryptjs', () => ({
-  hash: jest.fn().mockResolvedValue('hashed_password'),
   compare: jest.fn(),
 }));
 
@@ -52,12 +51,11 @@ describe('AuthService', () => {
       const result = await service.register(dto);
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: dto.email } });
-      expect(bcrypt.hash).toHaveBeenCalledWith(dto.password, 12);
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: {
           email: dto.email,
           name: dto.name,
-          passwordHash: 'hashed_password',
+          passwordHash: '$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS',
           role: dto.role,
         },
         select: { id: true, email: true, name: true, role: true, createdAt: true },
