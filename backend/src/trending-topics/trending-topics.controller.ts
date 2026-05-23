@@ -19,6 +19,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 export class TrendingTopicsController {
   private readonly SOURCE_KEYS = [
     'google-trends', 'sina', 'people', 'bbc', 'chinanews',
+    'guardian', 'nytimes', 'economist', 'ft', 'zaobao',
     '36kr', 'huxiu', 'douban-movie',
   ];
   private readonly UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -80,6 +81,41 @@ export class TrendingTopicsController {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
     return this.topicsService.fetchNewsBySource('chinanews', page, limit);
+  }
+
+  @Get('guardian')
+  fetchGuardian(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('guardian', page, limit);
+  }
+
+  @Get('nytimes')
+  fetchNYTimes(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('nytimes', page, limit);
+  }
+
+  @Get('economist')
+  fetchEconomist(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('economist', page, limit);
+  }
+
+  @Get('ft')
+  fetchFT(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('ft', page, limit);
+  }
+
+  @Get('zaobao')
+  fetchZaobao(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('zaobao', page, limit);
   }
 
   @Get('weibo-hot')

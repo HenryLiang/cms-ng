@@ -137,12 +137,17 @@ export class TrendingTopicsService {
 
   private readonly RSS_FEEDS = [
     { key: 'google-trends', url: 'https://trends.google.com/trending/rss?geo=HK', isGoogle: true },
+    // 原生 RSS 源（优先）
     { key: 'sina', url: 'https://rss.sina.com.cn/news/china/focus15.xml', isGoogle: false },
     { key: 'people', url: 'http://www.people.com.cn/rss/politics.xml', isGoogle: false },
     { key: 'bbc', url: 'http://feeds.bbci.co.uk/news/rss.xml', isGoogle: false },
     { key: 'chinanews', url: 'http://www.chinanews.com/rss/scroll-news.xml', isGoogle: false },
-    // RSSHub 源（默认本地实例，可通过 RSS_HUB_URL 环境变量覆盖）
-    // 注：社交媒体源（微博/知乎等）因反爬机制经常 503，仅保留稳定源
+    { key: 'guardian', url: 'https://www.theguardian.com/world/rss', isGoogle: false },
+    { key: 'nytimes', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', isGoogle: false },
+    { key: 'economist', url: 'https://www.economist.com/latest/rss.xml', isGoogle: false },
+    { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
+    { key: 'zaobao', url: 'https://www.zaobao.com.sg/rss/news.xml', isGoogle: false },
+    // RSSHub 源（网站无原生 RSS 时）
     { key: '36kr', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/36kr/news/latest`, isGoogle: false, isRSSHub: true },
     { key: 'huxiu', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/huxiu/article`, isGoogle: false, isRSSHub: true },
     { key: 'douban-movie', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/douban/movie/playing`, isGoogle: false, isRSSHub: true },
