@@ -36,3 +36,4 @@ coverage/
 
 # Keep example env files
 !.env.example
+.turbo/

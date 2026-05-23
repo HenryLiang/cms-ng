@@ -17,6 +17,7 @@ import {
   ReviewReportDto,
   OptimizeSEODto,
 } from './dto/ai-operations.dto';
+import { GenerateImageDto } from './dto/generate-image.dto';
 
 @Injectable()
 export class ArticlesService {
@@ -444,6 +445,34 @@ export class ArticlesService {
       subtitle: article.subtitle || undefined,
       content: article.content,
     });
+    return result;
+  }
+
+  async aiGenerateImage(
+    id: string,
+    user: { userId: string; role: string },
+    dto: GenerateImageDto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.generateArticleImage(
+      user.userId,
+      id,
+      article.title,
+      article.content,
+      {
+        style: dto.style,
+        aspectRatio: dto.aspectRatio,
+        size: dto.size,
+        customPrompt: dto.customPrompt,
+      },
+    );
+
+    // Optionally update coverImage
+    await this.prisma.article.update({
+      where: { id },
+      data: { coverImage: result.url },
+    });
+
     return result;
   }
 

@@ -1264,6 +1264,136 @@
                     <li><strong>争议标注</strong>：对有争议或多方不同说法的信息，AI标注"多方说法不一，建议补充来源"</li>
                 </ul>
 
+                <h4>6.2.6 AI智能配图 (AI Smart Image Generation)</h4>
+                <p>基于稿件内容自动生成配图，覆盖正文插图、文章封面及多平台OG/社交封面。与模块七「AI视觉素材工厂」面向运营设计人员的批量制图工具不同，本功能深度嵌入记者写作流程，在创作环节即时为稿件匹配视觉素材。</p>
+
+                <div class="info-box">
+                    <p><strong>生图模型</strong>：Seedream 5.0 lite（字节火山引擎方舟平台）</p>
+                    <p><strong>模型ID</strong>：<code>doubao-seedream-5-0-260128</code></p>
+                    <p><strong>API地址</strong>：<code>POST https://ark.cn-beijing.volces.com/api/v3/images/generations</code></p>
+                    <p><strong>支持分辨率</strong>：2K / 3K / 4K 或指定尺寸（如 2048x2048）</p>
+                    <p><strong>限流</strong>：500 张/分钟（IPM），单请求最多 15 张（含参考图）</p>
+                </div>
+
+                <h5>配图场景与类型</h5>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用途类型</th>
+                            <th>场景说明</th>
+                            <th>推荐尺寸</th>
+                            <th>存储位置</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>文章封面 (COVER)</strong></td>
+                            <td>文章列表、详情页顶部展示的主视觉图</td>
+                            <td>3K (约 2730x1536)</td>
+                            <td>Article.coverImage</td>
+                        </tr>
+                        <tr>
+                            <td><strong>正文插图 (INLINE)</strong></td>
+                            <td>插入在文章段落之间的内容配图，1-5张</td>
+                            <td>2K (约 2048x1152)</td>
+                            <td>Article.content 中 &lt;img&gt; 标签 + ArticleImage 记录</td>
+                        </tr>
+                        <tr>
+                            <td><strong>平台OG图 (PLATFORM_OG)</strong></td>
+                            <td>各分发平台的社交封面图，按平台比例适配</td>
+                            <td>按平台 aspectRatios 生成（如 FB 1.91:1、IG 1:1、小红书 3:4）</td>
+                            <td>PlatformPublish.coverImages</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h5>交互流程</h5>
+                <div class="flow-step">
+                    <div class="flow-number">1</div>
+                    <div class="flow-content">
+                        <h4>AI分析配图需求 <span class="tag tag-purple">AI主导</span></h4>
+                        <p>记者完成初稿后，点击"AI分析配图"。Kimi读取文章标题、正文、摘要，输出结构化推荐：</p>
+                        <ul style="margin-top:8px">
+                            <li>每张图的 <strong>用途</strong>（封面/正文插图/平台OG）</li>
+                            <li><strong>插入位置</strong>（正文插图：第几段之后）</li>
+                            <li><strong>生成Prompt</strong>：经AI优化的文生图提示词（中文，≤300字）</li>
+                            <li><strong>推荐尺寸</strong>：基于用途和平台适配器自动匹配</li>
+                            <li><strong>推荐理由</strong>：为什么这个位置/内容需要配图</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">2</div>
+                    <div class="flow-content">
+                        <h4>记者确认与调整 <span class="tag tag-blue">人机协作</span></h4>
+                        <p>系统在AI面板展示推荐卡片列表。记者可以：</p>
+                        <ul style="margin-top:8px">
+                            <li>勾选/取消勾选要生成的配图</li>
+                            <li>修改Prompt（如调整风格、增加细节）</li>
+                            <li>调整尺寸（在Seedream支持的2K/3K/4K范围内）</li>
+                            <li>手动添加额外的配图需求</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">3</div>
+                    <div class="flow-content">
+                        <h4>批量生成与存储 <span class="tag tag-purple">AI主导</span></h4>
+                        <p>确认后系统调用Seedream API批量生成图片：</p>
+                        <ul style="margin-top:8px">
+                            <li>使用 <code>sequential_image_generation: "auto"</code> + <code>max_images</code> 批量生成</li>
+                            <li>或拆分为多次单图请求（视接口稳定性）</li>
+                            <li>返回临时URL后，<strong>立即下载到本地服务器</strong>持久化存储</li>
+                            <li>存储路径：<code>./uploads/articles/{articleId}/{imageId}.png</code></li>
+                            <li>对外访问URL：<code>/uploads/articles/{articleId}/{imageId}.png</code></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">4</div>
+                    <div class="flow-content">
+                        <h4>应用与发布 <span class="tag tag-blue">人机协作</span></h4>
+                        <p>生成完成后，记者逐张决定图片用途：</p>
+                        <ul style="margin-top:8px">
+                            <li><strong>设为封面</strong> → 更新 Article.coverImage</li>
+                            <li><strong>插入正文</strong> → 在TipTap编辑器指定段落插入 &lt;img&gt;</li>
+                            <li><strong>分配给平台</strong> → 写入 PlatformPublish.coverImages（按平台）</li>
+                            <li><strong>删除</strong> → 清理本地文件 + 数据库记录</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h5>数据模型</h5>
+                <div class="model-diagram" style="margin:16px 0;">
+{
+  "ArticleImage": {
+    "id": "uuid",
+    "articleId": "关联Article",
+    "url": "/uploads/articles/{articleId}/{imageId}.png",
+    "localPath": "服务器绝对路径",
+    "alt": "图片描述（AI生成或记者填写）",
+    "usageType": "COVER | INLINE | PLATFORM_OG",
+    "platform": "当PLATFORM_OG时，对应平台key（如facebook）",
+    "prompt": "生成该图使用的完整prompt",
+    "seed": "生成seed，便于复现",
+    "sortOrder": "正文插图排序",
+    "createdAt": "timestamp"
+  }
+}
+                </div>
+
+                <h5>关键设计原则</h5>
+                <ul>
+                    <li><strong>临时URL必须落盘</strong>：Seedream返回的图片URL具有时效性，系统必须在返回后立即下载到本地存储，禁止直接引用外部临时URL</li>
+                    <li><strong>级联清理</strong>：删除文章时，自动删除所有关联的ArticleImage记录及本地文件</li>
+                    <li><strong>操作可追溯</strong>：所有AI分析、生图、下载操作记录到AIOperation表（agentType: VISUAL）</li>
+                    <li><strong>平台比例自适应</strong>：生成平台OG图时，根据PlatformMetadata.aspectRatios自动计算最佳尺寸</li>
+                    <li><strong>限流保护</strong>：单次最多生成5张，超出需分批；前端展示进度条和预计耗时</li>
+                </ul>
+
                 <h3>6.3 AI交互设计模式</h3>
                 <p>系统采用三种AI交互模式，适应不同场景：</p>
 
@@ -1351,14 +1481,56 @@
                 </div>
 
                 <h4>7.2.2 多智能体联合评审 (Multi-Agent Review)</h4>
-                <p>对于敏感或重要稿件，触发多智能体联合评审机制：</p>
+                <p>对于敏感或重要稿件（涉及政治、法律、企业舆情、公众人物等），系统自动触发多智能体联合评审机制。评审由4个独立AI智能体并行执行，每个智能体专注于不同维度：</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>智能体</th>
+                            <th>评审维度</th>
+                            <th>输出格式</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>事实核查智能体</strong></td>
+                            <td>交叉验证所有事实性陈述、数据来源、统计数字</td>
+                            <td>逐条标注：✅已核实 / ⚠️需复核 / ❌存疑（附建议来源）</td>
+                        </tr>
+                        <tr>
+                            <td><strong>法律智能体</strong></td>
+                            <td>诽谤、隐私侵权、版权、藐视法庭、煽动性内容等法律风险</td>
+                            <td>风险等级（高/中/低）+ 具体法条引用 + 修改建议</td>
+                        </tr>
+                        <tr>
+                            <td><strong>公关智能体</strong></td>
+                            <td>舆论反应预测、企业/个人声誉影响、可能的公关危机</td>
+                            <td>风险场景推演 + 应对话术建议 + 预警级别</td>
+                        </tr>
+                        <tr>
+                            <td><strong>风格智能体</strong></td>
+                            <td>是否符合01编辑风格、语言规范、标题规范、敏感词使用</td>
+                            <td>不符合项列表 + 规范依据 + 修改示例</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>触发条件</strong>：</p>
                 <ul>
-                    <li><strong>事实核查智能体</strong>：交叉验证所有事实性陈述</li>
-                    <li><strong>法律智能体</strong>：检查诽谤、隐私、版权等法律风险</li>
-                    <li><strong>公关智能体</strong>：评估可能的舆论反应和公关风险</li>
-                    <li><strong>风格智能体</strong>：检查是否符合01的编辑风格和语言规范</li>
+                    <li>AI预审评分低于B级（即存在多项事实或法律风险）</li>
+                    <li>文章标签包含「政治」「法律」「企业」「公众人物」等敏感分类</li>
+                    <li>编辑手动触发「请求联合评审」</li>
                 </ul>
-                <p>各智能体独立出具评审意见，编辑综合各方意见做出最终判断。</p>
+
+                <p><strong>评审结果呈现</strong>：</p>
+                <ul>
+                    <li>顶部汇总：4个智能体的综合风险等级（绿色/黄色/红色），编辑一键决策</li>
+                    <li>分栏展示：每个智能体的评审意见独立展示，支持按风险等级筛选</li>
+                    <li>原文批注：直接在文章对应段落旁显示相关智能体的标注（类似Google Docs评论）</li>
+                    <li>AI辩论：当两个智能体意见冲突时（如法律智能体认为安全但公关智能体认为高风险），系统高亮显示冲突点，提示编辑特别关注</li>
+                </ul>
+
+                <p><strong>编辑决策</strong>：编辑可「采纳全部建议」「逐条确认」「驳回」或「转交法务/公关部门」。所有决策记录到审核日志。</p>
 
                 <h4>7.2.3 看板式审核 (Kanban Review)</h4>
                 <p>编辑的工作看板，展示所有待审核稿件：</p>
@@ -1370,10 +1542,30 @@
                 </ul>
 
                 <h4>7.2.4 版本对比与批注 (Version Compare & Annotation)</h4>
+                <p>编辑在审核过程中需要对比稿件的多个版本，理解记者的修改意图，并留下专业的审核意见。</p>
+
+                <p><strong>版本对比（Diff View）</strong>：</p>
                 <ul>
-                    <li>清晰展示记者原始稿 → AI优化版 → 记者修改版的差异</li>
-                    <li>编辑可以直接在文本上批注，支持@AI生成修改建议</li>
-                    <li>所有批注和修改历史完整保留，可追溯</li>
+                    <li><strong>三栏对比模式</strong>：原始稿 | AI优化版 | 记者修改版，并排展示，差异以色块高亮（新增=绿色、删除=红色、修改=黄色）</li>
+                    <li><strong>变更导航</strong>：侧边栏显示所有变更点的缩略列表，点击快速跳转</li>
+                    <li><strong>逐段对比</strong>：点击任意段落展开该段的全部版本历史，包括修改人、修改时间、修改原因（记者提交时可填写）</li>
+                    <li><strong>忽略格式差异</strong>：支持只对比内容变化，忽略标点、空格的微调</li>
+                </ul>
+
+                <p><strong>批注系统（Annotation）</strong>：</p>
+                <ul>
+                    <li><strong>行内批注</strong>：选中任意文本段落，弹出批注浮层，输入审核意见。批注以彩色竖条标记在文本左侧</li>
+                    <li><strong>批注类型</strong>：提问（❓）、修改建议（✏️）、事实核查请求（🔍）、风险提示（⚠️）、通过标记（✅）</li>
+                    <li><strong>@AI 辅助</strong>：在批注框输入「@AI 帮我改写这段」「@AI 核实这个数据」，AI自动响应并生成建议</li>
+                    <li><strong>批注回复</strong>：记者收到退回稿件后，可在每条批注下回复说明修改情况，形成审核对话线程</li>
+                    <li><strong>批注状态</strong>：未读 → 已读 → 已处理 → 已解决，编辑可逐条确认关闭</li>
+                </ul>
+
+                <p><strong>审核历史追溯</strong>：</p>
+                <ul>
+                    <li><strong>时间轴视图</strong>：按时间顺序展示该稿件的全部审核事件（提交→AI预审→编辑批注→退回→修改→再审→通过）</li>
+                    <li><strong>操作人记录</strong>：每个操作（修改、批注、通过、退回）记录操作人、时间、IP地址</li>
+                    <li><strong>导出审核报告</strong>：一键导出PDF格式的审核报告，包含全部批注、修改对比、最终版本</li>
                 </ul>
             </section>
 
@@ -1402,30 +1594,208 @@
                 </ul>
 
                 <h4>8.2.2 平台适配预览 (Platform Preview)</h4>
-                <p>在发布前，模拟各平台的呈现效果：</p>
+                <p>在发布前，模拟各平台的呈现效果，让运营人员直观了解内容在目标平台的最终展示形态，避免发布后才发现格式问题。</p>
+
+                <p><strong>支持平台与预览模式</strong>：</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>平台</th>
+                            <th>预览模式</th>
+                            <th>展示元素</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>小红书</strong></td>
+                            <td>手机端笔记卡片</td>
+                            <td>封面图（3:4）+ 标题（最多20字）+ 正文前3行折叠 + 底部标签区</td>
+                        </tr>
+                        <tr>
+                            <td><strong>微信公众号</strong></td>
+                            <td>公众号文章页</td>
+                            <td>封面大图 + 标题 + 作者信息 + 导语 + 正文（支持图文混排预览）</td>
+                        </tr>
+                        <tr>
+                            <td><strong>微博</strong></td>
+                            <td>微博信息流卡片</td>
+                            <td>用户头像+昵称 + 正文（最多2000字，超140字显示「展开」）+ 配图九宫格 + 底部互动栏</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Facebook</strong></td>
+                            <td>Facebook Feed帖文</td>
+                            <td>发布者信息 + 正文 + 链接卡片（OG图+标题+描述）+ 互动按钮</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Instagram</strong></td>
+                            <td>Instagram Feed / Stories</td>
+                            <td>Feed：正方形图片/轮播 + 短文案（首行显示，点击展开）+ 标签区<br>Stories：竖屏9:16图片/视频 + 顶部文字叠加</td>
+                        </tr>
+                        <tr>
+                            <td><strong>X (Twitter)</strong></td>
+                            <td>X帖文卡片</td>
+                            <td>用户头像+昵称 + 正文（280字限制，超出截断）+ 配图（最多4张2x2网格）</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LinkedIn</strong></td>
+                            <td>LinkedIn文章/动态</td>
+                            <td>发布者职业信息 + 正文 + 链接预览卡片（1.91:1横图）+ 专业互动栏</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>预览交互</strong>：</p>
                 <ul>
-                    <li><strong>小红书预览</strong>：模拟手机端笔记样式（封面图+标题+正文+标签区）</li>
-                    <li><strong>微信公众号预览</strong>：模拟公众号文章样式（封面+标题+导语+正文）</li>
-                    <li><strong>Facebook预览</strong>：模拟帖文样式（缩略图+文案+链接卡片）</li>
-                    <li><strong>Instagram预览</strong>：模拟图文样式（图片+短文案）</li>
-                    <li>支持直接在预览中编辑调整标题和正文</li>
+                    <li><strong>设备切换</strong>：支持在「桌面端」和「移动端」之间切换，模拟不同设备的显示效果</li>
+                    <li><strong>深色模式</strong>：支持切换浅色/深色模式预览（部分平台支持）</li>
+                    <li><strong>实时编辑</strong>：直接在预览中修改标题和正文，修改实时同步到对应平台的适配版本</li>
+                    <li><strong>字数超限提示</strong>：当正文超过平台限制（如X的280字、小红书标题20字）时，预览区红字提示并在对应位置截断显示</li>
+                    <li><strong>OG图预览</strong>：在Facebook/LinkedIn预览中，显示AI生成的OG图或占位图，点击可唤起「AI智能配图」面板生成/替换</li>
                 </ul>
 
+                <p><strong>分屏对比</strong>：运营可同时打开2个平台的预览窗口并排对比（如小红书 vs Instagram），确保内容在不同平台呈现一致的核心信息。</p>
+
                 <h4>8.2.3 一键复制 (One-Click Copy)</h4>
+                <p>运营完成平台适配和预览确认后，需要快速将内容复制到目标平台的发布界面。系统提供多种复制方式，覆盖不同平台的内容格式需求。</p>
+
+                <p><strong>复制模式</strong>：</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>复制类型</th>
+                            <th>复制内容</th>
+                            <th>适用场景</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>完整文案</strong></td>
+                            <td>标题 + 正文 + 标签/话题（按平台格式自动拼接）</td>
+                            <td>直接粘贴到平台发布框</td>
+                        </tr>
+                        <tr>
+                            <td><strong>仅标题</strong></td>
+                            <td>适配后的平台标题</td>
+                            <td>平台标题与正文分开填写时（如微信公众号）</td>
+                        </tr>
+                        <tr>
+                            <td><strong>仅正文</strong></td>
+                            <td>适配后的正文（保留段落格式，自动转换平台支持的富文本标记）</td>
+                            <td>正文需要单独粘贴到编辑器</td>
+                        </tr>
+                        <tr>
+                            <td><strong>仅标签</strong></td>
+                            <td>#话题1 #话题2（按平台格式，X用#，Instagram用#，小红书用#）</td>
+                            <td>单独调整标签时使用</td>
+                        </tr>
+                        <tr>
+                            <td><strong>封面图提示词</strong></td>
+                            <td>AI生成的封面图prompt + 推荐尺寸</td>
+                            <td>交给设计师制作封面图</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>复制格式智能转换</strong>：</p>
                 <ul>
-                    <li><strong>复制文案</strong>：一键将标题+正文+标签复制到剪贴板，格式可直接粘贴到目标平台</li>
-                    <li><strong>复制封面提示词</strong>：复制AI生成的封面图提示词，供设计师使用</li>
-                    <li><strong>导出文本包</strong>：一次性导出所有平台的文案包（Markdown/TXT格式）</li>
-                    <li><strong>发布状态标记</strong>：运营粘贴发布后，手动标记为"已发布"</li>
+                    <li><strong>小红书</strong>：正文自动添加段落间的emoji分隔符，标签自动添加#前缀，标题限制20字超出截断并提示</li>
+                    <li><strong>微信公众号</strong>：正文保留Markdown格式（标题/加粗/引用/链接），发布前可一键转为微信编辑器兼容的HTML</li>
+                    <li><strong>微博</strong>：正文超过140字时自动提示「长文」标识，图片链接自动转为微博配图上传提示</li>
+                    <li><strong>Facebook/LinkedIn</strong>：正文保留段落格式，链接自动转为OG链接卡片格式</li>
+                    <li><strong>X</strong>：正文严格限制280字符（含标点），超出时红色高亮并禁止复制，提示精简</li>
+                    <li><strong>Instagram</strong>：正文首行提取为短文案预览，剩余内容标记为「展开」，标签集中放在末尾</li>
+                </ul>
+
+                <p><strong>批量导出</strong>：</p>
+                <ul>
+                    <li><strong>多平台文案包</strong>：一次性导出所有已适配平台的文案（Markdown格式，按平台分章节）</li>
+                    <li><strong>纯文本包</strong>：导出为TXT格式，无格式标记，适合直接粘贴</li>
+                    <li><strong>JSON数据包</strong>：导出结构化JSON（标题/正文/标签/封面图URL/发布状态），供第三方工具或自动化脚本使用</li>
+                </ul>
+
+                <p><strong>发布状态标记</strong>：</p>
+                <ul>
+                    <li>运营粘贴发布后，在对应平台卡片点击「标记为已发布」，系统记录发布时间</li>
+                    <li>支持「已复制（待发布）」「已发布」「发布失败（需重试）」三种状态</li>
+                    <li>全部平台发布完成后，系统自动更新稿件状态为「已分发」</li>
                 </ul>
 
                 <h4>8.2.4 效果追踪 (Performance Tracking)</h4>
-                <p>发布后数据记录与分析（运营手动回填+AI分析）：</p>
+                <p>内容分发到各平台后，需要持续追踪传播效果，为后续内容策略优化提供数据支撑。效果追踪采用「运营手动回填核心数据 + AI自动分析趋势」的人机协作模式。</p>
+
+                <p><strong>核心数据指标</strong>：</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>指标类别</th>
+                            <th>指标名称</th>
+                            <th>数据来源</th>
+                            <th>录入方式</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>曝光类</strong></td>
+                            <td>阅读量 / 浏览量 / 展示次数</td>
+                            <td>各平台后台</td>
+                            <td>运营手动回填（每日/每周）</td>
+                        </tr>
+                        <tr>
+                            <td><strong>互动类</strong></td>
+                            <td>点赞数、评论数、转发/分享数、收藏数</td>
+                            <td>各平台后台</td>
+                            <td>运营手动回填</td>
+                        </tr>
+                        <tr>
+                            <td><strong>粉丝类</strong></td>
+                            <td>新增粉丝、净增关注</td>
+                            <td>各平台后台</td>
+                            <td>运营手动回填</td>
+                        </tr>
+                        <tr>
+                            <td><strong>转化类</strong></td>
+                            <td>点击率（CTR）、跳转官网次数</td>
+                            <td>官网 Analytics + 平台后台</td>
+                            <td>系统自动采集（UTM参数追踪）</td>
+                        </tr>
+                        <tr>
+                            <td><strong>负面类</strong></td>
+                            <td>举报数、负面评论占比</td>
+                            <td>各平台后台</td>
+                            <td>运营手动回填</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>数据回填 UI</strong>：</p>
                 <ul>
-                    <li><strong>数据回填</strong>：运营手动录入各平台的阅读量、点赞、评论、收藏等核心指标</li>
-                    <li><strong>AI分析</strong>：自动分析高表现内容的共同特征，生成优化建议</li>
-                    <li><strong>对比分析</strong>：同一内容在不同平台的表现对比</li>
-                    <li><strong>趋势报告</strong>：周报/月报自动生成，总结内容表现趋势</li>
+                    <li><strong>分发任务卡片</strong>：每篇稿件的分发面板显示各平台的「待回填」状态，运营点击后弹出录入浮层</li>
+                    <li><strong>批量录入</strong>：支持Excel/CSV导入，格式为「文章ID | 平台 | 日期 | 阅读量 | 点赞 | 评论 | 转发 | 收藏」</li>
+                    <li><strong>数据校验</strong>：录入时自动校验数值合理性（如阅读量必须 ≥ 点赞数），异常值黄色高亮提示</li>
+                    <li><strong>历史趋势</strong>：每个指标显示近7天/30天趋势折线图，帮助运营判断数据波动</li>
+                </ul>
+
+                <p><strong>AI 智能分析</strong>：</p>
+                <ul>
+                    <li><strong>高表现内容特征提取</strong>：AI自动分析高阅读/高互动内容的共性（标题特征、发布时间、话题类型、配图风格、正文长度等），输出《高表现内容特征报告》</li>
+                    <li><strong>平台适配度评分</strong>：同一内容在不同平台的表现差异分析，AI给出「该内容更适合哪个平台」的建议</li>
+                    <li><strong>异常预警</strong>：当某平台数据突然下滑（如阅读量环比下降50%）或某篇内容互动率异常低时，AI自动推送预警通知</li>
+                    <li><strong>竞品对比</strong>：录入竞品账号的公开数据后，AI生成竞品内容策略对比报告</li>
+                </ul>
+
+                <p><strong>趋势报告自动生成</strong>：</p>
+                <ul>
+                    <li><strong>周报告</strong>（每周一自动生成）：本周总发稿量、各平台分发量、Top 3 高表现文章、Top 3 低表现文章、AI优化建议</li>
+                    <li><strong>月报告</strong>（每月1日自动生成）：月度传播数据汇总、平台表现排名、内容类型分布、粉丝增长趋势、下月选题建议</li>
+                    <li><strong>专题报告</strong>（手动触发）：针对特定选题或活动（如「香港书展报道」）生成专项传播效果分析</li>
+                    <li><strong>报告导出</strong>：支持导出为PDF（带图表）或PPT格式，直接用于团队会议</li>
+                </ul>
+
+                <p><strong>效果数据与内容创作联动</strong>：</p>
+                <ul>
+                    <li>在「选题中心」展示「历史同类选题表现」，帮助记者判断选题潜力</li>
+                    <li>在「AI协作面板」中，当记者要求AI生成标题时，AI参考高表现历史内容的标题特征进行优化</li>
+                    <li>在「编辑审核台」中，编辑可查看该记者过往稿件的平均传播表现，作为质量评估参考</li>
                 </ul>
             </section>
 
@@ -1440,27 +1810,168 @@
                 <h3>9.2 核心功能</h3>
 
                 <h4>9.2.1 团队工作看板 (Team Dashboard)</h4>
+                <p>为主编和管理层提供全局视角的内容生产实况，支持实时决策和资源调配。</p>
+
+                <p><strong>看板布局</strong>（三栏式）：</p>
                 <ul>
-                    <li><strong>全局状态</strong>：全团队当前选题总数、各环节稿件数量、今日/本周发稿量</li>
-                    <li><strong>记者负载</strong>：每位记者当前负责的选题数量和进度</li>
-                    <li><strong>审核积压</strong>：编辑审核队列状态，预警积压风险</li>
-                    <li><strong>热点覆盖</strong>：当前热点话题的媒体报道覆盖度分析</li>
+                    <li><strong>顶部 KPI 横幅</strong>：今日发稿量 / 本周发稿量 / 待审核稿件数 / 平均审核耗时 — 实时刷新，红色预警当审核队列 > 10 篇或平均审核耗时 > 4 小时</li>
+                    <li><strong>左栏：生产流水线</strong>：按稿件状态分泳道（选题中 → 采写中 → 待审核 → 审核中 → 待发布 → 已发布），每道显示稿件卡片（标题/记者/截止时间），支持拖拽调整优先级</li>
+                    <li><strong>中栏：记者负载</strong>：每位记者的当前任务数、本周已完成数、平均稿件质量评分、当前状态（空闲/正常/过载）。过载（任务 > 5）时红色高亮</li>
+                    <li><strong>右栏：热点覆盖</strong>：当前热点雷达中的 TOP 10 话题，每个话题显示「已覆盖/未覆盖」状态、已发布稿件数、阅读量汇总</li>
                 </ul>
 
-                <h4>9.2.2 AI使用分析 (AI Analytics)</h4>
+                <p><strong>预警与通知</strong>：</p>
                 <ul>
-                    <li><strong>功能使用率</strong>：各AI功能的使用频次和活跃率</li>
-                    <li><strong>效率提升</strong>：AI辅助前后的创作时间对比</li>
-                    <li><strong>质量指标</strong>：AI参与稿件 vs 纯人工稿件的质量评分对比</li>
-                    <li><strong>记者画像</strong>：识别"AI重度用户"和"AI轻度用户"，针对性推广</li>
+                    <li><strong>审核积压预警</strong>：审核队列超过 10 篇或单篇超过 4 小时未审，自动推送给主编和对应编辑</li>
+                    <li><strong>截稿风险预警</strong>：距离截稿时间 < 2 小时且状态未达「待审核」的稿件，黄色高亮并推送记者</li>
+                    <li><strong>热点遗漏预警</strong>：TOP 5 热点中超过 2 个未覆盖时，推送选题主编建议安排报道</li>
+                    <li><strong>记者过载预警</strong>：某记者同时负责选题 > 5 个时，提示主编考虑任务再分配</li>
+                </ul>
+
+                <p><strong>数据钻取</strong>：点击任意数字/卡片可下钻查看详情。如点击「待审核 8 篇」展开审核队列列表；点击记者姓名查看该记者的全部进行中和历史稿件。</p>
+
+                <h4>9.2.2 AI使用分析 (AI Analytics)</h4>
+                <p>全面追踪AI功能在内容生产中的实际价值，为功能迭代和推广策略提供数据支撑。</p>
+
+                <p><strong>核心指标仪表盘</strong>：</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>指标维度</th>
+                            <th>具体指标</th>
+                            <th>计算方式</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>功能使用率</strong></td>
+                            <td>各AI功能的月活跃使用次数、使用记者数、人均使用频次</td>
+                            <td>从AIOperation表按agentType聚合</td>
+                        </tr>
+                        <tr>
+                            <td><strong>功能渗透率</strong></td>
+                            <td>使用过AI功能的记者占比、稿件中至少使用过一项AI功能的占比</td>
+                            <td>活跃记者数 / 总记者数</td>
+                        </tr>
+                        <tr>
+                            <td><strong>效率提升</strong></td>
+                            <td>AI辅助稿件的平均创作时长 vs 纯人工稿件的平均创作时长</td>
+                            <td>（纯人工时长 - AI辅助时长）/ 纯人工时长 × 100%</td>
+                        </tr>
+                        <tr>
+                            <td><strong>质量对比</strong></td>
+                            <td>AI参与稿件的审核通过率、编辑评分均值 vs 纯人工稿件</td>
+                            <td>对比两组稿件的审核评分均值</td>
+                        </tr>
+                        <tr>
+                            <td><strong>AI采纳率</strong></td>
+                            <td>AI生成建议中被记者/编辑实际采纳的比例（如AI标题被采用率）</td>
+                            <td>采纳次数 / 生成次数 × 100%</td>
+                        </tr>
+                        <tr>
+                            <td><strong>成本效率</strong></td>
+                            <td>AI API调用成本 / 节省的人工工时，计算ROI</td>
+                            <td>（节省工时 × 人力成本）/ API成本</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>记者AI画像分层</strong>：</p>
+                <ul>
+                    <li><strong>AI重度用户</strong>（周使用 > 20次）：高频使用多个AI功能，通常效率提升显著。作为内部推广的种子用户，邀请撰写使用心得。</li>
+                    <li><strong>AI中度用户</strong>（周使用 5-20次）：主要使用1-2个核心功能（如续写、标题生成）。通过推送新功能教程和成功案例，引导扩展使用场景。</li>
+                    <li><strong>AI轻度用户</strong>（周使用 < 5次）：偶尔尝试，对AI能力持观望态度。安排1对1培训或推荐"最快上手的3个AI功能"。</li>
+                    <li><strong>AI未激活用户</strong>（注册后从未使用）：分析阻碍原因（是不了解功能入口？还是尝试后不满意？），针对性推送激活引导。</li>
+                </ul>
+
+                <p><strong>AI效果归因分析</strong>：</p>
+                <ul>
+                    <li><strong>单篇归因</strong>：每篇稿件详细记录使用了哪些AI功能、使用次数、AI输出是否被采纳。分析「AI标题生成+采纳」vs「纯人工标题」的传播效果差异。</li>
+                    <li><strong>功能价值排序</strong>：按「采纳率 × 使用频次」综合评估各AI功能的价值贡献，识别低价值功能（使用少+采纳低）进行优化或下线。</li>
+                    <li><strong>时段分析</strong>：分析AI使用高峰时段（通常是截稿前），评估是否需要在高峰时段增加AI服务资源保障响应速度。</li>
+                </ul>
+
+                <p><strong>可视化报表</strong>：</p>
+                <ul>
+                    <li><strong>周度简报</strong>（自动发送至主编邮箱）：本周AI使用总次数、Top 3 活跃功能、效率提升数据、待优化功能提示。</li>
+                    <li><strong>月度深度报告</strong>：AI功能使用趋势图（近6个月）、记者分层饼图、质量对比柱状图、ROI计算。</li>
+                    <li><strong>自定义报表</strong>：支持按时间段、按部门、按记者筛选生成定制报表。</li>
                 </ul>
 
                 <h4>9.2.3 知识库管理 (Knowledge Base Management)</h4>
+                <p>知识库是01创作大脑的智能资产中心，为AI功能提供领域知识支撑，同时为记者和编辑提供高效的资料检索能力。</p>
+
+                <p><strong>知识类型与结构</strong>：</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>知识类型</th>
+                            <th>内容示例</th>
+                            <th>维护方式</th>
+                            <th>AI用途</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>历史报道库</strong></td>
+                            <td>已发布的全部文章，含标题、正文、标签、发布时间、阅读量</td>
+                            <td>自动归档（发布后自动入库）</td>
+                            <td>AI续写时参考同类报道；资料搜索时语义检索</td>
+                        </tr>
+                        <tr>
+                            <td><strong>人物档案</strong></td>
+                            <td>常报道人物的基本信息、职务变动、关联事件、立场倾向、采访历史</td>
+                            <td>编辑手动维护 + AI自动提取文章人物信息辅助生成</td>
+                            <td>AI写作时自动引用人物背景；记者快速了解报道对象</td>
+                        </tr>
+                        <tr>
+                            <td><strong>机构档案</strong></td>
+                            <td>政府部门、企业、NGO等机构的背景、近期动态、发言人信息</td>
+                            <td>编辑手动维护</td>
+                            <td>AI在涉及相关机构时自动补充背景说明</td>
+                        </tr>
+                        <tr>
+                            <td><strong>风格指南</strong></td>
+                            <td>编辑规范、标题撰写规范、敏感词库、禁用表述、标点使用规则</td>
+                            <td>主编维护，版本化管理</td>
+                            <td>AI润色和风格检查的依据</td>
+                        </tr>
+                        <tr>
+                            <td><strong>热点事件追踪</strong></td>
+                            <td>持续追踪的重大事件的时间线、关键节点、各方表态</td>
+                            <td>编辑手动维护 + AI自动提取文章时间线辅助更新</td>
+                            <td>AI续写时提供事件上下文；记者快速跟进进展</td>
+                        </tr>
+                        <tr>
+                            <td><strong>优质稿件样本</strong></td>
+                            <td>编辑评选的高分稿件（审核评分A+或传播表现Top 10%）</td>
+                            <td>编辑标记为「优质样本」后自动入库</td>
+                            <td>AI few-shot学习的样本，提升生成质量</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>检索能力</strong>：</p>
                 <ul>
-                    <li><strong>历史报道库</strong>：管理可检索的历史报道档案</li>
-                    <li><strong>人物档案</strong>：维护常报道人物的背景资料库</li>
-                    <li><strong>风格指南</strong>：编辑规范、敏感词库、禁用表述管理</li>
-                    <li><strong>AI训练数据</strong>：上传优质稿件作为AI学习样本</li>
+                    <li><strong>全文检索</strong>：基于关键词的传统搜索，支持布尔逻辑（AND/OR/NOT）和短语精确匹配</li>
+                    <li><strong>语义检索</strong>：基于向量嵌入的语义搜索，输入自然语言描述即可找到相关内容（如搜索「最近关于楼市降温的报道」）</li>
+                    <li><strong>多条件筛选</strong>：按时间范围、作者、标签、稿件状态、阅读量级等组合筛选</li>
+                    <li><strong>关联推荐</strong>：查看某篇稿件时，自动推荐「相关报道」「同一人物的其他报道」「同一事件的后续报道」</li>
+                </ul>
+
+                <p><strong>AI 辅助维护</strong>：</p>
+                <ul>
+                    <li><strong>自动标签提取</strong>：新文章发布时，AI自动提取关键词和主题标签，建议入库标签，编辑确认后生效</li>
+                    <li><strong>人物信息自动更新</strong>：当新文章中出现已建档人物的新职务或新事件时，AI建议更新人物档案，编辑审核后合并</li>
+                    <li><strong>重复检测</strong>：新文章入库时，AI自动检测与历史报道的重复度，高重复时提示编辑判断是否需合并或更新</li>
+                    <li><strong>知识库健康度检查</strong>：定期扫描知识库，标识「过期信息」（如人物职务已变动但档案未更新）、「孤立条目」（无关联内容的孤立档案）</li>
+                </ul>
+
+                <p><strong>权限与审计</strong>：</p>
+                <ul>
+                    <li><strong>编辑权限</strong>：记者可检索和引用知识库内容，编辑可新增/修改人物和机构档案，主编可修改风格指南</li>
+                    <li><strong>变更历史</strong>：知识库条目的每次修改记录版本差异和修改人，支持回滚到历史版本</li>
+                    <li><strong>敏感信息保护</strong>：人物档案中的隐私信息（如联系方式、住址）仅对管理员和指定编辑可见，普通记者检索时自动脱敏</li>
                 </ul>
 
                 <h4>9.2.4 系统配置 (System Configuration)</h4>
@@ -2230,7 +2741,8 @@
                                 • 标题生成<br>
                                 • 摘要生成<br>
                                 • 基础资料搜索<br>
-                                • 事实核查标注
+                                • 事实核查标注<br>
+                                • <strong>AI智能配图（正文插图+封面+平台OG图）</strong>
                             </td>
                             <td>
                                 • 自动初稿生成<br>
@@ -2530,6 +3042,12 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td>v1.4</td>
+                            <td>2026-05-23</td>
+                            <td>新增6.2.6「AI智能配图」功能：基于Seedream 5.0 lite（字节火山引擎）文生图API，为稿件自动生成正文插图（1-5张）、文章封面图、以及各平台OG/社交封面图（Facebook/Instagram/X/Threads/LinkedIn/小红书/YouTube）。AI自动分析内容推荐配图方案（位置/prompt/尺寸），记者确认后批量生成。Seedream临时URL下载至本地服务器持久化存储（./uploads/articles/{articleId}/）。更新MVP范围表（AI协作创作模块增加智能配图）。关联新增数据模型：ArticleImage、ImageUsageType枚举。</td>
+                            <td>产品技术团队</td>
+                        </tr>
                         <tr>
                             <td>v1.3</td>
                             <td>2026-05-19</td>

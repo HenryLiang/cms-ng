@@ -20,6 +20,7 @@ import {
   aiFactCheck,
   aiReviewReport,
   aiOptimizeSEO,
+  aiGenerateImage,
   type Article,
   type ArticleVersion,
   type HeadlineOption,
@@ -28,6 +29,7 @@ import {
   type FactCheckResult,
   type ReviewReportResult,
   type SEOResult,
+  type GenerateImageResult,
 } from '@/lib/article-api';
 import { getEditors } from '@/lib/users-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
@@ -61,6 +63,7 @@ import {
   Target,
   AlertTriangle,
   TrendingUp,
+  Image,
 } from 'lucide-react';
 
 export default function ArticleEditorPage() {
@@ -135,6 +138,18 @@ export default function ArticleEditorPage() {
   const [versions, setVersions] = useState<ArticleVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
+
+  // AI Image Generation state
+  const [showImageGen, setShowImageGen] = useState(false);
+  const [imageGenLoading, setImageGenLoading] = useState(false);
+  const [imageGenResult, setImageGenResult] = useState<GenerateImageResult | null>(null);
+  const [imageGenStyle, setImageGenStyle] = useState<'news' | 'illustration' | 'photo' | 'social'>('news');
+  const [imageGenRatio, setImageGenRatio] = useState('16:9');
+  const [imageGenSize, setImageGenSize] = useState<'2K' | '3K'>('2K');
+  const [imageGenCustomPrompt, setImageGenCustomPrompt] = useState('');
+
+  // Image preview
+  const [showImagePreview, setShowImagePreview] = useState(false);
 
   useEffect(() => {
     loadArticle();
@@ -421,6 +436,25 @@ export default function ArticleEditorPage() {
       alert('SEO 分析失败，请稍后重试');
     } finally {
       setSeoLoading(false);
+    }
+  }
+
+  // ===== AI Image Generation =====
+  async function handleGenerateImage() {
+    setImageGenLoading(true);
+    try {
+      const result = await aiGenerateImage(articleId, {
+        style: imageGenStyle,
+        aspectRatio: imageGenRatio,
+        size: imageGenSize,
+        customPrompt: imageGenCustomPrompt || undefined,
+      });
+      setImageGenResult(result);
+      setArticle((prev) => (prev ? { ...prev, coverImage: result.url } : prev));
+    } catch {
+      alert('图片生成失败，请稍后重试');
+    } finally {
+      setImageGenLoading(false);
     }
   }
 
@@ -784,11 +818,33 @@ export default function ArticleEditorPage() {
               className="mb-4 w-full bg-transparent text-lg text-zinc-600 outline-none"
               placeholder="副标题（可选）"
             />
+            {/* Cover Image */}
+            {article?.coverImage ? (
+              <div
+                className="mb-4 rounded-lg border border-zinc-200 overflow-hidden max-h-[300px] cursor-pointer"
+                onClick={() => setShowImagePreview(true)}
+              >
+                <img
+                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${article.coverImage}`}
+                  alt="封面图"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowImageGen(true)}
+                className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 py-6 text-sm text-zinc-500 hover:bg-zinc-100 transition-colors"
+              >
+                <Image className="h-4 w-4" />
+                暂无封面图，点击 AI 生成配图
+              </button>
+            )}
           </div>
           <div className="flex-1 min-h-0 mx-auto max-w-3xl w-full px-8 pb-8">
             <RichTextEditor
+              key={articleId}
               ref={editorRef}
-              content={content}
+              content={content || ''}
               onChange={setContent}
               placeholder="开始写作..."
             />
@@ -979,6 +1035,18 @@ export default function ArticleEditorPage() {
                   AI SEO优化
                 </button>
                 <button
+                  onClick={() => setShowImageGen(true)}
+                  disabled={imageGenLoading}
+                  className="flex w-full items-center gap-2 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100 disabled:opacity-50"
+                >
+                  {imageGenLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Image className="h-4 w-4" />
+                  )}
+                  AI 生成配图
+                </button>
+                <button
                   onClick={() => handleSave('DRAFT')}
                   className="flex w-full items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
                 >
@@ -1097,6 +1165,164 @@ export default function ArticleEditorPage() {
           )}
         </aside>
       </div>
+
+      {/* AI Image Generation Modal */}
+      {showImageGen && (
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-10">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">AI 生成配图</h3>
+              <button
+                onClick={() => {
+                  setShowImageGen(false);
+                  setImageGenResult(null);
+                }}
+                className="text-zinc-400 hover:text-zinc-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {!imageGenResult ? (
+              <>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">风格</label>
+                    <div className="flex gap-2">
+                      {[
+                        { key: 'news', label: '新闻摄影' },
+                        { key: 'illustration', label: '插画' },
+                        { key: 'photo', label: '写实照片' },
+                        { key: 'social', label: '社媒海报' },
+                      ].map((s) => (
+                        <button
+                          key={s.key}
+                          onClick={() => setImageGenStyle(s.key as any)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+                            imageGenStyle === s.key
+                              ? 'bg-zinc-900 text-white'
+                              : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">比例</label>
+                    <select
+                      value={imageGenRatio}
+                      onChange={(e) => setImageGenRatio(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+                    >
+                      <option value="16:9">16:9 (文章横幅)</option>
+                      <option value="4:3">4:3 (标准)</option>
+                      <option value="1:1">1:1 (社媒方形)</option>
+                      <option value="3:4">3:4 (小红书)</option>
+                      <option value="9:16">9:16 (Stories)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">分辨率</label>
+                    <select
+                      value={imageGenSize}
+                      onChange={(e) => setImageGenSize(e.target.value as '2K' | '3K')}
+                      className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+                    >
+                      <option value="2K">2K</option>
+                      <option value="3K">3K</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">额外描述（可选）</label>
+                    <textarea
+                      value={imageGenCustomPrompt}
+                      onChange={(e) => setImageGenCustomPrompt(e.target.value)}
+                      placeholder="例如：加入香港天际线背景，黄昏时分..."
+                      rows={2}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowImageGen(false)}
+                    className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={imageGenLoading}
+                    className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    {imageGenLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Image className="h-4 w-4" />
+                    )}
+                    {imageGenLoading ? '生成中...' : '生成配图'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                  <img
+                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${imageGenResult.url}`}
+                    alt="AI 生成配图"
+                    className="w-full rounded-lg"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-zinc-500 line-clamp-2">
+                  Prompt: {imageGenResult.prompt}
+                </p>
+                <div className="mt-4 flex justify-end gap-3">
+                  <button
+                    onClick={() => setImageGenResult(null)}
+                    className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                  >
+                    重新生成
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowImageGen(false);
+                      setImageGenResult(null);
+                    }}
+                    className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    完成
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Overlay */}
+      {showImagePreview && article?.coverImage && (
+        <div
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80"
+          onClick={() => setShowImagePreview(false)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <button
+              onClick={() => setShowImagePreview(false)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${article.coverImage}`}
+              alt="封面图预览"
+              className="max-w-full max-h-[85vh] rounded-lg object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

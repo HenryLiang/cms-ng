@@ -16,6 +16,7 @@ export interface Article {
   author?: { id: string; name: string; email: string };
   editor?: { id: string; name: string; email: string };
   story?: { id: string; title: string };
+  coverImage?: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -206,5 +207,24 @@ export interface SEOResult {
 
 export async function aiOptimizeSEO(id: string): Promise<SEOResult> {
   const res = await api.post(`/articles/${id}/ai-seo`);
+  return res.data;
+}
+
+// ===== AI Image Generation =====
+
+export interface GenerateImageInput {
+  style?: 'news' | 'illustration' | 'photo' | 'social';
+  aspectRatio?: string;
+  size?: '2K' | '3K';
+  customPrompt?: string;
+}
+
+export interface GenerateImageResult {
+  url: string;
+  prompt: string;
+}
+
+export async function aiGenerateImage(id: string, options?: GenerateImageInput): Promise<GenerateImageResult> {
+  const res = await api.post(`/articles/${id}/ai-generate-image`, options, { timeout: 600000 });
   return res.data;
 }

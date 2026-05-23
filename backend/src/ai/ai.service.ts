@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
@@ -32,6 +32,10 @@ export class AIService {
   private readonly apiBase: string;
   private readonly model: string;
   private readonly defaultTemperature: number;
+  private readonly seedreamApiKey: string;
+  private readonly seedreamApiBase: string;
+  private readonly seedreamModel: string;
+  private readonly uploadDir: string;
 
   constructor(
     private config: ConfigService,
@@ -41,6 +45,10 @@ export class AIService {
     this.apiBase = this.config.get<string>('KIMI_API_BASE') || 'https://api.kimi.com/coding/v1';
     this.model = this.config.get<string>('KIMI_MODEL') || 'kimi-for-coding';
     this.defaultTemperature = this.model === 'kimi-k2.6' ? 1 : undefined as any;
+    this.seedreamApiKey = this.config.get<string>('SEEDREAM_API_KEY') || '';
+    this.seedreamApiBase = this.config.get<string>('SEEDREAM_API_BASE') || 'https://ark.cn-beijing.volces.com/api/v3';
+    this.seedreamModel = this.config.get<string>('SEEDREAM_MODEL') || 'doubao-seedream-5-0-260128';
+    this.uploadDir = this.config.get<string>('UPLOAD_DIR') || './uploads';
   }
 
   private getTemperature(preferred: number): number {
@@ -817,12 +825,9 @@ ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
           createdBy: userId,
         },
       });
-      return {
-        timeline: [],
-        people: [],
-        data: [],
-        opinions: [],
-      };
+      throw new InternalServerErrorException(
+        `资料搜集失败: ${error.message}`,
+      );
     }
   }
 
@@ -1232,5 +1237,170 @@ priority 取值说明：
         reason: '政策类选题具有持续关注度',
       },
     ];
+  }
+
+  // ===== AI 配图生成（Seedream 5.0 Lite） =====
+  async generateArticleImage(
+    userId: string,
+    articleId: string,
+    articleTitle: string,
+    articleContent: string,
+    options?: {
+      style?: 'news' | 'illustration' | 'photo' | 'social';
+      aspectRatio?: string;
+      size?: '2K' | '3K';
+      customPrompt?: string;
+    },
+  ): Promise<{ url: string; prompt: string }> {
+    const startTime = Date.now();
+    const style = options?.style || 'news';
+    const size = options?.size || '2K';
+    const aspectRatio = options?.aspectRatio;
+    const customPrompt = options?.customPrompt || '';
+
+    // Step 1: 用 Kimi 提炼高质量英文 prompt
+    const imagePrompt = await this.buildImagePrompt(articleTitle, articleContent, style, customPrompt);
+
+    // Step 2: 调用 Seedream 生成图片
+    const seedreamResponse = await this.callSeedream(imagePrompt, size, aspectRatio);
+    const tempImageUrl = seedreamResponse.data?.[0]?.url || '';
+    if (!tempImageUrl) {
+      throw new InternalServerErrorException('Seedream 未返回图片 URL');
+    }
+
+    // Step 3: 下载图片到本地
+    const localUrl = await this.downloadImage(tempImageUrl, articleId);
+
+    // Step 4: 记录 AI 操作
+    await this.prisma.aIOperation.create({
+      data: {
+        agentType: 'VISUAL',
+        action: 'generate_article_image',
+        prompt: `标题: ${articleTitle}\n风格: ${style}\n${customPrompt}`,
+        result: JSON.stringify({ imagePrompt, localUrl }),
+        model: this.seedreamModel,
+        durationMs: Date.now() - startTime,
+        articleId,
+        createdBy: userId,
+      },
+    });
+
+    return { url: localUrl, prompt: imagePrompt };
+  }
+
+  private async buildImagePrompt(
+    title: string,
+    content: string,
+    style: string,
+    customPrompt: string,
+  ): Promise<string> {
+    const styleMap: Record<string, string> = {
+      news: 'professional news photography style, photojournalistic, realistic, high detail',
+      illustration: 'editorial illustration style, artistic, expressive, modern digital art',
+      photo: 'high-quality stock photo style, clean composition, professional lighting',
+      social: 'social media graphic style, bold typography space, vibrant colors, eye-catching',
+    };
+
+    const styleDesc = styleMap[style] || styleMap.news;
+
+    const promptText = `文章标题：${title}
+
+文章内容摘要：
+${content.slice(0, 2000)}
+
+${customPrompt ? `额外要求：${customPrompt}` : ''}
+
+请基于以上内容，生成一个高质量的英文图片生成 prompt。该 prompt 将用于 Seedream 5.0 文生图模型。
+
+要求：
+1. 用英文描述，简洁但信息丰富（不超过 300 个英文单词）
+2. 包含场景设定、主体描述、视觉风格、光影效果、构图建议
+3. 风格方向：${styleDesc}
+4. 适合作为新闻/媒体配图使用
+5. 直接输出 prompt 文本，不要有任何解释或前缀`;
+
+    const response = await axios.post(
+      `${this.apiBase}/chat/completions`,
+      {
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert visual designer and news image prompt engineer. Generate concise, high-quality English image generation prompts.',
+          },
+          { role: 'user', content: promptText },
+        ],
+        temperature: this.getTemperature(0.8),
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 300000,
+      },
+    );
+
+    return response.data.choices[0]?.message?.content?.trim() || '';
+  }
+
+  private async callSeedream(
+    prompt: string,
+    size: string,
+    aspectRatio?: string,
+  ): Promise<any> {
+    const body: any = {
+      model: this.seedreamModel,
+      prompt,
+      size,
+      output_format: 'png',
+      watermark: false,
+    };
+
+    if (aspectRatio) {
+      body.aspect_ratio = aspectRatio;
+    }
+
+    const response = await axios.post(
+      `${this.seedreamApiBase}/images/generations`,
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${this.seedreamApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 300000,
+      },
+    );
+
+    return response.data;
+  }
+
+  private async downloadImage(tempUrl: string, articleId: string): Promise<string> {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const dir = path.join(this.uploadDir, 'articles', articleId);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const filename = `generated_${Date.now()}.png`;
+    const filePath = path.join(dir, filename);
+
+    const imageResponse = await axios.get(tempUrl, {
+      responseType: 'stream',
+      timeout: 300000,
+    });
+
+    const writer = fs.createWriteStream(filePath);
+    imageResponse.data.pipe(writer);
+
+    await new Promise<void>((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    return `/uploads/articles/${articleId}/${filename}`;
   }
 }

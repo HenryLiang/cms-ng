@@ -25,6 +25,7 @@ import {
   ReviewReportDto,
   OptimizeSEODto,
 } from './dto/ai-operations.dto';
+import { GenerateImageDto } from './dto/generate-image.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@cms-ng/shared';
@@ -210,5 +211,14 @@ export class ArticlesController {
     @Body() dto: OptimizeSEODto,
   ) {
     return this.articlesService.aiOptimizeSEO(id, user, dto);
+  }
+
+  @Post(':id/ai-generate-image')
+  aiGenerateImage(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: GenerateImageDto,
+  ) {
+    return this.articlesService.aiGenerateImage(id, user, dto);
   }
 }

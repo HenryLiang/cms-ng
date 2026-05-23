@@ -25,6 +25,10 @@ describe('AIService', () => {
           KIMI_API_KEY: 'test-key',
           KIMI_API_BASE: 'https://api.test.com',
           KIMI_MODEL: 'test-model',
+          SEEDREAM_API_KEY: 'test-seedream-key',
+          SEEDREAM_API_BASE: 'https://api.test.com/seedream',
+          SEEDREAM_MODEL: 'test-seedream-model',
+          UPLOAD_DIR: './uploads',
         };
         return map[key];
       }),
