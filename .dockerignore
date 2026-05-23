@@ -1,0 +1,12 @@
+node_modules
+*/node_modules
+.next
+dist
+coverage
+*.log
+.git
+.env
+.env.local
+.env.*.local
+.turbo
+EOF
