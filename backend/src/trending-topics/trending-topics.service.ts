@@ -141,18 +141,27 @@ export class TrendingTopicsService {
     { key: 'people', url: 'http://www.people.com.cn/rss/politics.xml', isGoogle: false },
     { key: 'bbc', url: 'http://feeds.bbci.co.uk/news/rss.xml', isGoogle: false },
     { key: 'chinanews', url: 'http://www.chinanews.com/rss/scroll-news.xml', isGoogle: false },
+    // RSSHub 源（默认本地实例，可通过 RSS_HUB_URL 环境变量覆盖）
+    // 注：社交媒体源（微博/知乎等）因反爬机制经常 503，仅保留稳定源
+    { key: '36kr', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/36kr/news/latest`, isGoogle: false, isRSSHub: true },
+    { key: 'huxiu', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/huxiu/article`, isGoogle: false, isRSSHub: true },
+    { key: 'douban-movie', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/douban/movie/playing`, isGoogle: false, isRSSHub: true },
   ];
 
   async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
     const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
-    const requestOptions: any = {};
+    const baseRequestOptions: any = {};
     if (proxyUrl) {
-      requestOptions.agent = new HttpsProxyAgent(proxyUrl);
+      baseRequestOptions.agent = new HttpsProxyAgent(proxyUrl);
     }
 
     const results = await Promise.allSettled(
       this.RSS_FEEDS.map(async (feed) => {
         try {
+          // RSSHub 本地实例不走代理
+          const requestOptions = (!feed.isGoogle && (feed as any).isRSSHub)
+            ? {}
+            : baseRequestOptions;
           if (feed.isGoogle) {
             return await this.fetchSingleGoogleTrends(feed.url.replace('HK', geo || 'HK'), requestOptions);
           }
@@ -254,7 +263,8 @@ export class TrendingTopicsService {
 
     const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
     const requestOptions: any = {};
-    if (proxyUrl) {
+    // RSSHub 本地实例不走代理
+    if (proxyUrl && !feed.url.includes('localhost') && !feed.url.includes('127.0.0.1')) {
       requestOptions.agent = new HttpsProxyAgent(proxyUrl);
     }
 

@@ -59,6 +59,9 @@ export default function StoryHubPage() {
     { key: 'people', label: '人民网', icon: Newspaper },
     { key: 'bbc', label: 'BBC', icon: Newspaper },
     { key: 'chinanews', label: '中国新闻网', icon: Newspaper },
+    { key: '36kr', label: '36氪', icon: Newspaper },
+    { key: 'huxiu', label: '虎嗅', icon: Newspaper },
+    { key: 'douban-movie', label: '豆瓣热映', icon: Newspaper },
   ] as const;
 
   // Create form state
@@ -605,6 +608,9 @@ function NewsSourcePanel({
     'people': { label: '人民网', color: 'text-blue-600', icon: Newspaper },
     'bbc': { label: 'BBC', color: 'text-indigo-600', icon: Newspaper },
     'chinanews': { label: '中国新闻网', color: 'text-emerald-600', icon: Newspaper },
+    '36kr': { label: '36氪', color: 'text-sky-600', icon: Newspaper },
+    'huxiu': { label: '虎嗅', color: 'text-amber-600', icon: Newspaper },
+    'douban-movie': { label: '豆瓣热映', color: 'text-green-600', icon: Newspaper },
   };
 
   const config = sourceConfig[sourceKey as keyof typeof sourceConfig] || { label: sourceKey, color: 'text-zinc-600', icon: Newspaper };

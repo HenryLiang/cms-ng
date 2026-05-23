@@ -25,6 +25,16 @@ services:
     volumes:
       - redis_data:/data
 
+  rsshub:
+    image: diygod/rsshub:latest
+    container_name: cms-ng-rsshub
+    restart: unless-stopped
+    ports:
+      - "1200:1200"
+    environment:
+      NODE_ENV: production
+      CACHE_TYPE: memory
+
 volumes:
   mysql_data:
   redis_data:

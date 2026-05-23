@@ -17,7 +17,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('trending-topics')
 export class TrendingTopicsController {
-  private readonly SOURCE_KEYS = ['google-trends', 'sina', 'people', 'bbc', 'chinanews'];
+  private readonly SOURCE_KEYS = [
+    'google-trends', 'sina', 'people', 'bbc', 'chinanews',
+    '36kr', 'huxiu', 'douban-movie',
+  ];
   private readonly UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   constructor(private topicsService: TrendingTopicsService) {}
@@ -77,6 +80,41 @@ export class TrendingTopicsController {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
     return this.topicsService.fetchNewsBySource('chinanews', page, limit);
+  }
+
+  @Get('weibo-hot')
+  fetchWeiboHot(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('weibo-hot', page, limit);
+  }
+
+  @Get('zhihu-hot')
+  fetchZhihuHot(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('zhihu-hot', page, limit);
+  }
+
+  @Get('36kr')
+  fetch36kr(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('36kr', page, limit);
+  }
+
+  @Get('huxiu')
+  fetchHuxiu(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('huxiu', page, limit);
+  }
+
+  @Get('douban-movie')
+  fetchDoubanMovie(@Query() query: any) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+    return this.topicsService.fetchNewsBySource('douban-movie', page, limit);
   }
 
   @Post('import-google-trend')
