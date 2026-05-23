@@ -1,4 +1,4 @@
-FROM node:23-alpine AS builder
+FROM node:23-slim AS builder
 WORKDIR /app
 
 ARG NEXT_PUBLIC_API_URL
@@ -24,7 +24,7 @@ RUN cd packages/shared && npm run build
 RUN cd frontend && npm run build
 
 # Production stage
-FROM node:23-alpine
+FROM node:23-slim
 WORKDIR /app
 
 COPY --from=builder /app/frontend/.next ./.next

@@ -1,4 +1,4 @@
-FROM node:23-alpine AS builder
+FROM node:23-slim AS builder
 WORKDIR /app
 
 # Copy root package files for workspace
@@ -21,7 +21,7 @@ RUN cd packages/shared && npm run build
 RUN cd backend && npx prisma generate && npm run build
 
 # Production stage
-FROM node:23-alpine
+FROM node:23-slim
 WORKDIR /app
 
 COPY --from=builder /app/backend/dist ./dist
