@@ -111,12 +111,20 @@ export interface ResearchKitOpinion {
   stance?: string;
 }
 
+export interface WikipediaEntry {
+  title: string;
+  extract: string;
+  url: string;
+  language: 'zh' | 'en';
+}
+
 export interface ResearchKitResult {
   timeline: ResearchKitTimelineEvent[];
   people: ResearchKitPerson[];
   data: ResearchKitDataPoint[];
   opinions: ResearchKitOpinion[];
   relatedArticles?: string[];
+  wikipedia?: WikipediaEntry[];
 }
 
 export interface ResearchKitInput {

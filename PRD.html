@@ -530,7 +530,7 @@
                 01创作大脑
                 <span class="badge">PRD</span>
             </div>
-            <div class="sidebar-version">CMS-NG v1.0 | 2025年5月</div>
+            <div class="sidebar-version">CMS-NG v1.5 | 2026年5月</div>
         </div>
 
         <div class="nav-section">
@@ -1112,7 +1112,7 @@
                     <div class="flow-number">2</div>
                     <div class="flow-content">
                         <h4>多源搜索</h4>
-                        <p>同时搜索新闻数据库、社交媒体、公开报告、历史报道等多源信息</p>
+                        <p>同时搜索新闻数据库、社交媒体、公开报告、历史报道等多源信息。自动从 Wikipedia 获取相关词条摘要（中英文），作为事实核查的基准来源</p>
                     </div>
                 </div>
                 <div class="flow-arrow">↓</div>
@@ -1133,6 +1133,15 @@
                 </div>
 
                 <p>最终生成的<strong>资料包</strong>包含以下内容：</p>
+
+                <div class="info-box">
+                    <p><strong>Wikipedia 资料增强（v1.5 新增）</strong></p>
+                    <p style="margin-top: 8px">在生成资料包时，系统自动从 Wikipedia 搜索相关词条（中英文并行），将词条摘要注入 AI 作为事实依据。AI 基于这些真实资料进行整理，而非仅依赖模型内部知识。每条 Wikipedia 引用的信息均标注来源链接，记者可一键跳转原文核实。</p>
+                    <p style="margin-top: 8px"><strong>触发方式：</strong>全自动，记者无感知。根据选题标题自动搜索，无需手动输入。<br>
+                    <strong>语言策略：</strong>优先搜索中文（zh / zh-yue），英文作为补充，结果自动合并去重。<br>
+                    <strong>降级策略：</strong>搜索无结果或 API 失败时，静默降级为纯 AI 生成，不影响使用体验。</p>
+                </div>
+
                 <table>
                     <thead>
                         <tr>
@@ -1166,6 +1175,11 @@
                             <td><strong>关联报道</strong></td>
                             <td>01历史上相关的报道链接</td>
                             <td>避免重复、寻找新角度</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Wikipedia 摘要</strong></td>
+                            <td>相关 Wikipedia 词条的标题、摘要、来源链接</td>
+                            <td>提供可溯源的事实基准，减少 AI 幻觉</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2740,7 +2754,7 @@
                                 • AI续写/改写/润色<br>
                                 • 标题生成<br>
                                 • 摘要生成<br>
-                                • 基础资料搜索<br>
+                                • 基础资料搜索（含 Wikipedia 自动增强）<br>
                                 • 事实核查标注<br>
                                 • <strong>AI智能配图（正文插图+封面+平台OG图）</strong>
                             </td>
@@ -3042,6 +3056,12 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td>v1.5</td>
+                            <td>2026-05-24</td>
+                            <td>增强6.2.1「智能资料搜集」功能：新增 Wikipedia 自动资料增强。生成 Research Kit 时，系统根据选题标题自动搜索 Wikipedia 词条（中英文并行），将词条摘要注入 AI 作为事实依据，提升资料包的准确性和可溯源性。每条 Wikipedia 引用信息均标注来源链接。搜索失败时静默降级为纯 AI 生成，不影响使用体验。更新MVP范围表（基础资料搜索增加 Wikipedia 增强说明）。</td>
+                            <td>产品技术团队</td>
+                        </tr>
                         <tr>
                             <td>v1.4</td>
                             <td>2026-05-23</td>
@@ -3441,7 +3461,7 @@
 
             <!-- 页脚 -->
             <div class="footer">
-                <p>01创作大脑 — CMS-NG 产品需求文档 v1.0</p>
+                <p>01创作大脑 — CMS-NG 产品需求文档 v1.5</p>
                 <p>香港01 | 2025年5月 | 内部机密，请勿外传</p>
             </div>
         </div>

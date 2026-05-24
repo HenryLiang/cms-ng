@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Loader2, X, Clock, Users, BarChart3, MessageSquare, Sparkles } from 'lucide-react';
+import { BookOpen, Loader2, X, Clock, Users, BarChart3, MessageSquare, Sparkles, Globe } from 'lucide-react';
 import type { ResearchKitResult } from '@/lib/story-api';
 
 interface ResearchKitPanelProps {
@@ -19,13 +19,14 @@ export default function ResearchKitPanel({
   onGenerateDraft,
   draftLoading,
 }: ResearchKitPanelProps) {
-  const [activeTab, setActiveTab] = useState<'timeline' | 'people' | 'data' | 'opinions'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'people' | 'data' | 'opinions' | 'wikipedia'>('timeline');
 
   const hasData = researchKit && (
     researchKit.timeline.length > 0 ||
     researchKit.people.length > 0 ||
     researchKit.data.length > 0 ||
-    researchKit.opinions.length > 0
+    researchKit.opinions.length > 0 ||
+    (researchKit.wikipedia?.length ?? 0) > 0
   );
 
   const tabs = [
@@ -33,6 +34,7 @@ export default function ResearchKitPanel({
     { key: 'people' as const, label: '关键人物', icon: Users, count: researchKit?.people.length ?? 0 },
     { key: 'data' as const, label: '核心数据', icon: BarChart3, count: researchKit?.data.length ?? 0 },
     { key: 'opinions' as const, label: '各方观点', icon: MessageSquare, count: researchKit?.opinions.length ?? 0 },
+    ...(researchKit?.wikipedia?.length ? [{ key: 'wikipedia' as const, label: 'Wikipedia', icon: Globe, count: researchKit.wikipedia.length }] : []),
   ];
 
   return (
@@ -195,6 +197,34 @@ export default function ResearchKitPanel({
                   ))}
                   {researchKit!.opinions.length === 0 && (
                     <p className="text-sm text-zinc-400 text-center py-4">暂无观点数据</p>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'wikipedia' && (
+                <div className="space-y-3">
+                  {researchKit!.wikipedia?.map((entry, idx) => (
+                    <div key={idx} className="rounded-lg border border-zinc-200 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Globe className="h-3.5 w-3.5 text-zinc-400" />
+                        <span className="text-sm font-medium text-zinc-900">{entry.title}</span>
+                        <span className="text-xs text-zinc-400 rounded-full bg-zinc-100 px-2 py-0.5">
+                          {entry.language === 'zh' ? '中文' : 'English'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-zinc-700 leading-relaxed">{entry.extract}</p>
+                      <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline mt-2 inline-block"
+                      >
+                        查看原文 →
+                      </a>
+                    </div>
+                  ))}
+                  {(!researchKit!.wikipedia || researchKit!.wikipedia.length === 0) && (
+                    <p className="text-sm text-zinc-400 text-center py-4">暂无 Wikipedia 资料</p>
                   )}
                 </div>
               )}

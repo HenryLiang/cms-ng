@@ -23,6 +23,7 @@ import {
   ReviewReportResult,
   OptimizeSEOInput,
   SEOResult,
+  WikipediaEntry,
 } from './dto/writing-operations.dto';
 
 @Injectable()
@@ -499,6 +500,15 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
         lines.push('');
       }
 
+      if (rk.wikipedia?.length) {
+        lines.push('【Wikipedia 參考資料】');
+        rk.wikipedia.forEach((w) => {
+          lines.push(`- ${w.title}（${w.language === 'zh' ? '中文' : '英文'}）：${w.extract}`);
+          lines.push(`  來源：${w.url}`);
+        });
+        lines.push('');
+      }
+
       if (lines.length) {
         researchKitSection = lines.join('\n');
       }
@@ -723,6 +733,46 @@ type 取值说明：
     }
   }
 
+  // ===== Wikipedia 资料增强 =====
+  private async searchWikipedia(title: string): Promise<WikipediaEntry[]> {
+    const entries: WikipediaEntry[] = [];
+    const seenTitles = new Set<string>();
+
+    const tryFetch = async (lang: 'zh' | 'en'): Promise<WikipediaEntry | null> => {
+      try {
+        const encoded = encodeURIComponent(title);
+        const res = await axios.get(
+          `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
+          { timeout: 10000 },
+        );
+        const data = res.data;
+        if (data.type === 'standard' || data.type === 'disambiguation') {
+          const extract = data.extract || '';
+          const pageTitle = data.title || title;
+          const url = data.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encoded}`;
+          if (extract && !seenTitles.has(pageTitle)) {
+            seenTitles.add(pageTitle);
+            return { title: pageTitle, extract, url, language: lang };
+          }
+        }
+      } catch (err: any) {
+        if (err.response?.status !== 404) {
+          this.logger.warn(`Wikipedia ${lang} search failed for "${title}": ${err.message}`);
+        }
+      }
+      return null;
+    };
+
+    // 优先中文，再英文补充
+    const zhEntry = await tryFetch('zh');
+    if (zhEntry) entries.push(zhEntry);
+
+    const enEntry = await tryFetch('en');
+    if (enEntry) entries.push(enEntry);
+
+    return entries;
+  }
+
   // ===== 智能资料搜集 =====
   async generateResearchKit(
     userId: string,
@@ -730,7 +780,28 @@ type 取值说明：
   ): Promise<ResearchKitResult> {
     const startTime = Date.now();
 
+    // Step 1: Wikipedia 资料增强（静默降级）
+    let wikipediaEntries: WikipediaEntry[] = [];
+    try {
+      wikipediaEntries = await this.searchWikipedia(input.storyTitle);
+    } catch {
+      // 静默降级：Wikipedia 搜索失败不影响主流程
+    }
+
     const tagsStr = input.storyTags.join(', ') || '未指定';
+
+    // Build Wikipedia context section
+    let wikipediaSection = '';
+    if (wikipediaEntries.length > 0) {
+      const lines: string[] = ['【Wikipedia 參考資料】'];
+      wikipediaEntries.forEach((entry) => {
+        lines.push(`- ${entry.title}（${entry.language === 'zh' ? '中文' : '英文'}）：${entry.extract}`);
+        lines.push(`  來源：${entry.url}`);
+      });
+      lines.push('');
+      wikipediaSection = lines.join('\n');
+    }
+
     const prompt = `请为以下新闻选题搜集并整理背景资料，生成结构化资料包。
 
 选题标题：${input.storyTitle}
@@ -738,6 +809,7 @@ ${input.storyDescription ? '选题描述：' + input.storyDescription : ''}
 ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
 相关标签：${tagsStr}
 
+${wikipediaSection}
 请从以下几个方面整理资料：
 1. 事件时间线：按时间顺序列出关键事件节点
 2. 关键人物：涉及的主要人物及其背景、立场
@@ -763,7 +835,7 @@ ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
 注意：
 - 所有内容使用繁体中文
 - 如果某类信息无法获取，返回空数组
-- 不要编造不存在的信息，仅基于你的知识提供分析框架和已知信息`;
+- ${wikipediaSection ? '请充分利用上述 Wikipedia 参考资料，确保信息准确、可溯源\n- ' : ''}不要编造不存在的信息，仅基于你的知识提供分析框架和已知信息`;
 
     try {
       const response = await axios.post(
@@ -796,6 +868,7 @@ ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
         people: Array.isArray(parsed.people) ? parsed.people : [],
         data: Array.isArray(parsed.data) ? parsed.data : [],
         opinions: Array.isArray(parsed.opinions) ? parsed.opinions : [],
+        wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
       };
 
       await this.prisma.aIOperation.create({
