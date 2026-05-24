@@ -898,9 +898,14 @@ ${wikipediaSection}
           createdBy: userId,
         },
       });
-      throw new InternalServerErrorException(
-        `资料搜集失败: ${error.message}`,
-      );
+      // 静默降级：API 失败时返回空资料包，不影响使用体验
+      return {
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+        wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
+      };
     }
   }
 
