@@ -129,7 +129,8 @@ export default function StoryDetailPage() {
     researchKit.timeline.length > 0 ||
     researchKit.people.length > 0 ||
     researchKit.data.length > 0 ||
-    researchKit.opinions.length > 0
+    researchKit.opinions.length > 0 ||
+    (researchKit.wikipedia?.length ?? 0) > 0
   );
 
   if (loading) {

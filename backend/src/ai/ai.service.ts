@@ -738,37 +738,69 @@ type 取值说明：
     const entries: WikipediaEntry[] = [];
     const seenTitles = new Set<string>();
 
-    const tryFetch = async (lang: 'zh' | 'en'): Promise<WikipediaEntry | null> => {
+    const searchAndFetch = async (lang: 'zh' | 'en', query: string): Promise<WikipediaEntry | null> => {
       try {
-        const encoded = encodeURIComponent(title);
-        const res = await axios.get(
-          `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encoded}`,
-          { timeout: 10000 },
+        // Step 1: Search for the best matching article title
+        const searchRes = await axios.get(
+          `https://${lang}.wikipedia.org/w/api.php`,
+          {
+            params: {
+              action: 'query',
+              list: 'search',
+              srsearch: query,
+              srlimit: 1,
+              format: 'json',
+              origin: '*',
+            },
+            headers: {
+              'User-Agent': 'CMS-NG/1.0 (research@example.com)',
+            },
+            timeout: 10000,
+          },
         );
-        const data = res.data;
+
+        const searchResults = searchRes.data?.query?.search || [];
+        if (!searchResults.length) return null;
+
+        const bestMatch = searchResults[0].title;
+        if (seenTitles.has(bestMatch)) return null;
+
+        // Step 2: Fetch summary for the matched article
+        const encodedTitle = encodeURIComponent(bestMatch);
+        const summaryRes = await axios.get(
+          `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodedTitle}`,
+          {
+            headers: {
+              'User-Agent': 'CMS-NG/1.0 (research@example.com)',
+            },
+            timeout: 10000,
+          },
+        );
+
+        const data = summaryRes.data;
         if (data.type === 'standard' || data.type === 'disambiguation') {
           const extract = data.extract || '';
-          const pageTitle = data.title || title;
-          const url = data.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encoded}`;
-          if (extract && !seenTitles.has(pageTitle)) {
+          const pageTitle = data.title || bestMatch;
+          const url = data.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodedTitle}`;
+          if (extract) {
             seenTitles.add(pageTitle);
             return { title: pageTitle, extract, url, language: lang };
           }
         }
       } catch (err: any) {
         if (err.response?.status !== 404) {
-          this.logger.warn(`Wikipedia ${lang} search failed for "${title}": ${err.message}`);
+          this.logger.warn(`Wikipedia ${lang} search failed for "${query}": ${err.message}`);
         }
       }
       return null;
     };
 
     // 优先中文，再英文补充
-    const zhEntry = await tryFetch('zh');
+    const zhEntry = await searchAndFetch('zh', title);
     if (zhEntry) entries.push(zhEntry);
 
-    const enEntry = await tryFetch('en');
-    if (enEntry) entries.push(enEntry);
+    const enEntry = await searchAndFetch('en', title);
+    if (enEntry && !seenTitles.has(enEntry.title)) entries.push(enEntry);
 
     return entries;
   }
