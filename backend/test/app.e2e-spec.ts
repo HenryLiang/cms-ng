@@ -30,24 +30,28 @@ describe('AppController (e2e)', () => {
   // Cleanup test data after each test
   afterEach(async () => {
     if (testArticleId) {
-      await prisma.article.deleteMany({ where: { id: testArticleId } }).catch(() => {});
+      await prisma.article
+        .deleteMany({ where: { id: testArticleId } })
+        .catch(() => {});
       testArticleId = '';
     }
     if (testStoryId) {
-      await prisma.story.deleteMany({ where: { id: testStoryId } }).catch(() => {});
+      await prisma.story
+        .deleteMany({ where: { id: testStoryId } })
+        .catch(() => {});
       testStoryId = '';
     }
     if (testUserId) {
-      await prisma.user.deleteMany({ where: { id: testUserId } }).catch(() => {});
+      await prisma.user
+        .deleteMany({ where: { id: testUserId } })
+        .catch(() => {});
       testUserId = '';
     }
   });
 
   describe('Health', () => {
     it('/ (GET) should require authentication', () => {
-      return request(app.getHttpServer())
-        .get('/')
-        .expect(401);
+      return request(app.getHttpServer()).get('/').expect(401);
     });
   });
 
@@ -131,9 +135,7 @@ describe('AppController (e2e)', () => {
     });
 
     it('GET /auth/me should reject without token', async () => {
-      await request(app.getHttpServer())
-        .get('/auth/me')
-        .expect(401);
+      await request(app.getHttpServer()).get('/auth/me').expect(401);
     });
   });
 

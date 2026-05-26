@@ -1,7 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
-import { Platform, PublishStatus, PlatformMetadata, UserRole } from '@cms-ng/shared';
+import {
+  Platform,
+  PublishStatus,
+  PlatformMetadata,
+  UserRole,
+} from '@cms-ng/shared';
 import { PlatformRegistry } from './platforms/platform-registry';
 import { PLATFORM_METADATA } from './platforms/constants';
 
@@ -16,7 +26,10 @@ export class ChannelsService {
     return Object.values(PLATFORM_METADATA);
   }
 
-  async verifyAccess(articleId: string, user: { userId: string; role: string }) {
+  async verifyAccess(
+    articleId: string,
+    user: { userId: string; role: string },
+  ) {
     const article = await this.prisma.article.findUnique({
       where: { id: articleId },
       select: { authorId: true, editorId: true },
@@ -29,7 +42,9 @@ export class ChannelsService {
       article.editorId === user.userId;
 
     if (!canAccess) {
-      throw new ForbiddenException('You do not have permission to access this article');
+      throw new ForbiddenException(
+        'You do not have permission to access this article',
+      );
     }
   }
 
@@ -68,7 +83,9 @@ export class ChannelsService {
 
     const adapter = PlatformRegistry.getAdapter(platform);
     if (!adapter) {
-      throw new BadRequestException(`Platform ${platform} is not supported yet`);
+      throw new BadRequestException(
+        `Platform ${platform} is not supported yet`,
+      );
     }
 
     // Upsert publish record with GENERATING status
@@ -118,7 +135,10 @@ export class ChannelsService {
       });
 
       // Guard against AI service returning fallback error messages
-      if (rawResult.includes('AI 助手暂时无法回答') || rawResult.includes('AI assistant temporarily unavailable')) {
+      if (
+        rawResult.includes('AI 助手暂时无法回答') ||
+        rawResult.includes('AI assistant temporarily unavailable')
+      ) {
         throw new Error('AI service returned an error response');
       }
 
@@ -133,7 +153,9 @@ export class ChannelsService {
             notes: validation.errors.join('; '),
           },
         });
-        throw new BadRequestException(`Adaptation validation failed: ${validation.errors.join(', ')}`);
+        throw new BadRequestException(
+          `Adaptation validation failed: ${validation.errors.join(', ')}`,
+        );
       }
 
       const updated = await this.prisma.platformPublish.update({
@@ -187,7 +209,8 @@ export class ChannelsService {
 
     const updateData: any = {};
     if (dto.status !== undefined) updateData.status = dto.status;
-    if (dto.publishedUrl !== undefined) updateData.publishedUrl = dto.publishedUrl;
+    if (dto.publishedUrl !== undefined)
+      updateData.publishedUrl = dto.publishedUrl;
     if (dto.notes !== undefined) updateData.notes = dto.notes;
     if (dto.status === PublishStatus.PUBLISHED) {
       updateData.publishedAt = new Date();

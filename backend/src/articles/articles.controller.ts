@@ -35,7 +35,10 @@ export class ArticlesController {
   constructor(private articlesService: ArticlesService) {}
 
   @Post()
-  create(@CurrentUser('userId') authorId: string, @Body() dto: CreateArticleDto) {
+  create(
+    @CurrentUser('userId') authorId: string,
+    @Body() dto: CreateArticleDto,
+  ) {
     return this.articlesService.create(authorId, dto);
   }
 
@@ -54,7 +57,10 @@ export class ArticlesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
     await this.articlesService.verifyAccess(id, user);
     return this.articlesService.findOne(id);
   }
@@ -70,7 +76,10 @@ export class ArticlesController {
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
     await this.articlesService.verifyAccess(id, user);
     return this.articlesService.remove(id);
   }
@@ -110,7 +119,12 @@ export class ArticlesController {
     @CurrentUser('userId') editorId: string,
     @Body() body: { decision: 'APPROVE' | 'REVISION'; comment?: string },
   ) {
-    return this.articlesService.submitReview(id, editorId, body.decision, body.comment);
+    return this.articlesService.submitReview(
+      id,
+      editorId,
+      body.decision,
+      body.comment,
+    );
   }
 
   // ===== AI Operations =====

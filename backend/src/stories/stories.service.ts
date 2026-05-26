@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { ArticlesService } from '../articles/articles.service';
@@ -46,7 +50,15 @@ export class StoriesService {
         OR: [
           { reporterId: user.userId },
           { editorId: user.userId },
-          { status: { in: [ArticleStatus.PENDING_REVIEW, ArticleStatus.IN_REVIEW, ArticleStatus.REVISION] } },
+          {
+            status: {
+              in: [
+                ArticleStatus.PENDING_REVIEW,
+                ArticleStatus.IN_REVIEW,
+                ArticleStatus.REVISION,
+              ],
+            },
+          },
         ],
       };
     }
@@ -95,7 +107,12 @@ export class StoriesService {
         status: dto.status,
         priority: dto.priority,
         tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
-        deadline: dto.deadline !== undefined ? (dto.deadline ? new Date(dto.deadline) : null) : undefined,
+        deadline:
+          dto.deadline !== undefined
+            ? dto.deadline
+              ? new Date(dto.deadline)
+              : null
+            : undefined,
       },
       include: {
         reporter: { select: { id: true, name: true, email: true } },
@@ -126,7 +143,9 @@ export class StoriesService {
       story.editorId === user.userId;
 
     if (!canAccess) {
-      throw new ForbiddenException('You do not have permission to modify this story');
+      throw new ForbiddenException(
+        'You do not have permission to modify this story',
+      );
     }
   }
 
@@ -155,8 +174,13 @@ export class StoriesService {
     return this.serializeStory(updated);
   }
 
-  async generateResearchKit(userId: string, storyId: string): Promise<ResearchKitResult> {
-    const story = await this.prisma.story.findUnique({ where: { id: storyId } });
+  async generateResearchKit(
+    userId: string,
+    storyId: string,
+  ): Promise<ResearchKitResult> {
+    const story = await this.prisma.story.findUnique({
+      where: { id: storyId },
+    });
     if (!story) throw new NotFoundException('Story not found');
 
     const tags = JSON.parse(story.tags || '[]') as string[];
@@ -175,7 +199,9 @@ export class StoriesService {
     researchKit: ResearchKitResult,
     instruction?: string,
   ) {
-    const story = await this.prisma.story.findUnique({ where: { id: storyId } });
+    const story = await this.prisma.story.findUnique({
+      where: { id: storyId },
+    });
     if (!story) throw new NotFoundException('Story not found');
 
     const tags = JSON.parse(story.tags || '[]') as string[];

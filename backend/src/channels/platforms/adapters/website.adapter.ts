@@ -1,12 +1,24 @@
 import { Platform } from '@cms-ng/shared';
-import { PlatformAdapter, PlatformMetadata, AdaptedContent, ValidationResult, extractJsonFromOutput } from '../platform.adapter';
+import {
+  PlatformAdapter,
+  PlatformMetadata,
+  AdaptedContent,
+  ValidationResult,
+  extractJsonFromOutput,
+} from '../platform.adapter';
 import { PLATFORM_METADATA } from '../constants';
 
 export class WebsiteAdapter implements PlatformAdapter {
   readonly platform = Platform.WEBSITE;
   readonly metadata: PlatformMetadata = PLATFORM_METADATA[Platform.WEBSITE];
 
-  getAdaptationPrompt(article: { title: string; subtitle?: string; content: string; excerpt?: string; tags: string[] }): string {
+  getAdaptationPrompt(article: {
+    title: string;
+    subtitle?: string;
+    content: string;
+    excerpt?: string;
+    tags: string[];
+  }): string {
     return `请根据以下文章，生成适配「香港01官网/APP」发布的内容。
 
 原文标题：${article.title}
@@ -40,7 +52,10 @@ ${article.content.slice(0, 3000)}
       };
     }
     // Fallback: try to extract title from first line
-    const lines = rawOutput.trim().split('\n').filter((l) => l.trim());
+    const lines = rawOutput
+      .trim()
+      .split('\n')
+      .filter((l) => l.trim());
     const title = lines[0]?.replace(/^#+\s*/, '').trim() || '';
     const content = lines.slice(1).join('\n').trim() || rawOutput;
     return { title, content, tags: [] };

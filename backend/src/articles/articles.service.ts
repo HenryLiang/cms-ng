@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -76,7 +81,15 @@ export class ArticlesService {
         OR: [
           { authorId: user.userId },
           { editorId: user.userId },
-          { status: { in: [ArticleStatus.PENDING_REVIEW, ArticleStatus.IN_REVIEW, ArticleStatus.REVISION] } },
+          {
+            status: {
+              in: [
+                ArticleStatus.PENDING_REVIEW,
+                ArticleStatus.IN_REVIEW,
+                ArticleStatus.REVISION,
+              ],
+            },
+          },
         ],
       };
     }
@@ -102,10 +115,7 @@ export class ArticlesService {
     const articles = await this.prisma.article.findMany({
       where: {
         status: { in: [ArticleStatus.PENDING_REVIEW, ArticleStatus.IN_REVIEW] },
-        OR: [
-          { editorId: editorId },
-          { editorId: null },
-        ],
+        OR: [{ editorId: editorId }, { editorId: null }],
       },
       orderBy: [{ updatedAt: 'desc' }],
       include: {
@@ -190,7 +200,9 @@ export class ArticlesService {
       article.editorId === user.userId;
 
     if (!canAccess) {
-      throw new ForbiddenException('You do not have permission to modify this article');
+      throw new ForbiddenException(
+        'You do not have permission to modify this article',
+      );
     }
   }
 
@@ -237,7 +249,9 @@ export class ArticlesService {
       // Allow admin override
       !(await this.isAdmin(editorId))
     ) {
-      throw new ForbiddenException('This article is assigned to another editor');
+      throw new ForbiddenException(
+        'This article is assigned to another editor',
+      );
     }
 
     if (decision !== 'APPROVE' && decision !== 'REVISION') {
@@ -494,7 +508,9 @@ export class ArticlesService {
       article.authorId !== user.userId &&
       article.editorId !== user.userId
     ) {
-      throw new ForbiddenException('You do not have permission to access this article');
+      throw new ForbiddenException(
+        'You do not have permission to access this article',
+      );
     }
     return article;
   }

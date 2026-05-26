@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
@@ -45,11 +50,20 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
-  async update(id: string, dto: UpdateTopicDto, userId: string, userRole: string) {
-    const existing = await this.prisma.trendingTopic.findUnique({ where: { id } });
+  async update(
+    id: string,
+    dto: UpdateTopicDto,
+    userId: string,
+    userRole: string,
+  ) {
+    const existing = await this.prisma.trendingTopic.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Topic not found');
     if (userRole !== UserRole.ADMIN && existing.createdBy !== userId) {
-      throw new ForbiddenException('You do not have permission to update this topic');
+      throw new ForbiddenException(
+        'You do not have permission to update this topic',
+      );
     }
 
     const topic = await this.prisma.trendingTopic.update({
@@ -67,10 +81,14 @@ export class TrendingTopicsService {
   }
 
   async remove(id: string, userId: string, userRole: string) {
-    const existing = await this.prisma.trendingTopic.findUnique({ where: { id } });
+    const existing = await this.prisma.trendingTopic.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Topic not found');
     if (userRole !== UserRole.ADMIN && existing.createdBy !== userId) {
-      throw new ForbiddenException('You do not have permission to delete this topic');
+      throw new ForbiddenException(
+        'You do not have permission to delete this topic',
+      );
     }
     await this.prisma.trendingTopic.delete({ where: { id } });
     return { success: true };
@@ -136,21 +154,72 @@ export class TrendingTopicsService {
   }
 
   private readonly RSS_FEEDS = [
-    { key: 'google-trends', url: 'https://trends.google.com/trending/rss?geo=HK', isGoogle: true },
+    {
+      key: 'google-trends',
+      url: 'https://trends.google.com/trending/rss?geo=HK',
+      isGoogle: true,
+    },
     // 原生 RSS 源（优先）
-    { key: 'sina', url: 'https://rss.sina.com.cn/news/china/focus15.xml', isGoogle: false },
-    { key: 'people', url: 'http://www.people.com.cn/rss/politics.xml', isGoogle: false },
-    { key: 'bbc', url: 'http://feeds.bbci.co.uk/news/rss.xml', isGoogle: false },
-    { key: 'chinanews', url: 'http://www.chinanews.com/rss/scroll-news.xml', isGoogle: false },
-    { key: 'guardian', url: 'https://www.theguardian.com/world/rss', isGoogle: false },
-    { key: 'nytimes', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', isGoogle: false },
-    { key: 'economist', url: 'https://www.economist.com/latest/rss.xml', isGoogle: false },
+    {
+      key: 'sina',
+      url: 'https://rss.sina.com.cn/news/china/focus15.xml',
+      isGoogle: false,
+    },
+    {
+      key: 'people',
+      url: 'http://www.people.com.cn/rss/politics.xml',
+      isGoogle: false,
+    },
+    {
+      key: 'bbc',
+      url: 'http://feeds.bbci.co.uk/news/rss.xml',
+      isGoogle: false,
+    },
+    {
+      key: 'chinanews',
+      url: 'http://www.chinanews.com/rss/scroll-news.xml',
+      isGoogle: false,
+    },
+    {
+      key: 'guardian',
+      url: 'https://www.theguardian.com/world/rss',
+      isGoogle: false,
+    },
+    {
+      key: 'nytimes',
+      url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+      isGoogle: false,
+    },
+    {
+      key: 'economist',
+      url: 'https://www.economist.com/latest/rss.xml',
+      isGoogle: false,
+    },
     { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
-    { key: 'zaobao', url: 'https://www.zaobao.com.sg/rss/news.xml', isGoogle: false },
+    {
+      key: 'zaobao',
+      url: 'https://www.zaobao.com.sg/rss/news.xml',
+      isGoogle: false,
+    },
     // RSSHub 源（网站无原生 RSS 时）
-    { key: '36kr', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/36kr/news/latest`, isGoogle: false, isRSSHub: true },
-    { key: 'huxiu', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/huxiu/article`, isGoogle: false, isRSSHub: true },
-    { key: 'douban-movie', url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/douban/movie/playing`, isGoogle: false, isRSSHub: true },
+    {
+      key: '36kr',
+      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/36kr/news/latest`,
+      isGoogle: false,
+      isRSSHub: true,
+    },
+    {
+      key: 'huxiu',
+      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/huxiu/article`,
+      isGoogle: false,
+      isRSSHub: true,
+    },
+    {
+      key: 'douban-movie',
+      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/douban/movie/playing`,
+      isGoogle: false,
+      isRSSHub: true,
+    },
   ];
 
   async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
@@ -164,11 +233,13 @@ export class TrendingTopicsService {
       this.RSS_FEEDS.map(async (feed) => {
         try {
           // RSSHub 本地实例不走代理
-          const requestOptions = (!feed.isGoogle && (feed as any).isRSSHub)
-            ? {}
-            : baseRequestOptions;
+          const requestOptions =
+            !feed.isGoogle && (feed as any).isRSSHub ? {} : baseRequestOptions;
           if (feed.isGoogle) {
-            return await this.fetchSingleGoogleTrends(feed.url.replace('HK', geo || 'HK'), requestOptions);
+            return await this.fetchSingleGoogleTrends(
+              feed.url.replace('HK', geo || 'HK'),
+              requestOptions,
+            );
           }
           return await this.fetchSingleRSS(feed, requestOptions);
         } catch (err: any) {
@@ -199,7 +270,12 @@ export class TrendingTopicsService {
   private async fetchSingleGoogleTrends(feedUrl: string, requestOptions: any) {
     const parser = new Parser({
       customFields: {
-        item: ['ht:approx_traffic', 'ht:picture', 'ht:picture_source', 'ht:news_item'],
+        item: [
+          'ht:approx_traffic',
+          'ht:picture',
+          'ht:picture_source',
+          'ht:news_item',
+        ],
       },
       requestOptions,
     });
@@ -209,7 +285,8 @@ export class TrendingTopicsService {
       const articles = this.normalizeNewsItems(item['ht:news_item']);
       const firstNews = articles[0];
       const snippet = firstNews?.snippet;
-      const description = snippet || firstNews?.title || item.contentSnippet || item.title || '';
+      const description =
+        snippet || firstNews?.title || item.contentSnippet || item.title || '';
       return {
         title: item.title || '',
         description,
@@ -233,7 +310,10 @@ export class TrendingTopicsService {
     };
   }
 
-  private async fetchSingleRSS(feed: { key: string; url: string }, requestOptions: any) {
+  private async fetchSingleRSS(
+    feed: { key: string; url: string },
+    requestOptions: any,
+  ) {
     const parser = new Parser({ requestOptions });
     const rssFeed = await parser.parseURL(feed.url);
     return (rssFeed.items || []).map((item: any) => ({
@@ -242,18 +322,35 @@ export class TrendingTopicsService {
       source: feed.key,
       heatScore: 50,
       tags: [],
-      articles: item.link ? [{ title: item.title || '', source: feed.key, snippet: item.contentSnippet || '', url: item.link }] : [],
+      articles: item.link
+        ? [
+            {
+              title: item.title || '',
+              source: feed.key,
+              snippet: item.contentSnippet || '',
+              url: item.link,
+            },
+          ]
+        : [],
     }));
   }
 
-  async fetchGoogleTrends(geo: string, _timeRange: string, page = 1, limit = 10) {
+  async fetchGoogleTrends(
+    geo: string,
+    _timeRange: string,
+    page = 1,
+    limit = 10,
+  ) {
     try {
       const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
       const requestOptions: any = {};
       if (proxyUrl) {
         requestOptions.agent = new HttpsProxyAgent(proxyUrl);
       }
-      const items = await this.fetchSingleGoogleTrends(`https://trends.google.com/trending/rss?geo=${geo || 'HK'}`, requestOptions);
+      const items = await this.fetchSingleGoogleTrends(
+        `https://trends.google.com/trending/rss?geo=${geo || 'HK'}`,
+        requestOptions,
+      );
       return this.paginate(items, page, limit);
     } catch (error: any) {
       throw new Error(`Google Trends 获取失败: ${error.message}`);
@@ -269,7 +366,11 @@ export class TrendingTopicsService {
     const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
     const requestOptions: any = {};
     // RSSHub 本地实例不走代理
-    if (proxyUrl && !feed.url.includes('localhost') && !feed.url.includes('127.0.0.1')) {
+    if (
+      proxyUrl &&
+      !feed.url.includes('localhost') &&
+      !feed.url.includes('127.0.0.1')
+    ) {
       requestOptions.agent = new HttpsProxyAgent(proxyUrl);
     }
 
@@ -301,7 +402,9 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
-  private normalizeNewsItems(newsItemField: any): { title: string; source: string; snippet: string; url: string }[] {
+  private normalizeNewsItems(
+    newsItemField: any,
+  ): { title: string; source: string; snippet: string; url: string }[] {
     if (!newsItemField) return [];
     // rss-parser merges multiple <ht:news_item> siblings into a single object with array properties
     const isMergedFormat =
@@ -314,7 +417,12 @@ export class TrendingTopicsService {
       const snippets = newsItemField['ht:news_item_snippet'] || [];
       const urls = newsItemField['ht:news_item_url'] || [];
       const sources = newsItemField['ht:news_item_source'] || [];
-      const count = Math.max(titles.length, snippets.length, urls.length, sources.length);
+      const count = Math.max(
+        titles.length,
+        snippets.length,
+        urls.length,
+        sources.length,
+      );
       const articles = [];
       for (let i = 0; i < count; i++) {
         const title = titles[i] || '';
@@ -332,12 +440,14 @@ export class TrendingTopicsService {
     // Single news item as object
     if (typeof newsItemField === 'object' && !Array.isArray(newsItemField)) {
       const title = newsItemField['ht:news_item_title'] || '';
-      return [{
-        title,
-        source: newsItemField['ht:news_item_source'] || '',
-        snippet: newsItemField['ht:news_item_snippet'] || title,
-        url: newsItemField['ht:news_item_url'] || '',
-      }];
+      return [
+        {
+          title,
+          source: newsItemField['ht:news_item_source'] || '',
+          snippet: newsItemField['ht:news_item_snippet'] || title,
+          url: newsItemField['ht:news_item_url'] || '',
+        },
+      ];
     }
 
     return [];

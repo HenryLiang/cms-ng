@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsInt, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { ArticleStatus } from '@cms-ng/shared';
 
 export class CreateStoryDto {

@@ -4,6 +4,8 @@ import { Logger } from '@nestjs/common';
 import { AIService } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
+import { AIToolsService } from './tools/ai-tools.service';
+import { TavilySearchTool } from './tools/tavily-search.tool';
 
 jest.mock('axios');
 import axios from 'axios';
@@ -13,6 +15,8 @@ describe('AIService', () => {
   let service: AIService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let config: { get: jest.Mock };
+  let aiTools: AIToolsService;
+  let tavilySearch: TavilySearchTool;
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -29,16 +33,22 @@ describe('AIService', () => {
           SEEDREAM_API_BASE: 'https://api.test.com/seedream',
           SEEDREAM_MODEL: 'test-seedream-model',
           UPLOAD_DIR: './uploads',
+          SEARCH_PROVIDER: 'kimi',
+          TAVILY_API_KEY: 'test-tavily-key',
         };
         return map[key];
       }),
     };
+
+    tavilySearch = new TavilySearchTool(config as unknown as ConfigService);
+    aiTools = new AIToolsService(tavilySearch);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AIService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
+        { provide: AIToolsService, useValue: aiTools },
       ],
     }).compile();
 
@@ -672,6 +682,346 @@ describe('AIService', () => {
     });
   });
 
+  describe('callKimiWithWebSearch', () => {
+    it('should return round1 response directly when tool_calls not triggered', async () => {
+      const round1Response = {
+        data: {
+          choices: [{
+            message: { content: '{"result":"direct"}' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      };
+      mockedAxios.post.mockResolvedValue(round1Response);
+
+      const result = await (service as any).callKimiWithWebSearch(
+        [{ role: 'user', content: 'Hello' }],
+        0.4,
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(round1Response);
+      const callArgs = mockedAxios.post.mock.calls[0];
+      expect(callArgs[1].tools).toEqual([{
+        type: 'builtin_function',
+        function: { name: '$web_search' },
+      }]);
+      expect(callArgs[1].temperature).toBe(0.4);
+      expect(callArgs[1].response_format).toBeUndefined();
+      expect(callArgs[1].messages).toEqual([{ role: 'user', content: 'Hello' }]);
+    });
+
+    it('should perform two-round call when tool_calls is triggered', async () => {
+      const round1Response = {
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{
+                id: 'call_abc123',
+                function: { name: '$web_search', arguments: '{"query":"test"}' },
+              }],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      };
+      const round2Response = {
+        data: {
+          choices: [{
+            message: { content: '{"result":"searched"}' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 200 },
+        },
+      };
+      mockedAxios.post
+        .mockResolvedValueOnce(round1Response)
+        .mockResolvedValueOnce(round2Response);
+
+      const result = await (service as any).callKimiWithWebSearch(
+        [{ role: 'user', content: 'Hello' }],
+        0.7,
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+
+      const round2CallArgs = mockedAxios.post.mock.calls[1];
+      const round2Body = round2CallArgs[1];
+      expect(round2Body.messages).toHaveLength(3);
+      expect(round2Body.messages[0]).toEqual({ role: 'user', content: 'Hello' });
+      expect(round2Body.messages[1].role).toBe('assistant');
+      expect(round2Body.messages[1].content).toBe('');
+      expect(round2Body.messages[1].tool_calls).toEqual([{
+        id: 'call_abc123',
+        function: { name: '$web_search', arguments: '{"query":"test"}' },
+      }]);
+      expect(round2Body.messages[2].role).toBe('tool');
+      expect(round2Body.messages[2].tool_call_id).toBe('call_abc123');
+      expect(round2Body.messages[2].name).toBe('$web_search');
+      expect(round2Body.messages[2].content).toBe('{"query":"test"}');
+      expect(round2Body.response_format).toBeUndefined();
+    });
+
+    it('should handle multiple tool_calls in round2', async () => {
+      const round1Response = {
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [
+                { id: 'call_1', function: { name: '$web_search', arguments: '{"q":"a"}' } },
+                { id: 'call_2', function: { name: '$web_search', arguments: '{"q":"b"}' } },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      };
+      const round2Response = {
+        data: {
+          choices: [{
+            message: { content: 'Final' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 150 },
+        },
+      };
+      mockedAxios.post
+        .mockResolvedValueOnce(round1Response)
+        .mockResolvedValueOnce(round2Response);
+
+      const result = await (service as any).callKimiWithWebSearch(
+        [{ role: 'system', content: 'Sys' }],
+        0.5,
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+      const round2Body = mockedAxios.post.mock.calls[1][1];
+      expect(round2Body.messages).toHaveLength(4);
+      expect(round2Body.messages[2].role).toBe('tool');
+      expect(round2Body.messages[2].tool_call_id).toBe('call_1');
+      expect(round2Body.messages[3].role).toBe('tool');
+      expect(round2Body.messages[3].tool_call_id).toBe('call_2');
+      expect(result.data.choices[0].message.content).toBe('Final');
+    });
+
+    it('should handle missing choice in round1', async () => {
+      const round1Response = {
+        data: { choices: [] },
+      };
+      mockedAxios.post.mockResolvedValue(round1Response);
+
+      const result = await (service as any).callKimiWithWebSearch(
+        [{ role: 'user', content: 'Hello' }],
+        0.4,
+      );
+
+      expect(result).toEqual(round1Response);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should use 300s timeout', async () => {
+      mockedAxios.post.mockResolvedValue({
+        data: {
+          choices: [{
+            message: { content: 'OK', finish_reason: 'stop' },
+          }],
+          usage: {},
+        },
+      });
+
+      await (service as any).callKimiWithWebSearch([{ role: 'user', content: 'Test' }], 0.5);
+
+      const callArgs = mockedAxios.post.mock.calls[0];
+      expect(callArgs[2].timeout).toBe(300000);
+    });
+  });
+
+  describe('callKimiWithCustomTools', () => {
+    it('should return round1 response when tool_calls not triggered', async () => {
+      const round1Response = {
+        data: {
+          choices: [{
+            message: { content: 'Direct answer' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      };
+      mockedAxios.post.mockResolvedValue(round1Response);
+
+      const result = await (service as any).callKimiWithCustomTools(
+        [{ role: 'user', content: 'Hello' }],
+        0.4,
+        [{ type: 'function', function: { name: 'test_tool', description: 'Test', parameters: { type: 'object', properties: {} } } }],
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(round1Response);
+      const callArgs = mockedAxios.post.mock.calls[0];
+      expect(callArgs[1].tools).toHaveLength(1);
+      expect(callArgs[1].tools[0].function.name).toBe('test_tool');
+    });
+
+    it('should perform two-round call with tool execution', async () => {
+      const toolDef = {
+        type: 'function',
+        function: {
+          name: 'tavily_search',
+          description: 'Search web',
+          parameters: { type: 'object', properties: {} },
+        },
+      };
+
+      const round1Response = {
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{
+                id: 'call_tav_1',
+                function: { name: 'tavily_search', arguments: '{"query":"test news"}' },
+              }],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      };
+      const round2Response = {
+        data: {
+          choices: [{
+            message: { content: 'Search result summary' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 200 },
+        },
+      };
+      mockedAxios.post
+        .mockResolvedValueOnce(round1Response)
+        .mockResolvedValueOnce(round2Response);
+
+      jest.spyOn(aiTools, 'executeTool').mockResolvedValue({ answer: 'Found it', results: [] });
+
+      const result = await (service as any).callKimiWithCustomTools(
+        [{ role: 'user', content: 'Hello' }],
+        0.7,
+        [toolDef],
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+      expect(aiTools.executeTool).toHaveBeenCalledWith('tavily_search', { query: 'test news' });
+
+      const round2Body = mockedAxios.post.mock.calls[1][1];
+      expect(round2Body.messages).toHaveLength(3);
+      expect(round2Body.messages[1].role).toBe('assistant');
+      expect(round2Body.messages[2].role).toBe('tool');
+      expect(round2Body.messages[2].tool_call_id).toBe('call_tav_1');
+      expect(round2Body.messages[2].content).toContain('Found it');
+    });
+
+    it('should handle tool execution error gracefully', async () => {
+      const toolDef = {
+        type: 'function',
+        function: {
+          name: 'tavily_search',
+          description: 'Search web',
+          parameters: { type: 'object', properties: {} },
+        },
+      };
+
+      const round1Response = {
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{
+                id: 'call_err',
+                function: { name: 'tavily_search', arguments: '{}' },
+              }],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      };
+      const round2Response = {
+        data: {
+          choices: [{
+            message: { content: 'Handled error' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 150 },
+        },
+      };
+      mockedAxios.post
+        .mockResolvedValueOnce(round1Response)
+        .mockResolvedValueOnce(round2Response);
+
+      jest.spyOn(aiTools, 'executeTool').mockRejectedValue(new Error('Tool failed'));
+
+      const result = await (service as any).callKimiWithCustomTools(
+        [{ role: 'user', content: 'Hello' }],
+        0.5,
+        [toolDef],
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+      const round2Body = mockedAxios.post.mock.calls[1][1];
+      expect(round2Body.messages[2].content).toContain('error');
+      expect(result.data.choices[0].message.content).toBe('Handled error');
+    });
+  });
+
+  describe('searchLatestNewsWithTavily', () => {
+    it('should return search results via Tavily tool', async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{
+                id: 'call_tav',
+                function: { name: 'tavily_search', arguments: '{"query":"AI news"}' },
+              }],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      });
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          choices: [{
+            message: { content: 'Latest AI news summary' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 200 },
+        },
+      });
+
+      jest.spyOn(aiTools, 'executeTool').mockResolvedValue({
+        answer: 'AI is advancing rapidly',
+        results: [{ title: 'AI News', url: 'https://example.com', content: '...' }],
+      });
+
+      const result = await (service as any).searchLatestNewsWithTavily('AI news');
+      expect(result).toBe('Latest AI news summary');
+      expect(aiTools.executeTool).toHaveBeenCalledWith('tavily_search', { query: 'AI news' });
+    });
+
+    it('should return empty string when tavily tool is not available', async () => {
+      jest.spyOn(aiTools, 'getToolDefinition').mockReturnValue(undefined);
+
+      const result = await (service as any).searchLatestNewsWithTavily('test');
+      expect(result).toBe('');
+    });
+  });
+
   describe('generateResearchKit', () => {
     it('should return research kit with all four dimensions on success', async () => {
       mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
@@ -747,6 +1097,211 @@ describe('AIService', () => {
       expect(result.people).toEqual([]);
       expect(result.data).toEqual([]);
       expect(result.opinions).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should perform two-round web search when tool_calls triggered', async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{ id: 'tc1', function: { name: '$web_search', arguments: '{}' } }],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      });
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          choices: [{
+            message: { content: 'Latest news summary from search' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 200 },
+        },
+      });
+      mockedAxios.post.mockResolvedValueOnce(mockAIResponse(JSON.stringify({
+        timeline: [{ date: '2025-06-01', event: 'Event', source: 'Source' }],
+        people: [],
+        data: [],
+        opinions: [],
+      })));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(result.timeline).toHaveLength(1);
+      expect(result.timeline[0].date).toBe('2025-06-01');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should strip markdown json code block from response', async () => {
+      mockedAxios.post.mockResolvedValue({
+        data: {
+          choices: [{
+            message: { content: '```json\n{"timeline":[{"date":"2024-01-01","event":"E1","source":"S1"}],"people":[],"data":[],"opinions":[]}\n```' },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 100 },
+        },
+      });
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      expect(result.timeline).toHaveLength(1);
+      expect(result.timeline[0].event).toBe('E1');
+    });
+
+    it('should include Wikipedia entries in prompt and result when search succeeds', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          query: {
+            search: [{ title: '香港房屋政策' }],
+          },
+        },
+      });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          type: 'standard',
+          title: '香港房屋政策',
+          extract: '香港房屋政策是指香港特區政府...',
+          content_urls: {
+            desktop: { page: 'https://zh.wikipedia.org/wiki/香港房屋政策' },
+          },
+        },
+      });
+
+      mockedAxios.post.mockResolvedValue({
+        data: {
+          choices: [{
+            message: { content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }) },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 100 },
+        },
+      });
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: '香港房屋政策最新變化',
+        storyTags: ['housing'],
+      });
+
+      // searchLatestNews 也会调用 axios.post，Step 3 的调用在最后
+      const step3Call = mockedAxios.post.mock.calls.find(
+        (call) => call[1]?.messages?.[1]?.content?.includes('【Wikipedia 參考資料】'),
+      );
+      expect(step3Call).toBeDefined();
+      const prompt = step3Call![1].messages[1].content;
+      expect(prompt).toContain('【Wikipedia 參考資料】');
+      expect(prompt).toContain('香港房屋政策');
+      expect(prompt).toContain('https://zh.wikipedia.org/wiki/香港房屋政策');
+      expect(prompt).toContain('充分利用 Wikipedia 参考资料');
+      expect(result.wikipedia).toBeDefined();
+      expect(result.wikipedia).toHaveLength(1);
+      expect(result.wikipedia![0].title).toBe('香港房屋政策');
+    });
+
+    it('should gracefully degrade when Wikipedia search fails', async () => {
+      mockedAxios.get.mockRejectedValue(new Error('Network timeout'));
+
+      mockedAxios.post.mockResolvedValue({
+        data: {
+          choices: [{
+            message: { content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }) },
+            finish_reason: 'stop',
+          }],
+          usage: { total_tokens: 100 },
+        },
+      });
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test Topic',
+        storyTags: ['tag1'],
+      });
+
+      expect(result.timeline).toEqual([]);
+      expect(result.wikipedia).toBeUndefined();
+      expect(mockedAxios.post).toHaveBeenCalled();
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should return fallback when round2 fails in web search flow', async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          choices: [{
+            message: {
+              content: '',
+              tool_calls: [{ id: 'tc1', function: { name: '$web_search', arguments: '{}' } }],
+            },
+            finish_reason: 'tool_calls',
+          }],
+          usage: { total_tokens: 50 },
+        },
+      });
+      mockedAxios.post.mockRejectedValueOnce(new Error('Round2 timeout'));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      expect(result.timeline).toEqual([]);
+      expect(result.people).toEqual([]);
+      expect(result.data).toEqual([]);
+      expect(result.opinions).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should use Tavily search when SEARCH_PROVIDER is tavily', async () => {
+      (service as any).searchProvider = 'tavily';
+
+      const tavilySpy = jest.spyOn(service as any, 'searchLatestNewsWithTavily').mockResolvedValue('Tavily search results');
+      const kimiSpy = jest.spyOn(service as any, 'searchLatestNews');
+
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        timeline: [{ date: '2024-06-01', event: 'E1', source: 'S1' }],
+        people: [],
+        data: [],
+        opinions: [],
+      })));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test Topic',
+        storyTags: ['tag1'],
+      });
+
+      expect(tavilySpy).toHaveBeenCalledWith('Test Topic');
+      expect(kimiSpy).not.toHaveBeenCalled();
+      expect(result.timeline).toHaveLength(1);
+      expect(result.timeline[0].date).toBe('2024-06-01');
+    });
+
+    it('should gracefully degrade when Tavily search fails', async () => {
+      (service as any).searchProvider = 'tavily';
+
+      jest.spyOn(service as any, 'searchLatestNewsWithTavily').mockRejectedValue(new Error('Tavily error'));
+
+      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      })));
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      expect(result.timeline).toEqual([]);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
   });

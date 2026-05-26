@@ -21,7 +21,10 @@ export class StoriesController {
   constructor(private storiesService: StoriesService) {}
 
   @Post()
-  create(@CurrentUser('userId') reporterId: string, @Body() dto: CreateStoryDto) {
+  create(
+    @CurrentUser('userId') reporterId: string,
+    @Body() dto: CreateStoryDto,
+  ) {
     return this.storiesService.create(reporterId, dto);
   }
 
@@ -31,7 +34,10 @@ export class StoriesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
     await this.storiesService.verifyAccess(id, user);
     return this.storiesService.findOne(id);
   }
@@ -47,7 +53,10 @@ export class StoriesController {
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string, @CurrentUser() user: { userId: string; role: string }) {
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
     await this.storiesService.verifyAccess(id, user);
     return this.storiesService.remove(id);
   }

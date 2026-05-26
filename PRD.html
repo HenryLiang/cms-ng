@@ -530,7 +530,7 @@
                 01创作大脑
                 <span class="badge">PRD</span>
             </div>
-            <div class="sidebar-version">CMS-NG v1.5 | 2026年5月</div>
+            <div class="sidebar-version">CMS-NG v1.7 | 2026年5月</div>
         </div>
 
         <div class="nav-section">
@@ -1140,6 +1140,86 @@
                     <p style="margin-top: 8px"><strong>触发方式：</strong>全自动，记者无感知。根据选题标题自动搜索，无需手动输入。<br>
                     <strong>语言策略：</strong>优先搜索中文（zh / zh-yue），英文作为补充，结果自动合并去重。<br>
                     <strong>降级策略：</strong>搜索无结果或 API 失败时，静默降级为纯 AI 生成，不影响使用体验。</p>
+                </div>
+
+                <div class="success-box">
+                    <p><strong>资料包时效性增强（v1.7 已实现）</strong></p>
+                    <p style="margin-top: 8px"><strong>原问题：</strong>v1.5 发现 AI 生成的资料包中大量信息为一年多以前的内容，对时效性强的新闻选题参考价值有限。</p>
+                    <p style="margin-top: 8px"><strong>解决方案：</strong>接入联网实时搜索能力，将最新资讯注入 AI 作为上下文，根本解决知识截止日期限制。</p>
+                </div>
+
+                <h4>实时搜索增强实现细节（v1.7）</h4>
+                <p>生成资料包时，系统在调用 AI 整理前，自动执行以下步骤：</p>
+                <ol>
+                    <li><strong>联网搜索：</strong>根据选题标题自动触发联网搜索，获取最新新闻和动态</li>
+                    <li><strong>搜索结果注入：</strong>将搜索到的资讯摘要作为上下文注入 Prompt，与 Wikipedia 资料合并</li>
+                    <li><strong>AI 整理：</strong>AI 基于实时搜索结果 + Wikipedia 资料生成结构化资料包，优先使用最新信息</li>
+                    <li><strong>静默降级：</strong>搜索失败时自动回退到纯 AI 生成 + Wikipedia，不影响使用体验</li>
+                </ol>
+
+                <div class="info-box">
+                    <p><strong>双搜索源架构</strong></p>
+                    <p style="margin-top: 8px">系统支持通过 <code>SEARCH_PROVIDER</code> 环境变量切换搜索提供商：</p>
+                    <ul style="margin-top: 8px">
+                        <li><strong>Kimi 内置搜索（默认）：</strong>使用 Kimi 模型的 <code>$web_search</code> 工具，无需额外 API Key</li>
+                        <li><strong>Tavily 搜索：</strong>专业 AI 搜索引擎，支持深度搜索模式、时间范围过滤、新闻主题优化。需配置 <code>TAVILY_API_KEY</code></li>
+                    </ul>
+                    <p style="margin-top: 8px">两者可无缝切换，生产环境建议根据实际效果选择。</p>
+                </div>
+
+                <h4>资料搜集实时搜索增强（规划中）</h4>
+                <p>为解决当前资料包时效性不足的问题，计划在 v1.6 引入实时搜索增强能力：</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>阶段</th>
+                            <th>方案</th>
+                            <th>数据来源</th>
+                            <th>状态</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="tag tag-green">Phase 1</span><br>Prompt 优化</td>
+                            <td>Prompt 优化</td>
+                            <td>无新增数据源</td>
+                            <td><span class="tag tag-green">✅ 已实现</span></td>
+                            <td>Prompt 增加"优先使用搜索结果中的最新信息"、"每个信息标注来源"、系统消息注入当前日期</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-gray">Phase 2</span><br>RSS 复用</td>
+                            <td>RSS 数据源复用</td>
+                            <td>选题中心已有 RSS 源</td>
+                            <td><span class="tag tag-gray">⏸ 已跳过</span></td>
+                            <td>因 Phase 3 直接接入专业搜索 API，RSS 匹配方案不再必要</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-green">Phase 3</span><br>实时搜索 API</td>
+                            <td>接入 Tavily / Kimi 内置搜索</td>
+                            <td>Tavily API / Kimi $web_search</td>
+                            <td><span class="tag tag-green">✅ 已实现</span></td>
+                            <td>双搜索源架构：Tavily（专业 AI 搜索引擎，支持深度搜索+时间过滤）和 Kimi 内置搜索（无需额外 Key）可切换</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-gray">Phase 4</span><br>模型层优化</td>
+                            <td>搜索增强型 AI</td>
+                            <td>Kimi 自带搜索 / Perplexity API</td>
+                            <td><span class="tag tag-gray">⏸ 待定</span></td>
+                            <td>当前 Phase 3 已满足需求，后续按需评估是否切换至原生支持联网的模型</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box">
+                    <p><strong>实现效果</strong></p>
+                    <ul style="margin-top:8px">
+                        <li>资料包时间线优先包含搜索结果中的最新事件</li>
+                        <li>每条信息均标注来源，可溯源核实</li>
+                        <li>AI 模型知识截止日期不再限制资料时效性</li>
+                        <li>搜索失败时自动静默降级，不影响使用体验</li>
+                    </ul>
                 </div>
 
                 <table>
@@ -3057,6 +3137,18 @@
                     </thead>
                     <tbody>
                         <tr>
+                            <td>v1.7</td>
+                            <td>2026-05-26</td>
+                            <td><strong>资料搜集实时搜索增强（根本解决时效性问题）：</strong>在 6.2.1「智能资料搜集」中实现联网实时搜索能力。新增 AI Tools 架构（ToolDefinition / AIToolsService / TavilySearchTool），支持双搜索源：Kimi 内置 $web_search（默认，无需额外 Key）和 Tavily API（专业 AI 搜索引擎，支持深度搜索+时间过滤）。generateResearchKit 流程改进：Step 1 Wikipedia 搜索 → Step 2 联网搜索最新资讯 → Step 3 AI 基于搜索结果+Wikipedia 整理资料包。Prompt 增加"优先使用最新信息"、"标注来源"要求，系统消息注入当前日期。搜索失败时静默降级。更新 .env.example 新增 SEARCH_PROVIDER / TAVILY_API_KEY 等配置。将 v1.6 记录的「已知问题」更新为「已实现」状态，改进规划表格标记 Phase 1/3 已完成、Phase 2 跳过、Phase 4 待定。</td>
+                            <td>产品技术团队</td>
+                        </tr>
+                        <tr>
+                            <td>v1.6</td>
+                            <td>2026-05-25</td>
+                            <td><strong>新增已知问题记录与改进规划：</strong>在 6.2.1「智能资料搜集」中新增「资料包内容时效性不足」已知问题说明。详细记录根因（AI模型知识截止、无实时搜索、Wikipedia滞后、Prompt未要求时效），并规划四阶段改进路线：Phase 1 Prompt优化 → Phase 2 RSS源复用 → Phase 3 实时搜索API接入 → Phase 4 搜索增强型AI模型。更新版本号、页脚信息。</td>
+                            <td>产品技术团队</td>
+                        </tr>
+                        <tr>
                             <td>v1.5</td>
                             <td>2026-05-24</td>
                             <td>增强6.2.1「智能资料搜集」功能：新增 Wikipedia 自动资料增强。生成 Research Kit 时，系统根据选题标题自动搜索 Wikipedia 词条（中英文并行），将词条摘要注入 AI 作为事实依据，提升资料包的准确性和可溯源性。每条 Wikipedia 引用信息均标注来源链接。搜索失败时静默降级为纯 AI 生成，不影响使用体验。更新MVP范围表（基础资料搜索增加 Wikipedia 增强说明）。</td>
@@ -3461,7 +3553,7 @@
 
             <!-- 页脚 -->
             <div class="footer">
-                <p>01创作大脑 — CMS-NG 产品需求文档 v1.5</p>
+                <p>01创作大脑 — CMS-NG 产品需求文档 v1.7</p>
                 <p>香港01 | 2025年5月 | 内部机密，请勿外传</p>
             </div>
         </div>

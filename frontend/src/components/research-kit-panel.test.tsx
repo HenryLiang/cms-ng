@@ -152,4 +152,158 @@ describe('ResearchKitPanel', () => {
     // Even with empty sections, panel shows as "no data" overall
     expect(screen.getByText('暂无资料，点击上方按钮生成')).toBeInTheDocument();
   });
+
+  // ===== Wikipedia tab tests =====
+
+  it('should render Wikipedia tab when wikipedia data exists', () => {
+    const withWiki = {
+      ...mockResearchKit,
+      wikipedia: [
+        {
+          title: '香港房屋政策',
+          extract: '香港房屋政策是指香港特區政府...',
+          url: 'https://zh.wikipedia.org/wiki/香港房屋政策',
+          language: 'zh' as const,
+        },
+      ],
+    };
+    render(
+      <ResearchKitPanel
+        researchKit={withWiki}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+    // Wikipedia tab button should contain count badge "1"
+    const wikiTab = screen.getByText('Wikipedia').closest('button');
+    expect(wikiTab).toHaveTextContent('1');
+  });
+
+  it('should not render Wikipedia tab when no wikipedia data', () => {
+    render(
+      <ResearchKitPanel
+        researchKit={mockResearchKit}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Wikipedia')).not.toBeInTheDocument();
+  });
+
+  it('should render Wikipedia entry details when tab clicked', () => {
+    const withWiki = {
+      timeline: [],
+      people: [],
+      data: [],
+      opinions: [],
+      wikipedia: [
+        {
+          title: '香港房屋政策',
+          extract: '香港房屋政策是指香港特區政府制定的房屋相關政策。',
+          url: 'https://zh.wikipedia.org/wiki/香港房屋政策',
+          language: 'zh' as const,
+        },
+      ],
+    };
+    render(
+      <ResearchKitPanel
+        researchKit={withWiki}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Wikipedia'));
+    expect(screen.getByText('香港房屋政策')).toBeInTheDocument();
+    expect(screen.getByText('中文')).toBeInTheDocument();
+    expect(screen.getByText('香港房屋政策是指香港特區政府制定的房屋相關政策。')).toBeInTheDocument();
+    expect(screen.getByText('查看原文 →')).toHaveAttribute('href', 'https://zh.wikipedia.org/wiki/香港房屋政策');
+  });
+
+  it('should render English Wikipedia entry with correct label', () => {
+    const withWiki = {
+      timeline: [],
+      people: [],
+      data: [],
+      opinions: [],
+      wikipedia: [
+        {
+          title: 'Housing in Hong Kong',
+          extract: 'Housing in Hong Kong varies...',
+          url: 'https://en.wikipedia.org/wiki/Housing_in_Hong_Kong',
+          language: 'en' as const,
+        },
+      ],
+    };
+    render(
+      <ResearchKitPanel
+        researchKit={withWiki}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Wikipedia'));
+    expect(screen.getByText('English')).toBeInTheDocument();
+  });
+
+  it('should treat wikipedia-only data as having data (not empty)', () => {
+    const wikiOnly = {
+      timeline: [],
+      people: [],
+      data: [],
+      opinions: [],
+      wikipedia: [
+        {
+          title: 'Test',
+          extract: 'Test extract',
+          url: 'https://zh.wikipedia.org/wiki/Test',
+          language: 'zh' as const,
+        },
+      ],
+    };
+    render(
+      <ResearchKitPanel
+        researchKit={wikiOnly}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    // Should NOT show empty state
+    expect(screen.queryByText('暂无资料，点击上方按钮生成')).not.toBeInTheDocument();
+    // Should show Wikipedia tab
+    expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+    // Should show generate draft button
+    expect(screen.getByText('基於資料生成初稿')).toBeInTheDocument();
+  });
+
+  it('should show "no wikipedia data" message when wikipedia tab is empty', () => {
+    const withEmptyWiki = {
+      timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
+      people: [],
+      data: [],
+      opinions: [],
+      wikipedia: [],
+    };
+    render(
+      <ResearchKitPanel
+        researchKit={withEmptyWiki}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    // Wikipedia tab should not appear when array is empty
+    expect(screen.queryByText('Wikipedia')).not.toBeInTheDocument();
+  });
 });

@@ -6,7 +6,7 @@ export function createMock<T extends Record<string, any>>(
   defaults: T,
   override?: Partial<T>,
 ): T {
-  return { ...defaults, ...override } as T;
+  return { ...defaults, ...override };
 }
 
 /** Common timestamp for test fixtures */
