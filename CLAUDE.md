@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **01创作大脑 (CMS-NG)** — AI-driven content creation system for Hong Kong 01 media. A monorepo containing:
-- **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS v4
+- **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS v4 + TipTap rich text editor
 - **Backend**: NestJS 11 + Prisma ORM + MySQL 8 + Redis
 - **Shared**: `@cms-ng/shared` package for types and constants shared across frontend/backend
+- **i18n**: Content-level language support (`SIMPLIFIED_CHINESE`, `TRADITIONAL_CHINESE_HK`, `TRADITIONAL_CHINESE_CANTONESE`, `ENGLISH`) via `ContentLanguage` enum
 
 ## Development Commands
 
@@ -25,6 +26,9 @@ npm run lint
 
 # Run all tests
 npm run test
+
+# Database seed (optional test data)
+npm run db:seed
 ```
 
 ### Frontend (`frontend/`)
@@ -41,6 +45,15 @@ cd frontend && npm run start
 
 # Lint
 cd frontend && npm run lint
+
+# Run tests (Vitest + jsdom)
+cd frontend && npm run test
+
+# Run tests in watch mode
+cd frontend && npm run test:watch
+
+# Run single test file
+cd frontend && npx vitest run src/lib/article-api.test.ts
 ```
 
 ### Backend (`backend/`)
@@ -123,39 +136,43 @@ cms-ng/
 | Backend | NestJS 11, Express, TypeScript |
 | ORM | Prisma (MySQL 8) |
 | Cache / Queue | Redis (ioredis) |
-| AI Model | Kimi (Moonshot AI) via REST API |
+| AI Model | Kimi (Moonshot AI) via REST API; Tavily search; Seedream image generation |
 | Monorepo | npm workspaces + Turbo |
 | Auth | JWT (NestJS @nestjs/jwt) |
 
 ### Database
 
-- **Provider**: MySQL 8 (existing container `mysql8` on host)
-- **Connection**: `mysql://root:root123@localhost:3306/cms_ng`
+- **Provider**: MySQL 8
+- **Host container** (reused): `mysql://root:root123@localhost:3306/cms_ng` — connect to existing `mysql8` container
+- **Docker Compose** (alternative): `mysql://root:root123@localhost:3307/cms_ng` — docker-compose maps host `3307` to container `3306`
 - **ORM**: Prisma with `@prisma/client`
 - **Schema**: `backend/prisma/schema.prisma`
 
-Key models: `User`, `Story`, `Article`, `ArticleVersion`, `AIOperation`.
+Key models: `User`, `Story`, `Article`, `ArticleVersion`, `AIOperation`, `PlatformPublish`.
 
 ### AI Layer
 
 All AI interactions go through an abstraction layer in `backend/src/ai/`:
 - `AIModelProvider` interface for swappable LLM backends
-- Current implementation: Kimi API (`moonshot-v1-8k`)
+- Current implementations: Kimi (`kimi-for-coding`), Tavily search, Seedream image generation
 - Operations logged to `AIOperation` table for audit
 
 ### Key Backend Conventions
 
-- NestJS modules mirror domain entities: `auth`, `users`, `stories`, `articles`, `ai`
+- NestJS modules mirror domain entities: `auth`, `users`, `stories`, `articles`, `ai`, `channels` (platform publishing), `trending-topics`
 - Controllers handle HTTP; Services contain business logic
 - PrismaService is injected as a singleton database client
 - Use `@cms-ng/shared` for enums and interfaces shared with frontend
+- `backend/src/common/test-helpers.ts` provides `createMock<T>()`, `UUID_REGEX`, and `now` fixture for tests
 
 ### Key Frontend Conventions
 
-- App Router file-based routing (`app/(dashboard)/page.tsx`)
+- App Router file-based routing: `app/login`, `app/register`, `app/dashboard` (with nested `/articles`, `/stories`, `/review`, `/profile`)
 - Server Components by default; Client Components only when needed (`'use client'`)
-- API calls centralized in `src/lib/api.ts`
-- Zustand stores in `src/stores/`
+- API calls centralized in `src/lib/api.ts` (Axios instance with JWT interceptor and 401 redirect)
+- Zustand store in `src/store/auth-store.ts` (auth state + user hydration)
+- Rich text editing via TipTap (`@tiptap/*` packages)
+- Tests use Vitest + jsdom + `@testing-library/jest-dom`; setup in `src/test/setup.ts`
 
 ## Environment Setup
 
@@ -166,10 +183,24 @@ All AI interactions go through an abstraction layer in `backend/src/ai/`:
 DATABASE_URL="mysql://root:root123@localhost:3306/cms_ng"
 REDIS_URL="redis://localhost:6379"
 KIMI_API_KEY="your-kimi-api-key"
-KIMI_API_BASE="https://api.moonshot.cn/v1"
-KIMI_MODEL="moonshot-v1-8k"
+KIMI_API_BASE="https://api.kimi.com/coding/v1"
+KIMI_MODEL="kimi-for-coding"
 PORT=3001
 JWT_SECRET="change-me"
+JWT_EXPIRES_IN="7d"
+
+# Optional: Tavily web search
+TAVILY_API_KEY="your-tavily-api-key"
+TAVILY_SEARCH_DEPTH="advanced"
+SEARCH_PROVIDER="kimi"   # 'kimi' | 'tavily'
+
+# Optional: Seedream image generation
+SEEDREAM_API_KEY="your-seedream-api-key"
+SEEDREAM_API_BASE="https://ark.cn-beijing.volces.com/api/v3"
+SEEDREAM_MODEL="doubao-seedream-5-0-260128"
+
+# File uploads
+UPLOAD_DIR="./uploads"
 ```
 
 **Frontend** (`frontend/.env.local` — copy from `.env.example`):
@@ -189,3 +220,4 @@ NEXT_PUBLIC_API_URL="http://localhost:3001"
 - **Prisma Client**: Regenerate (`npx prisma generate`) after any schema change before running backend code.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval.
 - **Shared package**: `@cms-ng/shared` must be built (`cd packages/shared && npm run build`) or use TypeScript project references before imports resolve in other packages.
+- **Next.js breaking changes**: See `frontend/AGENTS.md` — Next.js 16 APIs may differ from training data; read `node_modules/next/dist/docs/` before writing code.
