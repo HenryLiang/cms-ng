@@ -1,6 +1,7 @@
-import { Controller, Get, Param, Patch, Body } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Body, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Roles } from '../auth/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '@cms-ng/shared';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -25,7 +26,15 @@ export class UsersController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+  @Roles(UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN)
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    if (user.role !== UserRole.ADMIN && id !== user.userId) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
     return this.usersService.update(id, dto);
   }
 }

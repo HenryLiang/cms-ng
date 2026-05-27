@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getArticles, type Article } from '@/lib/article-api';
 import { FileText, ArrowRight, Loader2 } from 'lucide-react';
+import LanguageBadge from '@/components/language-badge';
 
 export default function ArticlesPage() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -73,6 +74,7 @@ export default function ArticlesPage() {
                 >
                   {statusLabels[article.status] || article.status}
                 </span>
+                <LanguageBadge language={article.contentLanguage} />
               </div>
               {article.story && (
                 <p className="mt-1 text-xs text-zinc-500">

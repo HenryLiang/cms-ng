@@ -26,6 +26,7 @@ Thumbs.db
 *.swp
 *.swo
 .codebuddy/
+.understand-anything/
 
 # Testing
 coverage/
