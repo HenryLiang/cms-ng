@@ -5,7 +5,7 @@ import {
   IsEnum,
   IsDateString,
 } from 'class-validator';
-import { ArticleStatus } from '@cms-ng/shared';
+import { ArticleStatus, ContentLanguage } from '@cms-ng/shared';
 
 export class CreateStoryDto {
   @IsString()
@@ -34,4 +34,8 @@ export class CreateStoryDto {
   @IsDateString()
   @IsOptional()
   deadline?: string;
+
+  @IsEnum(ContentLanguage)
+  @IsOptional()
+  contentLanguage?: ContentLanguage;
 }

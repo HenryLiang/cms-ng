@@ -106,6 +106,32 @@ describe('ArticlesService', () => {
       expect(result.title).toBe('Test Article');
     });
 
+    it('should create article with contentLanguage', async () => {
+      prisma.story.findUnique.mockResolvedValue({ id: 'story-id' });
+      prisma.article.create.mockResolvedValue(mockArticle({ contentLanguage: 'SIMPLIFIED_CHINESE' }));
+      prisma.articleVersion.create.mockResolvedValue({ id: 'version-id' });
+
+      const result = await service.create('author-id', {
+        storyId: 'story-id',
+        title: 'Test Article',
+        content: 'Content',
+        contentLanguage: 'SIMPLIFIED_CHINESE' as any,
+      } as any);
+
+      expect(prisma.article.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          storyId: 'story-id',
+          title: 'Test Article',
+          content: 'Content',
+          authorId: 'author-id',
+          version: 1,
+          contentLanguage: 'SIMPLIFIED_CHINESE',
+        }),
+        include: expect.any(Object),
+      });
+      expect(result.contentLanguage).toBe('SIMPLIFIED_CHINESE');
+    });
+
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
@@ -189,6 +215,20 @@ describe('ArticlesService', () => {
       expect(result.version).toBe(2);
     });
 
+    it('should update contentLanguage when provided', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle());
+      prisma.article.update.mockResolvedValue(mockArticle({ contentLanguage: 'TRADITIONAL_CHINESE_CANTONESE' }));
+
+      const result = await service.update('article-id', { contentLanguage: 'TRADITIONAL_CHINESE_CANTONESE' as any } as any);
+
+      expect(prisma.article.update).toHaveBeenCalledWith({
+        where: { id: 'article-id' },
+        data: expect.objectContaining({ contentLanguage: 'TRADITIONAL_CHINESE_CANTONESE' }),
+        include: expect.any(Object),
+      });
+      expect(result.contentLanguage).toBe('TRADITIONAL_CHINESE_CANTONESE');
+    });
+
     it('should not create version when content unchanged', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.article.update.mockResolvedValue(mockArticle());
@@ -235,7 +275,7 @@ describe('ArticlesService', () => {
 
       const result = await service.aiRewrite('article-id', mockUser, { text: 'Hello' } as any);
 
-      expect(aiService.rewriteText).toHaveBeenCalledWith('author-id', 'article-id', expect.any(Object));
+      expect(aiService.rewriteText).toHaveBeenCalledWith('author-id', 'article-id', expect.any(Object), undefined);
       expect(result.result).toBe('Rewritten');
     });
 

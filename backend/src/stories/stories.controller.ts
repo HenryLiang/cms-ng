@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ForbiddenException,
 } from '@nestjs/common';
 import { StoriesService } from './stories.service';
@@ -14,7 +15,7 @@ import { UpdateStoryDto } from './dto/update-story.dto';
 import { GenerateDraftFromResearchKitDto } from './dto/generate-draft.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@cms-ng/shared';
+import { UserRole, ContentLanguage } from '@cms-ng/shared';
 
 @Controller('stories')
 export class StoriesController {
@@ -74,9 +75,10 @@ export class StoriesController {
   async generateResearchKit(
     @Param('id') id: string,
     @CurrentUser() user: { userId: string; role: string },
+    @Query('language') language?: ContentLanguage,
   ) {
     await this.storiesService.verifyAccess(id, user);
-    return this.storiesService.generateResearchKit(user.userId, id);
+    return this.storiesService.generateResearchKit(user.userId, id, language);
   }
 
   @Post(':id/draft')
@@ -91,6 +93,7 @@ export class StoriesController {
       id,
       dto.researchKit,
       dto.instruction,
+      dto.language,
     );
     return { article };
   }

@@ -42,6 +42,7 @@ export class AuthService {
         email: true,
         name: true,
         role: true,
+        preferredLanguage: true,
         createdAt: true,
       },
     });
@@ -80,6 +81,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        preferredLanguage: user.preferredLanguage,
       },
       accessToken: token,
     };
@@ -96,6 +98,7 @@ export class AuthService {
         role: true,
         department: true,
         expertise: true,
+        preferredLanguage: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,

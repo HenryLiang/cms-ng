@@ -58,7 +58,7 @@ describe('AuthService', () => {
           passwordHash: '$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS',
           role: dto.role,
         },
-        select: { id: true, email: true, name: true, role: true, createdAt: true },
+        select: { id: true, email: true, name: true, role: true, preferredLanguage: true, createdAt: true },
       });
       expect(jwtService.sign).toHaveBeenCalledWith({ sub: 'user-id', email: dto.email, role: dto.role });
       expect(result.accessToken).toBe('test_jwt_token');
@@ -166,6 +166,7 @@ describe('AuthService', () => {
           role: true,
           department: true,
           expertise: true,
+          preferredLanguage: true,
           isActive: true,
           createdAt: true,
           updatedAt: true,

@@ -8,6 +8,7 @@ describe('UsersController', () => {
     findAll: jest.Mock;
     findEditors: jest.Mock;
     findOne: jest.Mock;
+    update: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -15,6 +16,7 @@ describe('UsersController', () => {
       findAll: jest.fn(),
       findEditors: jest.fn(),
       findOne: jest.fn(),
+      update: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -59,6 +61,18 @@ describe('UsersController', () => {
 
       expect(usersService.findOne).toHaveBeenCalledWith('u1');
       expect(result.id).toBe('u1');
+    });
+  });
+
+  describe('update', () => {
+    it('should update user and return updated user', async () => {
+      const dto = { name: 'Updated Name', preferredLanguage: 'ENGLISH' as const };
+      usersService.update.mockResolvedValue({ id: 'u1', name: 'Updated Name' });
+
+      const result = await controller.update('u1', dto);
+
+      expect(usersService.update).toHaveBeenCalledWith('u1', dto);
+      expect(result.name).toBe('Updated Name');
     });
   });
 });

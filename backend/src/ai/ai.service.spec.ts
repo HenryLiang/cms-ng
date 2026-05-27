@@ -1278,7 +1278,7 @@ describe('AIService', () => {
         storyTags: ['tag1'],
       });
 
-      expect(tavilySpy).toHaveBeenCalledWith('Test Topic');
+      expect(tavilySpy).toHaveBeenCalledWith('Test Topic', undefined);
       expect(kimiSpy).not.toHaveBeenCalled();
       expect(result.timeline).toHaveLength(1);
       expect(result.timeline[0].date).toBe('2024-06-01');

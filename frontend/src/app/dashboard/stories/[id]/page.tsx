@@ -23,6 +23,7 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
+import { ContentLanguage } from '@cms-ng/shared';
 import ResearchKitPanel from '@/components/research-kit-panel';
 
 export default function StoryDetailPage() {
@@ -50,6 +51,7 @@ export default function StoryDetailPage() {
   const [description, setDescription] = useState('');
   const [angle, setAngle] = useState('');
   const [status, setStatus] = useState<Story['status']>('DRAFT');
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
 
   useEffect(() => {
     loadData();
@@ -67,6 +69,9 @@ export default function StoryDetailPage() {
       setDescription(storyData.description || '');
       setAngle(storyData.angle || '');
       setStatus(storyData.status);
+      if (storyData.contentLanguage) {
+        setContentLanguage(storyData.contentLanguage);
+      }
     } finally {
       setLoading(false);
     }
@@ -75,7 +80,7 @@ export default function StoryDetailPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      await updateStory(storyId, { title, description, angle, status });
+      await updateStory(storyId, { title, description, angle, status, contentLanguage });
       setIsEditing(false);
       await loadData();
     } finally {
@@ -104,7 +109,7 @@ export default function StoryDetailPage() {
     setResearchLoading(true);
     setShowResearchPanel(true);
     try {
-      const result = await generateResearchKit(storyId);
+      const result = await generateResearchKit(storyId, contentLanguage);
       setResearchKit(result);
     } catch {
       alert('资料搜集失败，请稍后重试');
@@ -117,7 +122,7 @@ export default function StoryDetailPage() {
     if (!researchKit) return;
     setDraftLoading(true);
     try {
-      const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction);
+      const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction, contentLanguage);
       router.push(`/dashboard/articles/${article.id}`);
     } catch {
       alert('初稿生成失败，请稍后重试');
@@ -215,6 +220,17 @@ export default function StoryDetailPage() {
                   <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
                     {statusLabels[story.status] || story.status}
                   </span>
+                  <select
+                    value={contentLanguage}
+                    onChange={(e) => setContentLanguage(e.target.value as ContentLanguage)}
+                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400"
+                    title="内容语言"
+                  >
+                    <option value={ContentLanguage.SIMPLIFIED_CHINESE}>简体中文</option>
+                    <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>繁体中文（香港）</option>
+                    <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>繁体中文（粤语）</option>
+                    <option value={ContentLanguage.ENGLISH}>English</option>
+                  </select>
                 </div>
                 {story.description && (
                   <p className="mt-2 text-sm text-zinc-600">{story.description}</p>

@@ -1,4 +1,5 @@
 import { api } from './api';
+import { ContentLanguage } from '@cms-ng/shared';
 
 type ArticleStatus = 'DRAFT' | 'WRITING' | 'AI_OPTIMIZING' | 'PENDING_REVIEW' | 'IN_REVIEW' | 'REVISION' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -18,6 +19,7 @@ export interface Article {
   story?: { id: string; title: string };
   coverImage?: string;
   version: number;
+  contentLanguage?: ContentLanguage;
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
@@ -31,6 +33,7 @@ export interface CreateArticleInput {
   excerpt?: string;
   status?: ArticleStatus;
   tags?: string[];
+  contentLanguage?: ContentLanguage;
 }
 
 export interface UpdateArticleInput extends Partial<CreateArticleInput> {
@@ -85,23 +88,24 @@ export async function aiRewrite(
   text: string,
   style?: string,
   instruction?: string,
+  language?: ContentLanguage,
 ): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-rewrite`, { text, style, instruction });
+  const res = await api.post(`/articles/${id}/ai-rewrite`, { text, style, instruction, language });
   return res.data.result;
 }
 
-export async function aiExpand(id: string, text: string, instruction?: string): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-expand`, { text, instruction });
+export async function aiExpand(id: string, text: string, instruction?: string, language?: ContentLanguage): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-expand`, { text, instruction, language });
   return res.data.result;
 }
 
-export async function aiCondense(id: string, text: string, maxLength?: number): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-condense`, { text, maxLength });
+export async function aiCondense(id: string, text: string, maxLength?: number, language?: ContentLanguage): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-condense`, { text, maxLength, language });
   return res.data.result;
 }
 
-export async function aiPolish(id: string, text: string): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-polish`, { text });
+export async function aiPolish(id: string, text: string, language?: ContentLanguage): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-polish`, { text, language });
   return res.data.result;
 }
 
@@ -111,13 +115,13 @@ export interface HeadlineOption {
   reasoning: string;
 }
 
-export async function aiHeadlines(id: string, count?: number): Promise<HeadlineOption[]> {
-  const res = await api.post(`/articles/${id}/ai-headlines`, { count });
+export async function aiHeadlines(id: string, count?: number, language?: ContentLanguage): Promise<HeadlineOption[]> {
+  const res = await api.post(`/articles/${id}/ai-headlines`, { count, language });
   return res.data.headlines;
 }
 
-export async function aiExcerpt(id: string, maxLength?: number): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-excerpt`, { maxLength });
+export async function aiExcerpt(id: string, maxLength?: number, language?: ContentLanguage): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-excerpt`, { maxLength, language });
   return res.data.excerpt;
 }
 
@@ -126,8 +130,8 @@ export interface ChatMessage {
   content: string;
 }
 
-export async function aiChat(id: string, messages: ChatMessage[]): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-chat`, { messages });
+export async function aiChat(id: string, messages: ChatMessage[], language?: ContentLanguage): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-chat`, { messages, language });
   return res.data.reply;
 }
 
@@ -137,8 +141,8 @@ export interface DraftResult {
   content: string;
 }
 
-export async function aiGenerateDraft(id: string, instruction?: string): Promise<DraftResult> {
-  const res = await api.post(`/articles/${id}/ai-draft`, { instruction });
+export async function aiGenerateDraft(id: string, instruction?: string, language?: ContentLanguage): Promise<DraftResult> {
+  const res = await api.post(`/articles/${id}/ai-draft`, { instruction, language });
   return res.data;
 }
 
@@ -155,8 +159,8 @@ export interface FactCheckResult {
   findings: FactCheckFinding[];
 }
 
-export async function aiFactCheck(id: string): Promise<FactCheckResult> {
-  const res = await api.post(`/articles/${id}/ai-fact-check`);
+export async function aiFactCheck(id: string, language?: ContentLanguage): Promise<FactCheckResult> {
+  const res = await api.post(`/articles/${id}/ai-fact-check`, { language });
   return res.data;
 }
 
@@ -180,8 +184,8 @@ export interface ReviewReportResult {
   suggestions: ReviewSuggestion[];
 }
 
-export async function aiReviewReport(id: string): Promise<ReviewReportResult> {
-  const res = await api.post(`/articles/${id}/ai-review`);
+export async function aiReviewReport(id: string, language?: ContentLanguage): Promise<ReviewReportResult> {
+  const res = await api.post(`/articles/${id}/ai-review`, { language });
   return res.data;
 }
 
@@ -205,8 +209,8 @@ export interface SEOResult {
   suggestions: SEOSuggestion[];
 }
 
-export async function aiOptimizeSEO(id: string): Promise<SEOResult> {
-  const res = await api.post(`/articles/${id}/ai-seo`);
+export async function aiOptimizeSEO(id: string, language?: ContentLanguage): Promise<SEOResult> {
+  const res = await api.post(`/articles/${id}/ai-seo`, { language });
   return res.data;
 }
 

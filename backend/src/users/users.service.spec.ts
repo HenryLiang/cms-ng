@@ -125,4 +125,37 @@ describe('UsersService', () => {
       expect(result!.expertise).toEqual([]);
     });
   });
+
+  describe('update', () => {
+    it('should update user and return updated user with parsed expertise', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUser());
+      prisma.user.update.mockResolvedValue(mockUser({ name: 'Updated Name' }));
+
+      const result = await service.update('user-id', { name: 'Updated Name' });
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-id' } });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-id' },
+        data: { name: 'Updated Name' },
+        select: expect.any(Object),
+      });
+      expect(result.name).toBe('Updated Name');
+      expect(result.expertise).toEqual(['tech', 'politics']);
+    });
+
+    it('should update preferredLanguage', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUser());
+      prisma.user.update.mockResolvedValue(mockUser({ preferredLanguage: 'ENGLISH' }));
+
+      const result = await service.update('user-id', { preferredLanguage: 'ENGLISH' as any });
+
+      expect(result.preferredLanguage).toBe('ENGLISH');
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.update('nonexistent', { name: 'Test' })).rejects.toThrow('User not found');
+    });
+  });
 });

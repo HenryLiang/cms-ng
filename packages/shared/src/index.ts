@@ -36,6 +36,14 @@ export enum Platform {
   PUSH = 'PUSH',
 }
 
+// ===== 内容语言 =====
+export enum ContentLanguage {
+  SIMPLIFIED_CHINESE = 'SIMPLIFIED_CHINESE',
+  TRADITIONAL_CHINESE_HK = 'TRADITIONAL_CHINESE_HK',
+  TRADITIONAL_CHINESE_CANTONESE = 'TRADITIONAL_CHINESE_CANTONESE',
+  ENGLISH = 'ENGLISH',
+}
+
 // ===== 平台发布状态 =====
 export enum PublishStatus {
   DRAFT = 'DRAFT',
@@ -66,6 +74,7 @@ export interface User {
   role: UserRole;
   department?: string;
   expertise: string[];
+  preferredLanguage?: ContentLanguage;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +90,7 @@ export interface Story {
   reporterId: string;
   editorId?: string;
   tags: string[];
+  contentLanguage?: ContentLanguage;
   deadline?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -102,6 +112,7 @@ export interface Article {
   platforms: Platform[];
   aiGeneratedParts?: string[];
   version: number;
+  contentLanguage?: ContentLanguage;
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
