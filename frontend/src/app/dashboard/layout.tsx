@@ -68,7 +68,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
         <div className="border-t border-zinc-200 p-4">
-          <div className="flex items-center justify-between">
+          <Link
+            href="/dashboard/profile"
+            className={`flex items-center justify-between rounded-lg px-2 py-2 transition-colors ${
+              pathname === '/dashboard/profile' ? 'bg-zinc-100' : 'hover:bg-zinc-50'
+            }`}
+          >
             <div className="text-sm">
               <p className="font-medium text-zinc-900">{user?.name}</p>
               <p className="text-zinc-500">{user?.email}</p>
@@ -79,13 +84,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </div>
             <button
-              onClick={logout}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                logout();
+              }}
               className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
               title="退出"
             >
               <LogOut className="h-4 w-4" />
             </button>
-          </div>
+          </Link>
         </div>
       </aside>
       <main className="flex-1 overflow-auto bg-zinc-50">{children}</main>

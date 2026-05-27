@@ -61,6 +61,21 @@ describe('StoriesController', () => {
       expect(storiesService.create).toHaveBeenCalledWith('user-id', { title: 'Test' });
       expect(result.title).toBe('Test Story');
     });
+
+    it('should pass contentLanguage when provided', async () => {
+      storiesService.create.mockResolvedValue(mockStory({ contentLanguage: 'TRADITIONAL_CHINESE_HK' }));
+
+      const result = await controller.create('user-id', {
+        title: 'Test',
+        contentLanguage: 'TRADITIONAL_CHINESE_HK',
+      } as any);
+
+      expect(storiesService.create).toHaveBeenCalledWith('user-id', {
+        title: 'Test',
+        contentLanguage: 'TRADITIONAL_CHINESE_HK',
+      });
+      expect(result.contentLanguage).toBe('TRADITIONAL_CHINESE_HK');
+    });
   });
 
   describe('findAll', () => {
@@ -114,6 +129,17 @@ describe('StoriesController', () => {
       expect(storiesService.update).toHaveBeenCalledWith('story-id', { title: 'Updated' });
       expect(result.title).toBe('Updated');
     });
+
+    it('should pass contentLanguage when updating', async () => {
+      storiesService.verifyAccess.mockResolvedValue(undefined);
+      storiesService.update.mockResolvedValue(mockStory({ contentLanguage: 'SIMPLIFIED_CHINESE' }));
+
+      const result = await controller.update('story-id', { contentLanguage: 'SIMPLIFIED_CHINESE' } as any, mockUser);
+
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
+      expect(storiesService.update).toHaveBeenCalledWith('story-id', { contentLanguage: 'SIMPLIFIED_CHINESE' });
+      expect(result.contentLanguage).toBe('SIMPLIFIED_CHINESE');
+    });
   });
 
   describe('remove', () => {
@@ -150,7 +176,7 @@ describe('StoriesController', () => {
       const result = await controller.generateResearchKit('story-id', mockUser);
 
       expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
-      expect(storiesService.generateResearchKit).toHaveBeenCalledWith('user-id', 'story-id');
+      expect(storiesService.generateResearchKit).toHaveBeenCalledWith('user-id', 'story-id', undefined);
       expect(result.timeline).toEqual([]);
     });
 
@@ -185,6 +211,7 @@ describe('StoriesController', () => {
         'story-id',
         dto.researchKit,
         dto.instruction,
+        undefined,
       );
       expect(result.article.id).toBe('article-id');
     });
@@ -200,6 +227,7 @@ describe('StoriesController', () => {
         'user-id',
         'story-id',
         dto.researchKit,
+        undefined,
         undefined,
       );
       expect(result.article.id).toBe('article-id');

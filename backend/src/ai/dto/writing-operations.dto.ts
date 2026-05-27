@@ -1,21 +1,27 @@
+import { ContentLanguage } from '@cms-ng/shared';
+
 export interface RewriteTextInput {
   text: string;
   instruction?: string;
   style?: 'serious' | 'casual' | 'academic' | 'concise';
+  language?: ContentLanguage;
 }
 
 export interface ExpandTextInput {
   text: string;
   instruction?: string;
+  language?: ContentLanguage;
 }
 
 export interface CondenseTextInput {
   text: string;
   maxLength?: number;
+  language?: ContentLanguage;
 }
 
 export interface PolishTextInput {
   text: string;
+  language?: ContentLanguage;
 }
 
 export interface GenerateHeadlinesInput {
@@ -23,6 +29,7 @@ export interface GenerateHeadlinesInput {
   subtitle?: string;
   content: string;
   count?: number;
+  language?: ContentLanguage;
 }
 
 export interface HeadlineOption {
@@ -35,6 +42,7 @@ export interface GenerateExcerptInput {
   title: string;
   content: string;
   maxLength?: number;
+  language?: ContentLanguage;
 }
 
 export interface ChatMessage {
@@ -49,6 +57,7 @@ export interface ChatInput {
     subtitle?: string;
     content: string;
   };
+  language?: ContentLanguage;
 }
 
 export interface GenerateDraftInput {
@@ -60,6 +69,7 @@ export interface GenerateDraftInput {
   currentSubtitle?: string;
   instruction?: string;
   researchKit?: ResearchKitResult;
+  language?: ContentLanguage;
 }
 
 export interface DraftResult {
@@ -85,6 +95,7 @@ export interface FactCheckInput {
   title: string;
   subtitle?: string;
   content: string;
+  language?: ContentLanguage;
 }
 
 export interface ResearchKitTimelineEvent {
@@ -132,6 +143,7 @@ export interface ResearchKitInput {
   storyDescription?: string;
   storyAngle?: string;
   storyTags: string[];
+  language?: ContentLanguage;
 }
 
 export interface ReviewDimension {
@@ -158,6 +170,7 @@ export interface ReviewReportInput {
   title: string;
   subtitle?: string;
   content: string;
+  language?: ContentLanguage;
 }
 
 export interface SEOKeyword {
@@ -184,4 +197,5 @@ export interface OptimizeSEOInput {
   title: string;
   subtitle?: string;
   content: string;
+  language?: ContentLanguage;
 }

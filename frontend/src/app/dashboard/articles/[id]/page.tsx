@@ -31,6 +31,7 @@ import {
   type SEOResult,
   type GenerateImageResult,
 } from '@/lib/article-api';
+import { ContentLanguage } from '@cms-ng/shared';
 import { getEditors } from '@/lib/users-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
 import FactCheckPanel from '@/components/fact-check-panel';
@@ -80,6 +81,7 @@ export default function ArticleEditorPage() {
   const [subtitle, setSubtitle] = useState('');
   const [content, setContent] = useState('');
   const [excerpt, setExcerpt] = useState('');
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
 
   // AI Quick Mode state
   const [selectedText, setSelectedText] = useState('');
@@ -167,6 +169,9 @@ export default function ArticleEditorPage() {
       setSubtitle(data.subtitle || '');
       setContent(data.content);
       setExcerpt(data.excerpt || '');
+      if (data.contentLanguage) {
+        setContentLanguage(data.contentLanguage);
+      }
     } finally {
       setLoading(false);
     }
@@ -181,6 +186,7 @@ export default function ArticleEditorPage() {
         content,
         excerpt: excerpt || undefined,
         status: status as any,
+        contentLanguage,
       });
       await loadArticle();
       setSaveSuccess(true);
@@ -302,16 +308,16 @@ export default function ArticleEditorPage() {
       let result = '';
       switch (operation) {
         case 'rewrite':
-          result = await aiRewrite(articleId, text, style as any);
+          result = await aiRewrite(articleId, text, style as any, undefined, contentLanguage);
           break;
         case 'expand':
-          result = await aiExpand(articleId, text);
+          result = await aiExpand(articleId, text, undefined, contentLanguage);
           break;
         case 'condense':
-          result = await aiCondense(articleId, text);
+          result = await aiCondense(articleId, text, undefined, contentLanguage);
           break;
         case 'polish':
-          result = await aiPolish(articleId, text);
+          result = await aiPolish(articleId, text, contentLanguage);
           break;
       }
       setAiResult(result);
@@ -345,7 +351,7 @@ export default function ArticleEditorPage() {
     setHeadlinesLoading(true);
     setShowHeadlines(true);
     try {
-      const result = await aiHeadlines(articleId, 5);
+      const result = await aiHeadlines(articleId, 5, contentLanguage);
       setHeadlines(result);
     } catch {
       setHeadlines([]);
@@ -363,7 +369,7 @@ export default function ArticleEditorPage() {
   async function handleGenerateExcerpt() {
     setExcerptLoading(true);
     try {
-      const result = await aiExcerpt(articleId, 200);
+      const result = await aiExcerpt(articleId, 200, contentLanguage);
       setExcerpt(result);
     } finally {
       setExcerptLoading(false);
@@ -374,7 +380,7 @@ export default function ArticleEditorPage() {
   async function handleGenerateDraft() {
     setDraftLoading(true);
     try {
-      const result = await aiGenerateDraft(articleId);
+      const result = await aiGenerateDraft(articleId, undefined, contentLanguage);
       setDraftResult(result);
       setShowDraftPreview(true);
     } catch {
@@ -401,7 +407,7 @@ export default function ArticleEditorPage() {
   async function handleFactCheck() {
     setFactCheckLoading(true);
     try {
-      const result = await aiFactCheck(articleId);
+      const result = await aiFactCheck(articleId, contentLanguage);
       setFactCheckResult(result);
       setShowFactCheck(true);
     } catch {
@@ -415,7 +421,7 @@ export default function ArticleEditorPage() {
   async function handleReviewReport() {
     setReviewReportLoading(true);
     try {
-      const result = await aiReviewReport(articleId);
+      const result = await aiReviewReport(articleId, contentLanguage);
       setReviewReportResult(result);
       setShowReviewReport(true);
     } catch {
@@ -429,7 +435,7 @@ export default function ArticleEditorPage() {
   async function handleOptimizeSEO() {
     setSeoLoading(true);
     try {
-      const result = await aiOptimizeSEO(articleId);
+      const result = await aiOptimizeSEO(articleId, contentLanguage);
       setSeoResult(result);
       setShowSEO(true);
     } catch {
@@ -469,7 +475,7 @@ export default function ArticleEditorPage() {
       const reply = await aiChat(articleId, [
         ...chatMessages,
         { role: 'user', content: userMsg },
-      ]);
+      ], contentLanguage);
       setChatMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
     } finally {
       setChatLoading(false);
@@ -555,6 +561,17 @@ export default function ArticleEditorPage() {
               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                 {statusLabels[article.status] || article.status}
               </span>
+              <select
+                value={contentLanguage}
+                onChange={(e) => setContentLanguage(e.target.value as ContentLanguage)}
+                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400"
+                title="内容语言"
+              >
+                <option value={ContentLanguage.SIMPLIFIED_CHINESE}>简体中文</option>
+                <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>繁体中文（香港）</option>
+                <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>繁体中文（粤语）</option>
+                <option value={ContentLanguage.ENGLISH}>English</option>
+              </select>
             </div>
             <p className="text-xs text-zinc-500">
               版本 {article.version} · {wordCount} 字 · 最后保存{' '}

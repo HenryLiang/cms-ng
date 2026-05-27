@@ -1,4 +1,5 @@
 import { api } from './api';
+import { ContentLanguage } from '@cms-ng/shared';
 
 type ArticleStatus = 'DRAFT' | 'WRITING' | 'AI_OPTIMIZING' | 'PENDING_REVIEW' | 'IN_REVIEW' | 'REVISION' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -15,6 +16,7 @@ export interface Story {
   editorId?: string;
   reporter?: { id: string; name: string; email: string };
   editor?: { id: string; name: string; email: string };
+  contentLanguage?: ContentLanguage;
   createdAt: string;
   updatedAt: string;
   _count?: { articles: number };
@@ -28,6 +30,7 @@ export interface CreateStoryInput {
   priority?: number;
   tags?: string[];
   deadline?: string;
+  contentLanguage?: ContentLanguage;
 }
 
 export interface UpdateStoryInput extends Partial<CreateStoryInput> {}
@@ -96,8 +99,8 @@ export interface ResearchKitResult {
   wikipedia?: WikipediaEntry[];
 }
 
-export async function generateResearchKit(storyId: string): Promise<ResearchKitResult> {
-  const res = await api.post(`/stories/${storyId}/research`);
+export async function generateResearchKit(storyId: string, language?: ContentLanguage): Promise<ResearchKitResult> {
+  const res = await api.post(`/stories/${storyId}/research`, {}, { params: { language } });
   return res.data;
 }
 
@@ -105,7 +108,8 @@ export async function generateDraftFromResearchKit(
   storyId: string,
   researchKit: ResearchKitResult,
   instruction?: string,
+  language?: ContentLanguage,
 ): Promise<{ article: { id: string; title: string } }> {
-  const res = await api.post(`/stories/${storyId}/draft`, { researchKit, instruction });
+  const res = await api.post(`/stories/${storyId}/draft`, { researchKit, instruction, language });
   return res.data;
 }

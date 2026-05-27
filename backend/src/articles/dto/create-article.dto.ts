@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator';
-import { ArticleStatus } from '@cms-ng/shared';
+import { ArticleStatus, ContentLanguage } from '@cms-ng/shared';
 
 export class CreateArticleDto {
   @IsUUID()
@@ -26,4 +26,8 @@ export class CreateArticleDto {
   @IsString({ each: true })
   @IsOptional()
   tags?: string[];
+
+  @IsEnum(ContentLanguage)
+  @IsOptional()
+  contentLanguage?: ContentLanguage;
 }

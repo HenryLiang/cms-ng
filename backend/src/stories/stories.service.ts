@@ -8,7 +8,7 @@ import { AIService } from '../ai/ai.service';
 import { ArticlesService } from '../articles/articles.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
-import { ArticleStatus, UserRole } from '@cms-ng/shared';
+import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 
 @Injectable()
@@ -29,6 +29,7 @@ export class StoriesService {
         priority: dto.priority ?? 0,
         tags: JSON.stringify(dto.tags ?? []),
         deadline: dto.deadline ? new Date(dto.deadline) : null,
+        contentLanguage: dto.contentLanguage,
         reporterId,
       },
       include: {
@@ -107,6 +108,7 @@ export class StoriesService {
         status: dto.status,
         priority: dto.priority,
         tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
+        contentLanguage: dto.contentLanguage,
         deadline:
           dto.deadline !== undefined
             ? dto.deadline
@@ -177,6 +179,7 @@ export class StoriesService {
   async generateResearchKit(
     userId: string,
     storyId: string,
+    language?: ContentLanguage,
   ): Promise<ResearchKitResult> {
     const story = await this.prisma.story.findUnique({
       where: { id: storyId },
@@ -190,6 +193,7 @@ export class StoriesService {
       storyDescription: story.description || undefined,
       storyAngle: story.angle || undefined,
       storyTags: tags,
+      language,
     });
   }
 
@@ -198,6 +202,7 @@ export class StoriesService {
     storyId: string,
     researchKit: ResearchKitResult,
     instruction?: string,
+    language?: ContentLanguage,
   ) {
     const story = await this.prisma.story.findUnique({
       where: { id: storyId },
@@ -214,6 +219,7 @@ export class StoriesService {
       storyTags: tags,
       instruction,
       researchKit,
+      language,
     });
 
     // 2. Create article from draft

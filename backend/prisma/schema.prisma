@@ -13,12 +13,13 @@ model User {
   name         String
   passwordHash String
   avatar       String?
-  role         UserRole  @default(REPORTER)
-  department  String?
-  expertise   String    @default("[]")
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  role              UserRole        @default(REPORTER)
+  department        String?
+  expertise         String          @default("[]")
+  preferredLanguage ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   // Relations
   stories     Story[]   @relation("ReporterStories")
@@ -35,12 +36,13 @@ model Story {
   title       String
   description String?       @db.Text
   angle       String?
-  status      ArticleStatus @default(DRAFT)
-  priority    Int           @default(0)
-  tags        String        @default("[]")
-  deadline    DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status          ArticleStatus    @default(DRAFT)
+  priority        Int              @default(0)
+  tags            String           @default("[]")
+  contentLanguage ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
+  deadline        DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   // Relations
   reporterId  String
@@ -55,18 +57,19 @@ model Story {
 model Article {
   id          String        @id @default(uuid())
   title       String
-  subtitle    String?
-  content     String        @db.LongText
-  excerpt     String?       @db.Text
-  status      ArticleStatus @default(DRAFT)
-  tags        String        @default("[]")
-  platforms   String        @default("[]")
-  coverImage  String?
-  aiGeneratedParts String   @default("[]")
-  version     Int           @default(1)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  publishedAt DateTime?
+  subtitle         String?
+  content          String           @db.LongText
+  excerpt          String?          @db.Text
+  status           ArticleStatus    @default(DRAFT)
+  tags             String           @default("[]")
+  platforms        String           @default("[]")
+  coverImage       String?
+  aiGeneratedParts String           @default("[]")
+  version          Int              @default(1)
+  contentLanguage  ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  publishedAt      DateTime?
 
   // Relations
   storyId     String
@@ -136,6 +139,13 @@ model AIOperation {
   user        User      @relation(fields: [createdBy], references: [id])
 
   @@map("ai_operations")
+}
+
+enum ContentLanguage {
+  SIMPLIFIED_CHINESE
+  TRADITIONAL_CHINESE_HK
+  TRADITIONAL_CHINESE_CANTONESE
+  ENGLISH
 }
 
 enum UserRole {

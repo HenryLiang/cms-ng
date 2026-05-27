@@ -530,7 +530,7 @@
                 01创作大脑
                 <span class="badge">PRD</span>
             </div>
-            <div class="sidebar-version">CMS-NG v1.7 | 2026年5月</div>
+            <div class="sidebar-version">CMS-NG v1.8 | 2026年5月</div>
         </div>
 
         <div class="nav-section">
@@ -1487,6 +1487,101 @@
                     <li><strong>平台比例自适应</strong>：生成平台OG图时，根据PlatformMetadata.aspectRatios自动计算最佳尺寸</li>
                     <li><strong>限流保护</strong>：单次最多生成5张，超出需分批；前端展示进度条和预计耗时</li>
                 </ul>
+
+                <h4>6.2.7 多语言内容生成 (Multi-language Content Generation)</h4>
+                <p><span class="tag tag-blue">v1.8 新增</span> <span class="tag tag-purple">第一优先</span></p>
+
+                <p>AI 生成的内容支持四种语言/风格模式，满足不同读者群体和分发渠道的需求。语言设置采用<strong>"全局用户偏好 + 文章级覆盖"</strong>策略：记者可在个人设置中设定默认语言，每篇文章亦可单独指定目标语言，文章级设置优先。</p>
+
+                <div class="info-box">
+                    <p><strong>四种语言/风格模式</strong></p>
+                    <table style="margin-top:12px">
+                        <thead>
+                            <tr>
+                                <th>模式</th>
+                                <th>语言</th>
+                                <th>内容风格</th>
+                                <th>典型场景</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>简体中文</strong></td>
+                                <td>简体中文（zh-CN）</td>
+                                <td>中国内地新闻风格：客观、严谨、使用标准现代汉语词汇，符合内地主流媒体报道规范</td>
+                                <td>面向内地读者的报道、大湾区相关内容、需在内平台分发的稿件</td>
+                            </tr>
+                            <tr>
+                                <td><strong>繁体中文（香港新闻）</strong></td>
+                                <td>繁体中文（zh-HK）</td>
+                                <td>香港本地新闻书面语风格：专业、中立、使用香港常用词汇和表达方式（如「市民」、「政府」、「立法会」）</td>
+                                <td>香港01主站内容、面向香港本地读者的深度报道</td>
+                            </tr>
+                            <tr>
+                                <td><strong>繁体中文（粤语口语）</strong></td>
+                                <td>粤语书面语（zh-yue）</td>
+                                <td>香港口语化风格：亲切、生动，可使用粤语特有的词汇和表达方式（如「嘅」「咗」「喺」「冇」等），让内容更有本地感和亲切感</td>
+                                <td>社交媒体短内容、轻松话题、面向年轻读者的互动内容、小红书/Instagram 适配</td>
+                            </tr>
+                            <tr>
+                                <td><strong>English</strong></td>
+                                <td>英文（en-GB / en-US）</td>
+                                <td>英美新闻风格：客观、简洁、专业，使用英式/美式拼写和表达习惯</td>
+                                <td>国际报道、南华早报等英文媒体合作、面向海外读者的内容</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h5>功能覆盖范围</h5>
+                <p>语言选择影响以下全部 AI 生成内容：</p>
+                <ul>
+                    <li><strong>资料搜集</strong>：生成的资料包（时间线、人物、数据、观点）使用选定语言</li>
+                    <li><strong>初稿生成</strong>：AI 初稿按选定语言/风格输出</li>
+                    <li><strong>改写/扩写/润色/精简</strong>：选中文字的 AI 操作结果使用选定语言</li>
+                    <li><strong>标题生成</strong>：生成的标题使用选定语言</li>
+                    <li><strong>摘要生成</strong>：生成的摘要使用选定语言</li>
+                    <li><strong>AI 对话</strong>：AI 助手的回复使用选定语言</li>
+                    <li><strong>事实核查</strong>：核查报告使用选定语言</li>
+                    <li><strong>预审报告</strong>：AI 预审报告使用选定语言</li>
+                    <li><strong>SEO 优化</strong>：关键词建议考虑选定语言的搜索习惯</li>
+                </ul>
+
+                <h5>交互设计</h5>
+                <div class="flow-step">
+                    <div class="flow-number">1</div>
+                    <div class="flow-content">
+                        <h4>全局偏好设置 <span class="tag tag-blue">用户设置</span></h4>
+                        <p>记者在「我的设置」中选择默认语言。设置后，所有新创建的选题/稿件默认使用该语言。可选项：简体中文 / 繁体中文（香港新闻） / 繁体中文（粤语口语） / English。</p>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">2</div>
+                    <div class="flow-content">
+                        <h4>文章级语言选择 <span class="tag tag-blue">文章编辑页</span></h4>
+                        <p>在文章编辑器顶部工具栏（紧邻状态标签旁）显示当前语言。点击可展开下拉菜单切换。切换后，所有后续 AI 操作均使用新语言。已生成的内容不受影响（需手动重新生成）。</p>
+                    </div>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-step">
+                    <div class="flow-number">3</div>
+                    <div class="flow-content">
+                        <h4>AI 操作实时生效 <span class="tag tag-purple">AI主导</span></h4>
+                        <p>记者执行任意 AI 操作时，系统自动将当前文章的语言设置传递给 AI。AI 根据语言配置动态调整 system message 和内容风格指令，生成对应语言/风格的输出。</p>
+                    </div>
+                </div>
+
+                <h5>语言配置说明</h5>
+                <div class="warning-box">
+                    <p><strong>技术实现要点</strong></p>
+                    <ul style="margin-top:8px">
+                        <li><strong>Prompt 动态化</strong>：AI Service 中所有硬编码的"请用繁体中文回答"替换为动态语言配置。每种语言对应独立的 system message persona 描述和内容风格指令。</li>
+                        <li><strong>数据模型</strong>：<code>User</code> 模型新增 <code>preferredLanguage</code> 字段；<code>Article</code> 和 <code>Story</code> 模型新增 <code>contentLanguage</code> 字段。</li>
+                        <li><strong>共享枚举</strong>：<code>@cms-ng/shared</code> 包中新增 <code>ContentLanguage</code> 枚举（SIMPLIFIED_CHINESE / TRADITIONAL_CHINESE_HK / TRADITIONAL_CHINESE_CANTONESE / ENGLISH）。</li>
+                        <li><strong>向下兼容</strong>：未设置语言的历史文章默认使用繁体中文（香港新闻），与现有行为一致。</li>
+                    </ul>
+                </div>
 
                 <h3>6.3 AI交互设计模式</h3>
                 <p>系统采用三种AI交互模式，适应不同场景：</p>
@@ -2836,11 +2931,10 @@
                                 • 摘要生成<br>
                                 • 基础资料搜索（含 Wikipedia 自动增强）<br>
                                 • 事实核查标注<br>
-                                • <strong>AI智能配图（正文插图+封面+平台OG图）</strong>
+                                • <strong>AI智能配图（正文插图+封面+平台OG图）</strong><br>
+                                • <strong>多语言内容生成（简体中文/繁体中文/粤语/English）</strong>
                             </td>
                             <td>
-                                • 自动初稿生成<br>
-                                • 结构化资料包<br>
                                 • 采访提纲生成
                             </td>
                             <td><span class="tag tag-red">P0</span></td>
@@ -3060,7 +3154,7 @@
                 <ul>
                     <li><strong>浏览器</strong>：支持Chrome、Safari、Edge最新两个主版本</li>
                     <li><strong>设备</strong>：桌面端为主，平板端适配，移动端仅支持轻量操作</li>
-                    <li><strong>多语言</strong>：界面支持繁体中文，AI支持繁体中文和英文内容生成</li>
+                    <li><strong>多语言</strong>：界面支持繁体中文，AI支持简体中文、繁体中文（香港新闻/粤语口语）、English 四种语言/风格的内容生成</li>
                 </ul>
             </section>
 
@@ -3136,6 +3230,12 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td>v1.8</td>
+                            <td>2026-05-26</td>
+                            <td><strong>新增 6.2.7「多语言内容生成」功能：</strong>AI 生成内容支持四种语言/风格模式：简体中文（中国内地新闻风格）、繁体中文—香港新闻（香港本地新闻书面语）、繁体中文—粤语口语（使用「嘅」「咗」「喺」等粤语词汇，亲切生动）、English（英美新闻风格）。采用「全局用户偏好 + 文章级覆盖」策略，语言设置影响资料搜集、初稿生成、改写/扩写/润色、标题/摘要生成、AI 对话、事实核查、预审报告、SEO 优化等全部 AI 功能。更新 MVP 范围表（AI 协作创作模块增加多语言内容生成）。更新 19.4 兼容性章节（AI 支持多语言内容生成）。</td>
+                            <td>产品技术团队</td>
+                        </tr>
                         <tr>
                             <td>v1.7</td>
                             <td>2026-05-26</td>
@@ -3553,7 +3653,7 @@
 
             <!-- 页脚 -->
             <div class="footer">
-                <p>01创作大脑 — CMS-NG 产品需求文档 v1.7</p>
+                <p>01创作大脑 — CMS-NG 产品需求文档 v1.8</p>
                 <p>香港01 | 2025年5月 | 内部机密，请勿外传</p>
             </div>
         </div>

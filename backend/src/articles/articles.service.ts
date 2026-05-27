@@ -48,6 +48,7 @@ export class ArticlesService {
         tags: JSON.stringify(dto.tags ?? []),
         authorId,
         version: 1,
+        contentLanguage: dto.contentLanguage,
       },
       include: {
         author: { select: { id: true, name: true, email: true } },
@@ -157,6 +158,7 @@ export class ArticlesService {
         status: dto.status,
         editorId: dto.editorId,
         tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
+        contentLanguage: dto.contentLanguage,
         version: newVersion,
       },
       include: {
@@ -308,7 +310,7 @@ export class ArticlesService {
       text: dto.text,
       instruction: dto.instruction,
       style: dto.style,
-    });
+    }, dto.language);
     return { result };
   }
 
@@ -321,6 +323,7 @@ export class ArticlesService {
     const result = await this.aiService.expandText(user.userId, id, {
       text: dto.text,
       instruction: dto.instruction,
+      language: dto.language,
     });
     return { result };
   }
@@ -334,6 +337,7 @@ export class ArticlesService {
     const result = await this.aiService.condenseText(user.userId, id, {
       text: dto.text,
       maxLength: dto.maxLength,
+      language: dto.language,
     });
     return { result };
   }
@@ -346,6 +350,7 @@ export class ArticlesService {
     await this.verifyAccess(id, user);
     const result = await this.aiService.polishText(user.userId, id, {
       text: dto.text,
+      language: dto.language,
     });
     return { result };
   }
@@ -361,6 +366,7 @@ export class ArticlesService {
       subtitle: article.subtitle || undefined,
       content: article.content,
       count: dto.count,
+      language: dto.language,
     });
     return { headlines: result };
   }
@@ -375,6 +381,7 @@ export class ArticlesService {
       title: article.title,
       content: article.content,
       maxLength: dto.maxLength,
+      language: dto.language,
     });
     return { excerpt: result };
   }
@@ -392,6 +399,7 @@ export class ArticlesService {
         subtitle: article.subtitle || undefined,
         content: article.content,
       },
+      language: dto.language,
     });
     return { reply: result };
   }
@@ -415,6 +423,7 @@ export class ArticlesService {
       currentTitle: article.title,
       currentSubtitle: article.subtitle || undefined,
       instruction: dto.instruction,
+      language: dto.language,
     });
 
     return result;
@@ -423,13 +432,14 @@ export class ArticlesService {
   async aiFactCheck(
     id: string,
     user: { userId: string; role: string },
-    _dto: FactCheckDto,
+    dto: FactCheckDto,
   ) {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.factCheck(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
+      language: dto.language,
     });
     return result;
   }
@@ -437,13 +447,14 @@ export class ArticlesService {
   async aiReview(
     id: string,
     user: { userId: string; role: string },
-    _dto: ReviewReportDto,
+    dto: ReviewReportDto,
   ) {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.generateReviewReport(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
+      language: dto.language,
     });
     return result;
   }
@@ -451,13 +462,14 @@ export class ArticlesService {
   async aiOptimizeSEO(
     id: string,
     user: { userId: string; role: string },
-    _dto: OptimizeSEODto,
+    dto: OptimizeSEODto,
   ) {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.optimizeSEO(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
+      language: dto.language,
     });
     return result;
   }
