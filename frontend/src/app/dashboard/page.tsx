@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { getStories, type Story } from '@/lib/story-api';
 import { Plus, Clock, FileText, CheckCircle, Send, RefreshCw, Loader2 } from 'lucide-react';
+import LanguageBadge from '@/components/language-badge';
 
 const COLUMNS = [
   { key: 'DRAFT', label: '选题中', color: 'bg-zinc-100', borderColor: 'border-zinc-200', icon: Clock },
@@ -120,6 +121,7 @@ function StoryCard({ story, onMove }: { story: Story; onMove: (id: string, statu
               {story._count.articles}
             </span>
           )}
+          <LanguageBadge language={story.contentLanguage} />
         </div>
         <span className="text-xs text-zinc-400">
           {new Date(story.updatedAt).toLocaleDateString('zh-CN')}

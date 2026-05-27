@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createStory } from '@/lib/story-api';
+import { useAuthStore } from '@/store/auth-store';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewStoryPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [angle, setAngle] = useState('');
@@ -27,6 +29,7 @@ export default function NewStoryPage() {
         angle: angle || undefined,
         priority,
         deadline: deadline || undefined,
+        contentLanguage: user?.preferredLanguage,
       });
       router.push('/dashboard');
     } catch (err: any) {

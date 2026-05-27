@@ -20,6 +20,13 @@ export class StoriesService {
   ) {}
 
   async create(reporterId: string, dto: CreateStoryDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: reporterId },
+      select: { preferredLanguage: true },
+    });
+    const contentLanguage =
+      dto.contentLanguage ?? user?.preferredLanguage ?? ContentLanguage.TRADITIONAL_CHINESE_HK;
+
     const story = await this.prisma.story.create({
       data: {
         title: dto.title,
@@ -29,7 +36,7 @@ export class StoriesService {
         priority: dto.priority ?? 0,
         tags: JSON.stringify(dto.tags ?? []),
         deadline: dto.deadline ? new Date(dto.deadline) : null,
-        contentLanguage: dto.contentLanguage,
+        contentLanguage,
         reporterId,
       },
       include: {

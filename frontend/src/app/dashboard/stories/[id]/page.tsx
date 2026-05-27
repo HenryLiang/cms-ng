@@ -13,6 +13,7 @@ import {
   type ResearchKitResult,
 } from '@/lib/story-api';
 import { getArticles, createArticle, type Article } from '@/lib/article-api';
+import { useAuthStore } from '@/store/auth-store';
 import {
   ArrowLeft,
   Plus,
@@ -24,12 +25,14 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { ContentLanguage } from '@cms-ng/shared';
+import LanguageBadge from '@/components/language-badge';
 import ResearchKitPanel from '@/components/research-kit-panel';
 
 export default function StoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const storyId = params.id as string;
+  const { user } = useAuthStore();
 
   const [story, setStory] = useState<Story | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -101,6 +104,7 @@ export default function StoryDetailPage() {
       storyId,
       title,
       content: '',
+      contentLanguage: user?.preferredLanguage,
     });
     await loadData();
   }
@@ -348,15 +352,18 @@ export default function StoryDetailPage() {
                   {article.subtitle || '暂无副标题'} · 版本 {article.version}
                 </p>
               </div>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                article.status === 'PUBLISHED'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : article.status === 'PENDING_REVIEW'
-                  ? 'bg-amber-50 text-amber-700'
-                  : 'bg-zinc-100 text-zinc-700'
-              }`}>
-                {statusLabels[article.status] || article.status}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  article.status === 'PUBLISHED'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : article.status === 'PENDING_REVIEW'
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-zinc-100 text-zinc-700'
+                }`}>
+                  {statusLabels[article.status] || article.status}
+                </span>
+                <LanguageBadge language={article.contentLanguage} />
+              </div>
             </Link>
           ))}
           {articles.length === 0 && (

@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
-import { ArticleStatus, UserRole } from '@cms-ng/shared';
+import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import {
   RewriteTextDto,
   ExpandTextDto,
@@ -37,6 +37,13 @@ export class ArticlesService {
     });
     if (!story) throw new NotFoundException('Story not found');
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: authorId },
+      select: { preferredLanguage: true },
+    });
+    const contentLanguage =
+      dto.contentLanguage ?? user?.preferredLanguage ?? ContentLanguage.TRADITIONAL_CHINESE_HK;
+
     const article = await this.prisma.article.create({
       data: {
         storyId: dto.storyId,
@@ -48,7 +55,7 @@ export class ArticlesService {
         tags: JSON.stringify(dto.tags ?? []),
         authorId,
         version: 1,
-        contentLanguage: dto.contentLanguage,
+        contentLanguage,
       },
       include: {
         author: { select: { id: true, name: true, email: true } },

@@ -68,10 +68,29 @@ describe('UsersController', () => {
     it('should update user and return updated user', async () => {
       const dto = { name: 'Updated Name', preferredLanguage: 'ENGLISH' as const };
       usersService.update.mockResolvedValue({ id: 'u1', name: 'Updated Name' });
+      const user = { userId: 'u1', role: 'REPORTER' };
 
-      const result = await controller.update('u1', dto);
+      const result = await controller.update('u1', dto, user);
 
       expect(usersService.update).toHaveBeenCalledWith('u1', dto);
+      expect(result.name).toBe('Updated Name');
+    });
+
+    it('should reject updating other user profile for non-admin', async () => {
+      const dto = { name: 'Updated Name' };
+      const user = { userId: 'u1', role: 'REPORTER' };
+
+      await expect(controller.update('u2', dto, user)).rejects.toThrow('You can only update your own profile');
+    });
+
+    it('should allow admin to update any user', async () => {
+      const dto = { name: 'Updated Name' };
+      usersService.update.mockResolvedValue({ id: 'u2', name: 'Updated Name' });
+      const admin = { userId: 'admin-id', role: 'ADMIN' };
+
+      const result = await controller.update('u2', dto, admin);
+
+      expect(usersService.update).toHaveBeenCalledWith('u2', dto);
       expect(result.name).toBe('Updated Name');
     });
   });
