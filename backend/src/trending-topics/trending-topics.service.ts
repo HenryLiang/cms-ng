@@ -267,35 +267,45 @@ export class TrendingTopicsService {
     return this.paginate(deduped, page, limit);
   }
 
-  private async fetchSingleGoogleTrends(feedUrl: string, requestOptions: any) {
-    const parser = new Parser({
-      customFields: {
-        item: [
-          'ht:approx_traffic',
-          'ht:picture',
-          'ht:picture_source',
-          'ht:news_item',
-        ],
-      },
-      requestOptions,
-    });
-    const feed = await parser.parseURL(feedUrl);
-    return (feed.items || []).map((item: any) => {
-      const traffic = item['ht:approx_traffic'] || '';
-      const articles = this.normalizeNewsItems(item['ht:news_item']);
-      const firstNews = articles[0];
-      const snippet = firstNews?.snippet;
-      const description =
-        snippet || firstNews?.title || item.contentSnippet || item.title || '';
-      return {
-        title: item.title || '',
-        description,
-        source: 'google-trends',
-        heatScore: this.parseTrafficToScore(traffic),
-        tags: [],
-        articles: articles.slice(0, 3),
-      };
-    });
+  private async fetchSingleGoogleTrends(
+    feedUrl: string,
+    requestOptions: any,
+  ): Promise<any[]> {
+    try {
+      const parser = new Parser({
+        customFields: {
+          item: [
+            'ht:approx_traffic',
+            'ht:picture',
+            'ht:picture_source',
+            'ht:news_item',
+          ],
+        },
+        requestOptions,
+      });
+      const feed = await parser.parseURL(feedUrl);
+      return (feed.items || []).map((item: any) => {
+        const traffic = item['ht:approx_traffic'] || '';
+        const articles = this.normalizeNewsItems(item['ht:news_item']);
+        const firstNews = articles[0];
+        const snippet = firstNews?.snippet;
+        const description =
+          snippet || firstNews?.title || item.contentSnippet || item.title || '';
+        return {
+          title: item.title || '',
+          description,
+          source: 'google-trends',
+          heatScore: this.parseTrafficToScore(traffic),
+          tags: [],
+          articles: articles.slice(0, 3),
+        };
+      });
+    } catch (err: any) {
+      if (requestOptions?.agent) {
+        return this.fetchSingleGoogleTrends(feedUrl, {});
+      }
+      throw err;
+    }
   }
 
   private paginate(items: any[], page: number, limit: number) {
@@ -313,26 +323,33 @@ export class TrendingTopicsService {
   private async fetchSingleRSS(
     feed: { key: string; url: string },
     requestOptions: any,
-  ) {
-    const parser = new Parser({ requestOptions });
-    const rssFeed = await parser.parseURL(feed.url);
-    return (rssFeed.items || []).map((item: any) => ({
-      title: item.title || '',
-      description: item.contentSnippet || item.summary || item.title || '',
-      source: feed.key,
-      heatScore: 50,
-      tags: [],
-      articles: item.link
-        ? [
-            {
-              title: item.title || '',
-              source: feed.key,
-              snippet: item.contentSnippet || '',
-              url: item.link,
-            },
-          ]
-        : [],
-    }));
+  ): Promise<any[]> {
+    try {
+      const parser = new Parser({ requestOptions });
+      const rssFeed = await parser.parseURL(feed.url);
+      return (rssFeed.items || []).map((item: any) => ({
+        title: item.title || '',
+        description: item.contentSnippet || item.summary || item.title || '',
+        source: feed.key,
+        heatScore: 50,
+        tags: [],
+        articles: item.link
+          ? [
+              {
+                title: item.title || '',
+                source: feed.key,
+                snippet: item.contentSnippet || '',
+                url: item.link,
+              },
+            ]
+          : [],
+      }));
+    } catch (err: any) {
+      if (requestOptions?.agent) {
+        return this.fetchSingleRSS(feed, {});
+      }
+      throw err;
+    }
   }
 
   async fetchGoogleTrends(
