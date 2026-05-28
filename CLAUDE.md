@@ -146,7 +146,7 @@ UPLOAD_DIR="./uploads"
 AI_PROVIDER="deepseek"
 DEEPSEEK_API_KEY="..."
 DEEPSEEK_API_BASE="https://api.deepseek.com"
-DEEPSEEK_MODEL="deepseek-chat"
+DEEPSEEK_MODEL="deepseek-v4-pro"
 # KIMI_API_KEY="..."          # when AI_PROVIDER=kimi
 # KIMI_API_BASE="https://api.kimi.com/coding/v1"
 # KIMI_MODEL="kimi-for-coding"

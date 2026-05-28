@@ -10,6 +10,7 @@ import {
   CHAT_PROVIDER,
   type ChatCompletionProvider,
   type ChatCompletionResponse,
+  KimiProvider,
 } from './providers';
 
 // axios is still used by searchWikipedia (GET requests)
@@ -742,6 +743,412 @@ describe('AIService', () => {
     });
   });
 
+  describe('optimizeSEO', () => {
+    it('should return full SEO result on success', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 78,
+          readabilityScore: 82,
+          optimizedTitle: [
+            { title: '优化标题1', reasoning: '理由1' },
+            { title: '优化标题2', reasoning: '理由2' },
+          ],
+          metaDescription: '这是元描述',
+          keywords: [
+            { keyword: '关键词A', searchVolume: 'high' },
+            { keyword: '关键词B', searchVolume: 'medium' },
+          ],
+          suggestions: [
+            { category: '标题优化', priority: 'high', suggestion: '改进标题' },
+            { category: '内容优化', priority: 'low', suggestion: '补充数据' },
+          ],
+        })),
+      );
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: '测试文章',
+        content: '<p>文章正文内容</p>',
+      });
+
+      expect(result.overallScore).toBe(78);
+      expect(result.readabilityScore).toBe(82);
+      expect(result.optimizedTitle).toHaveLength(2);
+      expect(result.optimizedTitle[0].title).toBe('优化标题1');
+      expect(result.keywords).toHaveLength(2);
+      expect(result.keywords[0].searchVolume).toBe('high');
+      expect(result.suggestions).toHaveLength(2);
+      expect(result.suggestions[0].priority).toBe('high');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should clamp overallScore and readabilityScore to 0-100', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 150,
+          readabilityScore: -10,
+          optimizedTitle: [],
+          metaDescription: '',
+          keywords: [],
+          suggestions: [],
+        })),
+      );
+
+      const resultHigh = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(resultHigh.overallScore).toBe(100);
+      expect(resultHigh.readabilityScore).toBe(0);
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: -20,
+          readabilityScore: 200,
+          optimizedTitle: [],
+          metaDescription: '',
+          keywords: [],
+          suggestions: [],
+        })),
+      );
+
+      const resultLow = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(resultLow.overallScore).toBe(0);
+      expect(resultLow.readabilityScore).toBe(100);
+    });
+
+    it('should default scores to 50 when missing', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          optimizedTitle: [],
+          keywords: [],
+          suggestions: [],
+        })),
+      );
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(50);
+      expect(result.readabilityScore).toBe(50);
+    });
+
+    it('should handle non-array fields gracefully', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          readabilityScore: 70,
+          optimizedTitle: null,
+          metaDescription: '描述',
+          keywords: 'invalid',
+          suggestions: undefined,
+        })),
+      );
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.optimizedTitle).toEqual([]);
+      expect(result.keywords).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+    });
+
+    it('should filter out entries with empty title/keyword/suggestion', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70,
+          readabilityScore: 75,
+          optimizedTitle: [
+            { title: '', reasoning: '空标题应被过滤' },
+            { title: '有效标题', reasoning: '保留' },
+          ],
+          metaDescription: '描述',
+          keywords: [
+            { keyword: '', searchVolume: 'high' },
+            { keyword: '有效关键词', searchVolume: 'low' },
+          ],
+          suggestions: [
+            { category: 'A', priority: 'high', suggestion: '' },
+            { category: 'B', priority: 'medium', suggestion: '有效建议' },
+          ],
+        })),
+      );
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.optimizedTitle).toHaveLength(1);
+      expect(result.optimizedTitle[0].title).toBe('有效标题');
+      expect(result.keywords).toHaveLength(1);
+      expect(result.keywords[0].keyword).toBe('有效关键词');
+      expect(result.suggestions).toHaveLength(1);
+      expect(result.suggestions[0].suggestion).toBe('有效建议');
+    });
+
+    it('should default invalid searchVolume and priority to medium', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          readabilityScore: 65,
+          optimizedTitle: [],
+          keywords: [
+            { keyword: 'K1', searchVolume: 'invalid_value' },
+            { keyword: 'K2', searchVolume: null },
+            { keyword: 'K3', searchVolume: 'high' },
+          ],
+          suggestions: [
+            { category: 'C1', priority: 'invalid', suggestion: 'S1' },
+            { category: 'C2', priority: 'low', suggestion: 'S2' },
+          ],
+        })),
+      );
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.keywords[0].searchVolume).toBe('medium');
+      expect(result.keywords[1].searchVolume).toBe('medium');
+      expect(result.keywords[2].searchVolume).toBe('high');
+      expect(result.suggestions[0].priority).toBe('medium');
+      expect(result.suggestions[1].priority).toBe('low');
+    });
+
+    it('should return zero-value fallback on API failure', async () => {
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(0);
+      expect(result.readabilityScore).toBe(0);
+      expect(result.optimizedTitle).toEqual([]);
+      expect(result.metaDescription).toBe('');
+      expect(result.keywords).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should strip HTML tags from content before sending to AI', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70,
+          readabilityScore: 70,
+          optimizedTitle: [],
+          keywords: [],
+          suggestions: [],
+        })),
+      );
+
+      await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: '<p>Paragraph 1</p><h2>Heading</h2><p>Paragraph 2</p>',
+      });
+
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
+      expect(prompt).not.toContain('<p>');
+      expect(prompt).not.toContain('<h2>');
+      expect(prompt).toContain('Paragraph 1');
+      expect(prompt).toContain('Heading');
+    });
+
+    it('should include language-specific SEO context in prompt', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70,
+          readabilityScore: 70,
+          optimizedTitle: [],
+          keywords: [],
+          suggestions: [],
+        })),
+      );
+
+      // Simplified Chinese
+      await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+        language: 'SIMPLIFIED_CHINESE' as any,
+      });
+      let prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('中国内地媒体');
+
+      mockChatProvider.chatCompletion.mockClear();
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70, readabilityScore: 70,
+          optimizedTitle: [], keywords: [], suggestions: [],
+        })),
+      );
+
+      // English
+      await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+        language: 'ENGLISH' as any,
+      });
+      prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('英语媒体');
+    });
+  });
+
+  describe('generateArticleImage', () => {
+    it('should complete full image generation flow', async () => {
+      // Step 1: buildImagePrompt — chatProvider.chatCompletion
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('A professional news photograph of a city skyline at dusk'),
+      );
+
+      // Step 2: callSeedream — axios.post
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://seedream.example.com/temp/image.png' }] },
+      });
+
+      // Step 3: mock downloadImage to avoid fs/path dynamic imports
+      jest.spyOn(service as any, 'downloadImage').mockResolvedValue(
+        '/uploads/articles/article-123/generated_123.png',
+      );
+
+      const result = await service.generateArticleImage(
+        'user-id',
+        'article-123',
+        '测试文章标题',
+        '<p>文章内容</p>',
+        { style: 'news' },
+      );
+
+      expect(result.url).toBe('/uploads/articles/article-123/generated_123.png');
+      expect(result.prompt).toBe('A professional news photograph of a city skyline at dusk');
+      expect(mockChatProvider.chatCompletion).toHaveBeenCalled();
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should throw when Seedream returns no URL', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('A beautiful landscape'),
+      );
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{}] }, // no url field
+      });
+
+      await expect(
+        service.generateArticleImage('user-id', 'article-123', 'Title', 'Content'),
+      ).rejects.toThrow('Seedream 未返回图片 URL');
+    });
+
+    it('should throw when Seedream returns empty data array', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('A beautiful landscape'),
+      );
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [] },
+      });
+
+      await expect(
+        service.generateArticleImage('user-id', 'article-123', 'Title', 'Content'),
+      ).rejects.toThrow('Seedream 未返回图片 URL');
+    });
+
+    it('should pass style-specific prompt direction to buildImagePrompt', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Illustration prompt text'),
+      );
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://example.com/img.png' }] },
+      });
+
+      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+
+      await service.generateArticleImage(
+        'user-id', 'article-123', 'Title', 'Content',
+        { style: 'illustration' },
+      );
+
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const promptText = callArgs[0].messages[1].content;
+      expect(promptText).toContain('editorial illustration style');
+    });
+
+    it('should include customPrompt in image generation request', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Custom image prompt'),
+      );
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://example.com/img.png' }] },
+      });
+
+      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+
+      await service.generateArticleImage(
+        'user-id', 'article-123', 'Title', 'Content',
+        { customPrompt: '突出科技感' },
+      );
+
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const promptText = callArgs[0].messages[1].content;
+      expect(promptText).toContain('额外要求：突出科技感');
+    });
+
+    it('should pass aspectRatio to Seedream API', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Wide format image prompt'),
+      );
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://example.com/img.png' }] },
+      });
+
+      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+
+      await service.generateArticleImage(
+        'user-id', 'article-123', 'Title', 'Content',
+        { aspectRatio: '16:9' },
+      );
+
+      // Verify Seedream was called with aspect_ratio
+      const seedreamCall = mockedAxios.post.mock.calls[0];
+      expect(seedreamCall[1]).toMatchObject({ aspect_ratio: '16:9' });
+    });
+
+    it('should record AI operation with seedream model', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Image prompt'),
+      );
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://example.com/img.png' }] },
+      });
+
+      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+
+      await service.generateArticleImage(
+        'user-id', 'article-123', 'Title', 'Content',
+      );
+
+      const createCall = (prisma.aIOperation.create as jest.Mock).mock.calls[0][0];
+      expect(createCall.data.agentType).toBe('VISUAL');
+      expect(createCall.data.action).toBe('generate_article_image');
+      expect(createCall.data.model).toBe('test-seedream-model');
+    });
+  });
+
   describe('generateResearchKit', () => {
     it('should return research kit with all four dimensions on success', async () => {
       // Mock search (performSearch → chatCompletionWithTools)
@@ -964,4 +1371,181 @@ describe('AIService', () => {
     });
   });
 
+});
+
+describe('AIService — performSearch branch logic', () => {
+  let prisma: ReturnType<typeof createMockPrismaService>;
+  let aiTools: AIToolsService;
+  let tavilySearch: TavilySearchTool;
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    prisma = createMockPrismaService();
+    const config = {
+      get: jest.fn((key: string) => {
+        const map: Record<string, string> = {
+          SEEDREAM_API_KEY: 'test-key',
+          SEEDREAM_API_BASE: 'https://api.test.com',
+          SEEDREAM_MODEL: 'test-model',
+          UPLOAD_DIR: './uploads',
+          TAVILY_API_KEY: 'test-tavily-key',
+        };
+        return map[key];
+      }),
+    };
+    tavilySearch = new TavilySearchTool(config as unknown as ConfigService);
+    aiTools = new AIToolsService(tavilySearch);
+  });
+
+  it('should use Kimi built-in search when SEARCH_PROVIDER=kimi and provider is KimiProvider', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        const map: Record<string, string> = {
+          SEARCH_PROVIDER: 'kimi',
+          SEEDREAM_API_KEY: 'test-key',
+          SEEDREAM_API_BASE: 'https://api.test.com',
+          SEEDREAM_MODEL: 'test-model',
+          UPLOAD_DIR: './uploads',
+          TAVILY_API_KEY: 'test-tavily-key',
+        };
+        return map[key];
+      }),
+    };
+
+    // Use a real KimiProvider instance with mocked axios
+    const kimiProvider = new KimiProvider(config as unknown as ConfigService);
+
+    // Mock chatCompletionWithBuiltinSearch on the real instance
+    jest.spyOn(kimiProvider, 'chatCompletionWithBuiltinSearch').mockResolvedValue({
+      content: 'Kimi built-in search results',
+      finishReason: 'stop',
+    });
+    jest.spyOn(kimiProvider, 'chatCompletion').mockResolvedValue({
+      content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+      finishReason: 'stop',
+    });
+
+    const module = await Test.createTestingModule({
+      providers: [
+        AIService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ConfigService, useValue: config },
+        { provide: AIToolsService, useValue: aiTools },
+        { provide: CHAT_PROVIDER, useValue: kimiProvider },
+      ],
+    }).compile();
+
+    const svc = module.get<AIService>(AIService);
+    mockedAxios.get.mockRejectedValue(new Error('no wikipedia'));
+
+    await svc.generateResearchKit('user-id', {
+      storyTitle: 'Test Topic',
+      storyTags: [],
+    });
+
+    expect(kimiProvider.chatCompletionWithBuiltinSearch).toHaveBeenCalled();
+  });
+
+  it('should fall back to Tavily when SEARCH_PROVIDER=kimi but provider is NOT KimiProvider', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        const map: Record<string, string> = {
+          SEARCH_PROVIDER: 'kimi',
+          SEEDREAM_API_KEY: 'test-key',
+          SEEDREAM_API_BASE: 'https://api.test.com',
+          SEEDREAM_MODEL: 'test-model',
+          UPLOAD_DIR: './uploads',
+          TAVILY_API_KEY: 'test-tavily-key',
+        };
+        return map[key];
+      }),
+    };
+
+    // Use a plain mock provider (NOT a KimiProvider instance)
+    const mockProvider = {
+      providerName: 'deepseek',
+      model: 'test-model',
+      chatCompletion: jest.fn().mockResolvedValue({
+        content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        finishReason: 'stop',
+      }),
+      chatCompletionWithTools: jest.fn().mockResolvedValue({
+        content: 'Tavily search results via fallback',
+        finishReason: 'stop',
+      }),
+    };
+
+    const module = await Test.createTestingModule({
+      providers: [
+        AIService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ConfigService, useValue: config },
+        { provide: AIToolsService, useValue: aiTools },
+        { provide: CHAT_PROVIDER, useValue: mockProvider },
+      ],
+    }).compile();
+
+    const svc = module.get<AIService>(AIService);
+    mockedAxios.get.mockRejectedValue(new Error('no wikipedia'));
+
+    await svc.generateResearchKit('user-id', {
+      storyTitle: 'Test Topic',
+      storyTags: [],
+    });
+
+    // Should NOT call chatCompletionWithBuiltinSearch (provider is not KimiProvider)
+    // Instead, should use chatCompletionWithTools (Tavily fallback)
+    expect(mockProvider.chatCompletionWithTools).toHaveBeenCalled();
+  });
+
+  it('should use Tavily search when SEARCH_PROVIDER=tavily regardless of provider type', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        const map: Record<string, string> = {
+          SEARCH_PROVIDER: 'tavily',
+          SEEDREAM_API_KEY: 'test-key',
+          SEEDREAM_API_BASE: 'https://api.test.com',
+          SEEDREAM_MODEL: 'test-model',
+          UPLOAD_DIR: './uploads',
+          TAVILY_API_KEY: 'test-tavily-key',
+        };
+        return map[key];
+      }),
+    };
+
+    const mockProvider = {
+      providerName: 'test',
+      model: 'test-model',
+      chatCompletion: jest.fn().mockResolvedValue({
+        content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        finishReason: 'stop',
+      }),
+      chatCompletionWithTools: jest.fn().mockResolvedValue({
+        content: 'Tavily search results',
+        finishReason: 'stop',
+      }),
+    };
+
+    const module = await Test.createTestingModule({
+      providers: [
+        AIService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ConfigService, useValue: config },
+        { provide: AIToolsService, useValue: aiTools },
+        { provide: CHAT_PROVIDER, useValue: mockProvider },
+      ],
+    }).compile();
+
+    const svc = module.get<AIService>(AIService);
+    mockedAxios.get.mockRejectedValue(new Error('no wikipedia'));
+
+    await svc.generateResearchKit('user-id', {
+      storyTitle: 'Test Topic',
+      storyTags: [],
+    });
+
+    expect(mockProvider.chatCompletionWithTools).toHaveBeenCalled();
+  });
 });
