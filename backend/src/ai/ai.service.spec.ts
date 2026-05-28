@@ -6,7 +6,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import { AIToolsService } from './tools/ai-tools.service';
 import { TavilySearchTool } from './tools/tavily-search.tool';
+import {
+  CHAT_PROVIDER,
+  type ChatCompletionProvider,
+  type ChatCompletionResponse,
+} from './providers';
 
+// axios is still used by searchWikipedia (GET requests)
 jest.mock('axios');
 import axios from 'axios';
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -17,6 +23,12 @@ describe('AIService', () => {
   let config: { get: jest.Mock };
   let aiTools: AIToolsService;
   let tavilySearch: TavilySearchTool;
+  let mockChatProvider: {
+    providerName: string;
+    model: string;
+    chatCompletion: jest.Mock;
+    chatCompletionWithTools: jest.Mock;
+  };
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -26,14 +38,11 @@ describe('AIService', () => {
     config = {
       get: jest.fn((key: string) => {
         const map: Record<string, string> = {
-          KIMI_API_KEY: 'test-key',
-          KIMI_API_BASE: 'https://api.test.com',
-          KIMI_MODEL: 'test-model',
           SEEDREAM_API_KEY: 'test-seedream-key',
           SEEDREAM_API_BASE: 'https://api.test.com/seedream',
           SEEDREAM_MODEL: 'test-seedream-model',
           UPLOAD_DIR: './uploads',
-          SEARCH_PROVIDER: 'kimi',
+          SEARCH_PROVIDER: 'tavily',
           TAVILY_API_KEY: 'test-tavily-key',
         };
         return map[key];
@@ -43,12 +52,20 @@ describe('AIService', () => {
     tavilySearch = new TavilySearchTool(config as unknown as ConfigService);
     aiTools = new AIToolsService(tavilySearch);
 
+    mockChatProvider = {
+      providerName: 'test-provider',
+      model: 'test-model',
+      chatCompletion: jest.fn(),
+      chatCompletionWithTools: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AIService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
+        { provide: CHAT_PROVIDER, useValue: mockChatProvider },
       ],
     }).compile();
 
@@ -59,16 +76,21 @@ describe('AIService', () => {
     jest.clearAllMocks();
   });
 
-  const mockAIResponse = (content: string, usage?: any) => ({
-    data: {
-      choices: [{ message: { content } }],
-      usage: usage || { total_tokens: 100 },
-    },
+  const mockChatResponse = (
+    content: string,
+    finishReason = 'stop',
+    usage?: any,
+  ): ChatCompletionResponse => ({
+    content,
+    finishReason,
+    usage: usage || { promptTokens: 50, completionTokens: 50, totalTokens: 100 },
   });
 
   describe('generateStorySuggestions', () => {
     it('should return suggestions on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('[{"title":"T1","description":"D1","suggestedAngle":"A1","reason":"R1"}]'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('[{"title":"T1","description":"D1","suggestedAngle":"A1","reason":"R1"}]'),
+      );
 
       const result = await service.generateStorySuggestions('user-id', {
         name: 'Test',
@@ -76,14 +98,14 @@ describe('AIService', () => {
         department: 'News',
       });
 
-      expect(mockedAxios.post).toHaveBeenCalled();
+      expect(mockChatProvider.chatCompletion).toHaveBeenCalled();
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('T1');
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
 
     it('should return fallback on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
 
       const result = await service.generateStorySuggestions('user-id', {
         name: 'Test',
@@ -97,7 +119,7 @@ describe('AIService', () => {
 
   describe('rewriteText', () => {
     it('should return rewritten text on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('Rewritten text'));
+      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Rewritten text'));
 
       const result = await service.rewriteText('user-id', 'article-id', { text: 'Original' });
 
@@ -106,7 +128,7 @@ describe('AIService', () => {
     });
 
     it('should return original text on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.rewriteText('user-id', 'article-id', { text: 'Original' });
 
@@ -117,7 +139,7 @@ describe('AIService', () => {
 
   describe('expandText', () => {
     it('should return expanded text on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('Expanded text'));
+      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Expanded text'));
 
       const result = await service.expandText('user-id', 'article-id', { text: 'Short' });
 
@@ -125,7 +147,7 @@ describe('AIService', () => {
     });
 
     it('should return original text on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.expandText('user-id', 'article-id', { text: 'Short' });
 
@@ -135,7 +157,7 @@ describe('AIService', () => {
 
   describe('condenseText', () => {
     it('should return condensed text on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('Short'));
+      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Short'));
 
       const result = await service.condenseText('user-id', 'article-id', { text: 'Long text here' });
 
@@ -143,7 +165,7 @@ describe('AIService', () => {
     });
 
     it('should return original text on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.condenseText('user-id', 'article-id', { text: 'Original' });
 
@@ -153,7 +175,7 @@ describe('AIService', () => {
 
   describe('polishText', () => {
     it('should return polished text on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('Polished'));
+      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Polished'));
 
       const result = await service.polishText('user-id', 'article-id', { text: 'Rough' });
 
@@ -161,7 +183,7 @@ describe('AIService', () => {
     });
 
     it('should return original text on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.polishText('user-id', 'article-id', { text: 'Original' });
 
@@ -171,7 +193,9 @@ describe('AIService', () => {
 
   describe('generateHeadlines', () => {
     it('should return headlines on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('[{"title":"H1","style":"s","reasoning":"r"}]'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('[{"title":"H1","style":"s","reasoning":"r"}]'),
+      );
 
       const result = await service.generateHeadlines('user-id', 'article-id', { title: 'Article', content: 'Body' });
 
@@ -180,7 +204,7 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.generateHeadlines('user-id', 'article-id', { title: 'Article', content: 'Body' });
 
@@ -191,7 +215,7 @@ describe('AIService', () => {
 
   describe('generateExcerpt', () => {
     it('should return excerpt on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('Summary'));
+      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Summary'));
 
       const result = await service.generateExcerpt('user-id', 'article-id', { title: 'T', content: 'Body text' });
 
@@ -199,7 +223,7 @@ describe('AIService', () => {
     });
 
     it('should return content slice on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.generateExcerpt('user-id', 'article-id', { title: 'T', content: 'Body text' });
 
@@ -209,7 +233,7 @@ describe('AIService', () => {
 
   describe('chatWithAI', () => {
     it('should return reply on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse('AI reply'));
+      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('AI reply'));
 
       const result = await service.chatWithAI('user-id', 'article-id', {
         messages: [{ role: 'user', content: 'Hello' }],
@@ -219,7 +243,7 @@ describe('AIService', () => {
     });
 
     it('should return error message on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.chatWithAI('user-id', 'article-id', {
         messages: [{ role: 'user', content: 'Hello' }],
@@ -231,11 +255,13 @@ describe('AIService', () => {
 
   describe('generateDraft', () => {
     it('should return parsed draft on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        title: 'Draft Title',
-        subtitle: 'Draft Subtitle',
-        content: '<p>Draft content</p>',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          title: 'Draft Title',
+          subtitle: 'Draft Subtitle',
+          content: '<p>Draft content</p>',
+        })),
+      );
 
       const result = await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -250,7 +276,7 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -264,7 +290,7 @@ describe('AIService', () => {
     });
 
     it('should use storyTitle as fallback title when currentTitle missing', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Fail'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
       const result = await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -275,10 +301,12 @@ describe('AIService', () => {
     });
 
     it('should inject formatted research kit into prompt', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        title: 'Draft Title',
-        content: '<p>Content</p>',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          title: 'Draft Title',
+          content: '<p>Content</p>',
+        })),
+      );
 
       const researchKit = {
         timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
@@ -293,8 +321,8 @@ describe('AIService', () => {
         researchKit,
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
-      const prompt = callArgs[1].messages[1].content;
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
       expect(prompt).toContain('【事件時間線】');
       expect(prompt).toContain('2024-01-01：Event 1（來源：Source 1）');
       expect(prompt).toContain('【關鍵人物】');
@@ -307,10 +335,12 @@ describe('AIService', () => {
     });
 
     it('should skip empty research kit sections in prompt', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        title: 'Draft Title',
-        content: '<p>Content</p>',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          title: 'Draft Title',
+          content: '<p>Content</p>',
+        })),
+      );
 
       await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -323,8 +353,8 @@ describe('AIService', () => {
         },
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
-      const prompt = callArgs[1].messages[1].content;
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
       expect(prompt).not.toContain('【事件時間線】');
       expect(prompt).not.toContain('【核心數據】');
       expect(prompt).not.toContain('【各方觀點】');
@@ -332,10 +362,12 @@ describe('AIService', () => {
     });
 
     it('should use instruction in prompt when provided', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        title: 'Draft Title',
-        content: '<p>Content</p>',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          title: 'Draft Title',
+          content: '<p>Content</p>',
+        })),
+      );
 
       await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -343,16 +375,18 @@ describe('AIService', () => {
         instruction: '侧重民生角度',
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
-      const prompt = callArgs[1].messages[1].content;
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
       expect(prompt).toContain('额外要求：侧重民生角度');
     });
 
     it('should sanitize HTML in draft content', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        title: 'Draft Title',
-        content: '<p>Safe</p><script>alert("xss")</script><style>body{color:red}</style><iframe src="evil"></iframe>',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          title: 'Draft Title',
+          content: '<p>Safe</p><script>alert("xss")</script><style>body{color:red}</style><iframe src="evil"></iframe>',
+        })),
+      );
 
       const result = await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -363,10 +397,12 @@ describe('AIService', () => {
     });
 
     it('should fallback to currentTitle when AI returns no title', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        subtitle: 'Sub',
-        content: '<p>C</p>',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          subtitle: 'Sub',
+          content: '<p>C</p>',
+        })),
+      );
 
       const result = await service.generateDraft('user-id', 'article-id', {
         storyTitle: 'Story Title',
@@ -413,14 +449,16 @@ describe('AIService', () => {
 
   describe('factCheck', () => {
     it('should return fact-check result with score and findings on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        score: 85,
-        summary: 'Overall assessment summary',
-        findings: [
-          { type: 'fact', text: 'Fact A', message: 'Check this', severity: 'info' },
-          { type: 'risk', text: 'Risk B', message: 'Be careful', severity: 'warning' },
-        ],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          score: 85,
+          summary: 'Overall assessment summary',
+          findings: [
+            { type: 'fact', text: 'Fact A', message: 'Check this', severity: 'info' },
+            { type: 'risk', text: 'Risk B', message: 'Be careful', severity: 'warning' },
+          ],
+        })),
+      );
 
       const result = await service.factCheck('user-id', 'article-id', {
         title: 'Test Article',
@@ -436,11 +474,13 @@ describe('AIService', () => {
     });
 
     it('should clamp score to 0-100 range', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        score: 150,
-        summary: 'Test',
-        findings: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          score: 150,
+          summary: 'Test',
+          findings: [],
+        })),
+      );
 
       const resultHigh = await service.factCheck('user-id', 'article-id', {
         title: 'Test',
@@ -449,11 +489,13 @@ describe('AIService', () => {
 
       expect(resultHigh.score).toBe(100);
 
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        score: -20,
-        summary: 'Test',
-        findings: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          score: -20,
+          summary: 'Test',
+          findings: [],
+        })),
+      );
 
       const resultLow = await service.factCheck('user-id', 'article-id', {
         title: 'Test',
@@ -464,10 +506,12 @@ describe('AIService', () => {
     });
 
     it('should default score to 50 when missing', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        summary: 'No score provided',
-        findings: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          summary: 'No score provided',
+          findings: [],
+        })),
+      );
 
       const result = await service.factCheck('user-id', 'article-id', {
         title: 'Test',
@@ -478,11 +522,13 @@ describe('AIService', () => {
     });
 
     it('should handle findings that are not an array', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        score: 70,
-        summary: 'Test',
-        findings: null,
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          score: 70,
+          summary: 'Test',
+          findings: null,
+        })),
+      );
 
       const result = await service.factCheck('user-id', 'article-id', {
         title: 'Test',
@@ -493,7 +539,7 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
 
       const result = await service.factCheck('user-id', 'article-id', {
         title: 'Test',
@@ -507,20 +553,21 @@ describe('AIService', () => {
     });
 
     it('should strip HTML tags from content before sending to AI', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        score: 80,
-        summary: 'Good',
-        findings: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          score: 80,
+          summary: 'Good',
+          findings: [],
+        })),
+      );
 
       await service.factCheck('user-id', 'article-id', {
         title: 'Test',
         content: '<p>Paragraph 1</p><p>Paragraph 2</p>',
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
-      const requestBody = callArgs[1];
-      const prompt = requestBody.messages[1].content;
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
       expect(prompt).not.toContain('<p>');
       expect(prompt).toContain('Paragraph 1');
     });
@@ -528,18 +575,20 @@ describe('AIService', () => {
 
   describe('generateReviewReport', () => {
     it('should return parsed review report on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: 78,
-        summary: 'Structure is clear, language is fluent',
-        dimensions: [
-          { name: 'Structure', score: 80, maxScore: 100, comment: 'Good structure' },
-          { name: 'Language', score: 75, maxScore: 100, comment: 'Fluent' },
-        ],
-        suggestions: [
-          { dimension: 'Structure', priority: 'high', suggestion: 'Add more background' },
-          { dimension: 'Language', priority: 'medium', suggestion: 'Simplify sentences' },
-        ],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 78,
+          summary: 'Structure is clear, language is fluent',
+          dimensions: [
+            { name: 'Structure', score: 80, maxScore: 100, comment: 'Good structure' },
+            { name: 'Language', score: 75, maxScore: 100, comment: 'Fluent' },
+          ],
+          suggestions: [
+            { dimension: 'Structure', priority: 'high', suggestion: 'Add more background' },
+            { dimension: 'Language', priority: 'medium', suggestion: 'Simplify sentences' },
+          ],
+        })),
+      );
 
       const result = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test Article',
@@ -558,12 +607,14 @@ describe('AIService', () => {
     });
 
     it('should clamp overallScore to 0-100', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: 150,
-        summary: 'Test high',
-        dimensions: [],
-        suggestions: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 150,
+          summary: 'Test high',
+          dimensions: [],
+          suggestions: [],
+        })),
+      );
 
       const resultHigh = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
@@ -572,12 +623,14 @@ describe('AIService', () => {
 
       expect(resultHigh.overallScore).toBe(100);
 
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: -10,
-        summary: 'Test low',
-        dimensions: [],
-        suggestions: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: -10,
+          summary: 'Test low',
+          dimensions: [],
+          suggestions: [],
+        })),
+      );
 
       const resultLow = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
@@ -588,15 +641,17 @@ describe('AIService', () => {
     });
 
     it('should clamp each dimension score to 0-100', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: 50,
-        summary: 'Test',
-        dimensions: [
-          { name: 'Over', score: 200, maxScore: 100, comment: '' },
-          { name: 'Under', score: -50, maxScore: 100, comment: '' },
-        ],
-        suggestions: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 50,
+          summary: 'Test',
+          dimensions: [
+            { name: 'Over', score: 200, maxScore: 100, comment: '' },
+            { name: 'Under', score: -50, maxScore: 100, comment: '' },
+          ],
+          suggestions: [],
+        })),
+      );
 
       const result = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
@@ -608,16 +663,18 @@ describe('AIService', () => {
     });
 
     it('should validate suggestion priority to high/medium/low', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: 50,
-        summary: 'Test',
-        dimensions: [],
-        suggestions: [
-          { dimension: 'A', priority: 'invalid', suggestion: 'S1' },
-          { dimension: 'B', priority: 'high', suggestion: 'S2' },
-          { dimension: 'C', priority: null, suggestion: 'S3' },
-        ],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 50,
+          summary: 'Test',
+          dimensions: [],
+          suggestions: [
+            { dimension: 'A', priority: 'invalid', suggestion: 'S1' },
+            { dimension: 'B', priority: 'high', suggestion: 'S2' },
+            { dimension: 'C', priority: null, suggestion: 'S3' },
+          ],
+        })),
+      );
 
       const result = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
@@ -630,7 +687,7 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
 
       const result = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
@@ -645,12 +702,14 @@ describe('AIService', () => {
     });
 
     it('should handle non-array dimensions and suggestions', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: 60,
-        summary: 'Test',
-        dimensions: null,
-        suggestions: 'invalid',
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          summary: 'Test',
+          dimensions: null,
+          suggestions: 'invalid',
+        })),
+      );
 
       const result = await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
@@ -662,374 +721,42 @@ describe('AIService', () => {
     });
 
     it('should strip HTML tags from content before sending to AI', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        overallScore: 80,
-        summary: 'Good',
-        dimensions: [],
-        suggestions: [],
-      })));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 80,
+          summary: 'Good',
+          dimensions: [],
+          suggestions: [],
+        })),
+      );
 
       await service.generateReviewReport('user-id', 'article-id', {
         title: 'Test',
         content: '<p>Paragraph 1</p><p>Paragraph 2</p>',
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
-      const requestBody = callArgs[1];
-      const prompt = requestBody.messages[1].content;
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
       expect(prompt).not.toContain('<p>');
       expect(prompt).toContain('Paragraph 1');
     });
   });
 
-  describe('callKimiWithWebSearch', () => {
-    it('should return round1 response directly when tool_calls not triggered', async () => {
-      const round1Response = {
-        data: {
-          choices: [{
-            message: { content: '{"result":"direct"}' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      };
-      mockedAxios.post.mockResolvedValue(round1Response);
-
-      const result = await (service as any).callKimiWithWebSearch(
-        [{ role: 'user', content: 'Hello' }],
-        0.4,
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(round1Response);
-      const callArgs = mockedAxios.post.mock.calls[0];
-      expect(callArgs[1].tools).toEqual([{
-        type: 'builtin_function',
-        function: { name: '$web_search' },
-      }]);
-      expect(callArgs[1].temperature).toBe(0.4);
-      expect(callArgs[1].response_format).toBeUndefined();
-      expect(callArgs[1].messages).toEqual([{ role: 'user', content: 'Hello' }]);
-    });
-
-    it('should perform two-round call when tool_calls is triggered', async () => {
-      const round1Response = {
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [{
-                id: 'call_abc123',
-                function: { name: '$web_search', arguments: '{"query":"test"}' },
-              }],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      };
-      const round2Response = {
-        data: {
-          choices: [{
-            message: { content: '{"result":"searched"}' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 200 },
-        },
-      };
-      mockedAxios.post
-        .mockResolvedValueOnce(round1Response)
-        .mockResolvedValueOnce(round2Response);
-
-      const result = await (service as any).callKimiWithWebSearch(
-        [{ role: 'user', content: 'Hello' }],
-        0.7,
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
-
-      const round2CallArgs = mockedAxios.post.mock.calls[1];
-      const round2Body = round2CallArgs[1];
-      expect(round2Body.messages).toHaveLength(3);
-      expect(round2Body.messages[0]).toEqual({ role: 'user', content: 'Hello' });
-      expect(round2Body.messages[1].role).toBe('assistant');
-      expect(round2Body.messages[1].content).toBe('');
-      expect(round2Body.messages[1].tool_calls).toEqual([{
-        id: 'call_abc123',
-        function: { name: '$web_search', arguments: '{"query":"test"}' },
-      }]);
-      expect(round2Body.messages[2].role).toBe('tool');
-      expect(round2Body.messages[2].tool_call_id).toBe('call_abc123');
-      expect(round2Body.messages[2].name).toBe('$web_search');
-      expect(round2Body.messages[2].content).toBe('{"query":"test"}');
-      expect(round2Body.response_format).toBeUndefined();
-    });
-
-    it('should handle multiple tool_calls in round2', async () => {
-      const round1Response = {
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [
-                { id: 'call_1', function: { name: '$web_search', arguments: '{"q":"a"}' } },
-                { id: 'call_2', function: { name: '$web_search', arguments: '{"q":"b"}' } },
-              ],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      };
-      const round2Response = {
-        data: {
-          choices: [{
-            message: { content: 'Final' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 150 },
-        },
-      };
-      mockedAxios.post
-        .mockResolvedValueOnce(round1Response)
-        .mockResolvedValueOnce(round2Response);
-
-      const result = await (service as any).callKimiWithWebSearch(
-        [{ role: 'system', content: 'Sys' }],
-        0.5,
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
-      const round2Body = mockedAxios.post.mock.calls[1][1];
-      expect(round2Body.messages).toHaveLength(4);
-      expect(round2Body.messages[2].role).toBe('tool');
-      expect(round2Body.messages[2].tool_call_id).toBe('call_1');
-      expect(round2Body.messages[3].role).toBe('tool');
-      expect(round2Body.messages[3].tool_call_id).toBe('call_2');
-      expect(result.data.choices[0].message.content).toBe('Final');
-    });
-
-    it('should handle missing choice in round1', async () => {
-      const round1Response = {
-        data: { choices: [] },
-      };
-      mockedAxios.post.mockResolvedValue(round1Response);
-
-      const result = await (service as any).callKimiWithWebSearch(
-        [{ role: 'user', content: 'Hello' }],
-        0.4,
-      );
-
-      expect(result).toEqual(round1Response);
-      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-    });
-
-    it('should use 300s timeout', async () => {
-      mockedAxios.post.mockResolvedValue({
-        data: {
-          choices: [{
-            message: { content: 'OK', finish_reason: 'stop' },
-          }],
-          usage: {},
-        },
-      });
-
-      await (service as any).callKimiWithWebSearch([{ role: 'user', content: 'Test' }], 0.5);
-
-      const callArgs = mockedAxios.post.mock.calls[0];
-      expect(callArgs[2].timeout).toBe(300000);
-    });
-  });
-
-  describe('callKimiWithCustomTools', () => {
-    it('should return round1 response when tool_calls not triggered', async () => {
-      const round1Response = {
-        data: {
-          choices: [{
-            message: { content: 'Direct answer' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      };
-      mockedAxios.post.mockResolvedValue(round1Response);
-
-      const result = await (service as any).callKimiWithCustomTools(
-        [{ role: 'user', content: 'Hello' }],
-        0.4,
-        [{ type: 'function', function: { name: 'test_tool', description: 'Test', parameters: { type: 'object', properties: {} } } }],
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(round1Response);
-      const callArgs = mockedAxios.post.mock.calls[0];
-      expect(callArgs[1].tools).toHaveLength(1);
-      expect(callArgs[1].tools[0].function.name).toBe('test_tool');
-    });
-
-    it('should perform two-round call with tool execution', async () => {
-      const toolDef = {
-        type: 'function',
-        function: {
-          name: 'tavily_search',
-          description: 'Search web',
-          parameters: { type: 'object', properties: {} },
-        },
-      };
-
-      const round1Response = {
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [{
-                id: 'call_tav_1',
-                function: { name: 'tavily_search', arguments: '{"query":"test news"}' },
-              }],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      };
-      const round2Response = {
-        data: {
-          choices: [{
-            message: { content: 'Search result summary' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 200 },
-        },
-      };
-      mockedAxios.post
-        .mockResolvedValueOnce(round1Response)
-        .mockResolvedValueOnce(round2Response);
-
-      jest.spyOn(aiTools, 'executeTool').mockResolvedValue({ answer: 'Found it', results: [] });
-
-      const result = await (service as any).callKimiWithCustomTools(
-        [{ role: 'user', content: 'Hello' }],
-        0.7,
-        [toolDef],
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
-      expect(aiTools.executeTool).toHaveBeenCalledWith('tavily_search', { query: 'test news' });
-
-      const round2Body = mockedAxios.post.mock.calls[1][1];
-      expect(round2Body.messages).toHaveLength(3);
-      expect(round2Body.messages[1].role).toBe('assistant');
-      expect(round2Body.messages[2].role).toBe('tool');
-      expect(round2Body.messages[2].tool_call_id).toBe('call_tav_1');
-      expect(round2Body.messages[2].content).toContain('Found it');
-    });
-
-    it('should handle tool execution error gracefully', async () => {
-      const toolDef = {
-        type: 'function',
-        function: {
-          name: 'tavily_search',
-          description: 'Search web',
-          parameters: { type: 'object', properties: {} },
-        },
-      };
-
-      const round1Response = {
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [{
-                id: 'call_err',
-                function: { name: 'tavily_search', arguments: '{}' },
-              }],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      };
-      const round2Response = {
-        data: {
-          choices: [{
-            message: { content: 'Handled error' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 150 },
-        },
-      };
-      mockedAxios.post
-        .mockResolvedValueOnce(round1Response)
-        .mockResolvedValueOnce(round2Response);
-
-      jest.spyOn(aiTools, 'executeTool').mockRejectedValue(new Error('Tool failed'));
-
-      const result = await (service as any).callKimiWithCustomTools(
-        [{ role: 'user', content: 'Hello' }],
-        0.5,
-        [toolDef],
-      );
-
-      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
-      const round2Body = mockedAxios.post.mock.calls[1][1];
-      expect(round2Body.messages[2].content).toContain('error');
-      expect(result.data.choices[0].message.content).toBe('Handled error');
-    });
-  });
-
-  describe('searchLatestNewsWithTavily', () => {
-    it('should return search results via Tavily tool', async () => {
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [{
-                id: 'call_tav',
-                function: { name: 'tavily_search', arguments: '{"query":"AI news"}' },
-              }],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      });
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: { content: 'Latest AI news summary' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 200 },
-        },
-      });
-
-      jest.spyOn(aiTools, 'executeTool').mockResolvedValue({
-        answer: 'AI is advancing rapidly',
-        results: [{ title: 'AI News', url: 'https://example.com', content: '...' }],
-      });
-
-      const result = await (service as any).searchLatestNewsWithTavily('AI news');
-      expect(result).toBe('Latest AI news summary');
-      expect(aiTools.executeTool).toHaveBeenCalledWith('tavily_search', { query: 'AI news' });
-    });
-
-    it('should return empty string when tavily tool is not available', async () => {
-      jest.spyOn(aiTools, 'getToolDefinition').mockReturnValue(undefined);
-
-      const result = await (service as any).searchLatestNewsWithTavily('test');
-      expect(result).toBe('');
-    });
-  });
-
   describe('generateResearchKit', () => {
     it('should return research kit with all four dimensions on success', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
-        people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
-        data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
-        opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
-      })));
+      // Mock search (performSearch → chatCompletionWithTools)
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse('Latest news summary'),
+      );
+      // Mock final kit generation
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
+          people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
+          data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
+          opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
+        })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Story Title',
@@ -1048,12 +775,17 @@ describe('AIService', () => {
     });
 
     it('should handle missing optional fields in input', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        timeline: [],
-        people: [],
-        data: [],
-        opinions: [],
-      })));
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse(''),
+      );
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          timeline: [],
+          people: [],
+          data: [],
+          opinions: [],
+        })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Story Title',
@@ -1067,12 +799,17 @@ describe('AIService', () => {
     });
 
     it('should return empty arrays for non-array response fields', async () => {
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        timeline: null,
-        people: 'invalid',
-        data: undefined,
-        opinions: [{ source: 'S', viewpoint: 'V' }],
-      })));
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse('search results'),
+      );
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          timeline: null,
+          people: 'invalid',
+          data: undefined,
+          opinions: [{ source: 'S', viewpoint: 'V' }],
+        })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Story Title',
@@ -1086,7 +823,10 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse(''),
+      );
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Story Title',
@@ -1100,56 +840,38 @@ describe('AIService', () => {
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
 
-    it('should perform two-round web search when tool_calls triggered', async () => {
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [{ id: 'tc1', function: { name: '$web_search', arguments: '{}' } }],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      });
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: { content: 'Latest news summary from search' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 200 },
-        },
-      });
-      mockedAxios.post.mockResolvedValueOnce(mockAIResponse(JSON.stringify({
-        timeline: [{ date: '2025-06-01', event: 'Event', source: 'Source' }],
-        people: [],
-        data: [],
-        opinions: [],
-      })));
+    it('should perform web search via provider tools before generating kit', async () => {
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse('Latest news summary from search'),
+      );
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          timeline: [{ date: '2025-06-01', event: 'Event', source: 'Source' }],
+          people: [],
+          data: [],
+          opinions: [],
+        })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Test',
         storyTags: [],
       });
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(mockChatProvider.chatCompletionWithTools).toHaveBeenCalled();
+      expect(mockChatProvider.chatCompletion).toHaveBeenCalled();
       expect(result.timeline).toHaveLength(1);
       expect(result.timeline[0].date).toBe('2025-06-01');
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
 
     it('should strip markdown json code block from response', async () => {
-      mockedAxios.post.mockResolvedValue({
-        data: {
-          choices: [{
-            message: { content: '```json\n{"timeline":[{"date":"2024-01-01","event":"E1","source":"S1"}],"people":[],"data":[],"opinions":[]}\n```' },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 100 },
-        },
-      });
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse(''),
+      );
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('```json\n{"timeline":[{"date":"2024-01-01","event":"E1","source":"S1"}],"people":[],"data":[],"opinions":[]}\n```'),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Test',
@@ -1179,27 +901,20 @@ describe('AIService', () => {
         },
       });
 
-      mockedAxios.post.mockResolvedValue({
-        data: {
-          choices: [{
-            message: { content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }) },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 100 },
-        },
-      });
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse('search results'),
+      );
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({ timeline: [], people: [], data: [], opinions: [] })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: '香港房屋政策最新變化',
         storyTags: ['housing'],
       });
 
-      // searchLatestNews 也会调用 axios.post，Step 3 的调用在最后
-      const step3Call = mockedAxios.post.mock.calls.find(
-        (call) => call[1]?.messages?.[1]?.content?.includes('【Wikipedia 參考資料】'),
-      );
-      expect(step3Call).toBeDefined();
-      const prompt = step3Call![1].messages[1].content;
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
       expect(prompt).toContain('【Wikipedia 參考資料】');
       expect(prompt).toContain('香港房屋政策');
       expect(prompt).toContain('https://zh.wikipedia.org/wiki/香港房屋政策');
@@ -1212,15 +927,12 @@ describe('AIService', () => {
     it('should gracefully degrade when Wikipedia search fails', async () => {
       mockedAxios.get.mockRejectedValue(new Error('Network timeout'));
 
-      mockedAxios.post.mockResolvedValue({
-        data: {
-          choices: [{
-            message: { content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }) },
-            finish_reason: 'stop',
-          }],
-          usage: { total_tokens: 100 },
-        },
-      });
+      mockChatProvider.chatCompletionWithTools.mockResolvedValue(
+        mockChatResponse(''),
+      );
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({ timeline: [], people: [], data: [], opinions: [] })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Test Topic',
@@ -1229,24 +941,15 @@ describe('AIService', () => {
 
       expect(result.timeline).toEqual([]);
       expect(result.wikipedia).toBeUndefined();
-      expect(mockedAxios.post).toHaveBeenCalled();
+      expect(mockChatProvider.chatCompletion).toHaveBeenCalled();
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
 
-    it('should return fallback when round2 fails in web search flow', async () => {
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          choices: [{
-            message: {
-              content: '',
-              tool_calls: [{ id: 'tc1', function: { name: '$web_search', arguments: '{}' } }],
-            },
-            finish_reason: 'tool_calls',
-          }],
-          usage: { total_tokens: 50 },
-        },
-      });
-      mockedAxios.post.mockRejectedValueOnce(new Error('Round2 timeout'));
+    it('should return fallback when search fails', async () => {
+      mockChatProvider.chatCompletionWithTools.mockRejectedValue(new Error('Search error'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({ timeline: [], people: [], data: [], opinions: [] })),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Test',
@@ -1257,51 +960,6 @@ describe('AIService', () => {
       expect(result.people).toEqual([]);
       expect(result.data).toEqual([]);
       expect(result.opinions).toEqual([]);
-      expect(prisma.aIOperation.create).toHaveBeenCalled();
-    });
-
-    it('should use Tavily search when SEARCH_PROVIDER is tavily', async () => {
-      (service as any).searchProvider = 'tavily';
-
-      const tavilySpy = jest.spyOn(service as any, 'searchLatestNewsWithTavily').mockResolvedValue('Tavily search results');
-      const kimiSpy = jest.spyOn(service as any, 'searchLatestNews');
-
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        timeline: [{ date: '2024-06-01', event: 'E1', source: 'S1' }],
-        people: [],
-        data: [],
-        opinions: [],
-      })));
-
-      const result = await service.generateResearchKit('user-id', {
-        storyTitle: 'Test Topic',
-        storyTags: ['tag1'],
-      });
-
-      expect(tavilySpy).toHaveBeenCalledWith('Test Topic', undefined);
-      expect(kimiSpy).not.toHaveBeenCalled();
-      expect(result.timeline).toHaveLength(1);
-      expect(result.timeline[0].date).toBe('2024-06-01');
-    });
-
-    it('should gracefully degrade when Tavily search fails', async () => {
-      (service as any).searchProvider = 'tavily';
-
-      jest.spyOn(service as any, 'searchLatestNewsWithTavily').mockRejectedValue(new Error('Tavily error'));
-
-      mockedAxios.post.mockResolvedValue(mockAIResponse(JSON.stringify({
-        timeline: [],
-        people: [],
-        data: [],
-        opinions: [],
-      })));
-
-      const result = await service.generateResearchKit('user-id', {
-        storyTitle: 'Test',
-        storyTags: [],
-      });
-
-      expect(result.timeline).toEqual([]);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
   });
