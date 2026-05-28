@@ -4,7 +4,7 @@ export const PLATFORM_METADATA: Record<Platform, PlatformMetadata> = {
   [Platform.WEBSITE]: {
     key: Platform.WEBSITE,
     name: '官网/APP',
-    description: '香港01官方网站和移动应用',
+    description: 'LC 传媒官方网站和移动应用',
     maxTitleLength: 100,
     supportsImages: true,
     supportsVideo: true,

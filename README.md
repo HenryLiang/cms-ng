@@ -1,6 +1,6 @@
 # 01创作大脑 (CMS-NG)
 
-AI驱动的内容创作作业系统，面向香港 01 媒体的新闻编辑团队。以"记者 + AI"协作模式为核心，覆盖选题发现、稿件创作、编辑审核到多平台分发的完整内容生产链路。
+AI驱动的内容创作作业系统，面向媒体机构的新闻编辑团队。以"记者 + AI"协作模式为核心，覆盖选题发现、稿件创作、编辑审核到多平台分发的完整内容生产链路。
 
 ---
 
@@ -14,31 +14,31 @@ cms-ng/
 └── docker-compose.yml # MySQL + Redis 容器编排
 ```
 
-| 层级 | 技术 |
-|------|------|
-| 前端框架 | Next.js 16 (App Router), React 19, TypeScript |
-| 状态管理 | Zustand |
-| 数据请求 | TanStack Query (React Query), Axios |
-| UI 样式 | Tailwind CSS v4, Lucide Icons |
-| 后端框架 | NestJS 11, Express |
-| ORM | Prisma (MySQL 8) |
-| 缓存/队列 | Redis (ioredis) |
-| AI 模型 | Kimi (Moonshot AI) via REST API |
-| 认证 | JWT (@nestjs/jwt) |
-| Monorepo | npm workspaces + Turbo |
+| 层级      | 技术                                          |
+| --------- | --------------------------------------------- |
+| 前端框架  | Next.js 16 (App Router), React 19, TypeScript |
+| 状态管理  | Zustand                                       |
+| 数据请求  | TanStack Query (React Query), Axios           |
+| UI 样式   | Tailwind CSS v4, Lucide Icons                 |
+| 后端框架  | NestJS 11, Express                            |
+| ORM       | Prisma (MySQL 8)                              |
+| 缓存/队列 | Redis (ioredis)                               |
+| AI 模型   | Kimi (Moonshot AI) via REST API               |
+| 认证      | JWT (@nestjs/jwt)                             |
+| Monorepo  | npm workspaces + Turbo                        |
 
 ---
 
 ## 核心功能模块
 
-| 模块 | 功能 |
-|------|------|
-| **记者工作台** | 创建选题、撰写稿件、管理稿件生命周期 |
-| **选题中心** | 热点话题录入、AI 智能选题推荐、Google Trends 热点聚合与一键导入 |
-| **AI 协作创作** | AI 辅助改写、扩写、润色、生成标题/摘要、写作对话 |
-| **编辑审核台** | 稿件审核流程、版本对比、退回修改 |
-| **多平台分发** | 支持网站、Facebook、Instagram、X (Twitter) 多平台发布 |
-| **管理后台** | 用户与角色管理（记者 / 编辑 / 管理员）|
+| 模块                  | 功能                                                            |
+| --------------------- | --------------------------------------------------------------- |
+| **记者工作台**  | 创建选题、撰写稿件、管理稿件生命周期                            |
+| **选题中心**    | 热点话题录入、AI 智能选题推荐、Google Trends 热点聚合与一键导入 |
+| **AI 协作创作** | AI 辅助改写、扩写、润色、生成标题/摘要、写作对话                |
+| **编辑审核台**  | 稿件审核流程、版本对比、退回修改                                |
+| **多平台分发**  | 支持网站、Facebook、Instagram、X (Twitter) 多平台发布           |
+| **管理后台**    | 用户与角色管理（记者 / 编辑 / 管理员）                          |
 
 ---
 
@@ -65,6 +65,7 @@ docker-compose up -d
 ```
 
 这将启动：
+
 - MySQL 8 @ `localhost:3307`，数据库 `cms_ng`，root 密码 `root123`
 - Redis 7 @ `localhost:6379`
 
@@ -174,15 +175,15 @@ TrendingTopic  (热点话题，支持 Google Trends 导入)
 
 ## API 端点概览
 
-| 模块 | 基础路径 |
-|------|----------|
-| 认证 | `POST /auth/login`, `POST /auth/register` |
-| 用户 | `GET /users`, `GET /users/:id` |
-| 选题 | `GET /stories`, `POST /stories`, `GET /stories/:id` |
-| 稿件 | `GET /articles`, `POST /articles`, `GET /articles/:id` |
-| 热点 | `GET /trending-topics`, `POST /trending-topics` |
-| Google Trends | `GET /trending-topics/google-trends?geo=HK&timeRange=24h` |
-| AI | `POST /ai/story-suggestions`, `POST /ai/rewrite`, `POST /ai/polish` 等 |
+| 模块          | 基础路径                                                                     |
+| ------------- | ---------------------------------------------------------------------------- |
+| 认证          | `POST /auth/login`, `POST /auth/register`                                |
+| 用户          | `GET /users`, `GET /users/:id`                                           |
+| 选题          | `GET /stories`, `POST /stories`, `GET /stories/:id`                    |
+| 稿件          | `GET /articles`, `POST /articles`, `GET /articles/:id`                 |
+| 热点          | `GET /trending-topics`, `POST /trending-topics`                          |
+| Google Trends | `GET /trending-topics/google-trends?geo=HK&timeRange=24h`                  |
+| AI            | `POST /ai/story-suggestions`, `POST /ai/rewrite`, `POST /ai/polish` 等 |
 
 ---
 
@@ -248,11 +249,11 @@ cms-ng/
 
 ## 用户角色
 
-| 角色 | 权限 |
-|------|------|
-| REPORTER（记者）| 创建选题、撰写稿件、使用 AI 辅助工具 |
-| EDITOR（编辑）| 审核稿件、分配选题、管理发布流程 |
-| ADMIN（管理员）| 用户管理、系统配置、全部权限 |
+| 角色             | 权限                                 |
+| ---------------- | ------------------------------------ |
+| REPORTER（记者） | 创建选题、撰写稿件、使用 AI 辅助工具 |
+| EDITOR（编辑）   | 审核稿件、分配选题、管理发布流程     |
+| ADMIN（管理员）  | 用户管理、系统配置、全部权限         |
 
 ---
 

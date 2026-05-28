@@ -1196,7 +1196,7 @@ priority 取值说明：
       ? '针对中国内地媒体场景，关键词需考虑简体中文搜索习惯'
       : language === ContentLanguage.ENGLISH
       ? '针对英语媒体场景，关键词需考虑英语搜索习惯'
-      : '针对香港01媒体场景，关键词需考虑繁简体中文搜索习惯';
+      : '针对LC 传媒媒体场景，关键词需考虑繁简体中文搜索习惯';
 
     const prompt = `你是一位资深新闻SEO专家，精通Google搜索算法和中文内容优化。\n\n请对以下新闻稿件进行全面的SEO分析，并给出优化建议。${seoContext}。\n\n稿件标题：${input.title}\n${input.subtitle ? '副标题：' + input.subtitle : ''}\n正文内容：\n${input.content.replace(/<[^>]+>/g, '').slice(0, 3000)}\n\n请输出以下 JSON 格式：\n{\n  "overallScore": 78,\n  "readabilityScore": 82,\n  "optimizedTitle": [\n    {\n      "title": "优化后的标题1",\n      "reasoning": "推荐理由"\n    }\n  ],\n  "metaDescription": "适合搜索引擎摘要的元描述，120字以内",\n  "keywords": [\n    {\n      "keyword": "核心关键词",\n      "searchVolume": "high"\n    }\n  ],\n  "suggestions": [\n    {\n      "category": "标题优化",\n      "priority": "high",\n      "suggestion": "具体优化建议"\n    }\n  ]\n}\n\n字段说明：\n- overallScore: 综合SEO评分（0-100）\n- readabilityScore: 可读性评分（0-100）\n- optimizedTitle: AI建议的优化标题，1-3个选项，每个包含标题和推荐理由\n- metaDescription: 建议的元描述，适合搜索引擎摘要，120字以内\n- keywords: 提取的核心关键词列表，每个包含关键词和搜索热度评估（high/medium/low）\n- suggestions: 具体优化建议列表，按优先级分类（high/medium/low）\n\npriority 取值说明：\n- high：重要问题，建议优先修改\n- medium：一般问题，建议考虑改进\n- low：轻微问题，可酌情优化\n\n注意：${this.getLanguageInstruction(language)}。optimizedTitle 中的标题应当多样化，使用不同角度或风格。keywords 应当包含目标读者常用的搜索词。`;
 

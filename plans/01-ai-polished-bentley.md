@@ -5,6 +5,7 @@
 记者工作台已完成，用户可以创建选题、撰写稿件、管理看板。下一个模块是「选题中心」（PRD 模块二，P0 优先级），核心解决"今天写什么"的问题。MVP 范围包括：热点列表（手动录入）、AI 选题推荐（基础版）、一键立项。
 
 **已有基础可复用：**
+
 - 后端 NestJS CRUD 模块模式（stories/articles）
 - 前端 API 客户端模式（axios + Bearer token）
 - 前端页面结构（侧边栏导航 `/dashboard/stories` 已存在，当前为纯选题列表）
@@ -12,6 +13,7 @@
 - `.env` 中已配置 Kimi API 占位符（需确认 key 是否有效）
 
 **缺失需新建：**
+
 - AI 抽象层（`backend/src/ai/`）— 调用 Kimi API
 - 热点数据模型（`TrendingTopic`）
 - AI 选题推荐接口
@@ -19,6 +21,7 @@
 ## 目标
 
 实现选题中心完整功能：
+
 - 后端：热点话题 CRUD + AI 选题推荐 API（调用 Kimi）
 - 前端：热点列表页（左侧列表 + 右侧详情/AI 推荐面板）+ 一键创建选题
 - 数据库：新增 `TrendingTopic` 表
@@ -28,6 +31,7 @@
 ### Phase 1: 数据库变更
 
 **文件**: `backend/prisma/schema.prisma`
+
 - 新增 `TrendingTopic` 模型：
   - `id`, `title`, `description`, `source`, `heatScore`, `tags`, `status`(OPEN/ADOPTED/ARCHIVED)
   - `suggestedAngles String?` — AI 推荐的角度列表（JSON）
@@ -49,8 +53,9 @@
 3. **`backend/src/ai/dto/story-suggestion.dto.ts`** — AI 建议的数据结构
 
 AI Prompt 设计（供参考）：
+
 ```
-你是一位资深新闻编辑，为香港01媒体的记者提供选题建议。
+你是一位资深新闻编辑，为LC 传媒媒体的记者提供选题建议。
 记者信息：{name}，专长：{expertise}，部门：{department}
 
 请基于当前热点和记者专长，生成 3-5 个选题建议。
@@ -90,22 +95,23 @@ AI Prompt 设计（供参考）：
 ### Phase 4: 前端实现
 
 1. **`frontend/src/lib/topic-api.ts`** — API 客户端函数：
+
    - `getTopics()`, `createTopic()`, `updateTopic()`, `deleteTopic()`
    - `getAISuggestions()` — 获取 AI 选题建议
    - `adoptTopic(topicId)` — 一键采纳为选题
-
 2. **改造 `frontend/src/app/dashboard/stories/page.tsx`** — 从纯选题列表改造为「选题中心」：
+
    - 左侧：热点列表（可手动创建/编辑/删除）
    - 右侧：选中热点的详情面板
    - 面板内显示：标题、描述、来源、热度、AI 推荐角度
    - 「+ 创建选题」按钮 — 一键从热点创建 Story
    - 「AI 推荐选题」按钮 — 调用 AI 接口获取个性化建议
-
 3. **新建 `frontend/src/app/dashboard/stories/suggestions/page.tsx`** — AI 推荐结果页（可选，若集成在主页面则不需要）
 
 ### Phase 5: 验证
 
 **后端验证（cURL）：**
+
 ```bash
 # 创建热点
 curl -X POST http://localhost:3001/trending-topics -H "Authorization: Bearer <token>" -d '{"title":"香港楼市新政","description":"...","heatScore":95}'
@@ -118,6 +124,7 @@ curl -X POST http://localhost:3001/trending-topics/<id>/adopt -H "Authorization:
 ```
 
 **前端验证（浏览器）：**
+
 1. 访问 `/dashboard/stories` → 显示热点列表 + AI 推荐按钮
 2. 点击「AI 推荐选题」→ 显示 AI 生成的 3-5 个选题建议
 3. 点击「采纳」→ 自动创建 Story → 跳转工作台看板

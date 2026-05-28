@@ -19,7 +19,7 @@ export class WebsiteAdapter implements PlatformAdapter {
     excerpt?: string;
     tags: string[];
   }): string {
-    return `请根据以下文章，生成适配「香港01官网/APP」发布的内容。
+    return `请根据以下文章，生成适配「LC 传媒官网/APP」发布的内容。
 
 原文标题：${article.title}
 ${article.subtitle ? '原文副标题：' + article.subtitle : ''}
