@@ -10,30 +10,34 @@ COPY turbo.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY frontend/package*.json ./frontend/
 
-# Install dependencies
-RUN npm ci
-
 # Copy source
 COPY packages/shared/ ./packages/shared/
 COPY frontend/ ./frontend/
 
-# Build shared package
-RUN cd packages/shared && npm run build
+# Fix packageManager conflict and ensure Linux platform deps are installed
+RUN cd /app && \
+    node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));delete p.packageManager;fs.writeFileSync('package.json',JSON.stringify(p,null,2))" && \
+    cd frontend && \
+    node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));delete p.packageManager;fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
 
-# Build frontend
-RUN cd frontend && npm run build
+RUN cd /app && \
+    rm -rf node_modules package-lock.json && \
+    rm -rf frontend/node_modules frontend/package-lock.json && \
+    npm install && \
+    cd /app/packages/shared && npm run build && \
+    cd /app/frontend && npm run build
 
 # Production stage
 FROM node:23-slim
 WORKDIR /app
 
-COPY --from=builder /app/frontend/.next ./.next
-COPY --from=builder /app/frontend/node_modules ./node_modules
-COPY --from=builder /app/frontend/package.json ./
+# Copy standalone output (includes all needed node_modules)
+COPY --from=builder /app/frontend/.next/standalone ./
+COPY --from=builder /app/frontend/.next/static ./.next/static
 COPY --from=builder /app/frontend/public ./public
 
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   ChatCompletionProvider,
@@ -46,6 +47,8 @@ export class AIService {
   private readonly seedreamModel: string;
   private readonly uploadDir: string;
   private readonly searchProvider: string;
+  /** HTTP(S) proxy agent — used when Wikipedia/RSS are blocked by DNS pollution. */
+  private readonly proxyAgent?: HttpsProxyAgent<string>;
 
   constructor(
     private config: ConfigService,
@@ -61,6 +64,13 @@ export class AIService {
       this.config.get<string>('SEEDREAM_MODEL') || 'doubao-seedream-5-0-260128';
     this.uploadDir = this.config.get<string>('UPLOAD_DIR') || './uploads';
     this.searchProvider = this.config.get<string>('SEARCH_PROVIDER') || 'tavily';
+
+    const proxyUrl =
+      this.config.get<string>('HTTP_PROXY') ||
+      this.config.get<string>('http_proxy');
+    if (proxyUrl) {
+      this.proxyAgent = new HttpsProxyAgent(proxyUrl);
+    }
   }
 
   private getLanguageInstruction(language?: ContentLanguage): string {
@@ -742,9 +752,48 @@ type 取值说明：
   }
 
   // ===== Wikipedia 资料增强 =====
+
+  /**
+   * Editorial-style Chinese titles (e.g. "消费级机器人大爆发，我在今年看到的产业新变化")
+   * return zero relevant Wikipedia hits when used verbatim. Extract the core noun-phrase
+   * so that the Wikipedia search API returns genuinely related articles.
+   *
+   * Strategy: strip known editorial filler phrases, then split on sentence-level
+   * punctuation and keep the first substantive segment.
+   */
+  private extractWikipediaKeyword(title: string): string {
+    // Phrases commonly found in Chinese editorial/feature-article titles —
+    // they describe trends or viewpoints, not encyclopedia-worthy topics.
+    const FILLER_PHRASES = [
+      '大爆发', '冷思考', '深度解读', '全面解析', '深度分析',
+      '一文读懂', '一文看懂', '全解读', '大揭秘', '全解析',
+      '产业新变化', '新趋势', '大变局', '新格局', '新风口',
+      '新机遇', '新挑战', '新方向', '新突破', '新赛道',
+      '我在今年看到的', '今年的', '当下的', '当前的', '如今的',
+      '为什么说', '如何看待', '怎么看待', '怎么看',
+      '的背后', '背后', '值得关注', '值得关注的是',
+      '未来将', '未来会', '未来可能',
+    ];
+
+    let text = title;
+    for (const filler of FILLER_PHRASES) {
+      text = text.replaceAll(filler, '');
+    }
+
+    // Split on sentence-level punctuation and trim.
+    const candidates = text
+      .split(/[，,；;。：:！!？?\-—]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 3 && !/^\d+$/.test(s));
+
+    // Pick the first substantive candidate, or fall back to original title.
+    return candidates[0] || title;
+  }
+
   private async searchWikipedia(title: string): Promise<WikipediaEntry[]> {
     const entries: WikipediaEntry[] = [];
     const seenTitles = new Set<string>();
+    const zhKeyword = this.extractWikipediaKeyword(title);
 
     const searchAndFetch = async (
       lang: 'zh' | 'en',
@@ -767,6 +816,7 @@ type 取值说明：
               'User-Agent': 'CMS-NG/1.0 (research@example.com)',
             },
             timeout: 10000,
+            ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
           },
         );
 
@@ -786,6 +836,7 @@ type 取值说明：
                 'User-Agent': 'CMS-NG/1.0 (research@example.com)',
               },
               timeout: 10000,
+              ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
             },
           );
 
@@ -812,11 +863,19 @@ type 取值说明：
       return null;
     };
 
+    // Use the extracted keyword (e.g. "消费级机器人") instead of the full
+    // editorial title — Wikipedia search returns relevant articles for focused
+    // noun-phrases, not for long opinion-style titles.
     // 优先中文，再英文补充
-    const zhEntry = await searchAndFetch('zh', title);
+    const zhEntry = await searchAndFetch('zh', zhKeyword);
     if (zhEntry) entries.push(zhEntry);
 
-    const enEntry = await searchAndFetch('en', title);
+    // For English Wikipedia, try the keyword first; if no results,
+    // fall back to the original title (which may contain English terms).
+    let enEntry = await searchAndFetch('en', zhKeyword);
+    if (!enEntry && zhKeyword !== title) {
+      enEntry = await searchAndFetch('en', title);
+    }
     if (enEntry && !seenTitles.has(enEntry.title)) entries.push(enEntry);
 
     return entries;
