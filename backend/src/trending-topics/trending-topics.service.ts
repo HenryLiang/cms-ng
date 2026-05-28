@@ -15,10 +15,27 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 
 @Injectable()
 export class TrendingTopicsService {
+  private readonly proxyEnabled: boolean;
+  private readonly proxyUrl: string | undefined;
+
   constructor(
     private prisma: PrismaService,
     private aiService: AIService,
-  ) {}
+  ) {
+    this.proxyEnabled = (process.env.RSS_PROXY_ENABLED || '').toLowerCase() === 'true';
+    this.proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+  }
+
+  /**
+   * 根据代理开关返回请求选项。
+   * 开关关闭时返回空对象，即使设置了 HTTP_PROXY 也不使用代理。
+   */
+  private getProxyRequestOptions(): any {
+    if (this.proxyEnabled && this.proxyUrl) {
+      return { agent: new HttpsProxyAgent(this.proxyUrl) };
+    }
+    return {};
+  }
 
   async create(userId: string, dto: CreateTopicDto) {
     const topic = await this.prisma.trendingTopic.create({
@@ -223,11 +240,7 @@ export class TrendingTopicsService {
   ];
 
   async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
-    const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
-    const baseRequestOptions: any = {};
-    if (proxyUrl) {
-      baseRequestOptions.agent = new HttpsProxyAgent(proxyUrl);
-    }
+    const baseRequestOptions = this.getProxyRequestOptions();
 
     const results = await Promise.allSettled(
       this.RSS_FEEDS.map(async (feed) => {
@@ -359,11 +372,7 @@ export class TrendingTopicsService {
     limit = 10,
   ) {
     try {
-      const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
-      const requestOptions: any = {};
-      if (proxyUrl) {
-        requestOptions.agent = new HttpsProxyAgent(proxyUrl);
-      }
+      const requestOptions = this.getProxyRequestOptions();
       const items = await this.fetchSingleGoogleTrends(
         `https://trends.google.com/trending/rss?geo=${geo || 'HK'}`,
         requestOptions,
@@ -380,16 +389,11 @@ export class TrendingTopicsService {
       throw new BadRequestException(`未知的数据源: ${sourceKey}`);
     }
 
-    const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
-    const requestOptions: any = {};
     // RSSHub 本地实例不走代理
-    if (
-      proxyUrl &&
-      !feed.url.includes('localhost') &&
-      !feed.url.includes('127.0.0.1')
-    ) {
-      requestOptions.agent = new HttpsProxyAgent(proxyUrl);
-    }
+    const requestOptions =
+      feed.url.includes('localhost') || feed.url.includes('127.0.0.1')
+        ? {}
+        : this.getProxyRequestOptions();
 
     try {
       let items;

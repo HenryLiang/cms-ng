@@ -114,6 +114,8 @@ cms-ng/
 
 `trending-topics.service.ts` aggregates hot topics from two sources: Google Trends (`google-trends-api` package) and RSS feeds (`rss-parser` with `https-proxy-agent` for proxy support). RSSHub (in `docker-compose.yml` at `:1200`) provides a local RSS aggregator that the service can consume from.
 
+**代理开关**: 海外 RSS 源（Google Trends、BBC、Guardian 等）的代理由 `RSS_PROXY_ENABLED` 环境变量控制。设为 `true` 时才会读取 `HTTP_PROXY` 走代理（开发环境大陆需要），设为 `false` 则直连（生产环境新加坡不需要）。本地 RSSHub 源始终不走代理。
+
 ### Key Backend Conventions
 
 - Each domain module (auth, stories, articles, etc.) has: `<module>.module.ts`, `<module>.controller.ts`, `<module>.service.ts`, `dto/`, and `*.spec.ts` test files co-located.
@@ -163,6 +165,10 @@ SEARCH_PROVIDER="tavily"   # 'tavily' (recommended, all providers) | 'kimi' (AI_
 SEEDREAM_API_KEY="..."
 SEEDREAM_API_BASE="https://ark.cn-beijing.volces.com/api/v3"
 SEEDREAM_MODEL="doubao-seedream-5-0-260128"
+
+# RSS 代理开关: 'true' (大陆开发) | 'false' (海外生产环境)
+RSS_PROXY_ENABLED="false"
+HTTP_PROXY="http://127.0.0.1:7890"
 ```
 
 ### Frontend (`frontend/.env.local`)
