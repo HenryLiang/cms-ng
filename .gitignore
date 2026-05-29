@@ -27,6 +27,7 @@ Thumbs.db
 *.swo
 .codebuddy/
 .understand-anything/
+.lighthouseignore
 
 # Testing
 coverage/
