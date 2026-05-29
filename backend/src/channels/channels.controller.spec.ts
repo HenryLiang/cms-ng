@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChannelsController } from './channels.controller';
 import { ChannelsService } from './channels.service';
+import { WordPressService } from './wordpress.service';
 
 describe('ChannelsController', () => {
   let controller: ChannelsController;
@@ -11,6 +12,9 @@ describe('ChannelsController', () => {
     updatePublish: jest.Mock;
     deletePublish: jest.Mock;
     verifyAccess: jest.Mock;
+  };
+  let wpService: {
+    publish: jest.Mock;
   };
 
   const mockUser = { userId: 'user-1', role: 'REPORTER' };
@@ -25,9 +29,16 @@ describe('ChannelsController', () => {
       verifyAccess: jest.fn().mockResolvedValue(undefined),
     };
 
+    wpService = {
+      publish: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ChannelsController],
-      providers: [{ provide: ChannelsService, useValue: service }],
+      providers: [
+        { provide: ChannelsService, useValue: service },
+        { provide: WordPressService, useValue: wpService },
+      ],
     }).compile();
 
     controller = module.get<ChannelsController>(ChannelsController);
@@ -118,6 +129,27 @@ describe('ChannelsController', () => {
         publishedUrl: 'https://fb.com/post/1',
       });
       expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('POST /channels/:articleId/publish-wordpress', () => {
+    it('should publish to WordPress', async () => {
+      const mockResult = { id: 'p1', status: 'PUBLISHED', publishedUrl: 'https://wuququ.com/post/1' };
+      wpService.publish.mockResolvedValue(mockResult);
+
+      const result = await controller.publishToWordPress(mockUser, 'article-id', {});
+
+      expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
+      expect(wpService.publish).toHaveBeenCalledWith('article-id', 'publish');
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should pass draft status', async () => {
+      wpService.publish.mockResolvedValue({ id: 'p1', status: 'PUBLISHED' });
+
+      await controller.publishToWordPress(mockUser, 'article-id', { wpStatus: 'draft' });
+
+      expect(wpService.publish).toHaveBeenCalledWith('article-id', 'draft');
     });
   });
 

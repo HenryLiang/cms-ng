@@ -34,6 +34,7 @@ export enum Platform {
   XIAOHONGSHU = 'XIAOHONGSHU',
   YOUTUBE = 'YOUTUBE',
   PUSH = 'PUSH',
+  WORDPRESS = 'WORDPRESS',
 }
 
 // ===== 内容语言 =====

@@ -14,6 +14,7 @@ import {
 } from '@cms-ng/shared';
 import { PlatformRegistry } from './platforms/platform-registry';
 import { PLATFORM_METADATA } from './platforms/constants';
+import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()
 export class ChannelsService {
@@ -61,8 +62,8 @@ export class ChannelsService {
 
     return publishes.map((p) => ({
       ...p,
-      adaptedTags: JSON.parse(p.adaptedTags || '[]'),
-      coverImages: JSON.parse(p.coverImages || '[]'),
+      adaptedTags: safeJsonParse(p.adaptedTags, []),
+      coverImages: safeJsonParse(p.coverImages, []),
     }));
   }
 
@@ -115,14 +116,14 @@ export class ChannelsService {
             subtitle: article.subtitle || undefined,
             content: article.content,
             excerpt: article.excerpt || undefined,
-            tags: JSON.parse(article.tags || '[]'),
+            tags: safeJsonParse(article.tags, []),
           })}\n\n额外要求：${customPrompt}`
         : adapter.getAdaptationPrompt({
             title: article.title,
             subtitle: article.subtitle || undefined,
             content: article.content,
             excerpt: article.excerpt || undefined,
-            tags: JSON.parse(article.tags || '[]'),
+            tags: safeJsonParse(article.tags, []),
           });
 
       const rawResult = await this.aiService.chatWithAI(userId, articleId, {
@@ -172,7 +173,7 @@ export class ChannelsService {
       return {
         ...updated,
         adaptedTags: adapted.tags,
-        coverImages: JSON.parse(updated.coverImages || '[]'),
+        coverImages: safeJsonParse(updated.coverImages, []),
       };
     } catch (error: any) {
       // If already updated to READY or FAILED, don't overwrite
@@ -223,8 +224,8 @@ export class ChannelsService {
 
     return {
       ...updated,
-      adaptedTags: JSON.parse(updated.adaptedTags || '[]'),
-      coverImages: JSON.parse(updated.coverImages || '[]'),
+      adaptedTags: safeJsonParse(updated.adaptedTags, []),
+      coverImages: safeJsonParse(updated.coverImages, []),
     };
   }
 

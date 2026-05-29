@@ -8,6 +8,7 @@ import {
   generateAdaptation,
   updatePublish,
   deletePublish,
+  publishToWordPress,
   type PlatformMetadata,
   type PlatformPublish,
 } from '@/lib/channel-api';
@@ -23,6 +24,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
   const [publishes, setPublishes] = useState<PlatformPublish[]>([]);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState<Record<string, boolean>>({});
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
 
   const loadData = useCallback(async () => {
@@ -83,8 +85,23 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
     }
   };
 
+  const handlePublishWordPress = async (wpStatus: 'publish' | 'draft') => {
+    setPublishing(true);
+    setError('');
+    try {
+      const updated = await publishToWordPress(articleId, wpStatus);
+      setPublishes((prev) =>
+        prev.map((p) => (p.platform === Platform.WORDPRESS ? updated : p))
+      );
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const supportedPlatforms = platforms.filter((p) =>
-    [Platform.WEBSITE, Platform.FACEBOOK, Platform.INSTAGRAM, Platform.XIAOHONGSHU].includes(p.key)
+    [Platform.WEBSITE, Platform.FACEBOOK, Platform.INSTAGRAM, Platform.XIAOHONGSHU, Platform.WORDPRESS].includes(p.key)
   );
 
   const getPublishForPlatform = (platform: Platform) =>
@@ -148,7 +165,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
         <div className="mt-4 space-y-3">
           {publishes
             .filter((p) =>
-              [Platform.WEBSITE, Platform.FACEBOOK, Platform.INSTAGRAM, Platform.XIAOHONGSHU].includes(
+              [Platform.WEBSITE, Platform.FACEBOOK, Platform.INSTAGRAM, Platform.XIAOHONGSHU, Platform.WORDPRESS].includes(
                 p.platform as Platform
               )
             )
@@ -159,6 +176,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
                 onRegenerate={() => handleGenerate(publish.platform as Platform)}
                 onDelete={() => handleDelete(publish.id)}
                 onMarkPublished={() => handleMarkPublished(publish.id)}
+                onPublishWordPress={publish.platform === Platform.WORDPRESS ? handlePublishWordPress : undefined}
+                publishing={publishing}
                 regenerating={regenerating[publish.platform] || false}
               />
             ))}

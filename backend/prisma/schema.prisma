@@ -98,7 +98,7 @@ model PlatformPublish {
   coverImages    String        @default("[]")
   scheduledAt    DateTime?
   publishedAt    DateTime?
-  publishedUrl   String?
+  publishedUrl   String?       @db.VarChar(500)
   notes          String?       @db.Text
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

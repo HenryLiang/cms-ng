@@ -97,3 +97,22 @@ export async function deletePublish(articleId: string, publishId: string): Promi
   if (!res.ok) throw new Error('Failed to delete publish');
   return res.json();
 }
+
+export async function publishToWordPress(
+  articleId: string,
+  wpStatus: 'publish' | 'draft' = 'publish',
+): Promise<PlatformPublish> {
+  const res = await fetch(`${API_BASE}/channels/${articleId}/publish-wordpress`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ wpStatus }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(err.message || 'Failed to publish to WordPress');
+  }
+  return res.json();
+}

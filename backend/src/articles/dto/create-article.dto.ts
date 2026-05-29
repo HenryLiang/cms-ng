@@ -30,4 +30,8 @@ export class CreateArticleDto {
   @IsEnum(ContentLanguage)
   @IsOptional()
   contentLanguage?: ContentLanguage;
+
+  @IsString()
+  @IsOptional()
+  coverImage?: string;
 }

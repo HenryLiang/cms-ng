@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()
 export class UsersService {
@@ -25,7 +26,7 @@ export class UsersService {
     });
     return users.map((u) => ({
       ...u,
-      expertise: JSON.parse(u.expertise || '[]'),
+      expertise: safeJsonParse(u.expertise, []),
     }));
   }
 
@@ -65,7 +66,7 @@ export class UsersService {
     if (!user) return null;
     return {
       ...user,
-      expertise: JSON.parse(user.expertise || '[]'),
+      expertise: safeJsonParse(user.expertise, []),
     };
   }
 
@@ -95,7 +96,7 @@ export class UsersService {
 
     return {
       ...user,
-      expertise: JSON.parse(user.expertise || '[]'),
+      expertise: safeJsonParse(user.expertise, []),
     };
   }
 }

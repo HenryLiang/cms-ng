@@ -10,6 +10,7 @@ import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
+import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()
 export class StoriesService {
@@ -193,7 +194,7 @@ export class StoriesService {
     });
     if (!story) throw new NotFoundException('Story not found');
 
-    const tags = JSON.parse(story.tags || '[]') as string[];
+    const tags = safeJsonParse<string[]>(story.tags, []);
 
     return this.aiService.generateResearchKit(userId, {
       storyTitle: story.title,
@@ -216,7 +217,7 @@ export class StoriesService {
     });
     if (!story) throw new NotFoundException('Story not found');
 
-    const tags = JSON.parse(story.tags || '[]') as string[];
+    const tags = safeJsonParse<string[]>(story.tags, []);
 
     // 1. Generate draft using AI with research kit
     const draft = await this.aiService.generateDraft(userId, undefined, {
@@ -250,7 +251,7 @@ export class StoriesService {
   private serializeStory(story: any) {
     return {
       ...story,
-      tags: JSON.parse(story.tags || '[]'),
+      tags: safeJsonParse(story.tags, []),
     };
   }
 }

@@ -108,6 +108,18 @@ export const PLATFORM_METADATA: Record<Platform, PlatformMetadata> = {
     styleGuide:
       '一句话快讯，突出时间性和冲击力。标题必须极度精炼，制造紧迫感或好奇心。',
   },
+  [Platform.WORDPRESS]: {
+    key: Platform.WORDPRESS,
+    name: 'WordPress',
+    description: 'WordPress 博客/网站（API 自动发布）',
+    maxTitleLength: 200,
+    maxContentLength: 50000,
+    supportsImages: true,
+    supportsVideo: true,
+    aspectRatios: ['16:9', '3:2'],
+    styleGuide:
+      'SEO 友好的长文博客格式，标题含关键词，正文结构清晰，适当使用 H2/H3 分段。',
+  },
 };
 
 export const ALL_PLATFORMS = Object.values(Platform);

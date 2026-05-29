@@ -9,15 +9,20 @@ import {
   Query,
 } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
+import { WordPressService } from './wordpress.service';
 import { GenerateAdaptationDto } from './dto/generate-adaptation.dto';
 import { UpdatePublishDto } from './dto/update-publish.dto';
+import { PublishWordPressDto } from './dto/publish-wordpress.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@cms-ng/shared';
 
 @Controller('channels')
 export class ChannelsController {
-  constructor(private channelsService: ChannelsService) {}
+  constructor(
+    private channelsService: ChannelsService,
+    private wordPressService: WordPressService,
+  ) {}
 
   @Get('platforms')
   getPlatforms() {
@@ -57,6 +62,16 @@ export class ChannelsController {
   ) {
     await this.channelsService.verifyAccess(articleId, user);
     return this.channelsService.updatePublish(articleId, publishId, dto);
+  }
+
+  @Post(':articleId/publish-wordpress')
+  async publishToWordPress(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('articleId') articleId: string,
+    @Body() dto: PublishWordPressDto,
+  ) {
+    await this.channelsService.verifyAccess(articleId, user);
+    return this.wordPressService.publish(articleId, dto.wpStatus || 'publish');
   }
 
   @Delete(':articleId/publishes/:publishId')

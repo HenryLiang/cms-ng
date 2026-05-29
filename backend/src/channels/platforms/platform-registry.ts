@@ -4,6 +4,7 @@ import { WebsiteAdapter } from './adapters/website.adapter';
 import { FacebookAdapter } from './adapters/facebook.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
 import { XiaohongshuAdapter } from './adapters/xiaohongshu.adapter';
+import { WordPressAdapter } from './adapters/wordpress.adapter';
 
 export class PlatformRegistry {
   private static adapters = new Map<Platform, PlatformAdapter>([
@@ -11,6 +12,7 @@ export class PlatformRegistry {
     [Platform.FACEBOOK, new FacebookAdapter()],
     [Platform.INSTAGRAM, new InstagramAdapter()],
     [Platform.XIAOHONGSHU, new XiaohongshuAdapter()],
+    [Platform.WORDPRESS, new WordPressAdapter()],
   ]);
 
   static getAdapter(platform: Platform): PlatformAdapter | undefined {

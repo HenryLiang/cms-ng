@@ -10,6 +10,7 @@ import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
 import { UserRole } from '@cms-ng/shared';
+import { safeJsonParse } from '../common/json.utils';
 import Parser from 'rss-parser';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
@@ -124,7 +125,7 @@ export class TrendingTopicsService {
       select: { title: true },
     });
 
-    const expertise = JSON.parse(user.expertise || '[]');
+    const expertise = safeJsonParse<string[]>(user.expertise, []);
 
     return this.aiService.generateStorySuggestions(
       userId,
@@ -152,7 +153,7 @@ export class TrendingTopicsService {
         title: topic.title,
         description: topic.description,
         angle: topic.suggestedAngles
-          ? JSON.parse(topic.suggestedAngles)[0]
+          ? safeJsonParse<string[]>(topic.suggestedAngles, [])[0]
           : undefined,
         status: 'DRAFT',
         priority: topic.heatScore >= 80 ? 2 : topic.heatScore >= 50 ? 1 : 0,
@@ -492,9 +493,9 @@ export class TrendingTopicsService {
   private serializeTopic(topic: any) {
     return {
       ...topic,
-      tags: JSON.parse(topic.tags || '[]'),
+      tags: safeJsonParse(topic.tags, []),
       suggestedAngles: topic.suggestedAngles
-        ? JSON.parse(topic.suggestedAngles)
+        ? safeJsonParse(topic.suggestedAngles, [] as string[])
         : undefined,
     };
   }

@@ -9,6 +9,7 @@ import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
+import { safeJsonParse } from '../common/json.utils';
 import {
   RewriteTextDto,
   ExpandTextDto,
@@ -164,6 +165,7 @@ export class ArticlesService {
         excerpt: dto.excerpt,
         status: dto.status,
         editorId: dto.editorId,
+        coverImage: dto.coverImage,
         tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
         contentLanguage: dto.contentLanguage,
         version: newVersion,
@@ -426,7 +428,7 @@ export class ArticlesService {
       storyTitle: story.title,
       storyDescription: story.description || undefined,
       storyAngle: story.angle || undefined,
-      storyTags: JSON.parse(story.tags || '[]'),
+      storyTags: safeJsonParse(story.tags, []),
       currentTitle: article.title,
       currentSubtitle: article.subtitle || undefined,
       instruction: dto.instruction,
@@ -588,9 +590,9 @@ export class ArticlesService {
   private serializeArticle(article: any) {
     return {
       ...article,
-      tags: JSON.parse(article.tags || '[]'),
-      platforms: JSON.parse(article.platforms || '[]'),
-      aiGeneratedParts: JSON.parse(article.aiGeneratedParts || '[]'),
+      tags: safeJsonParse(article.tags, []),
+      platforms: safeJsonParse(article.platforms, []),
+      aiGeneratedParts: safeJsonParse(article.aiGeneratedParts, []),
     };
   }
 }
