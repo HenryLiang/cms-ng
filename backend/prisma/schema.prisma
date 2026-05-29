@@ -27,6 +27,7 @@ model User {
   articles    Article[] @relation("AuthorArticles")
   editedArticles Article[] @relation("EditorArticles")
   aiOperations AIOperation[]
+  autoPublishTasks AutoPublishTask[]
 
   @@map("users")
 }
@@ -164,6 +165,8 @@ enum ArticleStatus {
   APPROVED
   PUBLISHED
   ARCHIVED
+  PIPELINE_FAILED
+  AUTO_PUBLISHED
 }
 
 enum AgentType {
@@ -206,4 +209,109 @@ model TrendingTopic {
   updatedAt       DateTime    @updatedAt
 
   @@map("trending_topics")
+}
+
+// ─── Auto-Publishing Pipeline ───
+
+enum AutoTaskStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum ScheduleType {
+  FIXED_TIME
+  INTERVAL
+  CRON
+}
+
+enum RunStatus {
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+enum ArticleRunStatus {
+  PENDING
+  TOPIC_SELECTED
+  RESEARCHED
+  DRAFTED
+  IMAGED
+  SAVED
+  PUBLISHED
+  FAILED
+  WITHDRAWN
+}
+
+enum TriggerType {
+  SCHEDULED
+  MANUAL
+}
+
+model AutoPublishTask {
+  id             String         @id @default(uuid())
+  name           String
+  description    String?        @db.Text
+  status         AutoTaskStatus @default(PAUSED)
+  scheduleType   ScheduleType   @default(FIXED_TIME)
+  scheduleConfig String         @db.Text
+  topicStrategy  String         @db.Text
+  contentConfig  String         @db.Text
+  filterConfig   String         @db.Text
+  publishConfig  String         @db.Text
+  batchSize      Int            @default(1)
+  retryConfig    String         @db.Text
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  createdBy  String
+  user       User               @relation(fields: [createdBy], references: [id])
+  runs       AutoPublishRun[]
+  articles   AutoPublishArticle[]
+
+  @@map("auto_publish_tasks")
+}
+
+model AutoPublishRun {
+  id            String      @id @default(uuid())
+  status        RunStatus   @default(RUNNING)
+  startedAt     DateTime    @default(now())
+  completedAt   DateTime?
+  totalArticles Int         @default(0)
+  successCount  Int         @default(0)
+  failedCount   Int         @default(0)
+  errorLog      String?     @db.Text
+  triggerType   TriggerType @default(SCHEDULED)
+
+  // Relations
+  taskId   String
+  task     AutoPublishTask     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  articles AutoPublishArticle[]
+
+  @@map("auto_publish_runs")
+}
+
+model AutoPublishArticle {
+  id                String           @id @default(uuid())
+  status            ArticleRunStatus @default(PENDING)
+  topic             String?
+  articleId         String?
+  platformPublishId String?
+  failedStep        String?
+  errorMessage      String?          @db.Text
+  retryCount        Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Relations
+  runId  String
+  run    AutoPublishRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  taskId String
+  task   AutoPublishTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("auto_publish_articles")
 }

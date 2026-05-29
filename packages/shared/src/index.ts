@@ -21,6 +21,8 @@ export enum ArticleStatus {
   APPROVED = 'APPROVED',     // 审核通过
   PUBLISHED = 'PUBLISHED',   // 已发布
   ARCHIVED = 'ARCHIVED',     // 已归档
+  PIPELINE_FAILED = 'PIPELINE_FAILED', // 管道失败（自动发布半成品）
+  AUTO_PUBLISHED = 'AUTO_PUBLISHED',   // 自动发布
 }
 
 // ===== 平台类型 =====
@@ -164,6 +166,136 @@ export interface AIOperation {
   durationMs: number;
   createdBy: string;
   createdAt: Date;
+}
+
+// ===== 自动发布任务状态 =====
+export enum AutoTaskStatus {
+  ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
+  DISABLED = 'DISABLED',
+}
+
+// ===== 调度类型 =====
+export enum ScheduleType {
+  FIXED_TIME = 'FIXED_TIME',
+  INTERVAL = 'INTERVAL',
+  CRON = 'CRON',
+}
+
+// ===== 运行状态 =====
+export enum RunStatus {
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  PARTIAL = 'PARTIAL',
+  FAILED = 'FAILED',
+}
+
+// ===== 文章运行状态 =====
+export enum ArticleRunStatus {
+  PENDING = 'PENDING',
+  TOPIC_SELECTED = 'TOPIC_SELECTED',
+  RESEARCHED = 'RESEARCHED',
+  DRAFTED = 'DRAFTED',
+  IMAGED = 'IMAGED',
+  SAVED = 'SAVED',
+  PUBLISHED = 'PUBLISHED',
+  FAILED = 'FAILED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+// ===== 触发类型 =====
+export enum TriggerType {
+  SCHEDULED = 'SCHEDULED',
+  MANUAL = 'MANUAL',
+}
+
+// ===== 自动发布任务配置接口 =====
+export interface AutoPublishScheduleConfig {
+  times: string[];
+  timezone: string;
+}
+
+export interface AutoPublishTopicStrategy {
+  fixedKeywords: string[];
+  useTrending: boolean;
+  trendingSources: string[];
+}
+
+export interface AutoPublishContentConfig {
+  style: string;
+  maxLength: number;
+  language: ContentLanguage;
+  systemPrompt?: string;
+}
+
+export interface AutoPublishFilterConfig {
+  blockedCategories: string[];
+  blockedKeywords: string[];
+  allowedChannels: string[];
+}
+
+export interface AutoPublishPublishConfig {
+  platform: Platform;
+  wordpressSiteId?: string;
+  category?: string;
+  postStatus?: string;
+}
+
+export interface AutoPublishRetryConfig {
+  maxRetries: number;
+  retryDelayMs: number;
+}
+
+// ===== 自动发布任务 =====
+export interface AutoPublishTask {
+  id: string;
+  name: string;
+  description?: string;
+  status: AutoTaskStatus;
+  scheduleType: ScheduleType;
+  scheduleConfig: AutoPublishScheduleConfig;
+  topicStrategy: AutoPublishTopicStrategy;
+  contentConfig: AutoPublishContentConfig;
+  filterConfig: AutoPublishFilterConfig;
+  publishConfig: AutoPublishPublishConfig;
+  batchSize: number;
+  retryConfig: AutoPublishRetryConfig;
+  lastRunAt?: Date;
+  nextRunAt?: Date;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ===== 自动发布运行记录 =====
+export interface AutoPublishRun {
+  id: string;
+  taskId: string;
+  status: RunStatus;
+  startedAt: Date;
+  completedAt?: Date;
+  totalArticles: number;
+  successCount: number;
+  failedCount: number;
+  errorLog?: string;
+  triggerType: TriggerType;
+  articles?: AutoPublishArticle[];
+}
+
+// ===== 自动发布文章追踪 =====
+export interface AutoPublishArticle {
+  id: string;
+  runId: string;
+  taskId: string;
+  status: ArticleRunStatus;
+  topic?: string;
+  articleId?: string;
+  platformPublishId?: string;
+  failedStep?: string;
+  errorMessage?: string;
+  retryCount: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ===== API响应格式 =====

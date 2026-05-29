@@ -225,16 +225,17 @@ export class WordPressService {
         throw new Error(`WordPress API 错误 (${res.status}): ${errorText}`);
       }
 
-      const wpPost = await res.json() as { id: number; link: string };
+      const wpPost = await res.json() as { id: number; link: string; slug: string };
 
       // 更新 PlatformPublish 记录
+      // notes 存储 wpPostId 以便撤回时直接删除
       const updated = await this.prisma.platformPublish.update({
         where: { id: publish.id },
         data: {
           status: PublishStatus.PUBLISHED,
           publishedUrl: wpPost.link,
           publishedAt: new Date(),
-          notes: null,
+          notes: JSON.stringify({ wpPostId: wpPost.id, wpSlug: wpPost.slug }),
         },
       });
 
@@ -255,6 +256,111 @@ export class WordPressService {
         },
       });
       throw new BadRequestException(`WordPress 发布失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 从 WordPress 删除/下架文章。
+   * 优先使用 publish 时存储的 wpPostId，否则从 URL 提取 slug 查找。
+   * @param publishedUrl 已发布文章的 URL
+   * @param publishNotes publish 时存储在 notes 字段的 JSON（含 wpPostId, wpSlug）
+   */
+  async deletePost(publishedUrl: string, publishNotes?: string | null): Promise<void> {
+    this.ensureConfigured();
+
+    if (!publishedUrl) {
+      this.logger.warn('No published URL provided for deletion');
+      return;
+    }
+
+    const auth = this.getAuthHeader();
+
+    // 1. Try to get wpPostId from stored notes
+    if (publishNotes) {
+      const stored = safeJsonParse<{ wpPostId?: number; wpSlug?: string }>(publishNotes, {});
+      if (stored.wpPostId) {
+        const deleted = await this.tryDeleteById(stored.wpPostId, auth);
+        if (deleted) return;
+      }
+    }
+
+    // 2. Try to extract post ID from plain permalink URL (e.g., ?p=74)
+    const plainMatch = publishedUrl.match(/[?&]p=(\d+)/);
+    if (plainMatch) {
+      const deleted = await this.tryDeleteById(Number(plainMatch[1]), auth);
+      if (deleted) return;
+    }
+
+    // 3. Fallback: extract slug from URL and look up via REST API
+    const slug = this.extractSlugFromUrl(publishedUrl);
+    if (slug) {
+      try {
+        const lookupRes = await this.fetchWithTimeout(
+          `${this.siteUrl}/wp-json/wp/v2/posts?slug=${encodeURIComponent(slug)}&per_page=1`,
+          { headers: { Authorization: auth } },
+        );
+        if (lookupRes.ok) {
+          const posts = await lookupRes.json() as Array<{ id: number }>;
+          if (posts.length > 0) {
+            await this.tryDeleteById(posts[0].id, auth);
+            return;
+          }
+        }
+      } catch (error: any) {
+        this.logger.warn(`Error looking up post by slug "${slug}": ${error.message}`);
+      }
+    }
+
+    this.logger.warn(`Cannot delete WordPress post from URL: ${publishedUrl} (no match)`);
+  }
+
+  /**
+   * Try to delete a WordPress post by ID. Returns true if successful.
+   */
+  private async tryDeleteById(postId: number, auth: string): Promise<boolean> {
+    try {
+      const res = await this.fetchWithTimeout(
+        `${this.siteUrl}/wp-json/wp/v2/posts/${postId}?force=true`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: auth },
+        },
+      );
+      if (res.ok) {
+        this.logger.log(`WordPress post ${postId} deleted`);
+        return true;
+      }
+      const errorBody = await res.text();
+      this.logger.warn(`WordPress DELETE post/${postId} failed (${res.status}): ${errorBody}`);
+      return false;
+    } catch (error: any) {
+      this.logger.warn(`Error deleting WordPress post ${postId}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Extract the slug from a WordPress URL.
+   * Supports pretty permalinks like /2026/05/29/my-post/ and /my-post/
+   */
+  private extractSlugFromUrl(url: string): string | null {
+    try {
+      const pathname = new URL(url).pathname;
+      // Remove trailing slash and get last segment
+      const segments = pathname.replace(/\/$/, '').split('/');
+      const lastSegment = segments[segments.length - 1];
+      // Filter out numeric-only segments (dates, IDs)
+      if (lastSegment && !/^\d+$/.test(lastSegment)) {
+        return lastSegment;
+      }
+      // If last is numeric (e.g., /2026/05/29/my-post/ → "29"), try the segment before
+      if (segments.length >= 2) {
+        const prev = segments[segments.length - 2];
+        if (prev && !/^\d+$/.test(prev)) return prev;
+      }
+      return null;
+    } catch {
+      return null;
     }
   }
 }

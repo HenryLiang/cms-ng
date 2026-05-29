@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **01创作大脑 (CMS-NG)** — AI-driven content creation system for Hong Kong 01 media's newsroom. A monorepo covering story discovery, article writing with AI collaboration, editorial review, and multi-platform distribution.
 
-- **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS v4 + TipTap rich text editor
-- **Backend**: NestJS 11 + Prisma ORM + MySQL 8 + Redis
+- **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS v4 + TipTap rich text editor + Lucide icons
+- **Backend**: NestJS 11 + Prisma ORM + MySQL 8 + Redis (ioredis)
+- **Auth**: JWT via Passport (`@nestjs/passport` + `passport-jwt`)
 - **Shared**: `@cms-ng/shared` package (`packages/shared/`) for enums and interfaces used by both frontend and backend
 - **i18n**: Content-level language support via `ContentLanguage` enum: `SIMPLIFIED_CHINESE`, `TRADITIONAL_CHINESE_HK`, `TRADITIONAL_CHINESE_CANTONESE`, `ENGLISH`
 
@@ -68,10 +69,11 @@ cms-ng/
 ├── frontend/
 │   └── src/
 │       ├── app/           # Next.js App Router: /login, /register, /dashboard/*
-│       ├── components/    # UI components (rich-text-editor, role-guard, AI panels)
+│       ├── components/    # UI components: rich-text-editor, role-guard, AI panels, channels/
 │       ├── lib/           # API clients: api.ts (base Axios), article-api.ts, story-api.ts, etc.
 │       ├── hooks/         # use-role-guard, use-protected-route
 │       ├── store/         # Zustand: auth-store.ts (persisted to localStorage)
+│       ├── test/          # Test setup (setup.ts with localStorage mock)
 │       └── types/         # Frontend-specific types (auth.ts, etc.)
 ├── backend/
 │   ├── src/
@@ -80,9 +82,10 @@ cms-ng/
 │   │   ├── stories/       # Story/topic lifecycle
 │   │   ├── articles/      # Article CRUD, versioning, review workflow
 │   │   ├── ai/            # AI service + tool registry (see AI Layer below)
-│   │   ├── channels/      # Multi-platform publishing (platform adapters)
+│   │   ├── channels/      # Multi-platform publishing (platform adapters + WordPress service)
 │   │   ├── trending-topics/ # Hot topic aggregation (Google Trends + RSS)
-│   │   ├── common/        # Guards, interceptors, filters, test-helpers
+│   │   ├── common/        # Guards, interceptors, filters, test-helpers, json.utils
+│   │   ├── types/         # Backend-specific type definitions
 │   │   └── prisma/        # PrismaService singleton
 │   ├── prisma/
 │   │   ├── schema.prisma  # Single source of truth for DB schema
@@ -108,7 +111,30 @@ cms-ng/
 
 ### Platform Publishing (Channels)
 
-`backend/src/channels/platforms/` uses an adapter pattern: `platform.adapter.ts` defines the interface, `adapters/` contains per-platform implementations (Facebook, Instagram, X, etc.), and `platform-registry.ts` maps `Platform` enum values to adapter instances. Articles go through `PlatformPublish` records with per-platform adapted title/content/excerpt.
+`backend/src/channels/` has two layers:
+
+1. **Platform adapters** (`platforms/`): Adapter pattern — `platform.adapter.ts` defines the interface, `adapters/` contains per-platform implementations (Facebook, Instagram, X/Twitter, Threads, LinkedIn, YouTube, Website, WordPress, Xiaohongshu/小红书, Push), and `platform-registry.ts` maps `Platform` enum values to adapter instances. Articles go through `PlatformPublish` records with per-platform adapted title/content/excerpt.
+
+2. **WordPress service** (`wordpress.service.ts`): Dedicated service for WordPress REST API integration (publishing articles to WordPress sites).
+
+### Auto-Publishing System
+
+Automated content pipeline for scheduled/triggered article publishing without human intervention:
+
+- **Core entities** (in `packages/shared/`):
+  - `AutoPublishTask` — Task configuration (schedule, topic strategy, content config, filter rules, publish target)
+  - `AutoPublishRun` — Execution record for a task run (status, counts, error logs)
+  - `AutoPublishArticle` — Individual article tracking through the pipeline
+- **Article lifecycle in auto-publish**: `PENDING → TOPIC_SELECTED → RESEARCHED → DRAFTED → IMAGED → SAVED → PUBLISHED` (can fail at any step, tracked in `failedStep`)
+- **Schedule types**: `FIXED_TIME` (specific times), `INTERVAL` (every N hours), `CRON` (cron expressions)
+- **Trigger types**: `SCHEDULED` (timer-based) | `MANUAL` (user-initiated)
+- **Config components**:
+  - `AutoPublishScheduleConfig` — When to run (times, timezone)
+  - `AutoPublishTopicStrategy` — How to select topics (fixed keywords, trending sources)
+  - `AutoPublishContentConfig` — Content generation params (style, max length, language, system prompt)
+  - `AutoPublishFilterConfig` — Content filters (blocked categories/keywords, allowed channels)
+  - `AutoPublishPublishConfig` — Target platform/WordPress site
+  - `AutoPublishRetryConfig` — Retry policy on failure
 
 ### Trending Topics
 
@@ -122,6 +148,8 @@ cms-ng/
 - `PrismaService` extends `PrismaClient` and is provided globally via `PrismaModule`.
 - Use `@cms-ng/shared` enums rather than redefining status/role values in either app.
 - The shared package must be built (`cd packages/shared && npm run build`) before backend/frontend can import from it. Turbo's `^build` dependency handles this automatically during `npm run build` / `npm run test`.
+- **JSON string arrays**: Schema fields like `tags`, `platforms`, `aiGeneratedParts`, `coverImages`, `adaptedTags`, and `expertise` are stored as JSON strings (`@default("[]")`), not native arrays. Always use `safeJsonParse<T>()` from `src/common/json.utils.ts` to parse them safely (returns fallback on parse failure).
+- **API responses**: Use the `ApiResponse<T>` generic interface from `@cms-ng/shared` for standardized responses: `{ success: boolean, data?: T, error?: { code, message }, meta?: { page, pageSize, total } }`.
 
 ### Key Frontend Conventions
 
@@ -191,5 +219,5 @@ RSSHub: `docker-compose up -d rsshub` (port `1200`) — optional, used by trendi
 - **Node version**: v23.9.0. Some packages log engine warnings but function correctly.
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.
-- **Article status workflow**: `DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED` (can be sent back to `REVISION` from review states). Editors and admins can approve; reporters can only submit for review.
+- **Article status workflow**: `DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED → ARCHIVED` (can be sent back to `REVISION` from review states). Additional states: `PIPELINE_FAILED` (auto-publish pipeline failures), `AUTO_PUBLISHED` (articles published via automation without human review). Editors and admins can approve; reporters can only submit for review.
 - **Production deploy**: `docker-compose.prod.yml` builds backend + frontend containers. `scripts/update-cms-ng.sh` is a one-command deploy script (backup → pull → build → migrate → restart).
