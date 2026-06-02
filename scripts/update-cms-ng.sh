@@ -29,6 +29,22 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
+# 校验 backend/.env（compose 通过 env_file 读取）存在且含必要变量
+BACKEND_ENV="$PROJECT_DIR/backend/.env"
+if [ ! -f "$BACKEND_ENV" ]; then
+    # 首次部署 / 目录尚未创建时仅提示，不中断；恢复步骤会从备份回填
+    echo "Warning: $BACKEND_ENV 不存在，稍后从备份恢复或首次部署时需手动放置"
+    echo "         模板见 backend/.env.example"
+else
+    for var in DATABASE_URL REDIS_URL JWT_SECRET KIMI_API_KEY; do
+        if ! grep -qE "^${var}=" "$BACKEND_ENV"; then
+            echo "Error: $BACKEND_ENV 缺少 $var (backend 容器将拿到空值)"
+            echo "       模板见 backend/.env.example"
+            exit 1
+        fi
+    done
+fi
+
 # ---------- 1. 备份当前部署 ----------
 echo "[1/7] 备份当前部署 -> $BACKUP_DIR"
 if [ -d "$PROJECT_DIR" ]; then
@@ -138,10 +154,18 @@ echo ""
 echo "[3/7] 恢复环境配置"
 cd "$PROJECT_DIR"
 
-# 恢复 .env 文件（如果有备份）
-if [ -f "$BACKUP_DIR/.env" ]; then
-    cp "$BACKUP_DIR/.env" "$PROJECT_DIR/.env"
-    echo "      .env 已恢复"
+# 恢复 backend/.env（git pull / zipball 不带它进来，因为已 gitignore）
+if [ -f "$BACKUP_DIR/backend/.env" ]; then
+    mkdir -p "$PROJECT_DIR/backend"
+    cp "$BACKUP_DIR/backend/.env" "$PROJECT_DIR/backend/.env"
+    echo "      backend/.env 已恢复"
+fi
+
+# 兼容旧版本：也恢复 frontend/.env.local（若存在）
+if [ -f "$BACKUP_DIR/frontend/.env.local" ]; then
+    mkdir -p "$PROJECT_DIR/frontend"
+    cp "$BACKUP_DIR/frontend/.env.local" "$PROJECT_DIR/frontend/.env.local"
+    echo "      frontend/.env.local 已恢复"
 fi
 
 # 确保 docker-compose.prod.yml 端口正确
@@ -165,11 +189,20 @@ echo "      服务已启动"
 # ---------- 6. 数据库迁移 ----------
 echo ""
 echo "[6/7] 执行数据库迁移..."
-sleep 8
+
+# 等待 backend 容器进入可 exec 状态（最多 ~30s）
+# MySQL 已外部部署、应处于稳态，无需等待容器内 mysqld 启动
+for i in {1..15}; do
+    if docker compose -f "$COMPOSE_FILE" exec -T backend node -e "process.exit(0)" 2>/dev/null; then
+        break
+    fi
+    sleep 2
+done
+
 if docker compose -f "$COMPOSE_FILE" exec -T backend npx prisma migrate deploy 2>&1; then
     echo "      迁移完成"
 else
-    echo "      Warning: 迁移执行失败，请手动检查"
+    echo "      Warning: 迁移执行失败，请手动检查 (常见原因：DATABASE_URL 不可达 / .env 未挂入容器)"
 fi
 
 # ---------- 7. 验证 ----------

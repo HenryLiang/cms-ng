@@ -35,7 +35,14 @@ coverage/
 
 # Claude Code / Playwright temp files
 .playwright-mcp/
+.playwright-cli/
 .claude/
+
+# Playwright test runtime artifacts (re-generated on each run)
+tests/regression/results/
+
+# One-off debug screenshots (not test fixtures)
+login-page.png
 
 # Keep example env files
 !.env.example

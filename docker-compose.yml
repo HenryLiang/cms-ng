@@ -1,30 +1,8 @@
-version: '3.8'
+# 外部依赖（MySQL / Redis）不在 compose 内编排，请在宿主或独立服务器上单独部署。
+# 本文件仅承载本地开发用的 RSSHub 聚合代理。
+# 应用本身（frontend / backend）在 dev 环境通过 `npm run dev` 直跑，不进容器。
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: cms-ng-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: cms_ng
-      MYSQL_CHARACTER_SET_SERVER: utf8mb4
-      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
-
-  redis:
-    image: redis:7-alpine
-    container_name: cms-ng-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
   rsshub:
     image: diygod/rsshub:latest
     container_name: cms-ng-rsshub
@@ -34,7 +12,3 @@ services:
     environment:
       NODE_ENV: production
       CACHE_TYPE: memory
-
-volumes:
-  mysql_data:
-  redis_data:

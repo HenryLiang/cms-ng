@@ -21,7 +21,8 @@ npm run dev          # Start all services (frontend :3000 + backend :3001)
 npm run build        # Build all packages (respects Turbo dependency order)
 npm run lint         # Lint all packages
 npm run test         # Run all tests
-npm run db:seed      # Seed DB — runs backend/prisma/seed.ts (file may not exist; check first)
+npm run db:seed      # Wired in package.json (runs backend/prisma/seed.ts) but the seed file
+                     # is NOT currently committed — the command will fail until it's added.
 ```
 
 Turbo task config (`turbo.json`): `build` and `test` have `dependsOn: ["^build"]` — the shared package is built before backend/frontend tests run.
@@ -83,7 +84,9 @@ cms-ng/
 │   │   ├── articles/      # Article CRUD, versioning, review workflow
 │   │   ├── ai/            # AI service + tool registry (see AI Layer below)
 │   │   ├── channels/      # Multi-platform publishing (platform adapters + WordPress service)
+│   │   ├── auto-publish/  # Scheduled/triggered publishing pipeline (see Auto-Publishing below)
 │   │   ├── trending-topics/ # Hot topic aggregation (Google Trends + RSS)
+│   │   ├── redis/         # RedisService wrapper around ioredis (cache + transient state)
 │   │   ├── common/        # Guards, interceptors, filters, test-helpers, json.utils
 │   │   ├── types/         # Backend-specific type definitions
 │   │   └── prisma/        # PrismaService singleton
@@ -94,8 +97,8 @@ cms-ng/
 ├── packages/shared/src/index.ts  # Shared enums: UserRole, ArticleStatus, Platform,
 │                                 #   ContentLanguage, PublishStatus, AgentType
 │                                 # Shared interfaces: User, Story, Article, PlatformPublish, etc.
-├── docker-compose.yml            # Dev: MySQL :3307, Redis :6379, RSSHub :1200
-├── docker-compose.prod.yml       # Prod: adds backend + frontend containers
+├── docker-compose.yml            # Dev: RSSHub :1200 only (MySQL/Redis are external)
+├── docker-compose.prod.yml       # Prod: backend + frontend containers; backend reads env from backend/.env via env_file
 └── scripts/update-cms-ng.sh      # One-command production deploy/update script
 ```
 
@@ -113,19 +116,22 @@ cms-ng/
 
 `backend/src/channels/` has two layers:
 
-1. **Platform adapters** (`platforms/`): Adapter pattern — `platform.adapter.ts` defines the interface, `adapters/` contains per-platform implementations (Facebook, Instagram, X/Twitter, Threads, LinkedIn, YouTube, Website, WordPress, Xiaohongshu/小红书, Push), and `platform-registry.ts` maps `Platform` enum values to adapter instances. Articles go through `PlatformPublish` records with per-platform adapted title/content/excerpt.
+1. **Platform adapters** (`platforms/`): Adapter pattern — `platform.adapter.ts` defines the interface and `platform-registry.ts` maps `Platform` enum values to adapter instances. Currently registered adapters: **Website, Facebook, Instagram, Xiaohongshu (小红书), WordPress** (`adapters/*.adapter.ts`). The `Platform` enum in `@cms-ng/shared` also lists `X`, `THREADS`, `LINKEDIN`, `YOUTUBE`, `PUSH` — these are reserved values with no adapter implementation yet; calling `PlatformRegistry.getAdapter()` returns `undefined` for them. Articles go through `PlatformPublish` records with per-platform adapted title/content/excerpt.
 
 2. **WordPress service** (`wordpress.service.ts`): Dedicated service for WordPress REST API integration (publishing articles to WordPress sites).
 
 ### Auto-Publishing System
 
-Automated content pipeline for scheduled/triggered article publishing without human intervention:
+Automated content pipeline for scheduled/triggered article publishing without human intervention. Implementation lives in `backend/src/auto-publish/`:
 
-- **Core entities** (in `packages/shared/`):
+- **`auto-publish.service.ts`** — CRUD over `AutoPublishTask` / `AutoPublishRun` / `AutoPublishArticle` and manual-trigger entry point.
+- **`auto-publish-scheduler.service.ts`** — Uses `@nestjs/schedule` to fire tasks on `FIXED_TIME` / `INTERVAL` / `CRON` schedules and hand them to the pipeline.
+- **`pipeline/pipeline.service.ts`** + **`pipeline/steps/`** — The pipeline is a sequence of step classes implementing `step.interface.ts`. Each step advances an `AutoPublishArticle` through one stage of the lifecycle below; failures are recorded in `failedStep` and the run continues to the next article.
+- **Core entities** (defined in `packages/shared/`):
   - `AutoPublishTask` — Task configuration (schedule, topic strategy, content config, filter rules, publish target)
   - `AutoPublishRun` — Execution record for a task run (status, counts, error logs)
   - `AutoPublishArticle` — Individual article tracking through the pipeline
-- **Article lifecycle in auto-publish**: `PENDING → TOPIC_SELECTED → RESEARCHED → DRAFTED → IMAGED → SAVED → PUBLISHED` (can fail at any step, tracked in `failedStep`)
+- **Article lifecycle**: `PENDING → TOPIC_SELECTED → RESEARCHED → DRAFTED → IMAGED → SAVED → PUBLISHED` (can fail at any step, tracked in `failedStep`)
 - **Schedule types**: `FIXED_TIME` (specific times), `INTERVAL` (every N hours), `CRON` (cron expressions)
 - **Trigger types**: `SCHEDULED` (timer-based) | `MANUAL` (user-initiated)
 - **Config components**:
@@ -153,20 +159,21 @@ Automated content pipeline for scheduled/triggered article publishing without hu
 
 ### Key Frontend Conventions
 
-- App Router routes: `app/login`, `app/register`, `app/dashboard/` (with nested `articles/`, `stories/`, `review/`, `profile/` segments, each with their own `page.tsx` + `layout.tsx`).
+- App Router routes: `app/login`, `app/register`, `app/dashboard/` with nested segments — `articles/`, `stories/`, `review/`, `profile/`, `auto-publish/` — each with their own `page.tsx` + `layout.tsx`.
 - Server Components by default; add `'use client'` only when needed (event handlers, hooks, browser APIs).
 - All API calls go through `src/lib/api.ts` — an Axios instance that attaches the JWT from `localStorage` and redirects to `/login` on 401.
-- Domain-specific API modules (`article-api.ts`, `story-api.ts`, `topic-api.ts`, `channel-api.ts`, `review-api.ts`) wrap the base `api` client.
+- Domain-specific API modules wrap the base `api` client: `article-api.ts`, `story-api.ts`, `topic-api.ts`, `channel-api.ts`, `review-api.ts`, `auth-api.ts`, `users-api.ts`, `auto-publish-api.ts`.
+- **TanStack Query** (`@tanstack/react-query`) is the canonical data-fetching/caching layer wrapped around the Axios modules — use it for server state, Zustand only for client state.
 - `auth-store.ts` uses Zustand with `persist` middleware (localStorage) + a `_hasHydrated` flag to avoid flash-of-login-state on page load.
-- **Next.js 16 has breaking changes**: see `frontend/AGENTS.md`. Read `node_modules/next/dist/docs/` before writing Next.js-specific code.
+- **Next.js 16 has breaking changes**: `frontend/CLAUDE.md` re-exports `frontend/AGENTS.md`, so when working in `frontend/` that note loads automatically. Read `node_modules/next/dist/docs/` before writing Next.js-specific code.
 
 ## Environment Setup
 
 ### Backend (`backend/.env`)
 
 ```env
-DATABASE_URL="mysql://root:root123@localhost:3306/cms_ng"   # or :3307 if using docker-compose MySQL
-REDIS_URL="redis://localhost:6379"
+DATABASE_URL="mysql://root:root123@localhost:3306/cms_ng"   # external MySQL (any reachable host)
+REDIS_URL="redis://localhost:6379"                          # external Redis (any reachable host)
 PORT=3001
 JWT_SECRET="change-me"
 JWT_EXPIRES_IN="7d"
@@ -207,12 +214,13 @@ NEXT_PUBLIC_API_URL="http://localhost:3001"
 
 ### Infrastructure
 
-Two MySQL options — pick one:
-- **Existing `mysql8` container** on port `3306`: connect with `DATABASE_URL=mysql://root:root123@localhost:3306/cms_ng`. Do not add MySQL to `docker-compose.yml`.
-- **docker-compose MySQL** on port `3307`: `docker-compose up -d mysql` maps host `3307 → container 3306`. Use `DATABASE_URL=mysql://root:root123@localhost:3307/cms_ng`.
+MySQL 8 and Redis are **external middleware** — they are no longer part of `docker-compose.yml`. Point the apps at them via env vars:
 
-Redis: `docker-compose up -d redis` (port `6379`).
-RSSHub: `docker-compose up -d rsshub` (port `1200`) — optional, used by trending-topics for RSS ingestion.
+- **MySQL 8** (external): set `DATABASE_URL` in `backend/.env`. Any reachable MySQL 8 host works — local install, `mysql8` Docker container you manage, cloud RDS, etc. Use the URL form `mysql://USER:PASS@HOST:PORT/cms_ng`.
+- **Redis** (external): set `REDIS_URL` the same way. `RedisService` fail-opens to a no-op (warn log only) if the URL is unset or unreachable, so missing Redis won't crash the backend.
+- **RSSHub** (containerized, optional): `docker-compose up -d rsshub` runs the only service still in `docker-compose.yml` (port `1200`). Used by `trending-topics` for RSS ingestion. Prod compose does not include RSSHub — point at it via `RSS_HUB_URL` if needed.
+
+`backend/.env` is the **single source of truth** for backend config in both dev and prod. The prod compose (`docker-compose.prod.yml`) injects it into the backend container via `env_file: ./backend/.env`, so the same file you run locally is what runs in production (substitute real secrets, of course). Template: `backend/.env.example`. Both files are gitignored except the `.example`.
 
 ## Important Notes
 
@@ -220,4 +228,14 @@ RSSHub: `docker-compose up -d rsshub` (port `1200`) — optional, used by trendi
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.
 - **Article status workflow**: `DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED → ARCHIVED` (can be sent back to `REVISION` from review states). Additional states: `PIPELINE_FAILED` (auto-publish pipeline failures), `AUTO_PUBLISHED` (articles published via automation without human review). Editors and admins can approve; reporters can only submit for review.
-- **Production deploy**: `docker-compose.prod.yml` builds backend + frontend containers. `scripts/update-cms-ng.sh` is a one-command deploy script (backup → pull → build → migrate → restart).
+- **Production deploy**: `docker-compose.prod.yml` builds backend + frontend containers (MySQL/Redis are external). The backend container reads `backend/.env` via `env_file:` — make sure that file exists on the deploy host with real `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `KIMI_API_KEY` (see `backend/.env.example`). `scripts/update-cms-ng.sh` is a one-command deploy script (backup → pull → build → migrate → restart) and validates these vars before running.
+
+## Documentation
+
+`docs/` holds PRDs, architecture reviews, and DB schema notes — start there when reasoning about scope or schema rather than rediscovering from code:
+
+- `PRD-auto-publish-pipeline.md` — auto-publish system PRD
+- `architecture-review.md`, `project_architecture_assessment.md` — architecture audits + open tech debt
+- `database.md` — DB schema overview
+- `ai-image-generation-fsd.md`, `ai-image-generation-interaction.md`, `ai-image-development-tasks.md` — image generation feature spec
+- `test-handoff-*.md`, `qa/`, `testing/` — QA handoffs and test plans

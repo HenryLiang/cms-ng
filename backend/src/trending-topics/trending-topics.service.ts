@@ -214,12 +214,14 @@ export class TrendingTopicsService {
       isGoogle: false,
     },
     { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
+    // RSSHub 源（网站无原生 RSS 时）
     {
       key: 'zaobao',
-      url: 'https://www.zaobao.com.sg/rss/news.xml',
+      // 早报官方 .com.sg/rss/news.xml 已下线（2026 改版后全 404），改走 RSSHub
+      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/zaobao/realtime/china`,
       isGoogle: false,
+      isRSSHub: true,
     },
-    // RSSHub 源（网站无原生 RSS 时）
     {
       key: '36kr',
       url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/36kr/news/latest`,

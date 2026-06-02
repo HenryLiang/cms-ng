@@ -1,56 +1,80 @@
 # 数据库配置备忘
 
-## MySQL
+## MySQL（外部中间件）
+
+MySQL 8 不再随 `docker-compose` 启动，由独立宿主或云 RDS 提供。
 
 | 项目 | 值 |
 |------|-----|
-| 容器名 | `cms-ng-mysql` |
-| 镜像 | `mysql:8.0` |
-| 端口 | `3307`（宿主机）→ `3306`（容器内） |
-| Root 密码 | `root123` |
-| 数据库名 | `cms_ng` |
+| 引擎版本 | MySQL 8.x |
 | 字符集 | `utf8mb4` |
+| 字符序 | `utf8mb4_unicode_ci` |
+| 数据库名 | `cms_ng`（需事先建好） |
+| 认证插件 | `mysql_native_password`（如 Prisma 报 caching_sha2_password 错误请按此调整） |
 
-### 连接 URL
+### 连接 URL（环境变量 `DATABASE_URL`）
+
+格式：
 
 ```
-mysql://root:root123@localhost:3307/cms_ng
+mysql://USER:PASSWORD@HOST:PORT/DATABASE
 ```
 
-> 后端服务通过 Docker 网络访问容器名 `cms-ng-mysql`。
-> 本地命令行访问需用 `localhost:3306`。
+示例：
+
+```
+# 本机开发（指向你自管的本地 MySQL）
+mysql://root:root123@localhost:3306/cms_ng
+
+# 生产（指向远程 MySQL 主机）
+mysql://cms_user:strongpass@mysql.internal.example.com:3306/cms_ng
+```
+
+后端 `PrismaService` 在启动时通过 `env("DATABASE_URL")` 直接读取，无须额外配置。
 
 ### 常用命令
 
 ```bash
-# 启动所有服务
-docker-compose up -d
-
-# 进入 MySQL 容器
-docker exec -it cms-ng-mysql mysql -u root -proot123 cms_ng
+# 命令行连接外部 MySQL
+mysql -h <HOST> -P <PORT> -u <USER> -p cms_ng
 
 # 导出备份
-docker exec cms-ng-mysql mysqldump -u root -proot123 cms_ng > backup.sql
+mysqldump -h <HOST> -P <PORT> -u <USER> -p cms_ng > backup.sql
 
 # 导入恢复
-docker exec -i cms-ng-mysql mysql -u root -proot123 cms_ng < backup.sql
+mysql -h <HOST> -P <PORT> -u <USER> -p cms_ng < backup.sql
 
-# Prisma 重建表结构
+# Prisma 应用迁移（开发环境，会生成新迁移文件）
+cd backend && npx prisma migrate dev --name <change-name>
+
+# Prisma 应用迁移（生产环境，不生成新文件）
 cd backend && npx prisma migrate deploy && npx prisma generate
 ```
 
-## Redis
+## Redis（外部中间件）
+
+Redis 同样不在 compose 内，由外部实例提供（自管或云托管 Redis 皆可）。
 
 | 项目 | 值 |
 |------|-----|
-| 容器名 | `cms-ng-redis` |
-| 镜像 | `redis:7-alpine` |
-| 端口 | `6379` |
+| 引擎 | Redis 5+（推荐 7.x） |
+| 协议 | RESP2 / RESP3 |
+| 连接超时 | 服务端代码内置 `lazyConnect: true` + 重试策略 |
 
-## 数据卷（持久化）
+连接 URL（环境变量 `REDIS_URL`）：
 
-- `mysql_data` — MySQL 数据文件
-- `redis_data` — Redis 数据文件
+```
+# 标准
+redis://HOST:PORT
+
+# 带密码
+redis://:PASSWORD@HOST:PORT
+
+# 指定 DB
+redis://HOST:PORT/2
+```
+
+`RedisService` 在 `REDIS_URL` 不可达或未设置时会 fail-open（只打 warn 日志），不会让后端启动失败 — 这是设计上故意的，便于本地开发时跳过 Redis。
 
 ## Schema 来源
 
@@ -60,4 +84,11 @@ cd backend && npx prisma migrate deploy && npx prisma generate
 backend/prisma/schema.prisma
 ```
 
-包含模型：User、Story、Article、ArticleVersion、AIOperation、TrendingTopic
+包含主要模型：User、Story、Article、ArticleVersion、AIOperation、TrendingTopic、PlatformPublish、AutoPublishTask、AutoPublishRun、AutoPublishArticle 等。
+
+## 容器化范围
+
+仓库内 docker-compose 文件不再编排数据中间件：
+
+- `docker-compose.yml`（dev）：仅 `rsshub` 一个服务
+- `docker-compose.prod.yml`（prod）：仅 `backend` + `frontend` 两个应用容器；backend 通过 `env_file: ./backend/.env` 直接注入配置（模板见 `backend/.env.example`）
