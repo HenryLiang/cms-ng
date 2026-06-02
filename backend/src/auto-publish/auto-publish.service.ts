@@ -316,11 +316,11 @@ export class AutoPublishService {
 
   // ===== Kill Switch =====
 
-  async killSwitch(enable: boolean) {
+  async killSwitch(enable: boolean, operatorId: string, reason?: string) {
     if (enable) {
-      await this.scheduler.enableKillSwitch();
+      await this.scheduler.enableKillSwitch(operatorId, reason);
     } else {
-      await this.scheduler.disableKillSwitch();
+      await this.scheduler.disableKillSwitch(operatorId);
     }
     return { killSwitchActive: await this.scheduler.isKillSwitchActive() };
   }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -8,6 +8,7 @@ import {
 } from '@cms-ng/shared';
 import { PipelineStep, PipelineContext } from './step.interface';
 import { RedisService } from '../../redis/redis.service';
+import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { TopicCollectionStep } from './steps/topic-collection.step';
 import { ResearchStep } from './steps/research.step';
 import { ArticleGenerationStep } from './steps/article-generation.step';
@@ -28,6 +29,8 @@ export class PipelineService {
     private prisma: PrismaService,
     private config: ConfigService,
     private redis: RedisService,
+    @Inject(forwardRef(() => AutoPublishSchedulerService))
+    private scheduler: AutoPublishSchedulerService,
     private topicStep: TopicCollectionStep,
     private researchStep: ResearchStep,
     private articleGenStep: ArticleGenerationStep,
@@ -72,7 +75,8 @@ export class PipelineService {
    */
   async runTask(taskId: string, triggerType: 'SCHEDULED' | 'MANUAL' = 'SCHEDULED'): Promise<void> {
     // Check kill switch first — blocks both scheduled and manual triggers
-    const killSwitchActive = await this.redis.get('auto-publish:kill-switch') === 'true';
+    // MySQL is the source of truth (issue #48 P0), not Redis
+    const killSwitchActive = await this.scheduler.isKillSwitchActive();
     if (killSwitchActive) {
       this.logger.warn(`Kill switch active — skipping task ${taskId} (${triggerType})`);
       return;
@@ -94,7 +98,14 @@ export class PipelineService {
     const lockKey = `auto-publish:task:${taskId}`;
     const lockAcquired = await this.redis.acquireLock(lockKey, 600); // 10 min TTL
     if (!lockAcquired) {
-      this.logger.warn(`Task ${taskId} is already running — skipping duplicate trigger`);
+      // 区分两种场景：Redis 不可用 (fail-closed) vs. 同任务并发去重
+      if (!this.redis.isAvailable) {
+        this.logger.error(
+          `Task ${taskId} BLOCKED: Redis unavailable, fail-closed lock denied (${triggerType})`,
+        );
+      } else {
+        this.logger.warn(`Task ${taskId} is already running — skipping duplicate trigger`);
+      }
       return;
     }
 

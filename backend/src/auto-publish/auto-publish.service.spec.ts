@@ -233,21 +233,21 @@ describe('AutoPublishService', () => {
   });
 
   describe('killSwitch', () => {
-    it('should enable kill switch', async () => {
+    it('should enable kill switch and forward operator + reason', async () => {
       mockScheduler.isKillSwitchActive.mockResolvedValue(true);
 
-      const result = await service.killSwitch(true);
+      const result = await service.killSwitch(true, 'admin-uuid-1', 'emergency');
 
-      expect(mockScheduler.enableKillSwitch).toHaveBeenCalled();
+      expect(mockScheduler.enableKillSwitch).toHaveBeenCalledWith('admin-uuid-1', 'emergency');
       expect(result).toEqual({ killSwitchActive: true });
     });
 
-    it('should disable kill switch', async () => {
+    it('should disable kill switch and forward operator', async () => {
       mockScheduler.isKillSwitchActive.mockResolvedValue(false);
 
-      const result = await service.killSwitch(false);
+      const result = await service.killSwitch(false, 'admin-uuid-1');
 
-      expect(mockScheduler.disableKillSwitch).toHaveBeenCalled();
+      expect(mockScheduler.disableKillSwitch).toHaveBeenCalledWith('admin-uuid-1');
       expect(result).toEqual({ killSwitchActive: false });
     });
   });

@@ -43,10 +43,19 @@ export class RedisService implements OnModuleDestroy {
 
   /**
    * Acquire a distributed lock.
-   * Returns true if lock acquired, false if already held.
+   * Returns true if lock acquired, false if already held or Redis unavailable.
+   *
+   * 关键路径默认拒绝（fail-closed）— see issue #48 P0：
+   * Redis 不可用或网络错误时返 false，绝不静默放过并发触发。
+   * 失败会打 error 日志，便于运维发现并告警。
    */
   async acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
-    if (!this.isAvailable) return true; // If Redis unavailable, allow operation
+    if (!this.isAvailable) {
+      this.logger.error(
+        `[FAIL-CLOSED] Redis unavailable — refusing to acquire lock: ${key}`,
+      );
+      return false;
+    }
     try {
       const result = await this.client!.set(
         `lock:${key}`,
@@ -56,20 +65,26 @@ export class RedisService implements OnModuleDestroy {
         'NX',
       );
       return result === 'OK';
-    } catch {
-      return true; // Fail open
+    } catch (err: any) {
+      this.logger.error(
+        `[FAIL-CLOSED] Redis SET NX failed for ${key}: ${err.message}`,
+      );
+      return false;
     }
   }
 
   /**
    * Release a distributed lock.
+   * 释放失败无需 fail-closed — 锁有 TTL 自愈到时自然过期。
    */
   async releaseLock(key: string): Promise<void> {
     if (!this.isAvailable) return;
     try {
       await this.client!.del(`lock:${key}`);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      this.logger.warn(
+        `Redis DEL failed for ${key}: ${err.message} — lock will expire via TTL`,
+      );
     }
   }
 

@@ -30,9 +30,11 @@ describe('RedisService', () => {
   });
 
   describe('acquireLock', () => {
-    it('should return true (fail open) when Redis is unavailable', async () => {
+    it('should return false (fail-closed) when Redis is unavailable — issue #48 P0', async () => {
+      // 关键路径默认拒绝：Redis 不可用时 acquireLock 必须返 false，
+      // 绝不让并发去重锁静默放过。
       const result = await service.acquireLock('test-key', 60);
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 

@@ -98,8 +98,13 @@ export class AutoPublishController {
   @Post('kill-switch')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  async killSwitch(@Body('enable') enable: boolean) {
-    return this.service.killSwitch(enable !== false);
+  async killSwitch(
+    @Request() req: any,
+    @Body('enable') enable: boolean,
+    @Body('reason') reason?: string,
+  ) {
+    const operatorId = req.user?.userId || req.user?.id || 'unknown';
+    return this.service.killSwitch(enable !== false, operatorId, reason);
   }
 
   @Get('stats')
