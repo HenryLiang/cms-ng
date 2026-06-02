@@ -20,6 +20,7 @@
     "packages/*"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "turbo": "^2.5.0"
   },
   "packageManager": "npm@10.9.0"

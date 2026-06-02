@@ -46,11 +46,11 @@
 ### 2.1 必需配置
 
 ```bash
-# 数据库
-mysql8 (localhost:3306, cms_ng)
+# 数据库（外部 MySQL，地址由 backend/.env 的 DATABASE_URL 决定）
+mysql8 (localhost:3306, cms_ng)  # 示例：本机自管 MySQL
 
-# 缓存
-redis (localhost:6379)
+# 缓存（外部 Redis，地址由 backend/.env 的 REDIS_URL 决定）
+redis (localhost:6379)            # 示例：本机自管 Redis
 
 # 后端
 npm run dev  # port 3001
