@@ -7,6 +7,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# SSL certificates
+ssl/
+
 # Build outputs
 dist/
 build/

@@ -14,6 +14,7 @@ export class WordPressService {
   private readonly siteUrl: string;
   private readonly username: string;
   private readonly appPassword: string;
+  private readonly backendUrl: string;
   private static readonly FETCH_TIMEOUT_MS = 30_000;
 
   private fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
@@ -29,6 +30,7 @@ export class WordPressService {
     this.siteUrl = this.configService.get<string>('WORDPRESS_SITE_URL', '');
     this.username = this.configService.get<string>('WORDPRESS_USERNAME', '');
     this.appPassword = this.configService.get<string>('WORDPRESS_APP_PASSWORD', '');
+    this.backendUrl = this.configService.get<string>('BACKEND_URL', 'http://localhost:3001');
   }
 
   private getAuthHeader(): string {
@@ -95,13 +97,12 @@ export class WordPressService {
   }
 
   /**
-   * 上传图片到 WordPress 媒体库，返回 media ID
+   * 上传图片到 WordPress 媒体库，返回 media ID 和 WordPress 托管 URL
    */
-  private async uploadImage(imageUrl: string): Promise<number | null> {
+  private async uploadImage(imageUrl: string): Promise<{ id: number; sourceUrl: string } | null> {
     const auth = this.getAuthHeader();
 
     try {
-      // 下载图片
       const imageRes = await this.fetchWithTimeout(imageUrl);
       if (!imageRes.ok) {
         this.logger.warn(`Failed to download image: ${imageUrl}`);
@@ -111,21 +112,17 @@ export class WordPressService {
       const imageBuffer = await imageRes.arrayBuffer();
       const contentType = (imageRes.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
 
-      // 从 URL 提取文件名，确保有正确的扩展名
       const urlPath = new URL(imageUrl).pathname;
       let filename = urlPath.split('/').pop() || 'cover';
-      // MIME type → 扩展名映射
       const extMap: Record<string, string> = {
         'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
         'image/webp': '.webp', 'image/svg+xml': '.svg', 'image/avif': '.avif',
       };
       const ext = extMap[contentType] || '.jpg';
-      // 如果文件名没有扩展名，补上
       if (!filename.includes('.')) {
         filename = `${filename}${ext}`;
       }
 
-      // 上传到 WordPress
       const uploadRes = await this.fetchWithTimeout(`${this.siteUrl}/wp-json/wp/v2/media`, {
         method: 'POST',
         headers: {
@@ -137,8 +134,8 @@ export class WordPressService {
       });
 
       if (uploadRes.ok) {
-        const media = await uploadRes.json() as { id: number };
-        return media.id;
+        const media = await uploadRes.json() as { id: number; source_url: string };
+        return { id: media.id, sourceUrl: media.source_url };
       } else {
         const errorText = await uploadRes.text();
         this.logger.warn(`Failed to upload image to WordPress: ${uploadRes.status} ${errorText}`);
@@ -148,6 +145,58 @@ export class WordPressService {
       this.logger.warn(`Error uploading image: ${error.message}`);
       return null;
     }
+  }
+
+  /**
+   * 将相对路径图片 URL 解析为绝对 URL
+   */
+  private resolveImageUrl(src: string): string {
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+      return src;
+    }
+    if (src.startsWith('/')) {
+      const base = this.backendUrl.replace(/\/$/, '');
+      return `${base}${src}`;
+    }
+    const base = this.backendUrl.replace(/\/$/, '');
+    return `${base}/${src}`;
+  }
+
+  /**
+   * 处理文章内容中的图片：下载并上传到 WordPress 媒体库，替换 src 为 WordPress 托管 URL
+   */
+  private async processContentImages(html: string): Promise<string> {
+    const imgRegex = /<img[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+    const replacements: Array<{ original: string; wpUrl: string }> = [];
+    const seen = new Set<string>();
+
+    const matches = [...html.matchAll(imgRegex)];
+    for (const match of matches) {
+      const originalSrc = match[1];
+      if (seen.has(originalSrc)) continue;
+      seen.add(originalSrc);
+
+      const absoluteUrl = this.resolveImageUrl(originalSrc);
+
+      if (absoluteUrl.startsWith('data:')) continue;
+
+      if (absoluteUrl.startsWith(this.siteUrl)) {
+        this.logger.debug(`Skipping already-WordPress-hosted image: ${absoluteUrl}`);
+        continue;
+      }
+
+      const result = await this.uploadImage(absoluteUrl);
+      if (result && result.sourceUrl !== originalSrc) {
+        replacements.push({ original: originalSrc, wpUrl: result.sourceUrl });
+      }
+    }
+
+    let processed = html;
+    for (const { original, wpUrl } of replacements) {
+      processed = processed.replaceAll(original, wpUrl);
+    }
+
+    return processed;
   }
 
   /**
@@ -192,16 +241,23 @@ export class WordPressService {
       // 解析标签
       const tagIds = await this.resolveTags(adaptedTags);
 
+      // 处理正文中的图片：上传到 WordPress 媒体库并替换 URL
+      const finalContent = await this.processContentImages(adaptedContent);
+
       // 上传封面图（如果有）
       let featuredMediaId: number | null = null;
       if (article.coverImage) {
-        featuredMediaId = await this.uploadImage(article.coverImage);
+        const coverUrl = this.resolveImageUrl(article.coverImage);
+        const uploaded = await this.uploadImage(coverUrl);
+        if (uploaded) {
+          featuredMediaId = uploaded.id;
+        }
       }
 
       // 构建 WordPress post 数据
       const postData: Record<string, unknown> = {
         title: adaptedTitle,
-        content: adaptedContent,
+        content: finalContent,
         excerpt: adaptedExcerpt,
         status: wpStatus,
         tags: tagIds,

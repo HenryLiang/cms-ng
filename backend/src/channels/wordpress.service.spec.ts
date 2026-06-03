@@ -201,9 +201,12 @@ describe('WordPressService', () => {
             arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
           });
         }
-        // Image upload
+        // Image upload to WP media
         if (fetchCallCount === 6) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 20 }) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 20, source_url: 'https://wp.test/wp-content/uploads/cover.jpg' }),
+          });
         }
         // Post creation
         return Promise.resolve({

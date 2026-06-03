@@ -35,6 +35,7 @@ ${article.content.slice(0, 5000)}
    - 使用 <p> 包裹段落
    - 可使用 <strong>、<em>、<blockquote>、<ul>、<ol>、<li> 等标签
    - 不要使用 <h1>（WordPress 会自动用标题作为 H1）
+   - 保留原文中的 <img> 标签及其 src 属性，不要删除或修改图片
 3. 生成一个 meta description 风格的摘要（120-160字），概括文章核心内容，适合搜索引擎展示
 4. 生成 3-5 个 SEO 相关的标签/关键词
 5. 输出格式为 JSON：
