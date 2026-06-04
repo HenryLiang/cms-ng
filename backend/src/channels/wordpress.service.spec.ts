@@ -21,7 +21,7 @@ describe('WordPressService', () => {
     title: '测试文章',
     content: '<p>测试内容</p>',
     excerpt: '摘要',
-    coverImage: 'https://example.com/cover.jpg',
+    coverImage: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-1/cover.png',
     tags: '["标签1"]',
   };
 
