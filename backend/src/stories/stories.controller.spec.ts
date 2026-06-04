@@ -1,3 +1,7 @@
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { StoriesController } from './stories.controller';
@@ -79,13 +83,28 @@ describe('StoriesController', () => {
   });
 
   describe('findAll', () => {
-    it('should call storiesService.findAll with user', async () => {
-      storiesService.findAll.mockResolvedValue([mockStory()]);
+    it('should call storiesService.findAll with user and query', async () => {
+      storiesService.findAll.mockResolvedValue({
+        data: [mockStory()],
+        meta: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      });
+      const query = { page: 1, pageSize: 20 };
 
-      const result = await controller.findAll(mockUser);
+      const result = await controller.findAll(mockUser, query);
 
-      expect(storiesService.findAll).toHaveBeenCalledWith(mockUser);
-      expect(result).toHaveLength(1);
+      expect(storiesService.findAll).toHaveBeenCalledWith(mockUser, query);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should call findAll with empty query when no params provided', async () => {
+      storiesService.findAll.mockResolvedValue({
+        data: [],
+        meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+      });
+
+      await controller.findAll(mockUser, {});
+
+      expect(storiesService.findAll).toHaveBeenCalledWith(mockUser, {});
     });
   });
 

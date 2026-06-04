@@ -7,6 +7,7 @@ describe('AuthController', () => {
   let authService: {
     register: jest.Mock;
     login: jest.Mock;
+    refresh: jest.Mock;
     getCurrentUser: jest.Mock;
   };
 
@@ -14,6 +15,7 @@ describe('AuthController', () => {
     authService = {
       register: jest.fn(),
       login: jest.fn(),
+      refresh: jest.fn(),
       getCurrentUser: jest.fn(),
     };
 
@@ -61,6 +63,21 @@ describe('AuthController', () => {
 
       expect(authService.getCurrentUser).toHaveBeenCalledWith('u1');
       expect(result.name).toBe('Test');
+    });
+  });
+
+  // ===== issue #49 — POST /auth/refresh =====
+  describe('refresh (issue #49)', () => {
+    it('should call authService.refresh with the token from the dto body', async () => {
+      authService.refresh.mockResolvedValue({
+        accessToken: 'new_jwt_token',
+        user: { id: 'u1' },
+      });
+
+      const result = await controller.refresh({ token: 'old.jwt.token' } as any);
+
+      expect(authService.refresh).toHaveBeenCalledWith('old.jwt.token');
+      expect(result.accessToken).toBe('new_jwt_token');
     });
   });
 });

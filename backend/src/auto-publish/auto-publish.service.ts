@@ -128,7 +128,7 @@ export class AutoPublishService {
     // Update cron if schedule or status changed
     if (dto.status !== undefined || dto.scheduleConfig) {
       if (task.status === AutoTaskStatus.ACTIVE) {
-        this.scheduler.registerTaskCron(task);
+        await this.scheduler.registerTaskCron(task);
       } else {
         this.scheduler.removeTaskCron(id);
       }
@@ -165,7 +165,7 @@ export class AutoPublishService {
     });
 
     if (newStatus === AutoTaskStatus.ACTIVE) {
-      this.scheduler.registerTaskCron(updated);
+      await this.scheduler.registerTaskCron(updated);
     } else {
       this.scheduler.removeTaskCron(id);
     }

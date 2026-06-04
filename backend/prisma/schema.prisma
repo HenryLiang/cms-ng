@@ -73,8 +73,8 @@ model Article {
   publishedAt      DateTime?
 
   // Relations
-  storyId           String
-  story             Story             @relation(fields: [storyId], references: [id])
+  storyId           String?
+  story             Story?            @relation(fields: [storyId], references: [id], onDelete: SetNull)
   authorId          String
   author            User              @relation("AuthorArticles", fields: [authorId], references: [id])
   editorId          String?

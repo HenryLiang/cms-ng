@@ -1,3 +1,7 @@
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { StoriesService } from './stories.service';
@@ -85,30 +89,146 @@ describe('StoriesService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all stories ordered by priority for admin', async () => {
+    it('should return all stories with default pagination for admin', async () => {
       prisma.story.findMany.mockResolvedValue([
-        mockStory({ id: 's1', priority: 2 }),
-        mockStory({ id: 's2', priority: 1 }),
+        mockStory({ id: 's1' }),
+        mockStory({ id: 's2' }),
       ]);
+      prisma.story.count.mockResolvedValue(2);
 
-      const result = await service.findAll({ userId: 'admin-id', role: 'ADMIN' });
+      const result = await service.findAll({ userId: 'admin-id', role: 'ADMIN' }, {});
 
       expect(prisma.story.findMany).toHaveBeenCalledWith({
         where: {},
-        orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
+        skip: 0,
+        take: 20,
+        orderBy: { createdAt: 'desc' },
         include: expect.any(Object),
       });
-      expect(result).toHaveLength(2);
+      expect(prisma.story.count).toHaveBeenCalledWith({ where: {} });
+      expect(result.data).toHaveLength(2);
+      expect(result.meta).toEqual({ page: 1, pageSize: 20, total: 2, totalPages: 1 });
     });
 
-    it('should filter by reporterId for reporter role', async () => {
-      prisma.story.findMany.mockResolvedValue([mockStory()]);
+    it('should paginate with page/pageSize (#54)', async () => {
+      prisma.story.findMany.mockResolvedValue([mockStory({ id: 's1' })]);
+      prisma.story.count.mockResolvedValue(380);
 
-      await service.findAll({ userId: 'user-id', role: 'REPORTER' });
+      const result = await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { page: 1, pageSize: 2 },
+      );
+
+      expect(prisma.story.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 2 }),
+      );
+      expect(prisma.story.count).toHaveBeenCalledWith({ where: {} });
+      expect(result.data).toHaveLength(1);
+      expect(result.meta).toEqual({ page: 1, pageSize: 2, total: 380, totalPages: 190 });
+    });
+
+    it('should compute correct skip for page 3 pageSize 5', async () => {
+      prisma.story.findMany.mockResolvedValue([]);
+      prisma.story.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { page: 3, pageSize: 5 },
+      );
+
+      expect(prisma.story.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 5 }),
+      );
+    });
+
+    it('should filter by status (#54)', async () => {
+      prisma.story.findMany.mockResolvedValue([mockStory({ status: 'APPROVED' })]);
+      prisma.story.count.mockResolvedValue(1);
+
+      const result = await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { status: 'APPROVED' },
+      );
+
+      expect(prisma.story.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: 'APPROVED' }),
+        }),
+      );
+      expect(prisma.story.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ status: 'APPROVED' }),
+      });
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should filter by contentLanguage (#54)', async () => {
+      prisma.story.findMany.mockResolvedValue([]);
+      prisma.story.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { contentLanguage: 'ENGLISH' },
+      );
+
+      expect(prisma.story.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ contentLanguage: 'ENGLISH' }),
+        }),
+      );
+    });
+
+    it('should sort by createdAt desc by default', async () => {
+      prisma.story.findMany.mockResolvedValue([]);
+      prisma.story.count.mockResolvedValue(0);
+
+      await service.findAll({ userId: 'admin-id', role: 'ADMIN' }, {});
+
+      expect(prisma.story.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+      );
+    });
+
+    it('should respect sortBy/order query params (#54)', async () => {
+      prisma.story.findMany.mockResolvedValue([]);
+      prisma.story.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { sortBy: 'title', order: 'asc' },
+      );
+
+      expect(prisma.story.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { title: 'asc' } }),
+      );
+    });
+
+    it('should still filter by reporterId for reporter role', async () => {
+      prisma.story.findMany.mockResolvedValue([mockStory()]);
+      prisma.story.count.mockResolvedValue(1);
+
+      const result = await service.findAll(
+        { userId: 'user-id', role: 'REPORTER' },
+        {},
+      );
 
       expect(prisma.story.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { reporterId: 'user-id' } }),
       );
+      expect(result.meta.total).toBe(1);
+    });
+
+    it('should combine role-based where with status filter for editor', async () => {
+      prisma.story.findMany.mockResolvedValue([]);
+      prisma.story.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'user-id', role: 'EDITOR' },
+        { status: 'PENDING_REVIEW' },
+      );
+
+      const call = (prisma.story.findMany as jest.Mock).mock.calls[0][0];
+      expect(call.where.OR).toBeDefined();
+      expect(call.where.status).toBe('PENDING_REVIEW');
     });
   });
 
@@ -157,6 +277,7 @@ describe('StoriesService', () => {
   describe('remove', () => {
     it('should delete story when found', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.updateMany.mockResolvedValue({ count: 0 });
       prisma.story.delete.mockResolvedValue(mockStory());
 
       const result = await service.remove('story-id');
@@ -165,10 +286,48 @@ describe('StoriesService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should null out Article.storyId before deleting story (#55 cascade)', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.updateMany.mockResolvedValue({ count: 3 });
+      prisma.story.delete.mockResolvedValue(mockStory());
+
+      const callOrder: string[] = [];
+      (prisma.article.updateMany as jest.Mock).mockImplementation(async () => {
+        callOrder.push('article.updateMany');
+        return { count: 3 };
+      });
+      (prisma.story.delete as jest.Mock).mockImplementation(async () => {
+        callOrder.push('story.delete');
+        return mockStory();
+      });
+
+      await service.remove('story-id');
+
+      expect(prisma.article.updateMany).toHaveBeenCalledWith({
+        where: { storyId: 'story-id' },
+        data: { storyId: null },
+      });
+      // updateMany must run BEFORE story.delete to avoid FK error
+      expect(callOrder).toEqual(['article.updateMany', 'story.delete']);
+    });
+
+    it('should still invoke updateMany even when no articles reference the story', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.updateMany.mockResolvedValue({ count: 0 });
+      prisma.story.delete.mockResolvedValue(mockStory());
+
+      await service.remove('story-id');
+
+      expect(prisma.article.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.story.delete).toHaveBeenCalledTimes(1);
+    });
+
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(prisma.article.updateMany).not.toHaveBeenCalled();
+      expect(prisma.story.delete).not.toHaveBeenCalled();
     });
   });
 

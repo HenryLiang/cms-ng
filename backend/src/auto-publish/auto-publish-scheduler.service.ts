@@ -5,9 +5,10 @@ import {
   Logger,
   Inject,
   forwardRef,
+  BadRequestException,
 } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { CronJob } from 'cron';
+import { CronJob, validateCronExpression } from 'cron';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PipelineService } from './pipeline/pipeline.service';
@@ -57,11 +58,11 @@ export class AutoPublishSchedulerService
   /**
    * Register a cron job for a task based on its schedule config.
    */
-  registerTaskCron(task: {
+  async registerTaskCron(task: {
     id: string;
     name: string;
     scheduleConfig: string;
-  }): void {
+  }): Promise<void> {
     const config = safeJsonParse<{ times: string[]; timezone: string }>(
       task.scheduleConfig,
       { times: [], timezone: 'Asia/Hong_Kong' },
@@ -76,12 +77,11 @@ export class AutoPublishSchedulerService
     this.removeTaskCron(task.id);
 
     // Create a cron job for each time
-    config.times.forEach((time, idx) => {
+    for (const [idx, time] of config.times.entries()) {
+      // Validate upfront — issue #50 acceptance: any failure must throw,
+      // never silently skip. timeToCron throws BadRequestException on invalid
+      // input; that bubbles up to the controller as HTTP 400.
       const cronExpression = this.timeToCron(time);
-      if (!cronExpression) {
-        this.logger.warn(`Invalid time format "${time}" for task ${task.name}`);
-        return;
-      }
 
       const jobName = `auto-publish-${task.id}-${idx}`;
       const job = new CronJob(cronExpression, async () => {
@@ -103,10 +103,10 @@ export class AutoPublishSchedulerService
       this.logger.log(
         `Registered cron job: ${task.name} at ${time} (${config.timezone})`,
       );
-    });
+    }
 
     // Compute and store nextRunAt
-    this.updateNextRunAt(task.id, config.times, config.timezone);
+    await this.updateNextRunAt(task.id, config.times, config.timezone);
   }
 
   /**
@@ -184,19 +184,56 @@ export class AutoPublishSchedulerService
   }
 
   /**
-   * Convert a time string like "08:00" to a cron expression.
+   * Normalize a schedule entry to a standard 5-field cron expression.
+   *
+   * Two input shapes are accepted (issue #50):
+   *
+   *  1. `HH:MM` shorthand (legacy, e.g. "08:00") -> expands to daily cron
+   *     "0 8 * * *". Hour 00-23, minute 00-59.
+   *
+   *  2. Standard 5-field cron expression (e.g. star-slash-5 every minute).
+   *     Validated via the `cron` library's `validateCronExpression` and
+   *     returned verbatim if valid.
+   *
+   * Throws `BadRequestException` (HTTP 400) on anything else — issue #50
+   * acceptance criterion: "any failure throws 400, never silently skips".
    */
-  private timeToCron(time: string): string | null {
-    const match = time.match(/^(\d{1,2}):(\d{2})$/);
-    if (!match) return null;
-    const hour = parseInt(match[1], 10);
-    const minute = parseInt(match[2], 10);
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-    return `${minute} ${hour} * * *`; // every day at HH:MM
+  private timeToCron(time: string): string {
+    // (1) HH:MM shorthand
+    const hhmm = time.match(/^(\d{1,2}):(\d{2})$/);
+    if (hhmm) {
+      const hour = parseInt(hhmm[1], 10);
+      const minute = parseInt(hhmm[2], 10);
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        throw new BadRequestException(
+          `Invalid time "${time}": hours must be 00-23 and minutes 00-59`,
+        );
+      }
+      return `${minute} ${hour} * * *`; // every day at HH:MM
+    }
+
+    // (2) Standard cron — validate before returning
+    const result = validateCronExpression(time);
+    if (result.valid) {
+      return time;
+    }
+
+    // (3) Anything else: surface a 400, never silently skip
+    const errorMsg =
+      (result.error && (result.error as { message?: string }).message) ||
+      'unparseable';
+    throw new BadRequestException(
+      `Invalid cron expression "${time}": ${errorMsg}`,
+    );
   }
 
   /**
    * Update the nextRunAt field for a task.
+   *
+   * Supports both HH:MM shorthand and standard cron (issue #50). For standard
+   * cron we delegate to the `cron` library's `sendAt()` helper which knows
+   * the actual next-fire time; for HH:MM we keep the simple "next occurrence"
+   * approximation.
    */
   private async updateNextRunAt(
     taskId: string,
@@ -207,18 +244,30 @@ export class AutoPublishSchedulerService
     let earliest: Date | null = null;
 
     for (const time of times) {
-      const match = time.match(/^(\d{1,2}):(\d{2})$/);
-      if (!match) continue;
-      const hour = parseInt(match[1], 10);
-      const minute = parseInt(match[2], 10);
+      let next: Date | null = null;
+      const hhmm = time.match(/^(\d{1,2}):(\d{2})$/);
 
-      // Simple approximation: find next occurrence in local time
-      const next = new Date(now);
-      next.setHours(hour, minute, 0, 0);
-      if (next <= now) {
-        next.setDate(next.getDate() + 1);
+      if (hhmm) {
+        const hour = parseInt(hhmm[1], 10);
+        const minute = parseInt(hhmm[2], 10);
+        next = new Date(now);
+        next.setHours(hour, minute, 0, 0);
+        if (next <= now) {
+          next.setDate(next.getDate() + 1);
+        }
+      } else {
+        // Standard cron — use sendAt() to compute the real next fire time
+        try {
+          const { sendAt } = await import('cron');
+          const nextLuxon = sendAt(time).setZone(timezone);
+          next = nextLuxon.toJSDate();
+        } catch {
+          // skip — will be re-validated by registerTaskCron on next call
+          continue;
+        }
       }
-      if (!earliest || next < earliest) {
+
+      if (next && (!earliest || next < earliest)) {
         earliest = next;
       }
     }

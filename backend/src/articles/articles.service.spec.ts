@@ -1,5 +1,9 @@
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ArticlesService } from './articles.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
@@ -231,9 +235,9 @@ describe('ArticlesService', () => {
 
     it('should not create version when content unchanged', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.article.update.mockResolvedValue(mockArticle());
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'WRITING' }));
 
-      await service.update('article-id', { status: 'PUBLISHED' } as any);
+      await service.update('article-id', { status: 'WRITING' } as any);
 
       expect(prisma.articleVersion.create).not.toHaveBeenCalled();
     });
@@ -711,6 +715,186 @@ describe('ArticlesService', () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
       await expect(service.rollback('article-id', 1)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('state machine transition validation (#51)', () => {
+    const expectInvalidTransition = async (
+      from: string,
+      to: string,
+      method: 'update' | 'submitReview' = 'update',
+    ) => {
+      if (method === 'update') {
+        prisma.article.findUnique.mockResolvedValue(mockArticle({ status: from }));
+        await expect(
+          service.update('article-id', { status: to } as any),
+        ).rejects.toThrow(BadRequestException);
+      } else {
+        prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: from, editorId: 'editor-id' });
+        prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+        const decision = to === 'APPROVED' ? 'APPROVE' : 'REVISION';
+        await expect(
+          service.submitReview('article-id', 'editor-id', decision, 'comment'),
+        ).rejects.toThrow(BadRequestException);
+      }
+    };
+
+    const expectValidTransition = async (
+      from: string,
+      to: string,
+      method: 'update' | 'submitReview' = 'update',
+    ) => {
+      if (method === 'update') {
+        prisma.article.findUnique.mockResolvedValue(mockArticle({ status: from }));
+        prisma.article.update.mockResolvedValue(mockArticle({ status: to }));
+        const result = await service.update('article-id', { status: to } as any);
+        expect(result.status).toBe(to);
+      } else {
+        prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: from, editorId: 'editor-id' });
+        prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+        prisma.article.update.mockResolvedValue(mockArticle({ status: to, editorId: 'editor-id' }));
+        const decision = to === 'APPROVED' ? 'APPROVE' : 'REVISION';
+        const result = await service.submitReview('article-id', 'editor-id', decision, 'comment');
+        expect(result.article.status).toBe(to);
+      }
+    };
+
+    describe('update() should reject illegal transitions', () => {
+      it.each([
+        ['DRAFT', 'PUBLISHED'],
+        ['DRAFT', 'APPROVED'],
+        ['DRAFT', 'IN_REVIEW'],
+        ['DRAFT', 'AUTO_PUBLISHED'],
+        ['DRAFT', 'PIPELINE_FAILED'],
+        ['WRITING', 'PUBLISHED'],
+        ['WRITING', 'PENDING_REVIEW'],
+        ['AI_OPTIMIZING', 'PUBLISHED'],
+        ['PENDING_REVIEW', 'PUBLISHED'],
+        ['PENDING_REVIEW', 'APPROVED'],
+        ['IN_REVIEW', 'PUBLISHED'],
+        ['IN_REVIEW', 'DRAFT'],
+        ['APPROVED', 'DRAFT'],
+        ['APPROVED', 'WRITING'],
+        ['APPROVED', 'AI_OPTIMIZING'],
+        ['PUBLISHED', 'DRAFT'],
+        ['PUBLISHED', 'PENDING_REVIEW'],
+        ['ARCHIVED', 'DRAFT'],
+        ['ARCHIVED', 'PUBLISHED'],
+        ['ARCHIVED', 'WRITING'],
+        ['REVISION', 'PUBLISHED'],
+        ['REVISION', 'PENDING_REVIEW'],
+        ['REVISION', 'APPROVED'],
+        ['AUTO_PUBLISHED', 'DRAFT'],
+        ['AUTO_PUBLISHED', 'WRITING'],
+        ['AUTO_PUBLISHED', 'PENDING_REVIEW'],
+        ['AUTO_PUBLISHED', 'IN_REVIEW'],
+        ['PIPELINE_FAILED', 'PUBLISHED'],
+        ['PIPELINE_FAILED', 'WRITING'],
+        ['PIPELINE_FAILED', 'PENDING_REVIEW'],
+        ['PIPELINE_FAILED', 'APPROVED'],
+      ])('should reject %s -> %s', async (from, to) => {
+        await expectInvalidTransition(from, to, 'update');
+      });
+    });
+
+    describe('update() should accept legal transitions', () => {
+      it.each([
+        ['DRAFT', 'WRITING'],
+        ['DRAFT', 'ARCHIVED'],
+        ['WRITING', 'AI_OPTIMIZING'],
+        ['WRITING', 'DRAFT'],
+        ['WRITING', 'ARCHIVED'],
+        ['AI_OPTIMIZING', 'PENDING_REVIEW'],
+        ['AI_OPTIMIZING', 'WRITING'],
+        ['AI_OPTIMIZING', 'DRAFT'],
+        ['PENDING_REVIEW', 'IN_REVIEW'],
+        ['PENDING_REVIEW', 'REVISION'],
+        ['PENDING_REVIEW', 'DRAFT'],
+        ['IN_REVIEW', 'APPROVED'],
+        ['IN_REVIEW', 'REVISION'],
+        ['IN_REVIEW', 'PENDING_REVIEW'],
+        ['APPROVED', 'PUBLISHED'],
+        ['APPROVED', 'REVISION'],
+        ['APPROVED', 'IN_REVIEW'],
+        ['PUBLISHED', 'ARCHIVED'],
+        ['REVISION', 'WRITING'],
+        ['REVISION', 'DRAFT'],
+        ['REVISION', 'ARCHIVED'],
+        ['AUTO_PUBLISHED', 'ARCHIVED'],
+        ['AUTO_PUBLISHED', 'PUBLISHED'],
+        ['PIPELINE_FAILED', 'DRAFT'],
+        ['PIPELINE_FAILED', 'ARCHIVED'],
+      ])('should accept %s -> %s', async (from, to) => {
+        await expectValidTransition(from, to, 'update');
+      });
+    });
+
+    it('should not validate transition when status field is not being updated', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ status: 'DRAFT' }));
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'DRAFT', content: 'New content' }));
+
+      const result = await service.update('article-id', { content: 'New content' } as any);
+      expect(result.content).toBe('New content');
+    });
+
+    it('should not throw when same status is provided (idempotent no-op)', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ status: 'DRAFT' }));
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'DRAFT' }));
+
+      const result = await service.update('article-id', { status: 'DRAFT' } as any);
+      expect(result.status).toBe('DRAFT');
+    });
+
+    it('error message should include both from and to status', async () => {
+      prisma.article.findUnique.mockResolvedValue(mockArticle({ status: 'DRAFT' }));
+
+      try {
+        await service.update('article-id', { status: 'PUBLISHED' } as any);
+        fail('expected BadRequestException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).message).toContain('DRAFT');
+        expect((err as BadRequestException).message).toContain('PUBLISHED');
+      }
+    });
+
+    describe('submitReview() should reject illegal review transitions', () => {
+      it('should reject REVIEW from DRAFT (not in review yet)', async () => {
+        prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'DRAFT', editorId: 'editor-id' });
+        prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+
+        await expect(
+          service.submitReview('article-id', 'editor-id', 'APPROVE'),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should reject REVIEW from PUBLISHED', async () => {
+        prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'PUBLISHED', editorId: 'editor-id' });
+        prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+
+        await expect(
+          service.submitReview('article-id', 'editor-id', 'APPROVE'),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should reject REVIEW from ARCHIVED', async () => {
+        prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'ARCHIVED', editorId: 'editor-id' });
+        prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
+
+        await expect(
+          service.submitReview('article-id', 'editor-id', 'APPROVE'),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('submitReview() should accept legal review transitions', () => {
+      it('IN_REVIEW -> APPROVED is allowed', async () => {
+        await expectValidTransition('IN_REVIEW', 'APPROVED', 'submitReview');
+      });
+
+      it('IN_REVIEW -> REVISION is allowed', async () => {
+        await expectValidTransition('IN_REVIEW', 'REVISION', 'submitReview');
+      });
     });
   });
 });

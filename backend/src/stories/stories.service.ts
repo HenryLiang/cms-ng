@@ -3,11 +3,13 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { ArticlesService } from '../articles/articles.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
+import { FindAllStoriesDto } from './dto/find-all-stories.dto';
 import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 import { safeJsonParse } from '../common/json.utils';
@@ -49,40 +51,73 @@ export class StoriesService {
     return this.serializeStory(story);
   }
 
-  async findAll(user: { userId: string; role: string }) {
-    let where: any = {};
+  async findAll(
+    user: { userId: string; role: string },
+    query: FindAllStoriesDto = {},
+  ) {
+    const {
+      page = 1,
+      pageSize = 20,
+      status,
+      contentLanguage,
+      sortBy = 'createdAt',
+      order = 'desc',
+    } = query;
+
+    // 1) 角色基线 where
+    const where: Prisma.StoryWhereInput = {};
 
     if (user.role === UserRole.REPORTER) {
-      where = { reporterId: user.userId };
+      where.reporterId = user.userId;
     } else if (user.role === UserRole.EDITOR) {
-      where = {
-        OR: [
-          { reporterId: user.userId },
-          { editorId: user.userId },
-          {
-            status: {
-              in: [
-                ArticleStatus.PENDING_REVIEW,
-                ArticleStatus.IN_REVIEW,
-                ArticleStatus.REVISION,
-              ],
-            },
+      where.OR = [
+        { reporterId: user.userId },
+        { editorId: user.userId },
+        {
+          status: {
+            in: [
+              ArticleStatus.PENDING_REVIEW,
+              ArticleStatus.IN_REVIEW,
+              ArticleStatus.REVISION,
+            ],
           },
-        ],
-      };
+        },
+      ];
     }
-    // ADMIN sees everything (no where clause)
+    // ADMIN sees everything (no role-based where)
 
-    const stories = await this.prisma.story.findMany({
-      where,
-      orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
-      include: {
-        reporter: { select: { id: true, name: true, email: true } },
-        editor: { select: { id: true, name: true, email: true } },
-        _count: { select: { articles: true } },
+    // 2) 应用 query 过滤
+    if (status) where.status = status;
+    if (contentLanguage) where.contentLanguage = contentLanguage;
+
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
+
+    // 3) data + total 并行查询
+    const [stories, total] = await Promise.all([
+      this.prisma.story.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy]: order } as Prisma.StoryOrderByWithRelationInput,
+        include: {
+          reporter: { select: { id: true, name: true, email: true } },
+          editor: { select: { id: true, name: true, email: true } },
+          _count: { select: { articles: true } },
+        },
+      }),
+      this.prisma.story.count({ where }),
+    ]);
+
+    return {
+      data: stories.map((s) => this.serializeStory(s)),
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
       },
-    });
-    return stories.map((s) => this.serializeStory(s));
+    };
   }
 
   async findOne(id: string) {
@@ -136,6 +171,15 @@ export class StoriesService {
   async remove(id: string) {
     const existing = await this.prisma.story.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Story not found');
+
+    // #55: 显式先清空关联 Article.storyId 防 orphan 数据。
+    // schema 已有 onDelete: SetNull(双保险),但显式 updateMany
+    // 让我们能在 service 层记录清理数,且对旧数据 schema 也安全。
+    await this.prisma.article.updateMany({
+      where: { storyId: id },
+      data: { storyId: null },
+    });
+
     await this.prisma.story.delete({ where: { id } });
     return { success: true };
   }

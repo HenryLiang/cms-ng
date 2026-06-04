@@ -109,4 +109,63 @@ export class AuthService {
     }
     return user;
   }
+
+  /**
+   * Refresh an access token (issue #49).
+   *
+   * Accepts an existing JWT (valid OR expired) and re-issues a new one IF:
+   *   1. The token's signature is valid (catch verify errors -> 401)
+   *   2. The user still exists
+   *   3. The user is still active (isActive=true)
+   *
+   * `ignoreExpiration: true` is intentional: the whole point of /refresh is
+   * to renew tokens AFTER they expire. The signature check still rejects
+   * forged tokens.
+   *
+   * Returns the same shape as login() so the frontend can swap the access
+   * token transparently.
+   */
+  async refresh(oldToken: string) {
+    let payload: { sub: string; email: string; role: string };
+    try {
+      payload = this.jwtService.verify(oldToken, { ignoreExpiration: true });
+    } catch {
+      throw new UnauthorizedException('Invalid or malformed token');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        preferredLanguage: true,
+      },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User no longer exists');
+    }
+    if (user.isActive === false) {
+      throw new UnauthorizedException('User is inactive');
+    }
+
+    const newToken = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        preferredLanguage: user.preferredLanguage,
+      },
+      accessToken: newToken,
+    };
+  }
 }

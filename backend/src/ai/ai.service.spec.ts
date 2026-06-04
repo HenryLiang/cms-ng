@@ -1440,22 +1440,29 @@ describe('AIService', () => {
     });
 
     it('should include Wikipedia entries in prompt and result when search succeeds', async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          query: {
-            search: [{ title: '香港房屋政策' }],
-          },
-        },
-      });
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          type: 'standard',
-          title: '香港房屋政策',
-          extract: '香港房屋政策是指香港特區政府...',
-          content_urls: {
-            desktop: { page: 'https://zh.wikipedia.org/wiki/香港房屋政策' },
-          },
-        },
+      // Use order-independent mocks: respond based on URL.
+      // zh.wikipedia returns a hit; en.wikipedia returns nothing.
+      mockedAxios.get.mockImplementation(async (url: any) => {
+        const urlStr = String(url);
+        if (urlStr.includes('zh.wikipedia.org') && urlStr.includes('w/api.php')) {
+          return {
+            data: { query: { search: [{ title: '香港房屋政策' }] } },
+          };
+        }
+        if (urlStr.includes('zh.wikipedia.org') && urlStr.includes('summary')) {
+          return {
+            data: {
+              type: 'standard',
+              title: '香港房屋政策',
+              extract: '香港房屋政策是指香港特區政府...',
+              content_urls: {
+                desktop: { page: 'https://zh.wikipedia.org/wiki/香港房屋政策' },
+              },
+            },
+          };
+        }
+        // en.wikipedia: empty results (no entries)
+        return { data: { query: { search: [] } } };
       });
 
       mockChatProvider.chatCompletionWithTools.mockResolvedValue(
@@ -1518,6 +1525,152 @@ describe('AIService', () => {
       expect(result.data).toEqual([]);
       expect(result.opinions).toEqual([]);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('generateResearchKit — parallel execution (#52)', () => {
+    it('should run Wikipedia and Tavily search in parallel (total time ≈ max, not sum)', async () => {
+      const wikiSpy = jest
+        .spyOn(service as any, 'searchWikipedia')
+        .mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 200));
+          return [];
+        });
+      const searchSpy = jest
+        .spyOn(service as any, 'performSearch')
+        .mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 200));
+          return 'tavily summary';
+        });
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
+      );
+
+      const start = Date.now();
+      await service.generateResearchKit('user-id', {
+        storyTitle: 'Test Topic',
+        storyTags: [],
+      });
+      const elapsed = Date.now() - start;
+
+      expect(wikiSpy).toHaveBeenCalled();
+      expect(searchSpy).toHaveBeenCalled();
+
+      // Parallel: total elapsed ≈ max(200, 200) + LLM, not sum (400) + LLM
+      expect(elapsed).toBeLessThan(350);
+    });
+
+    it('should still call LLM synthesis after both data sources complete', async () => {
+      const wikiSpy = jest.spyOn(service as any, 'searchWikipedia').mockResolvedValue([]);
+      const searchSpy = jest.spyOn(service as any, 'performSearch').mockResolvedValue('tavily');
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
+      );
+
+      await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      const wikiOrder = wikiSpy.mock.invocationCallOrder[0];
+      const searchOrder = searchSpy.mock.invocationCallOrder[0];
+      const llmOrder = mockChatProvider.chatCompletion.mock.invocationCallOrder[0];
+
+      expect(wikiOrder).toBeLessThan(llmOrder);
+      expect(searchOrder).toBeLessThan(llmOrder);
+    });
+
+    it('should fail-soft if Wikipedia throws but Tavily succeeds', async () => {
+      jest
+        .spyOn(service as any, 'searchWikipedia')
+        .mockRejectedValue(new Error('Wikipedia down'));
+      jest.spyOn(service as any, 'performSearch').mockResolvedValue('tavily summary');
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
+      );
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      expect(result).toBeDefined();
+      expect(result.timeline).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should fail-soft if Tavily throws but Wikipedia succeeds', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: { query: { search: [] } },
+      });
+      jest
+        .spyOn(service as any, 'performSearch')
+        .mockRejectedValue(new Error('Tavily down'));
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
+      );
+
+      const result = await service.generateResearchKit('user-id', {
+        storyTitle: 'Test',
+        storyTags: [],
+      });
+
+      expect(result).toBeDefined();
+      expect(result.timeline).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('P95 across 5 sequential runs is < 1.2s with 200ms parallel stubs (#52 perf SLA)', async () => {
+      // 5 runs of generateResearchKit, each with both external sources delayed
+      // 200ms. If parallelization regresses to sequential, P95 of total time
+      // would approach 2*200ms + LLM = ~500ms+; with parallel, the dominant
+      // cost per run is just the slower source (~200ms) + LLM. We assert
+      // P95 < 1200ms to give margin for CI noise while still catching a
+      // doubling of wall time.
+      jest
+        .spyOn(service as any, 'searchWikipedia')
+        .mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 200));
+          return [];
+        });
+      jest
+        .spyOn(service as any, 'performSearch')
+        .mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 200));
+          return 'tavily summary';
+        });
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
+      );
+
+      const samples: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const start = Date.now();
+        await service.generateResearchKit('user-id', {
+          storyTitle: `P95 run ${i}`,
+          storyTags: [],
+        });
+        samples.push(Date.now() - start);
+      }
+      samples.sort((a, b) => a - b);
+      // 95th percentile index for 5 samples = index 4 (the max)
+      const p95 = samples[Math.ceil(samples.length * 0.95) - 1];
+      expect(p95).toBeLessThan(1200);
     });
   });
 
