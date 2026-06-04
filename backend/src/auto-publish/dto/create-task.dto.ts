@@ -5,11 +5,18 @@ import {
   IsIn,
   IsInt,
   IsObject,
+  Matches,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ContentLanguage, Platform, ScheduleType } from '@cms-ng/shared';
+
+/**
+ * HH:MM in 24-hour clock.  Hours 00–23, minutes 00–59.
+ * Anchored with ^…$ to reject trailing garbage like "9:00 extra".
+ */
+const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Allowlist of IANA timezones the auto-publish scheduler is allowed to use.
@@ -38,6 +45,7 @@ const ALLOWED_TIMEZONES = [
 
 export class ScheduleConfigDto {
   @IsString({ each: true })
+  @Matches(HHMM_REGEX, { each: true, message: 'times must be HH:MM in 24h format (00:00–23:59)' })
   times: string[];
 
   @IsIn(ALLOWED_TIMEZONES as unknown as string[])
