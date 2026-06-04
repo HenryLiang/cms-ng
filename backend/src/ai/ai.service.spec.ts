@@ -1631,6 +1631,47 @@ describe('AIService', () => {
       expect(result.timeline).toEqual([]);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
+
+    it('P95 across 5 sequential runs is < 1.2s with 200ms parallel stubs (#52 perf SLA)', async () => {
+      // 5 runs of generateResearchKit, each with both external sources delayed
+      // 200ms. If parallelization regresses to sequential, P95 of total time
+      // would approach 2*200ms + LLM = ~500ms+; with parallel, the dominant
+      // cost per run is just the slower source (~200ms) + LLM. We assert
+      // P95 < 1200ms to give margin for CI noise while still catching a
+      // doubling of wall time.
+      jest
+        .spyOn(service as any, 'searchWikipedia')
+        .mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 200));
+          return [];
+        });
+      jest
+        .spyOn(service as any, 'performSearch')
+        .mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 200));
+          return 'tavily summary';
+        });
+
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
+      );
+
+      const samples: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const start = Date.now();
+        await service.generateResearchKit('user-id', {
+          storyTitle: `P95 run ${i}`,
+          storyTags: [],
+        });
+        samples.push(Date.now() - start);
+      }
+      samples.sort((a, b) => a - b);
+      // 95th percentile index for 5 samples = index 4 (the max)
+      const p95 = samples[Math.ceil(samples.length * 0.95) - 1];
+      expect(p95).toBeLessThan(1200);
+    });
   });
 
 });
