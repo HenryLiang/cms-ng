@@ -879,13 +879,17 @@ type 取值说明：
     // Use the extracted keyword (e.g. "消费级机器人") instead of the full
     // editorial title — Wikipedia search returns relevant articles for focused
     // noun-phrases, not for long opinion-style titles.
-    // 优先中文，再英文补充
-    const zhEntry = await searchAndFetch('zh', zhKeyword);
+    // Run zh and en searches in parallel — they're independent and the API
+    // calls are the dominant cost of this step. The en branch's keyword→title
+    // fallback remains sequential within its own branch to preserve the
+    // existing fallback semantics.
+    const [zhEntry, enFirst] = await Promise.all([
+      searchAndFetch('zh', zhKeyword),
+      searchAndFetch('en', zhKeyword),
+    ]);
     if (zhEntry) entries.push(zhEntry);
 
-    // For English Wikipedia, try the keyword first; if no results,
-    // fall back to the original title (which may contain English terms).
-    let enEntry = await searchAndFetch('en', zhKeyword);
+    let enEntry: WikipediaEntry | null = enFirst;
     if (!enEntry && zhKeyword !== title) {
       enEntry = await searchAndFetch('en', title);
     }
@@ -977,13 +981,16 @@ type 取值说明：
     const startTime = Date.now();
     const language = input.language;
 
-    // Step 1: Wikipedia 资料增强（静默降级）
-    let wikipediaEntries: WikipediaEntry[] = [];
-    try {
-      wikipediaEntries = await this.searchWikipedia(input.storyTitle);
-    } catch {
-      // 静默降级：Wikipedia 搜索失败不影响主流程
-    }
+    // Step 1 + Step 2 (parallel): Wikipedia + Tavily/Kimi web search.
+    // Both are independent and were previously sequential. Running them in
+    // parallel cuts the network-bound portion of the request roughly in half
+    // (was ~30-50s for Wikipedia + ~30s for Tavily; now bounded by the slower
+    // of the two). Both fail-soft independently — a Wikipedia outage no
+    // longer blocks the web search and vice versa.
+    const [wikipediaEntries, searchSummary] = await Promise.all([
+      this.searchWikipedia(input.storyTitle).catch(() => [] as WikipediaEntry[]),
+      this.performSearch(input.storyTitle, language).catch(() => ''),
+    ]);
 
     const tagsStr = input.storyTags.join(', ') || '未指定';
 
@@ -993,19 +1000,9 @@ type 取值说明：
     const prevYear = currentYear - 1;
     const currentDateStr = now.toISOString().split('T')[0];
 
-    // Step 2: 联网搜索最新资讯（provider-agnostic）
-    let searchResults = '';
-    try {
-      const searchSummary = await this.performSearch(
-        input.storyTitle,
-        language,
-      );
-      if (searchSummary) {
-        searchResults = `【联网搜索最新資訊】\n${searchSummary}\n`;
-      }
-    } catch {
-      // 静默降级：搜索失败不影响主流程
-    }
+    const searchResults = searchSummary
+      ? `【联网搜索最新資訊】\n${searchSummary}\n`
+      : '';
 
     // Build Wikipedia context section
     let wikipediaSection = '';
