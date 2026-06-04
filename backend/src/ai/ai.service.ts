@@ -3,11 +3,13 @@ import {
   Inject,
   Logger,
   InternalServerErrorException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { PrismaService } from '../prisma/prisma.service';
+import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
 import type {
   ChatCompletionProvider,
   ChatMessage as ProviderChatMessage,
@@ -45,7 +47,6 @@ export class AIService {
   private readonly seedreamApiKey: string;
   private readonly seedreamApiBase: string;
   private readonly seedreamModel: string;
-  private readonly uploadDir: string;
   private readonly searchProvider: string;
   /** HTTP(S) proxy agent — used when Wikipedia/RSS are blocked by DNS pollution. */
   private readonly proxyAgent?: HttpsProxyAgent<string>;
@@ -55,6 +56,7 @@ export class AIService {
     private prisma: PrismaService,
     private aiTools: AIToolsService,
     @Inject(CHAT_PROVIDER) private chatProvider: ChatCompletionProvider,
+    @Inject(STORAGE_SERVICE) private storageService: StorageService,
   ) {
     this.seedreamApiKey = this.config.get<string>('SEEDREAM_API_KEY') || '';
     this.seedreamApiBase =
@@ -62,7 +64,6 @@ export class AIService {
       'https://ark.cn-beijing.volces.com/api/v3';
     this.seedreamModel =
       this.config.get<string>('SEEDREAM_MODEL') || 'doubao-seedream-5-0-260128';
-    this.uploadDir = this.config.get<string>('UPLOAD_DIR') || './uploads';
     this.searchProvider = this.config.get<string>('SEARCH_PROVIDER') || 'tavily';
 
     const proxyUrl =
@@ -1519,8 +1520,8 @@ priority 取值说明：
       throw new InternalServerErrorException('Seedream 未返回图片 URL');
     }
 
-    // Step 3: 下载图片到本地
-    const localUrl = await this.downloadImage(tempImageUrl, articleId);
+    // Step 3: 下载图片并上传到 COS
+    const publicUrl = await this.uploadToStorage(tempImageUrl, articleId);
 
     // Step 4: 记录 AI 操作
     await this.prisma.aIOperation.create({
@@ -1528,7 +1529,7 @@ priority 取值说明：
         agentType: 'VISUAL',
         action: 'generate_article_image',
         prompt: `标题: ${articleTitle}\n风格: ${style}\n${customPrompt}`,
-        result: JSON.stringify({ imagePrompt, localUrl }),
+        result: JSON.stringify({ imagePrompt, publicUrl }),
         model: this.seedreamModel,
         durationMs: Date.now() - startTime,
         articleId,
@@ -1536,7 +1537,7 @@ priority 取值说明：
       },
     });
 
-    return { url: localUrl, prompt: imagePrompt };
+    return { url: publicUrl, prompt: imagePrompt };
   }
 
   private async buildImagePrompt(
@@ -1620,34 +1621,34 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     return response.data;
   }
 
-  private async downloadImage(
+  /**
+   * 下载临时图片并上传到对象存储,返回公网 URL
+   */
+  private async uploadToStorage(
     tempUrl: string,
     articleId: string,
   ): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const dir = path.join(this.uploadDir, 'articles', articleId);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    const filename = `generated_${Date.now()}.png`;
-    const filePath = path.join(dir, filename);
-
     const imageResponse = await axios.get(tempUrl, {
-      responseType: 'stream',
-      timeout: 300000,
+      responseType: 'arraybuffer',
+      timeout: 300_000,
     });
-
-    const writer = fs.createWriteStream(filePath);
-    imageResponse.data.pipe(writer);
-
-    await new Promise<void>((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-    });
-
-    return `/uploads/articles/${articleId}/${filename}`;
+    const buffer = Buffer.from(imageResponse.data);
+    const contentType: string =
+      (imageResponse.headers['content-type'] as string) || 'image/png';
+    const mimeExt = contentType.split('/')[1]?.split(';')[0]?.trim() || 'png';
+    const ext = mimeExt === 'jpeg' ? 'jpg' : mimeExt;
+    const key = `cms-ng/articles/${articleId}/generated_${Date.now()}.${ext}`;
+    try {
+      const { url } = await this.storageService.put(key, buffer, contentType);
+      return url;
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to upload image to storage: ${error.message}`,
+        error.stack,
+      );
+      throw new ServiceUnavailableException(
+        `图片上传到对象存储失败: ${error.message}`,
+      );
+    }
   }
 }
