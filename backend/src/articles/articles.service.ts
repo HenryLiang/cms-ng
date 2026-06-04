@@ -27,6 +27,62 @@ import { GenerateImageDto } from './dto/generate-image.dto';
 
 @Injectable()
 export class ArticlesService {
+  /**
+   * Allowed state transitions for Article (per PRD §8.4).
+   * Key: current status, Value: list of valid next statuses.
+   */
+  private static readonly VALID_TRANSITIONS: Record<ArticleStatus, ArticleStatus[]> = {
+    [ArticleStatus.DRAFT]: [ArticleStatus.WRITING, ArticleStatus.ARCHIVED],
+    [ArticleStatus.WRITING]: [
+      ArticleStatus.AI_OPTIMIZING,
+      ArticleStatus.DRAFT,
+      ArticleStatus.ARCHIVED,
+    ],
+    [ArticleStatus.AI_OPTIMIZING]: [
+      ArticleStatus.PENDING_REVIEW,
+      ArticleStatus.WRITING,
+      ArticleStatus.DRAFT,
+    ],
+    [ArticleStatus.PENDING_REVIEW]: [
+      ArticleStatus.IN_REVIEW,
+      ArticleStatus.REVISION,
+      ArticleStatus.DRAFT,
+    ],
+    [ArticleStatus.IN_REVIEW]: [
+      ArticleStatus.APPROVED,
+      ArticleStatus.REVISION,
+      ArticleStatus.PENDING_REVIEW,
+    ],
+    [ArticleStatus.APPROVED]: [
+      ArticleStatus.PUBLISHED,
+      ArticleStatus.REVISION,
+      ArticleStatus.IN_REVIEW,
+    ],
+    [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
+    [ArticleStatus.ARCHIVED]: [],
+    [ArticleStatus.REVISION]: [
+      ArticleStatus.WRITING,
+      ArticleStatus.DRAFT,
+      ArticleStatus.ARCHIVED,
+    ],
+    [ArticleStatus.AUTO_PUBLISHED]: [ArticleStatus.ARCHIVED, ArticleStatus.PUBLISHED],
+    [ArticleStatus.PIPELINE_FAILED]: [ArticleStatus.DRAFT, ArticleStatus.ARCHIVED],
+  };
+
+  /**
+   * Throws BadRequestException if the transition from→to is not in the
+   * allowed transition matrix. Same-state updates are no-ops (allowed).
+   */
+  private validateStateTransition(from: ArticleStatus, to: ArticleStatus): void {
+    if (from === to) return; // idempotent: no actual transition
+    const allowed = ArticlesService.VALID_TRANSITIONS[from];
+    if (!allowed || !allowed.includes(to)) {
+      throw new BadRequestException(
+        `Invalid state transition: ${from} -> ${to}`,
+      );
+    }
+  }
+
   constructor(
     private prisma: PrismaService,
     private aiService: AIService,
@@ -154,6 +210,11 @@ export class ArticlesService {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
 
+    // Validate state-machine transition when status is being changed
+    if (dto.status && dto.status !== existing.status) {
+      this.validateStateTransition(existing.status, dto.status);
+    }
+
     const newVersion = existing.version + 1;
 
     const article = await this.prisma.article.update({
@@ -278,6 +339,11 @@ export class ArticlesService {
     } else {
       newStatus = ArticleStatus.REVISION;
     }
+
+    // Validate state-machine transition: only articles currently in review
+    // (IN_REVIEW) can be reviewed. Anything else (DRAFT, PUBLISHED, ARCHIVED, ...)
+    // is an illegal review target.
+    this.validateStateTransition(article.status, newStatus);
 
     const updated = await this.prisma.article.update({
       where: { id },
