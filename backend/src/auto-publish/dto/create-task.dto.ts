@@ -8,7 +8,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ScheduleType } from '@cms-ng/shared';
+import { ContentLanguage, Platform, ScheduleType } from '@cms-ng/shared';
 
 export class ScheduleConfigDto {
   @IsString({ each: true })
@@ -39,8 +39,8 @@ export class ContentConfigDto {
   @Max(5000)
   maxLength: number;
 
-  @IsString()
-  language: string;
+  @IsEnum(ContentLanguage)
+  language: ContentLanguage;
 
   @IsOptional()
   @IsString()
