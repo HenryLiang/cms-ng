@@ -842,7 +842,7 @@ export default function ArticleEditorPage() {
                 onClick={() => setShowImagePreview(true)}
               >
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${article.coverImage}`}
+                  src={article.coverImage}
                   alt="封面图"
                   className="w-full h-full object-cover"
                 />
@@ -1332,7 +1332,7 @@ export default function ArticleEditorPage() {
               <X className="h-6 w-6" />
             </button>
             <img
-              src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${article.coverImage}`}
+              src={article.coverImage}
               alt="封面图预览"
               className="max-w-full max-h-[85vh] rounded-lg object-contain"
               onClick={(e) => e.stopPropagation()}
