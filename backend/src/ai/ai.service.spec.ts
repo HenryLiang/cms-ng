@@ -16,6 +16,7 @@ import {
   type ChatCompletionResponse,
   KimiProvider,
 } from './providers';
+import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
 
 // axios is still used by searchWikipedia (GET requests)
 jest.mock('axios');
@@ -34,6 +35,7 @@ describe('AIService', () => {
     chatCompletion: jest.Mock;
     chatCompletionWithTools: jest.Mock;
   };
+  let storageMock: { put: jest.Mock; delete: jest.Mock };
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -64,6 +66,11 @@ describe('AIService', () => {
       chatCompletionWithTools: jest.fn(),
     };
 
+    storageMock = {
+      put: jest.fn(),
+      delete: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AIService,
@@ -71,6 +78,7 @@ describe('AIService', () => {
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: mockChatProvider },
+        { provide: STORAGE_SERVICE, useValue: storageMock },
       ],
     }).compile();
 
@@ -1021,10 +1029,15 @@ describe('AIService', () => {
         data: { data: [{ url: 'https://seedream.example.com/temp/image.png' }] },
       });
 
-      // Step 3: mock downloadImage to avoid fs/path dynamic imports
-      jest.spyOn(service as any, 'downloadImage').mockResolvedValue(
-        '/uploads/articles/article-123/generated_123.png',
-      );
+      // Step 3: mock storageService.put to avoid real network/COS calls
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/generated_123.png',
+        key: 'cms-ng/articles/article-123/generated_123.png',
+      });
 
       const result = await service.generateArticleImage(
         'user-id',
@@ -1034,8 +1047,13 @@ describe('AIService', () => {
         { style: 'news' },
       );
 
-      expect(result.url).toBe('/uploads/articles/article-123/generated_123.png');
+      expect(result.url).toBe('https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/generated_123.png');
       expect(result.prompt).toBe('A professional news photograph of a city skyline at dusk');
+      expect(storageMock.put).toHaveBeenCalledWith(
+        expect.stringMatching(/^cms-ng\/articles\/article-123\/generated_\d+\.png$/),
+        expect.any(Buffer),
+        'image/png',
+      );
       expect(mockChatProvider.chatCompletion).toHaveBeenCalled();
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
@@ -1077,7 +1095,14 @@ describe('AIService', () => {
         data: { data: [{ url: 'https://example.com/img.png' }] },
       });
 
-      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/img.png',
+        key: 'cms-ng/articles/article-123/img.png',
+      });
 
       await service.generateArticleImage(
         'user-id', 'article-123', 'Title', 'Content',
@@ -1098,7 +1123,14 @@ describe('AIService', () => {
         data: { data: [{ url: 'https://example.com/img.png' }] },
       });
 
-      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/img.png',
+        key: 'cms-ng/articles/article-123/img.png',
+      });
 
       await service.generateArticleImage(
         'user-id', 'article-123', 'Title', 'Content',
@@ -1119,7 +1151,14 @@ describe('AIService', () => {
         data: { data: [{ url: 'https://example.com/img.png' }] },
       });
 
-      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/img.png',
+        key: 'cms-ng/articles/article-123/img.png',
+      });
 
       await service.generateArticleImage(
         'user-id', 'article-123', 'Title', 'Content',
@@ -1140,7 +1179,14 @@ describe('AIService', () => {
         data: { data: [{ url: 'https://example.com/img.png' }] },
       });
 
-      jest.spyOn(service as any, 'downloadImage').mockResolvedValue('/uploads/articles/article-123/img.png');
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/img.png',
+        key: 'cms-ng/articles/article-123/img.png',
+      });
 
       await service.generateArticleImage(
         'user-id', 'article-123', 'Title', 'Content',
@@ -1381,12 +1427,14 @@ describe('AIService — performSearch branch logic', () => {
   let prisma: ReturnType<typeof createMockPrismaService>;
   let aiTools: AIToolsService;
   let tavilySearch: TavilySearchTool;
+  let storageMock: { put: jest.Mock; delete: jest.Mock };
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     prisma = createMockPrismaService();
+    storageMock = { put: jest.fn(), delete: jest.fn() };
     const config = {
       get: jest.fn((key: string) => {
         const map: Record<string, string> = {
@@ -1438,6 +1486,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: kimiProvider },
+        { provide: STORAGE_SERVICE, useValue: storageMock },
       ],
     }).compile();
 
@@ -1488,6 +1537,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: mockProvider },
+        { provide: STORAGE_SERVICE, useValue: storageMock },
       ],
     }).compile();
 
@@ -1539,6 +1589,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: mockProvider },
+        { provide: STORAGE_SERVICE, useValue: storageMock },
       ],
     }).compile();
 
