@@ -1199,6 +1199,107 @@ describe('AIService', () => {
     });
   });
 
+  describe('uploadToStorage', () => {
+    it('rejects non-image content types (text/html)', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('not an image'),
+        headers: { 'content-type': 'text/html' },
+      });
+
+      await expect(
+        (service as any).uploadToStorage(
+          'https://seedream.example.com/temp/x',
+          'article-x',
+        ),
+      ).rejects.toThrow(/Unexpected image content type/);
+
+      // storageService.put must NOT be called when validation fails
+      expect(storageMock.put).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-image content types with charset suffix (image/png; charset=utf-8 still allowed, but text/html; charset=... rejected)', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('not an image'),
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+
+      await expect(
+        (service as any).uploadToStorage(
+          'https://seedream.example.com/temp/x',
+          'article-x',
+        ),
+      ).rejects.toThrow(/Unexpected image content type/);
+    });
+
+    it('accepts image/png and uploads with .png extension', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt.example.com/cms-ng/articles/article-1/generated_1.png',
+        key: 'cms-ng/articles/article-1/generated_1.png',
+      });
+
+      const url = await (service as any).uploadToStorage(
+        'https://seedream.example.com/temp/x',
+        'article-1',
+      );
+
+      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/generated_1.png');
+      expect(storageMock.put).toHaveBeenCalledWith(
+        expect.stringMatching(/^cms-ng\/articles\/article-1\/generated_\d+\.png$/),
+        expect.any(Buffer),
+        'image/png',
+      );
+    });
+
+    it('accepts image/jpeg and uploads with .jpg extension', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-jpeg-bytes'),
+        headers: { 'content-type': 'image/jpeg' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt.example.com/cms-ng/articles/article-1/generated_1.jpg',
+        key: 'cms-ng/articles/article-1/generated_1.jpg',
+      });
+
+      const url = await (service as any).uploadToStorage(
+        'https://seedream.example.com/temp/x',
+        'article-1',
+      );
+
+      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/generated_1.jpg');
+      expect(storageMock.put).toHaveBeenCalledWith(
+        expect.stringMatching(/^cms-ng\/articles\/article-1\/generated_\d+\.jpg$/),
+        expect.any(Buffer),
+        'image/jpeg',
+      );
+    });
+
+    it('passes maxContentLength to axios.get to cap download size', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt.example.com/cms-ng/articles/article-1/generated_1.png',
+        key: 'cms-ng/articles/article-1/generated_1.png',
+      });
+
+      await (service as any).uploadToStorage(
+        'https://seedream.example.com/temp/x',
+        'article-1',
+      );
+
+      const callArgs = mockedAxios.get.mock.calls[0];
+      const opts = callArgs[1];
+      expect(opts.maxContentLength).toBe(20 * 1024 * 1024);
+      expect(opts.responseType).toBe('arraybuffer');
+      expect(opts.timeout).toBe(300_000);
+    });
+  });
+
   describe('generateResearchKit', () => {
     it('should return research kit with all four dimensions on success', async () => {
       // Mock search (performSearch → chatCompletionWithTools)

@@ -41,6 +41,17 @@ import {
 } from './dto/writing-operations.dto';
 import { AIToolsService } from './tools/ai-tools.service';
 
+/**
+ * Module-level safety bounds for the image-fetch path in `uploadToStorage`.
+ * - `ALLOWED_IMAGE_TYPES` blocks SSRF amplification where a non-image
+ *   `Content-Type` (e.g. `text/html`) would be uploaded to COS and later
+ *   trusted by WordPress/the frontend as an image.
+ * - `MAX_IMAGE_BYTES` caps the in-memory `arraybuffer` to prevent a malicious
+ *   or misconfigured upstream from exhausting backend memory.
+ */
+const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg']);
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
+
 @Injectable()
 export class AIService {
   private readonly logger = new Logger(AIService.name);
@@ -1631,15 +1642,22 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     const imageResponse = await axios.get(tempUrl, {
       responseType: 'arraybuffer',
       timeout: 300_000,
+      maxContentLength: MAX_IMAGE_BYTES,
     });
     const buffer = Buffer.from(imageResponse.data);
-    const contentType: string =
-      (imageResponse.headers['content-type'] as string) || 'image/png';
-    const mimeExt = contentType.split('/')[1]?.split(';')[0]?.trim() || 'png';
-    const ext = mimeExt === 'jpeg' ? 'jpg' : mimeExt;
+    const rawType = String(imageResponse.headers['content-type'] || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    if (!ALLOWED_IMAGE_TYPES.has(rawType)) {
+      throw new InternalServerErrorException(
+        `Unexpected image content type: ${rawType}`,
+      );
+    }
+    const ext = rawType === 'image/png' ? 'png' : 'jpg';
     const key = `cms-ng/articles/${articleId}/generated_${Date.now()}.${ext}`;
     try {
-      const { url } = await this.storageService.put(key, buffer, contentType);
+      const { url } = await this.storageService.put(key, buffer, rawType);
       return url;
     } catch (error: any) {
       this.logger.error(
