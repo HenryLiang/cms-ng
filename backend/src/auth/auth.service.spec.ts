@@ -14,11 +14,14 @@ import * as bcrypt from 'bcryptjs';
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof createMockPrismaService>;
-  let jwtService: { sign: jest.Mock };
+  let jwtService: { sign: jest.Mock; verify: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
-    jwtService = { sign: jest.fn().mockReturnValue('test_jwt_token') };
+    jwtService = {
+      sign: jest.fn().mockReturnValue('test_jwt_token'),
+      verify: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -179,6 +182,105 @@ describe('AuthService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(service.getCurrentUser('nonexistent')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  // ===== issue #49 — POST /auth/refresh =====
+  describe('refresh (issue #49)', () => {
+    it('should return a new access token for a valid, non-expired token', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        name: 'Test',
+        role: 'REPORTER',
+        isActive: true,
+      });
+
+      const result = await service.refresh('valid.jwt.token');
+
+      // verify must be called with ignoreExpiration: true so expired tokens
+      // can still be refreshed (issue #49 acceptance criteria)
+      expect(jwtService.verify).toHaveBeenCalledWith(
+        'valid.jwt.token',
+        { ignoreExpiration: true },
+      );
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+      });
+      expect(result.accessToken).toBe('test_jwt_token');
+      expect(result.user.id).toBe('user-id');
+    });
+
+    it('should return a new access token for an expired-but-signed token', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        name: 'Test',
+        role: 'REPORTER',
+        isActive: true,
+      });
+
+      const result = await service.refresh('expired.but.signed.jwt');
+
+      expect(result.accessToken).toBe('test_jwt_token');
+    });
+
+    it('should throw UnauthorizedException when user is inactive (isActive=false)', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        name: 'Test',
+        role: 'REPORTER',
+        isActive: false,
+      });
+
+      await expect(service.refresh('valid.jwt.token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when token signature is invalid', async () => {
+      jwtService.verify.mockImplementation(() => {
+        throw new Error('invalid signature');
+      });
+
+      await expect(service.refresh('forged.jwt.token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when user referenced by token no longer exists', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'deleted-user-id',
+        email: 'gone@example.com',
+        role: 'REPORTER',
+      });
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.refresh('token.for.deleted.user')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(jwtService.sign).not.toHaveBeenCalled();
     });
   });
 });
