@@ -219,7 +219,7 @@ export async function aiOptimizeSEO(id: string, language?: ContentLanguage): Pro
 export interface GenerateImageInput {
   style?: 'news' | 'illustration' | 'photo' | 'social';
   aspectRatio?: string;
-  size?: '2K' | '3K';
+  size?: '2K' | '3K' | '4K';
   customPrompt?: string;
 }
 
@@ -229,6 +229,6 @@ export interface GenerateImageResult {
 }
 
 export async function aiGenerateImage(id: string, options?: GenerateImageInput): Promise<GenerateImageResult> {
-  const res = await api.post(`/articles/${id}/ai-generate-image`, options, { timeout: 600000 });
+  const res = await api.post(`/articles/${id}/ai-generate-image`, options, { timeout: 180000 });
   return res.data;
 }

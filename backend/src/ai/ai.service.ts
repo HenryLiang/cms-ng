@@ -1500,7 +1500,7 @@ priority 取值说明：
     options?: {
       style?: 'news' | 'illustration' | 'photo' | 'social';
       aspectRatio?: string;
-      size?: '2K' | '3K';
+      size?: '2K' | '3K' | '4K';
       customPrompt?: string;
     },
   ): Promise<{ url: string; prompt: string }> {
@@ -1510,27 +1510,73 @@ priority 取值说明：
     const aspectRatio = options?.aspectRatio;
     const customPrompt = options?.customPrompt || '';
 
-    // Step 1: 用 Kimi 提炼高质量英文 prompt
-    const imagePrompt = await this.buildImagePrompt(
-      articleTitle,
-      articleContent,
-      style,
-      customPrompt,
+    this.logger.log(
+      `[generateArticleImage] START articleId=${articleId} style=${style} size=${size} aspectRatio=${aspectRatio || 'none'}`,
     );
 
-    // Step 2: 调用 Seedream 生成图片
-    const seedreamResponse = await this.callSeedream(
-      imagePrompt,
-      size,
-      aspectRatio,
-    );
-    const tempImageUrl = seedreamResponse.data?.[0]?.url || '';
-    if (!tempImageUrl) {
-      throw new InternalServerErrorException('Seedream 未返回图片 URL');
+    // Step 1: 用 ChatProvider 提炼高质量英文 prompt
+    let imagePrompt: string;
+    try {
+      this.logger.log('[generateArticleImage] Step 1: buildImagePrompt ...');
+      imagePrompt = await this.buildImagePrompt(
+        articleTitle,
+        articleContent,
+        style,
+        customPrompt,
+      );
+      this.logger.log(
+        `[generateArticleImage] Step 1 done (${Date.now() - startTime}ms): prompt="${imagePrompt.slice(0, 120)}..."`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[generateArticleImage] Step 1 buildImagePrompt FAILED (${Date.now() - startTime}ms): ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
 
+    // Step 2: 调用 Seedream 生成图片
+    let seedreamResponse: any;
+    try {
+      this.logger.log('[generateArticleImage] Step 2: callSeedream ...');
+      seedreamResponse = await this.callSeedream(imagePrompt, size, aspectRatio);
+      this.logger.log(
+        `[generateArticleImage] Step 2 done (${Date.now() - startTime}ms): response keys=${JSON.stringify(Object.keys(seedreamResponse || {}))}`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[generateArticleImage] Step 2 callSeedream FAILED (${Date.now() - startTime}ms): ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+
+    const tempImageUrl = seedreamResponse.data?.[0]?.url || '';
+    if (!tempImageUrl) {
+      this.logger.error(
+        `[generateArticleImage] Seedream returned no image URL. Response data: ${JSON.stringify(seedreamResponse)}`,
+      );
+      throw new InternalServerErrorException('Seedream 未返回图片 URL');
+    }
+    this.logger.log(
+      `[generateArticleImage] Temp image URL: ${tempImageUrl.slice(0, 100)}...`,
+    );
+
     // Step 3: 下载图片并上传到 COS
-    const publicUrl = await this.uploadToStorage(tempImageUrl, articleId);
+    let publicUrl: string;
+    try {
+      this.logger.log('[generateArticleImage] Step 3: uploadToStorage ...');
+      publicUrl = await this.uploadToStorage(tempImageUrl, articleId);
+      this.logger.log(
+        `[generateArticleImage] Step 3 done (${Date.now() - startTime}ms): publicUrl=${publicUrl}`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[generateArticleImage] Step 3 uploadToStorage FAILED (${Date.now() - startTime}ms): ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
 
     // Step 4: 记录 AI 操作
     await this.prisma.aIOperation.create({
@@ -1546,6 +1592,9 @@ priority 取值说明：
       },
     });
 
+    this.logger.log(
+      `[generateArticleImage] COMPLETE (${Date.now() - startTime}ms) url=${publicUrl}`,
+    );
     return { url: publicUrl, prompt: imagePrompt };
   }
 
@@ -1598,22 +1647,49 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     return response.content.trim();
   }
 
+  /**
+   * Seedream API 不支持 aspect_ratio 参数，必须通过 size 像素值控制宽高比。
+   * 映射表：aspectRatio × resolutionLevel → 具体像素 size
+   */
+  private static readonly SIZE_PIXEL_MAP: Record<string, Record<string, string>> = {
+    '1:1':  { '2K': '2048x2048', '3K': '3072x3072', '4K': '4096x4096' },
+    '4:3':  { '2K': '2304x1728', '3K': '3456x2592', '4K': '4704x3520' },
+    '3:4':  { '2K': '1728x2304', '3K': '2592x3456', '4K': '3520x4704' },
+    '16:9': { '2K': '2848x1600', '3K': '4096x2304', '4K': '5504x3040' },
+    '9:16': { '2K': '1600x2848', '3K': '2304x4096', '4K': '3040x5504' },
+    '3:2':  { '2K': '2496x1664', '3K': '3744x2496', '4K': '4992x3328' },
+    '2:3':  { '2K': '1664x2496', '3K': '2496x3744', '4K': '3328x4992' },
+    '21:9': { '2K': '3136x1344', '3K': '4704x2016', '4K': '6240x2656' },
+  };
+
+  private resolveSeedreamSize(
+    resolution: string,
+    aspectRatio?: string,
+  ): string {
+    if (aspectRatio && AIService.SIZE_PIXEL_MAP[aspectRatio]?.[resolution]) {
+      return AIService.SIZE_PIXEL_MAP[aspectRatio][resolution];
+    }
+    // 无比例或比例不匹配时，回退到分辨率级别（模型自动决定比例）
+    return resolution;
+  }
+
   private async callSeedream(
     prompt: string,
     size: string,
     aspectRatio?: string,
   ): Promise<any> {
+    const resolvedSize = this.resolveSeedreamSize(size, aspectRatio);
+    this.logger.log(
+      `[callSeedream] resolution=${size} aspectRatio=${aspectRatio || 'none'} → size=${resolvedSize}`,
+    );
+
     const body: any = {
       model: this.seedreamModel,
       prompt,
-      size,
-      output_format: 'png',
+      size: resolvedSize,
+      output_format: 'jpeg',
       watermark: false,
     };
-
-    if (aspectRatio) {
-      body.aspect_ratio = aspectRatio;
-    }
 
     const response = await axios.post(
       `${this.seedreamApiBase}/images/generations`,
@@ -1623,7 +1699,8 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
           Authorization: `Bearer ${this.seedreamApiKey}`,
           'Content-Type': 'application/json',
         },
-        timeout: 300000,
+        timeout: 120000,
+        ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
       },
     );
 
@@ -1637,16 +1714,21 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     tempUrl: string,
     articleId: string,
   ): Promise<string> {
+    this.logger.log(`[uploadToStorage] Downloading temp image: ${tempUrl.slice(0, 120)}...`);
     const imageResponse = await axios.get(tempUrl, {
       responseType: 'arraybuffer',
-      timeout: 300_000,
+      timeout: 60_000,
       maxContentLength: MAX_IMAGE_BYTES,
+      ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
     });
     const buffer = Buffer.from(imageResponse.data);
     const rawType = String(imageResponse.headers['content-type'] || '')
       .split(';')[0]
       .trim()
       .toLowerCase();
+    this.logger.log(
+      `[uploadToStorage] Downloaded: ${buffer.length} bytes, content-type=${rawType}`,
+    );
     if (!ALLOWED_IMAGE_TYPES.has(rawType)) {
       throw new InternalServerErrorException(
         `Unexpected image content type: ${rawType}`,
@@ -1656,6 +1738,7 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     const key = `cms-ng/articles/${articleId}/generated_${Date.now()}.${ext}`;
     try {
       const { url } = await this.storageService.put(key, buffer, rawType);
+      this.logger.log(`[uploadToStorage] Uploaded to COS: ${url}`);
       return url;
     } catch (error: any) {
       this.logger.error(

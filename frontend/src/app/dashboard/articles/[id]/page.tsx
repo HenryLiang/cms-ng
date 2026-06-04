@@ -147,7 +147,7 @@ export default function ArticleEditorPage() {
   const [imageGenResult, setImageGenResult] = useState<GenerateImageResult | null>(null);
   const [imageGenStyle, setImageGenStyle] = useState<'news' | 'illustration' | 'photo' | 'social'>('news');
   const [imageGenRatio, setImageGenRatio] = useState('16:9');
-  const [imageGenSize, setImageGenSize] = useState<'2K' | '3K'>('2K');
+  const [imageGenSize, setImageGenSize] = useState<'2K' | '3K' | '4K'>('2K');
   const [imageGenCustomPrompt, setImageGenCustomPrompt] = useState('');
 
   // Image preview
@@ -457,8 +457,10 @@ export default function ArticleEditorPage() {
       });
       setImageGenResult(result);
       setArticle((prev) => (prev ? { ...prev, coverImage: result.url } : prev));
-    } catch {
-      alert('图片生成失败，请稍后重试');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || '未知错误';
+      console.error('AI 配图生成失败:', msg, err);
+      alert(`图片生成失败：${msg}`);
     } finally {
       setImageGenLoading(false);
     }
@@ -1244,11 +1246,12 @@ export default function ArticleEditorPage() {
                     <label className="mb-1 block text-sm font-medium text-zinc-700">分辨率</label>
                     <select
                       value={imageGenSize}
-                      onChange={(e) => setImageGenSize(e.target.value as '2K' | '3K')}
+                      onChange={(e) => setImageGenSize(e.target.value as '2K' | '3K' | '4K')}
                       className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
                     >
-                      <option value="2K">2K</option>
-                      <option value="3K">3K</option>
+                      <option value="2K">2K（快速）</option>
+                      <option value="3K">3K（高清）</option>
+                      <option value="4K">4K（超清）</option>
                     </select>
                   </div>
                   <div>
@@ -1287,7 +1290,7 @@ export default function ArticleEditorPage() {
               <>
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2">
                   <img
-                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${imageGenResult.url}`}
+                    src={imageGenResult.url}
                     alt="AI 生成配图"
                     className="w-full rounded-lg"
                   />

@@ -1141,7 +1141,7 @@ describe('AIService', () => {
       expect(promptText).toContain('额外要求：突出科技感');
     });
 
-    it('should pass aspectRatio to Seedream API', async () => {
+    it('should pass aspectRatio as pixel-based size to Seedream API', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse('Wide format image prompt'),
       );
@@ -1161,12 +1161,13 @@ describe('AIService', () => {
 
       await service.generateArticleImage(
         'user-id', 'article-123', 'Title', 'Content',
-        { aspectRatio: '16:9' },
+        { aspectRatio: '16:9', size: '2K' },
       );
 
-      // Verify Seedream was called with aspect_ratio
+      // Verify Seedream was called with pixel-based size (not aspect_ratio)
       const seedreamCall = mockedAxios.post.mock.calls[0];
-      expect(seedreamCall[1]).toMatchObject({ aspect_ratio: '16:9' });
+      expect(seedreamCall[1]).toMatchObject({ size: '2848x1600', output_format: 'jpeg' });
+      expect(seedreamCall[1].aspect_ratio).toBeUndefined();
     });
 
     it('should record AI operation with seedream model', async () => {

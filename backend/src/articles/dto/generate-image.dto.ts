@@ -9,9 +9,9 @@ export class GenerateImageDto {
   @IsOptional()
   aspectRatio?: string;
 
-  @IsIn(['2K', '3K'])
+  @IsIn(['2K', '3K', '4K'])
   @IsOptional()
-  size?: '2K' | '3K';
+  size?: '2K' | '3K' | '4K';
 
   @IsString()
   @IsOptional()
