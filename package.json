@@ -5,6 +5,9 @@
   "description": "01创作大脑 — AI驱动的内容创作作业系统",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:start": "bash scripts/dev-start.sh",
+    "dev:backend": "bash scripts/dev-start.sh --backend-only",
+    "dev:frontend": "bash scripts/dev-start.sh --frontend-only",
     "build": "turbo run build",
     "start": "turbo run start",
     "lint": "turbo run lint",

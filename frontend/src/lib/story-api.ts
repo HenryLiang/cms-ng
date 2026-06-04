@@ -37,7 +37,8 @@ export interface UpdateStoryInput extends Partial<CreateStoryInput> {}
 
 export async function getStories(): Promise<Story[]> {
   const res = await api.get('/stories');
-  return res.data;
+  // Backend returns { data: Story[], meta: { page, total, ... } }
+  return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
 }
 
 export async function getStory(id: string): Promise<Story> {
