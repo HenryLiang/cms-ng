@@ -62,8 +62,8 @@ export class FilterConfigDto {
 }
 
 export class PublishConfigDto {
-  @IsString()
-  platform: string;
+  @IsEnum(Platform)
+  platform: Platform;
 
   @IsOptional()
   @IsString()
