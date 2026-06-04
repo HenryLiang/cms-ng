@@ -14,7 +14,6 @@ export class WordPressService {
   private readonly siteUrl: string;
   private readonly username: string;
   private readonly appPassword: string;
-  private readonly backendUrl: string;
   private static readonly FETCH_TIMEOUT_MS = 30_000;
 
   private fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
@@ -30,7 +29,6 @@ export class WordPressService {
     this.siteUrl = this.configService.get<string>('WORDPRESS_SITE_URL', '');
     this.username = this.configService.get<string>('WORDPRESS_USERNAME', '');
     this.appPassword = this.configService.get<string>('WORDPRESS_APP_PASSWORD', '');
-    this.backendUrl = this.configService.get<string>('BACKEND_URL', 'http://localhost:3001');
   }
 
   private getAuthHeader(): string {
@@ -148,21 +146,6 @@ export class WordPressService {
   }
 
   /**
-   * 将相对路径图片 URL 解析为绝对 URL
-   */
-  private resolveImageUrl(src: string): string {
-    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
-      return src;
-    }
-    if (src.startsWith('/')) {
-      const base = this.backendUrl.replace(/\/$/, '');
-      return `${base}${src}`;
-    }
-    const base = this.backendUrl.replace(/\/$/, '');
-    return `${base}/${src}`;
-  }
-
-  /**
    * 处理文章内容中的图片：下载并上传到 WordPress 媒体库，替换 src 为 WordPress 托管 URL
    */
   private async processContentImages(html: string): Promise<string> {
@@ -176,7 +159,7 @@ export class WordPressService {
       if (seen.has(originalSrc)) continue;
       seen.add(originalSrc);
 
-      const absoluteUrl = this.resolveImageUrl(originalSrc);
+      const absoluteUrl = originalSrc; // 图片已是公网 https:// 绝对 URL
 
       if (absoluteUrl.startsWith('data:')) continue;
 
@@ -247,8 +230,8 @@ export class WordPressService {
       // 上传封面图（如果有）
       let featuredMediaId: number | null = null;
       if (article.coverImage) {
-        const coverUrl = this.resolveImageUrl(article.coverImage);
-        const uploaded = await this.uploadImage(coverUrl);
+        // article.coverImage 已是 https://... 绝对 URL(COS),直接传
+        const uploaded = await this.uploadImage(article.coverImage);
         if (uploaded) {
           featuredMediaId = uploaded.id;
         }
