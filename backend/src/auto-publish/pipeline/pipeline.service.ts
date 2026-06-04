@@ -361,7 +361,21 @@ export class PipelineService {
             },
           });
 
-          currentCtx = await step.execute(currentCtx);
+          try {
+            currentCtx = await step.execute(currentCtx);
+          } catch (stepError: any) {
+            // Notification step is non-critical (issue #56): its failure
+            // (e.g., SMTP timeout) should NOT mark the run FAILED because
+            // the article has already been published. Log + continue.
+            if (step.name === 'notification') {
+              this.logger.warn(
+                `Notification step failed for "${ctx.topic || 'unknown'}" ` +
+                  `(non-critical, run status preserved): ${stepError.message}`,
+              );
+              return; // treat article as published-successfully
+            }
+            throw stepError;
+          }
         }
         return; // success
       } catch (error: any) {
