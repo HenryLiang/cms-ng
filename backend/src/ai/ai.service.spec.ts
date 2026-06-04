@@ -48,7 +48,6 @@ describe('AIService', () => {
           SEEDREAM_API_KEY: 'test-seedream-key',
           SEEDREAM_API_BASE: 'https://api.test.com/seedream',
           SEEDREAM_MODEL: 'test-seedream-model',
-          UPLOAD_DIR: './uploads',
           SEARCH_PROVIDER: 'tavily',
           TAVILY_API_KEY: 'test-tavily-key',
         };
@@ -1542,7 +1541,6 @@ describe('AIService — performSearch branch logic', () => {
           SEEDREAM_API_KEY: 'test-key',
           SEEDREAM_API_BASE: 'https://api.test.com',
           SEEDREAM_MODEL: 'test-model',
-          UPLOAD_DIR: './uploads',
           TAVILY_API_KEY: 'test-tavily-key',
         };
         return map[key];
@@ -1560,7 +1558,6 @@ describe('AIService — performSearch branch logic', () => {
           SEEDREAM_API_KEY: 'test-key',
           SEEDREAM_API_BASE: 'https://api.test.com',
           SEEDREAM_MODEL: 'test-model',
-          UPLOAD_DIR: './uploads',
           TAVILY_API_KEY: 'test-tavily-key',
         };
         return map[key];
@@ -1610,7 +1607,6 @@ describe('AIService — performSearch branch logic', () => {
           SEEDREAM_API_KEY: 'test-key',
           SEEDREAM_API_BASE: 'https://api.test.com',
           SEEDREAM_MODEL: 'test-model',
-          UPLOAD_DIR: './uploads',
           TAVILY_API_KEY: 'test-tavily-key',
         };
         return map[key];
@@ -1663,7 +1659,6 @@ describe('AIService — performSearch branch logic', () => {
           SEEDREAM_API_KEY: 'test-key',
           SEEDREAM_API_BASE: 'https://api.test.com',
           SEEDREAM_MODEL: 'test-model',
-          UPLOAD_DIR: './uploads',
           TAVILY_API_KEY: 'test-tavily-key',
         };
         return map[key];
