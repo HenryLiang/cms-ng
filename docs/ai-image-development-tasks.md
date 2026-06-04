@@ -1,5 +1,11 @@
 # AI 智能配图功能 — 开发任务清单
 
+> **状态**: 已被后续实现替代
+>
+> 本文档描述的是 **2026-05-23 原始开发计划**,当时计划使用本地文件系统存储图片。**截至 2026-06-04,存储层已迁移至腾讯云 COS 对象存储**,相关代码改动已完成,见:
+> - 设计文档: `docs/superpowers/specs/2026-06-04-cos-storage-design.md`
+> - 实施计划: `docs/superpowers/plans/2026-06-04-cos-storage-implementation.md`
+
 ## 1. 任务总览
 
 | 迭代 | 范围 | 预估工时 | 优先级 |
@@ -36,17 +42,17 @@
 - **前置依赖**：Task-B1
 - **负责人**：后端开发
 - **详细内容**：
-  - 新建 `backend/src/upload/upload.module.ts` 和 `upload.service.ts`
-  - 实现 `saveImageFromUrl()`：axios 下载 + 本地文件写入
-  - 实现 `deleteImage()`：文件删除 + 错误处理
-  - 实现 `getImagePath()`：路径拼接
-  - 在 `main.ts` 注册 `app.use('/uploads', express.static(...))`
-  - 在 `AppModule` 中导入 `UploadModule`
+  - ~~新建 `backend/src/upload/upload.module.ts` 和 `upload.service.ts`~~ (已由 `StorageModule` + `CosStorageService` 替代,见 COS 实施计划)
+  - ~~实现 `saveImageFromUrl()`：axios 下载 + 本地文件写入~~
+  - ~~实现 `deleteImage()`：文件删除 + 错误处理~~
+  - ~~实现 `getImagePath()`：路径拼接~~
+  - ~~在 `main.ts` 注册 `app.use('/uploads', express.static(...))`~~ (已删除,图片走 COS)
+  - ~~在 `AppModule` 中导入 `UploadModule`~~ (已由 `StorageModule` 替代)
 - **验收标准**：
-  - [ ] `UploadService.saveImageFromUrl()` 能把网络图片保存到 `./uploads/articles/{id}/`
-  - [ ] `UploadService.deleteImage()` 能删除文件
-  - [ ] 通过 `http://localhost:3001/uploads/...` 能访问到保存的图片
-  - [ ] 单元测试覆盖下载和删除逻辑
+  - [x] `CosStorageService.put()` 能把网络图片上传到 COS 并返回公网 URL
+  - [x] `CosStorageService.delete()` 能从 COS 删除对象
+  - [x] 图片公网可访问(COS bucket 设为公有读)
+  - [x] 单元测试覆盖 put 和 delete 逻辑
 
 #### Task-B3: Seedream API 集成
 - **工作量**：1 天
@@ -108,11 +114,11 @@
 - **负责人**：后端开发
 - **详细内容**：
   - `insertImageToContent()`：将 `<img>` 标签插入 Article.content HTML 指定段落
-  - 更新 `ArticleService.remove()`：级联删除 ArticleImage + 本地文件
+  - 更新 `ArticleService.remove()`：级联删除 ArticleImage + COS 对象
   - 更新 `ArticleService.update()`：支持 coverImage 字段更新
   - `PlatformPublish` coverImages 字段的读写逻辑
 - **验收标准**：
-  - [ ] 删除文章后，本地 `uploads/articles/{id}/` 目录被清空
+  - [ ] 删除文章后，COS 中对应 `cms-ng/articles/{id}/` 对象被删除
   - [ ] 插入正文后，Article.content 包含正确的 `<img>` 标签
   - [ ] 设为封面后，Article.coverImage 更新
 
