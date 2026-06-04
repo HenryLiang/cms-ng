@@ -2,6 +2,7 @@ import {
   IsString,
   IsOptional,
   IsEnum,
+  IsIn,
   IsInt,
   IsObject,
   Min,
@@ -10,11 +11,36 @@ import {
 import { Type } from 'class-transformer';
 import { ContentLanguage, Platform, ScheduleType } from '@cms-ng/shared';
 
+/**
+ * Allowlist of IANA timezones the auto-publish scheduler is allowed to use.
+ *
+ * We intentionally keep this a small, curated subset rather than using
+ * `Intl.supportedValuesOf('timeZone')` (the host runtime may differ from
+ * production) or hardcoding the full 400+ IANA list (a maintenance burden).
+ *
+ * Why DTO-level validation matters: `new CronJob(expr, undefined, false, tz)`
+ * throws `RangeError: Invalid IANA timezone` for unknown zones, and that
+ * happens AFTER the DTO has been accepted, so we have to reject bad zones
+ * here — otherwise a single bad request can crash the scheduler worker.
+ *
+ * If your deployment needs a zone not on this list, add it explicitly.
+ */
+const ALLOWED_TIMEZONES = [
+  'UTC',
+  'Asia/Shanghai',
+  'Asia/Hong_Kong',
+  'Asia/Singapore',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Asia/Tokyo',
+] as const;
+
 export class ScheduleConfigDto {
   @IsString({ each: true })
   times: string[];
 
-  @IsString()
+  @IsIn(ALLOWED_TIMEZONES as unknown as string[])
   timezone: string;
 }
 
