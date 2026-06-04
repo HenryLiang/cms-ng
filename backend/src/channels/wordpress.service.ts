@@ -14,7 +14,7 @@ export class WordPressService {
   private readonly siteUrl: string;
   private readonly username: string;
   private readonly appPassword: string;
-  private static readonly FETCH_TIMEOUT_MS = 30_000;
+  private static readonly FETCH_TIMEOUT_MS = 120_000;
 
   private fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
