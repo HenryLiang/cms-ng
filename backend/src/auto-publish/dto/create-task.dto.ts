@@ -8,6 +8,7 @@ import {
   Matches,
   Min,
   Max,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ContentLanguage, Platform, ScheduleType } from '@cms-ng/shared';
@@ -136,23 +137,24 @@ export class CreateTaskDto {
   @IsEnum(ScheduleType)
   scheduleType?: ScheduleType;
 
-  @IsObject()
+  @ValidateNested()
   @Type(() => ScheduleConfigDto)
   scheduleConfig: ScheduleConfigDto;
 
-  @IsObject()
+  @ValidateNested()
   @Type(() => TopicStrategyDto)
   topicStrategy: TopicStrategyDto;
 
-  @IsObject()
+  @ValidateNested()
   @Type(() => ContentConfigDto)
   contentConfig: ContentConfigDto;
 
   @IsOptional()
-  @IsObject()
+  @ValidateNested()
+  @Type(() => FilterConfigDto)
   filterConfig?: FilterConfigDto;
 
-  @IsObject()
+  @ValidateNested()
   @Type(() => PublishConfigDto)
   publishConfig: PublishConfigDto;
 
