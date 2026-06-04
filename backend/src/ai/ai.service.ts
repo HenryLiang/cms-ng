@@ -9,7 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { PrismaService } from '../prisma/prisma.service';
-import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
+import { STORAGE_SERVICE } from '../storage/storage.service';
+import type { StorageService } from '../storage/storage.service';
 import type {
   ChatCompletionProvider,
   ChatMessage as ProviderChatMessage,
