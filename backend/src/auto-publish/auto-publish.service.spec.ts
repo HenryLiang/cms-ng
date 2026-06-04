@@ -144,6 +144,24 @@ describe('AutoPublishService', () => {
         NotFoundException,
       );
     });
+
+    it('should not throw when pipeline.runTask rejects (fire-and-forget #56 contract)', async () => {
+      // Pipeline rejection must be swallowed by the .catch in manualRun so the
+      // controller returns 200 immediately and the failure is logged async.
+      // If this test ever throws, the swallow was removed and a 500 will
+      // surface to the API caller — that's the #56 regression.
+      const mockTask = { id: 'task-1', status: AutoTaskStatus.ACTIVE };
+      mockPrisma.autoPublishTask.findUnique.mockResolvedValue(mockTask);
+      mockPipeline.runTask = jest
+        .fn()
+        .mockReturnValue(Promise.reject(new Error('Notification step failed')));
+
+      const result = await service.manualRun('task-1');
+      expect(result).toEqual({ message: 'Manual run triggered', taskId: 'task-1' });
+
+      // Let the microtask queue drain so the .catch handler logs
+      await new Promise((r) => setTimeout(r, 10));
+    });
   });
 
   describe('withdrawArticle', () => {
