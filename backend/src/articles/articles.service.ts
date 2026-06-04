@@ -31,7 +31,10 @@ export class ArticlesService {
    * Allowed state transitions for Article (per PRD §8.4).
    * Key: current status, Value: list of valid next statuses.
    */
-  private static readonly VALID_TRANSITIONS: Record<ArticleStatus, ArticleStatus[]> = {
+  // Note: keys/values are `string` rather than the `ArticleStatus` enum from
+  // @cms-ng/shared to avoid TS2345 mismatches with Prisma's own enum
+  // (two distinct TypeScript enum types with identical runtime values).
+  private static readonly VALID_TRANSITIONS: Record<string, readonly string[]> = {
     [ArticleStatus.DRAFT]: [ArticleStatus.WRITING, ArticleStatus.ARCHIVED],
     [ArticleStatus.WRITING]: [
       ArticleStatus.AI_OPTIMIZING,
@@ -73,7 +76,7 @@ export class ArticlesService {
    * Throws BadRequestException if the transition from→to is not in the
    * allowed transition matrix. Same-state updates are no-ops (allowed).
    */
-  private validateStateTransition(from: ArticleStatus, to: ArticleStatus): void {
+  private validateStateTransition(from: string, to: string): void {
     if (from === to) return; // idempotent: no actual transition
     const allowed = ArticlesService.VALID_TRANSITIONS[from];
     if (!allowed || !allowed.includes(to)) {
@@ -485,6 +488,9 @@ export class ArticlesService {
     dto: GenerateDraftDto,
   ) {
     const article = await this.verifyAccessAndGet(id, user);
+    if (!article.storyId) {
+      throw new BadRequestException('Article is not linked to a Story');
+    }
     const story = await this.prisma.story.findUnique({
       where: { id: article.storyId },
     });
