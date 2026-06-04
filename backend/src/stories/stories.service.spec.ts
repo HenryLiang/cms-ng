@@ -277,6 +277,7 @@ describe('StoriesService', () => {
   describe('remove', () => {
     it('should delete story when found', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.updateMany.mockResolvedValue({ count: 0 });
       prisma.story.delete.mockResolvedValue(mockStory());
 
       const result = await service.remove('story-id');
@@ -285,10 +286,48 @@ describe('StoriesService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should null out Article.storyId before deleting story (#55 cascade)', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.updateMany.mockResolvedValue({ count: 3 });
+      prisma.story.delete.mockResolvedValue(mockStory());
+
+      const callOrder: string[] = [];
+      (prisma.article.updateMany as jest.Mock).mockImplementation(async () => {
+        callOrder.push('article.updateMany');
+        return { count: 3 };
+      });
+      (prisma.story.delete as jest.Mock).mockImplementation(async () => {
+        callOrder.push('story.delete');
+        return mockStory();
+      });
+
+      await service.remove('story-id');
+
+      expect(prisma.article.updateMany).toHaveBeenCalledWith({
+        where: { storyId: 'story-id' },
+        data: { storyId: null },
+      });
+      // updateMany must run BEFORE story.delete to avoid FK error
+      expect(callOrder).toEqual(['article.updateMany', 'story.delete']);
+    });
+
+    it('should still invoke updateMany even when no articles reference the story', async () => {
+      prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.updateMany.mockResolvedValue({ count: 0 });
+      prisma.story.delete.mockResolvedValue(mockStory());
+
+      await service.remove('story-id');
+
+      expect(prisma.article.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.story.delete).toHaveBeenCalledTimes(1);
+    });
+
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(prisma.article.updateMany).not.toHaveBeenCalled();
+      expect(prisma.story.delete).not.toHaveBeenCalled();
     });
   });
 

@@ -171,6 +171,15 @@ export class StoriesService {
   async remove(id: string) {
     const existing = await this.prisma.story.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Story not found');
+
+    // #55: 显式先清空关联 Article.storyId 防 orphan 数据。
+    // schema 已有 onDelete: SetNull(双保险),但显式 updateMany
+    // 让我们能在 service 层记录清理数,且对旧数据 schema 也安全。
+    await this.prisma.article.updateMany({
+      where: { storyId: id },
+      data: { storyId: null },
+    });
+
     await this.prisma.story.delete({ where: { id } });
     return { success: true };
   }
