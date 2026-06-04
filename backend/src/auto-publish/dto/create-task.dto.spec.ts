@@ -151,3 +151,58 @@ describe('CreateTaskDto — full happy path (regression guard)', () => {
     expect(errors).toHaveLength(0);
   });
 });
+
+describe('CreateTaskDto — #50 ScheduleConfigDto.times accepts standard cron (issue #50)', () => {
+  it('accepts a standard 5-field cron expression (every 5 minutes)', async () => {
+    const errors = await validateDto(ScheduleConfigDto, {
+      times: ['*/5 * * * *'],
+      timezone: 'UTC',
+    });
+    expect(errors).toHaveLength(0);
+  });
+
+  it('accepts a mixed list of HH:MM and standard cron entries', async () => {
+    const errors = await validateDto(ScheduleConfigDto, {
+      times: ['08:00', '*/15 * * * *', '23:30'],
+      timezone: 'Asia/Hong_Kong',
+    });
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects a malformed cron expression', async () => {
+    const errors = await validateDto(ScheduleConfigDto, {
+      times: ['bogus cron'],
+      timezone: 'UTC',
+    });
+    const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+    expect(messages.some((m) => /times/.test(m))).toBe(true);
+  });
+
+  it('rejects non-string entries (numbers, null, empty)', async () => {
+    for (const bad of [123 as unknown, null as unknown, '' as unknown]) {
+      const errors = await validateDto(ScheduleConfigDto, {
+        times: [bad],
+        timezone: 'UTC',
+      });
+      expect(errors.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('rejects a cron with out-of-range values (60 in minute field)', async () => {
+    const errors = await validateDto(ScheduleConfigDto, {
+      times: ['60 * * * *'],
+      timezone: 'UTC',
+    });
+    const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+    expect(messages.some((m) => /times/.test(m))).toBe(true);
+  });
+
+  it('accepts the CreateTaskDto with cron times (end-to-end shape)', async () => {
+    const errors = await validateDto(CreateTaskDto, {
+      ...baseCreatePayload,
+      scheduleType: ScheduleType.CRON,
+      scheduleConfig: { times: ['*/5 * * * *'], timezone: 'UTC' },
+    });
+    expect(errors).toHaveLength(0);
+  });
+});
