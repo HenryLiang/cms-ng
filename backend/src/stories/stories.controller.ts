@@ -12,6 +12,7 @@ import {
 import { StoriesService } from './stories.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
+import { FindAllStoriesDto } from './dto/find-all-stories.dto';
 import { GenerateDraftFromResearchKitDto } from './dto/generate-draft.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -30,8 +31,11 @@ export class StoriesController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: { userId: string; role: string }) {
-    return this.storiesService.findAll(user);
+  findAll(
+    @CurrentUser() user: { userId: string; role: string },
+    @Query() query: FindAllStoriesDto,
+  ) {
+    return this.storiesService.findAll(user, query);
   }
 
   @Get(':id')
