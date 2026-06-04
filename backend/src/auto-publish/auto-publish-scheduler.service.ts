@@ -57,11 +57,11 @@ export class AutoPublishSchedulerService
   /**
    * Register a cron job for a task based on its schedule config.
    */
-  registerTaskCron(task: {
+  async registerTaskCron(task: {
     id: string;
     name: string;
     scheduleConfig: string;
-  }): void {
+  }): Promise<void> {
     const config = safeJsonParse<{ times: string[]; timezone: string }>(
       task.scheduleConfig,
       { times: [], timezone: 'Asia/Hong_Kong' },
@@ -106,7 +106,7 @@ export class AutoPublishSchedulerService
     });
 
     // Compute and store nextRunAt
-    this.updateNextRunAt(task.id, config.times, config.timezone);
+    await this.updateNextRunAt(task.id, config.times, config.timezone);
   }
 
   /**

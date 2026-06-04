@@ -232,6 +232,79 @@ describe('AutoPublishService', () => {
     });
   });
 
+  describe('toggleTask', () => {
+    it('should await registerTaskCron before returning when activating a task', async () => {
+      // Deferred tracker: registerTaskCron's completion is signaled through this
+      let resolveRegister: () => void;
+      const registerDone = new Promise<void>((res) => {
+        resolveRegister = res;
+      });
+
+      mockScheduler.registerTaskCron.mockImplementation(
+        async () => {
+          await registerDone;
+        },
+      );
+
+      const mockTask = {
+        id: 'task-1',
+        name: 'Test Task',
+        status: AutoTaskStatus.PAUSED,
+        nextRunAt: null,
+      };
+      const updatedTask = {
+        ...mockTask,
+        status: AutoTaskStatus.ACTIVE,
+        nextRunAt: new Date('2026-06-05T08:00:00.000Z'),
+      };
+
+      mockPrisma.autoPublishTask.findUnique.mockResolvedValue(mockTask);
+      mockPrisma.autoPublishTask.update.mockResolvedValue(updatedTask);
+
+      const togglePromise = service.toggleTask('task-1');
+
+      // Give toggleTask a chance to return synchronously if it doesn't await registerTaskCron
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Check whether toggleTask has resolved yet using Promise.race trick
+      let toggleResolved = false;
+      togglePromise.then(() => { toggleResolved = true; });
+
+      // If toggleTask awaited registerTaskCron, it should still be pending after 10ms
+      // (because registerDone is not resolved yet)
+      await new Promise((r) => setTimeout(r, 5));
+      expect(toggleResolved).toBe(false);
+
+      // Now complete registerTaskCron
+      resolveRegister!();
+
+      // toggleTask should now complete
+      const result = await togglePromise;
+      expect(result.status).toBe(AutoTaskStatus.ACTIVE);
+    });
+
+    it('should call removeTaskCron when pausing a task', async () => {
+      const mockTask = {
+        id: 'task-1',
+        name: 'Test Task',
+        status: AutoTaskStatus.ACTIVE,
+        nextRunAt: new Date(),
+      };
+      const updatedTask = {
+        ...mockTask,
+        status: AutoTaskStatus.PAUSED,
+        nextRunAt: null,
+      };
+
+      mockPrisma.autoPublishTask.findUnique.mockResolvedValue(mockTask);
+      mockPrisma.autoPublishTask.update.mockResolvedValue(updatedTask);
+
+      await service.toggleTask('task-1');
+
+      expect(mockScheduler.removeTaskCron).toHaveBeenCalledWith('task-1');
+    });
+  });
+
   describe('killSwitch', () => {
     it('should enable kill switch and forward operator + reason', async () => {
       mockScheduler.isKillSwitchActive.mockResolvedValue(true);
