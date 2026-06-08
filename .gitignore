@@ -32,6 +32,9 @@ Thumbs.db
 .understand-anything/
 .lighthouseignore
 
+# ChromaDB local vector store (regenerated on first run)
+chroma_data/
+
 # Testing
 coverage/
 .nyc_output/
