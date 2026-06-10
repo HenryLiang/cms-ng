@@ -395,14 +395,14 @@ test.describe('§11.2 — Platform adapters (adaptation only, no real posting)',
 // ============================================================
 
 test.describe('§15 — rebrand copy on UI', () => {
-  test('TC-RB-003 — login page does NOT contain 香港01', async ({ page }) => {
+  test('TC-RB-003 — login page does NOT contain INFO-NG', async ({ page }) => {
     await page.goto('http://localhost:3000/login');
     await page.waitForLoadState('domcontentloaded');
     const html = await page.content();
-    expect(html).not.toMatch(/香港01/);
+    expect(html).not.toMatch(/INFO-NG/);
   });
 
-  test('TC-RB-004 — dashboard layout shows 01创作大脑 brand and no 香港01', async ({ browser, loginAs }) => {
+  test('TC-RB-004 — dashboard layout shows 01创作大脑 brand and no INFO-NG', async ({ browser, loginAs }) => {
     const { token, userId, email } = await loginAs('admin');
     const ctx = await browser.newContext({ baseURL: 'http://localhost:3000' });
     await ctx.route('**://localhost:3001/**', async (route) => {
@@ -422,23 +422,23 @@ test.describe('§15 — rebrand copy on UI', () => {
     // give the SPA a moment to render
     await page.waitForTimeout(1500);
     const html = await page.content();
-    expect(html).not.toMatch(/香港01/);
+    expect(html).not.toMatch(/INFO-NG/);
     // New brand (the dashboard shows 01创作大脑) is expected
     expect(html).toMatch(/01创作大脑|LC 传媒/);
     await ctx.close();
   });
 
-  test('TC-RB-006 — error responses do not contain 香港01', async ({ api, loginAs }) => {
+  test('TC-RB-006 — error responses do not contain INFO-NG', async ({ api, loginAs }) => {
     const { token } = await loginAs('reporter-sc');
     // Trigger 403 by accessing another user's article
     const otherArticleId = '00000000-0000-0000-0000-000000000000';
     const r = await callApi(api, 'GET', `/channels/${otherArticleId}/publishes`, token);
     expect([403, 404]).toContain(r.status);
-    expect(JSON.stringify(r.body)).not.toMatch(/香港01/);
+    expect(JSON.stringify(r.body)).not.toMatch(/INFO-NG/);
 
     // 404 unknown id
     const r2 = await callApi(api, 'GET', `/channels/${otherArticleId}/publishes`, token);
     expect([403, 404]).toContain(r2.status);
-    expect(JSON.stringify(r2.body)).not.toMatch(/香港01/);
+    expect(JSON.stringify(r2.body)).not.toMatch(/INFO-NG/);
   });
 });

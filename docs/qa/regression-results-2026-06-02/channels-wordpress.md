@@ -120,7 +120,7 @@ X（保留位）也返回元数据（`{name: "X / Twitter", maxTitleLength: 50, 
 - `backend/src/channels/platforms/adapters/website.adapter.ts:22` → `生成适配「LC 传媒官网/APP」发布的内容`
 - `frontend/src/app/dashboard/layout.tsx:49` → `01创作大脑`（沿用此 ID）
 - `frontend/src/app/login/page.tsx`、`register/page.tsx`、`layout.tsx` → `01创作大脑`
-- 全代码库 grep "香港01"：**0 命中**（在 `frontend/src/` 与 `backend/src/channels/` 内）
+- 全代码库 grep "INFO-NG"：**0 命中**（在 `frontend/src/` 与 `backend/src/channels/` 内）
 - "LC 传媒" 在 `backend/src/channels/` 出现 2 次（平台元数据 + 适配 prompt）
 
 → **§15 TC-RB-001/003/004/006 全部满足。**
@@ -167,9 +167,9 @@ describe('§15 — rebrand copy on UI')                         → 3 tests
 | §11 TC-CHN-007 | 小红书适配 | §11.2 XIAOHONGSHU |
 | §11 TC-CHN-009 | 人工标记已发布 | 跳过（覆盖在 PATCH /publishes/:id 但 spec 未单列） |
 | §13 TC-SJP-006 | PlatformPublish.adaptedTags/coverImages | §5 → "corrupted adaptedTags" |
-| §15 TC-RB-003 | 登录页 Logo | §15 → "login page does NOT contain 香港01" |
+| §15 TC-RB-003 | 登录页 Logo | §15 → "login page does NOT contain INFO-NG" |
 | §15 TC-RB-004 | Dashboard 顶部 | §15 → "dashboard layout shows 01创作大脑" |
-| §15 TC-RB-006 | 错误提示 | §15 → "error responses do not contain 香港01" |
+| §15 TC-RB-006 | 错误提示 | §15 → "error responses do not contain INFO-NG" |
 
 ### 4.3 真实副作用与隔离
 
@@ -203,7 +203,7 @@ describe('§15 — rebrand copy on UI')                         → 3 tests
 | §5 TC-WP-012 | 凭据无效（401）— 会污染 .env |
 | §5 TC-WP-019/020 | ChannelPanel 前端 UI — 需进入文章详情页 + 触发 adapt；与 §18 E2E 重叠 |
 | §11 TC-CHN-003/011/012 | 前端 UI 检查 — 同上，与前端 agent 重叠 |
-| §15 TC-RB-001/002/005/007 | 文档 / 错误信息 grep — 已通过 `grep -rE "香港01"` 间接验证（0 命中），不需 Playwright 自动化 |
+| §15 TC-RB-001/002/005/007 | 文档 / 错误信息 grep — 已通过 `grep -rE "INFO-NG"` 间接验证（0 命中），不需 Playwright 自动化 |
 
 ---
 
