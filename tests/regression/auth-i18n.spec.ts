@@ -796,6 +796,75 @@ test.describe('I18N §7 frontend list page language badge', () => {
 });
 
 // =============================================================
+// §7 audit — one end-to-end TC per ContentLanguage (4 roles)
+// Verifies the "login as reporter → create story with that reporter's
+// preferred contentLanguage → read back" loop for every reporter persona
+// listed in tests/regression/_shared/fixtures.ts. While many existing TCs
+// touch one of these roles in isolation, none of them covers the full
+// loop for every persona, so we add one explicit per-role TC here.
+// =============================================================
+test.describe('I18N §7 audit: per-reporter contentLanguage end-to-end (4 roles)', () => {
+  test('TC-I18N-LANG-001 reporter-sc (pref=SIMPLIFIED_CHINESE) → story.contentLanguage === SIMPLIFIED_CHINESE after read-back', async () => {
+    const { token } = await loginByApi('reporter-sc');
+    const created = await createStoryViaApi(token, {
+      title: `qa-i18n-lang-001-${SUFFIX}`,
+      contentLanguage: 'SIMPLIFIED_CHINESE',
+    });
+    expect(created).not.toBeNull();
+    expect(created!.contentLanguage).toBe('SIMPLIFIED_CHINESE');
+    trackStory(created!.id);
+    const fetched = await getStory(token, created!.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched.contentLanguage).toBe('SIMPLIFIED_CHINESE');
+  });
+
+  test('TC-I18N-LANG-002 reporter-en (pref=ENGLISH) → story.contentLanguage === ENGLISH after read-back', async () => {
+    const { token } = await loginByApi('reporter-en');
+    const created = await createStoryViaApi(token, {
+      title: `qa-i18n-lang-002-${SUFFIX}`,
+      contentLanguage: 'ENGLISH',
+    });
+    expect(created).not.toBeNull();
+    expect(created!.contentLanguage).toBe('ENGLISH');
+    trackStory(created!.id);
+    const fetched = await getStory(token, created!.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched.contentLanguage).toBe('ENGLISH');
+  });
+
+  test('TC-I18N-LANG-003 reporter-hk (pref=TRADITIONAL_CHINESE_HK) → story.contentLanguage === TRADITIONAL_CHINESE_HK after read-back', async () => {
+    const { token } = await loginByApi('reporter-hk');
+    const created = await createStoryViaApi(token, {
+      title: `qa-i18n-lang-003-${SUFFIX}`,
+      contentLanguage: 'TRADITIONAL_CHINESE_HK',
+    });
+    expect(created).not.toBeNull();
+    expect(created!.contentLanguage).toBe('TRADITIONAL_CHINESE_HK');
+    trackStory(created!.id);
+    const fetched = await getStory(token, created!.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched.contentLanguage).toBe('TRADITIONAL_CHINESE_HK');
+  });
+
+  test('TC-I18N-LANG-004 reporter-none (pref=null) → explicit TRADITIONAL_CHINESE_CANTONESE persists on read-back', async () => {
+    // reporter-none has no preferredLanguage (null/empty in DB). The DTO still
+    // accepts an explicit enum value, which is what we send here. This proves
+    // the fourth role's full loop works end-to-end independent of user pref.
+    const { token } = await loginByApi('reporter-none');
+    const created = await createStoryViaApi(token, {
+      title: `qa-i18n-lang-004-${SUFFIX}`,
+      contentLanguage: 'TRADITIONAL_CHINESE_CANTONESE',
+    });
+    expect(created).not.toBeNull();
+    expect(created!.contentLanguage).toBe('TRADITIONAL_CHINESE_CANTONESE');
+    trackStory(created!.id);
+    const fetched = await getStory(token, created!.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched.contentLanguage).toBe('TRADITIONAL_CHINESE_CANTONESE');
+  });
+});
+
+// =============================================================
 // Smoke: end-to-end auth + i18n in one run
 // =============================================================
 test.describe('I18N+AUTH smoke', () => {
