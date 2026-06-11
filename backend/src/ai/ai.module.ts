@@ -10,6 +10,7 @@ import {
   KimiProvider,
   OpenAIProvider,
 } from './providers';
+import { BillingModule } from '../billing/billing.module';
 
 const chatProviderFactory = {
   provide: CHAT_PROVIDER,
@@ -29,6 +30,7 @@ const chatProviderFactory = {
 };
 
 @Module({
+  imports: [BillingModule],
   providers: [chatProviderFactory, AIService, AIToolsService, TavilySearchTool],
   exports: [AIService, AIToolsService],
 })

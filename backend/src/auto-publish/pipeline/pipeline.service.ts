@@ -5,10 +5,13 @@ import {
   ArticleRunStatus,
   RunStatus,
   ArticleStatus,
+  TransactionType,
+  BillingCategory,
 } from '@cms-ng/shared';
 import { PipelineStep, PipelineContext } from './step.interface';
 import { RedisService } from '../../redis/redis.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
+import { BillingService } from '../../billing/billing.service';
 import { TopicCollectionStep } from './steps/topic-collection.step';
 import { ResearchStep } from './steps/research.step';
 import { ArticleGenerationStep } from './steps/article-generation.step';
@@ -16,6 +19,8 @@ import { ImageGenerationStep } from './steps/image-generation.step';
 import { ArticleSaveStep } from './steps/article-save.step';
 import { PublishStep } from './steps/publish.step';
 import { NotificationStep } from './steps/notification.step';
+import { BillingCheckStep } from './steps/billing-check.step';
+import { EstimateOperationType } from '../../billing/dto/estimate-cost.dto';
 import { safeJsonParse } from '../../common/json.utils';
 import * as nodemailer from 'nodemailer';
 
@@ -29,8 +34,10 @@ export class PipelineService {
     private prisma: PrismaService,
     private config: ConfigService,
     private redis: RedisService,
+    private billingService: BillingService,
     @Inject(forwardRef(() => AutoPublishSchedulerService))
     private scheduler: AutoPublishSchedulerService,
+    private billingCheckStep: BillingCheckStep,
     private topicStep: TopicCollectionStep,
     private researchStep: ResearchStep,
     private articleGenStep: ArticleGenerationStep,
@@ -40,6 +47,7 @@ export class PipelineService {
     private notificationStep: NotificationStep,
   ) {
     this.steps = [
+      this.billingCheckStep,
       this.topicStep,
       this.researchStep,
       this.articleGenStep,
@@ -372,11 +380,16 @@ export class PipelineService {
                 `Notification step failed for "${ctx.topic || 'unknown'}" ` +
                   `(non-critical, run status preserved): ${stepError.message}`,
               );
+              // Deduct billing even if notification fails (article was published)
+              await this.deductAutoPublishBilling(currentCtx);
               return; // treat article as published-successfully
             }
             throw stepError;
           }
         }
+
+        // All steps succeeded — deduct billing
+        await this.deductAutoPublishBilling(currentCtx);
         return; // success
       } catch (error: any) {
         lastError = error;
@@ -400,10 +413,68 @@ export class PipelineService {
   }
 
   /**
+   * Deduct billing after a successful auto-publish.
+   * Wrapped in try-catch — billing failure should NOT roll back a published article.
+   */
+  private async deductAutoPublishBilling(ctx: PipelineContext): Promise<void> {
+    if (!this.billingService.isEnabled()) return;
+
+    const idempotencyKey = `auto_publish:${ctx.articleId}:${ctx.publishConfig.platform}`;
+
+    try {
+      // Estimate cost for this single article
+      const estimation = await this.billingService.estimateCost(ctx.userId, {
+        operationType: EstimateOperationType.AUTO_PUBLISH,
+        batchSize: 1,
+        platforms: [ctx.publishConfig.platform],
+      });
+
+      if (estimation.estimatedCost <= 0) return;
+
+      await this.billingService.deduct({
+        userId: ctx.userId,
+        type: TransactionType.AUTO_PUBLISH,
+        category: BillingCategory.PUBLISHING,
+        amount: estimation.estimatedCost,
+        description: `自动发布扣费: ${ctx.topic || 'unknown'} → ${ctx.publishConfig.platform}`,
+        articleId: ctx.savedArticleId,
+        platformPublishId: ctx.platformPublishId,
+        idempotencyKey,
+        metadata: {
+          taskId: ctx.taskId,
+          runId: ctx.runId,
+          articleTrackingId: ctx.articleId,
+          topic: ctx.topic,
+          platform: ctx.publishConfig.platform,
+        },
+      });
+
+      this.logger.log(
+        `Auto-publish billing deducted: user=${ctx.userId}, ` +
+          `amount=¥${estimation.estimatedCost.toFixed(4)}, article=${ctx.articleId}`,
+      );
+
+      // Check and trigger low-balance alert
+      await this.billingService.checkAndAlertBalance(ctx.userId);
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to deduct auto-publish billing (article still published): ` +
+          `articleId=${ctx.articleId}, error=${error.message}`,
+      );
+    }
+  }
+
+  /**
    * Determine which step failed based on the current context state.
    */
   private getFailedStep(ctx: PipelineContext): string {
-    if (!ctx.topic) return 'topic-collection';
+    // billing_check is a pre-check that doesn't mutate ctx;
+    // if it fails, no fields are populated yet — same signature as topic-collection failure.
+    // The pipeline engine records the actual step name from the error path, so this
+    // fallback only applies when the context has zero signals. In practice the
+    // billing_check step throws before any other step runs, and the error message
+    // itself contains "Insufficient balance" which is sufficient for diagnosis.
+    if (!ctx.topic) return 'billing_check/topic-collection';
     if (!ctx.researchData) return 'research';
     if (!ctx.draft) return 'article-generation';
     if (!ctx.savedArticleId) return 'article-save';

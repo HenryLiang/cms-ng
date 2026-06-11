@@ -1,3 +1,7 @@
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChannelsController } from './channels.controller';
 import { ChannelsService } from './channels.service';

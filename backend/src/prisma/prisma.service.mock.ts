@@ -43,7 +43,7 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
     aIOperation: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue({ id: 'mock-ai-op-id' }),
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),

@@ -1,16 +1,20 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
+import { BillingService } from '../billing/billing.service';
 import {
   Platform,
   PublishStatus,
   PlatformMetadata,
   UserRole,
+  TransactionType,
+  BillingCategory,
 } from '@cms-ng/shared';
 import { PlatformRegistry } from './platforms/platform-registry';
 import { PLATFORM_METADATA } from './platforms/constants';
@@ -18,9 +22,12 @@ import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()
 export class ChannelsService {
+  private readonly logger = new Logger(ChannelsService.name);
+
   constructor(
     private prisma: PrismaService,
     private aiService: AIService,
+    private billingService: BillingService,
   ) {}
 
   getPlatforms(): PlatformMetadata[] {
@@ -222,6 +229,16 @@ export class ChannelsService {
       data: updateData,
     });
 
+    // Deduct billing on successful publish (non-blocking)
+    if (dto.status === PublishStatus.PUBLISHED) {
+      await this.deductPublishBilling(
+        article.authorId,
+        publish.id,
+        publish.platform,
+        articleId,
+      );
+    }
+
     return {
       ...updated,
       adaptedTags: safeJsonParse(updated.adaptedTags, []),
@@ -240,5 +257,57 @@ export class ChannelsService {
     });
 
     return { deleted: true };
+  }
+
+  /**
+   * Deduct billing for a successful platform publish.
+   * Non-blocking: logs warning on failure but never blocks publishing.
+   */
+  private async deductPublishBilling(
+    userId: string,
+    platformPublishId: string,
+    platform: string,
+    articleId: string,
+  ): Promise<void> {
+    try {
+      if (!this.billingService.isEnabled()) return;
+
+      // Website publishing is free
+      if (platform === Platform.WEBSITE) return;
+
+      // Look up unit price from billing config
+      const configKey = `publish_${platform.toLowerCase()}`;
+      let unitPrice = 0.10; // default fallback
+      try {
+        const config = await this.billingService.getConfig(configKey);
+        unitPrice = config.unitPrice;
+      } catch {
+        // Config not found — use default price
+        this.logger.debug(`Billing config "${configKey}" not found, using default ¥${unitPrice}`);
+      }
+
+      if (unitPrice <= 0) return;
+
+      await this.billingService.deduct({
+        userId,
+        type: TransactionType.PUBLISH,
+        category: BillingCategory.PUBLISHING,
+        amount: unitPrice,
+        description: `${platform} 平台发布扣费`,
+        articleId,
+        platformPublishId,
+        quantity: 1,
+        unitPrice,
+        idempotencyKey: `publish:${platformPublishId}`,
+      });
+
+      this.logger.log(
+        `Publish billing deducted: user=${userId}, platform=${platform}, amount=¥${unitPrice}, publishId=${platformPublishId}`,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to deduct publish billing (non-blocking): platform=${platform}, publishId=${platformPublishId}, error=${error.message}`,
+      );
+    }
   }
 }

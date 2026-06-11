@@ -17,6 +17,7 @@ import {
   KimiProvider,
 } from './providers';
 import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
+import { BillingService } from '../billing/billing.service';
 
 // axios is still used by searchWikipedia (GET requests)
 jest.mock('axios');
@@ -70,6 +71,13 @@ describe('AIService', () => {
       delete: jest.fn(),
     };
 
+    const billingMock = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      checkBalance: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(null),
+      getConfig: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AIService,
@@ -78,6 +86,7 @@ describe('AIService', () => {
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: mockChatProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
+        { provide: BillingService, useValue: billingMock },
       ],
     }).compile();
 
@@ -343,7 +352,7 @@ describe('AIService', () => {
       expect(prompt).toContain('Label 1：Value 1（來源：Source 1）');
       expect(prompt).toContain('【各方觀點】');
       expect(prompt).toContain('Source A（Stance A）：Viewpoint A');
-      expect(prompt).toContain('请充分利用上述背景资料撰写初稿');
+      expect(prompt).toContain('注意：背景资料中已包含多方信息，请在行文中自然引用，不要整段搬运。');
     });
 
     it('should skip empty research kit sections in prompt', async () => {
@@ -1296,7 +1305,7 @@ describe('AIService', () => {
       const opts = callArgs[1];
       expect(opts.maxContentLength).toBe(20 * 1024 * 1024);
       expect(opts.responseType).toBe('arraybuffer');
-      expect(opts.timeout).toBe(300_000);
+      expect(opts.timeout).toBe(60_000);
     });
   });
 
@@ -1731,6 +1740,13 @@ describe('AIService — performSearch branch logic', () => {
       finishReason: 'stop',
     });
 
+    const billingMock = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      checkBalance: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(null),
+      getConfig: jest.fn().mockResolvedValue(null),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         AIService,
@@ -1739,6 +1755,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: kimiProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
+        { provide: BillingService, useValue: billingMock },
       ],
     }).compile();
 
@@ -1781,6 +1798,13 @@ describe('AIService — performSearch branch logic', () => {
       }),
     };
 
+    const billingMock = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      checkBalance: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(null),
+      getConfig: jest.fn().mockResolvedValue(null),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         AIService,
@@ -1789,6 +1813,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: mockProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
+        { provide: BillingService, useValue: billingMock },
       ],
     }).compile();
 
@@ -1832,6 +1857,13 @@ describe('AIService — performSearch branch logic', () => {
       }),
     };
 
+    const billingMock = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      checkBalance: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(null),
+      getConfig: jest.fn().mockResolvedValue(null),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         AIService,
@@ -1840,6 +1872,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: AIToolsService, useValue: aiTools },
         { provide: CHAT_PROVIDER, useValue: mockProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
+        { provide: BillingService, useValue: billingMock },
       ],
     }).compile();
 

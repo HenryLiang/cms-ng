@@ -1,8 +1,13 @@
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
+import { BillingService } from '../billing/billing.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import { Platform, PublishStatus } from '@cms-ng/shared';
 
@@ -15,11 +20,22 @@ describe('ChannelsService', () => {
     prisma = createMockPrismaService();
     aiService = { chatWithAI: jest.fn() };
 
+    const billingService = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      checkBalance: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(null),
+      credit: jest.fn().mockResolvedValue(null),
+      estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0, breakdown: [], sufficientBalance: true, currentBalance: 100 }),
+      checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
+      getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.02 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChannelsService,
         { provide: PrismaService, useValue: prisma },
         { provide: AIService, useValue: aiService },
+        { provide: BillingService, useValue: billingService },
       ],
     }).compile();
 

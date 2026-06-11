@@ -68,6 +68,37 @@ export enum AgentType {
   DISTRIBUTE = 'DISTRIBUTE',
 }
 
+// ===== 计费相关枚举 =====
+export enum TransactionType {
+  TOP_UP = 'TOP_UP',
+  AI_LLM = 'AI_LLM',
+  AI_IMAGE = 'AI_IMAGE',
+  PUBLISH = 'PUBLISH',
+  AUTO_PUBLISH = 'AUTO_PUBLISH',
+  REFUND = 'REFUND',
+  ADJUSTMENT = 'ADJUSTMENT',
+}
+
+export enum TransactionStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum PaymentMethod {
+  ALIPAY = 'ALIPAY',
+  WECHAT_PAY = 'WECHAT_PAY',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  MANUAL = 'MANUAL',
+}
+
+export enum BillingCategory {
+  AI = 'AI',
+  PUBLISHING = 'PUBLISHING',
+  OTHER = 'OTHER',
+}
+
 // ===== 用户 =====
 export interface User {
   id: string;
@@ -78,6 +109,7 @@ export interface User {
   department?: string;
   expertise: string[];
   preferredLanguage?: ContentLanguage;
+  balance?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -296,6 +328,64 @@ export interface AutoPublishArticle {
   retryCount: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ===== 计费接口 =====
+export interface BillingConfigItem {
+  id: string;
+  category: BillingCategory;
+  itemKey: string;
+  itemName: string;
+  unitPrice: number;
+  unit: string;
+  isActive: boolean;
+}
+
+export interface BillingTransactionRecord {
+  id: string;
+  userId: string;
+  type: TransactionType;
+  category: BillingCategory;
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  articleId?: string;
+  aiOperationId?: string;
+  platformPublishId?: string;
+  quantity?: number;
+  unitPrice?: number;
+  status: TransactionStatus;
+  createdAt: Date;
+}
+
+export interface BalanceInfo {
+  balance: number;
+  alertThreshold: number | null;
+  recentTransactions: BillingTransactionRecord[];
+}
+
+export interface CostEstimate {
+  estimatedCost: number;
+  breakdown: Array<{
+    item: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+  }>;
+  sufficientBalance: boolean;
+  currentBalance: number;
+}
+
+export interface TopUpRecordInfo {
+  id: string;
+  userId: string;
+  amount: number;
+  creditsAdded: number;
+  bonusCredits: number;
+  paymentMethod: PaymentMethod;
+  status: TransactionStatus;
+  paidAt?: Date;
+  createdAt: Date;
 }
 
 // ===== API响应格式 =====

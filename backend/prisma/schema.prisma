@@ -18,16 +18,20 @@ model User {
   expertise         String           @default("[]")
   preferredLanguage ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
   isActive          Boolean          @default(true)
+  balance           Decimal          @default(0) @db.Decimal(12, 4)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   // Relations
-  stories          Story[]           @relation("ReporterStories")
-  editedStories    Story[]           @relation("EditorStories")
-  articles         Article[]         @relation("AuthorArticles")
-  editedArticles   Article[]         @relation("EditorArticles")
-  aiOperations     AIOperation[]
-  autoPublishTasks AutoPublishTask[]
+  stories             Story[]              @relation("ReporterStories")
+  editedStories       Story[]              @relation("EditorStories")
+  articles            Article[]            @relation("AuthorArticles")
+  editedArticles      Article[]            @relation("EditorArticles")
+  aiOperations        AIOperation[]
+  autoPublishTasks    AutoPublishTask[]
+  topUpRecords        TopUpRecord[]
+  billingTransactions BillingTransaction[]
+  balanceAlert        BalanceAlert?
 
   @@map("users")
 }
@@ -79,9 +83,10 @@ model Article {
   author            User              @relation("AuthorArticles", fields: [authorId], references: [id])
   editorId          String?
   editor            User?             @relation("EditorArticles", fields: [editorId], references: [id])
-  versions          ArticleVersion[]
-  aiOperations      AIOperation[]
-  platformPublishes PlatformPublish[]
+  versions            ArticleVersion[]
+  aiOperations        AIOperation[]
+  platformPublishes   PlatformPublish[]
+  billingTransactions BillingTransaction[]
 
   @@map("articles")
 }
@@ -103,6 +108,8 @@ model PlatformPublish {
   notes          String?       @db.Text
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  billingTransaction BillingTransaction?
 
   @@unique([articleId, platform])
   @@map("platform_publishes")
@@ -138,6 +145,8 @@ model AIOperation {
   article   Article? @relation(fields: [articleId], references: [id])
   createdBy String
   user      User     @relation(fields: [createdBy], references: [id])
+
+  billingTransaction BillingTransaction?
 
   @@map("ai_operations")
 }
@@ -314,6 +323,123 @@ model AutoPublishArticle {
   task   AutoPublishTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@map("auto_publish_articles")
+}
+
+// ─── 计费系统 (Billing System) ───
+
+enum TransactionType {
+  TOP_UP
+  AI_LLM
+  AI_IMAGE
+  PUBLISH
+  AUTO_PUBLISH
+  REFUND
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  ALIPAY
+  WECHAT_PAY
+  BANK_TRANSFER
+  MANUAL
+}
+
+enum BillingCategory {
+  AI
+  PUBLISHING
+  OTHER
+}
+
+// 计费配置（各操作的单价）
+model BillingConfig {
+  id        String          @id @default(uuid())
+  category  BillingCategory
+  itemKey   String
+  itemName  String
+  unitPrice Decimal         @db.Decimal(12, 4)
+  unit      String
+  isActive  Boolean         @default(true)
+  updatedAt DateTime        @updatedAt
+  updatedBy String?
+
+  @@unique([category, itemKey])
+  @@map("billing_configs")
+}
+
+// 充值记录
+model TopUpRecord {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id])
+  amount          Decimal           @db.Decimal(12, 4)
+  creditsAdded    Decimal           @db.Decimal(12, 4)
+  bonusCredits    Decimal           @db.Decimal(12, 4) @default(0)
+  paymentMethod   PaymentMethod
+  externalOrderId String?           @db.VarChar(255)
+  status          TransactionStatus @default(PENDING)
+  paidAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  billingTransaction BillingTransaction?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("top_up_records")
+}
+
+// 计费流水（核心表，append-only）
+model BillingTransaction {
+  id                String            @id @default(uuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id])
+  type              TransactionType
+  category          BillingCategory
+  amount            Decimal           @db.Decimal(12, 4)
+  balanceAfter      Decimal           @db.Decimal(12, 4)
+  description       String            @db.VarChar(500)
+  articleId         String?
+  article           Article?          @relation(fields: [articleId], references: [id])
+  aiOperationId     String?           @unique
+  aiOperation       AIOperation?      @relation(fields: [aiOperationId], references: [id])
+  platformPublishId String?           @unique
+  platformPublish   PlatformPublish?  @relation(fields: [platformPublishId], references: [id])
+  topUpRecordId     String?           @unique
+  topUpRecord       TopUpRecord?      @relation(fields: [topUpRecordId], references: [id])
+  quantity          Decimal?          @db.Decimal(12, 4)
+  unitPrice         Decimal?          @db.Decimal(12, 4)
+  status            TransactionStatus @default(COMPLETED)
+  idempotencyKey    String?           @unique @db.VarChar(255)
+  metadata          String?           @db.Text
+  createdAt         DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([articleId])
+  @@index([aiOperationId])
+  @@map("billing_transactions")
+}
+
+// 余额预警配置
+model BalanceAlert {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  thresholdAmount Decimal   @db.Decimal(12, 4)
+  isEnabled       Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId])
+  @@map("balance_alerts")
 }
 
 // 紧急杀戮开关单例表（issue #48 P0 修复）

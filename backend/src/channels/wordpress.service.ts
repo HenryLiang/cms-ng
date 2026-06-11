@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { PublishStatus } from '@cms-ng/shared';
+import { BillingService } from '../billing/billing.service';
+import { PublishStatus, TransactionType, BillingCategory } from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class WordPressService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private billingService: BillingService,
   ) {
     this.siteUrl = this.configService.get<string>('WORDPRESS_SITE_URL', '');
     this.username = this.configService.get<string>('WORDPRESS_USERNAME', '');
@@ -280,6 +282,9 @@ export class WordPressService {
 
       this.logger.log(`Article published to WordPress: ${wpPost.link}`);
 
+      // Deduct billing for WordPress publish (non-blocking)
+      await this.deductWordPressBilling(article.authorId, publish.id, articleId);
+
       return {
         ...updated,
         adaptedTags: safeJsonParse(updated.adaptedTags, []),
@@ -400,6 +405,52 @@ export class WordPressService {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Deduct billing for a successful WordPress publish.
+   * Non-blocking: logs warning on failure but never blocks publishing.
+   */
+  private async deductWordPressBilling(
+    userId: string,
+    platformPublishId: string,
+    articleId: string,
+  ): Promise<void> {
+    try {
+      if (!this.billingService.isEnabled()) return;
+
+      const configKey = 'publish_wordpress';
+      let unitPrice = 0.10; // default fallback
+      try {
+        const config = await this.billingService.getConfig(configKey);
+        unitPrice = config.unitPrice;
+      } catch {
+        this.logger.debug(`Billing config "${configKey}" not found, using default ¥${unitPrice}`);
+      }
+
+      if (unitPrice <= 0) return;
+
+      await this.billingService.deduct({
+        userId,
+        type: TransactionType.PUBLISH,
+        category: BillingCategory.PUBLISHING,
+        amount: unitPrice,
+        description: 'WordPress 平台发布扣费',
+        articleId,
+        platformPublishId,
+        quantity: 1,
+        unitPrice,
+        idempotencyKey: `publish:${platformPublishId}`,
+      });
+
+      this.logger.log(
+        `WordPress publish billing deducted: user=${userId}, amount=¥${unitPrice}, publishId=${platformPublishId}`,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to deduct WordPress publish billing (non-blocking): publishId=${platformPublishId}, error=${error.message}`,
+      );
     }
   }
 }

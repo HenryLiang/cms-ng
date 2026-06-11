@@ -13,6 +13,8 @@ import { ImageGenerationStep } from './steps/image-generation.step';
 import { ArticleSaveStep } from './steps/article-save.step';
 import { PublishStep } from './steps/publish.step';
 import { NotificationStep } from './steps/notification.step';
+import { BillingCheckStep } from './steps/billing-check.step';
+import { BillingService } from '../../billing/billing.service';
 
 // Mock modules that have ESM compatibility issues with Jest
 jest.mock('https-proxy-agent', () => ({
@@ -81,6 +83,22 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
     isKillSwitchActive: jest.fn().mockResolvedValue(false),
   };
 
+  const billingService = {
+    isEnabled: jest.fn().mockReturnValue(false),
+    checkBalance: jest.fn().mockResolvedValue(true),
+    deduct: jest.fn().mockResolvedValue(null),
+    credit: jest.fn().mockResolvedValue(null),
+    estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0, breakdown: [], sufficientBalance: true, currentBalance: 100 }),
+    checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
+    getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.02 }),
+  };
+
+  const billingCheckStep = {
+    name: 'billing_check',
+    successStatus: ArticleRunStatus.PENDING,
+    execute: jest.fn().mockImplementation((ctx: PipelineContext) => Promise.resolve(ctx)),
+  };
+
   beforeEach(async () => {
     // Reset step behaviors and instances
     steps.length = 0;
@@ -88,6 +106,7 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
 
     // Default: all steps succeed and just pass ctx through
     [
+      'billing_check',
       'topic-collection',
       'research',
       'article-generation',
@@ -100,6 +119,7 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
     });
 
     // Build step instances with the same names the real pipeline uses
+    steps.push(buildStep('billing_check', ArticleRunStatus.PENDING));
     steps.push(buildStep('topic-collection', ArticleRunStatus.TOPIC_SELECTED));
     steps.push(buildStep('research', ArticleRunStatus.RESEARCHED));
     steps.push(buildStep('article-generation', ArticleRunStatus.DRAFTED));
@@ -115,6 +135,8 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
         { provide: ConfigService, useValue: mockConfig },
         { provide: RedisService, useValue: mockRedis },
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
+        { provide: BillingService, useValue: billingService },
+        { provide: BillingCheckStep, useValue: billingCheckStep },
         // Step stubs — replaced wholesale below; existence is enough for DI
         { provide: TopicCollectionStep, useValue: {} },
         { provide: ResearchStep, useValue: {} },

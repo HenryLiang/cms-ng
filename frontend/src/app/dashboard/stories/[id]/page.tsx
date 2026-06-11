@@ -115,8 +115,9 @@ export default function StoryDetailPage() {
     try {
       const result = await generateResearchKit(storyId, contentLanguage);
       setResearchKit(result);
-    } catch {
-      alert('资料搜集失败，请稍后重试');
+    } catch (err: any) {
+      const apiMsg = err?.response?.data?.message;
+      alert(apiMsg || '资料搜集失败，请稍后重试');
     } finally {
       setResearchLoading(false);
     }
@@ -128,8 +129,9 @@ export default function StoryDetailPage() {
     try {
       const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction, contentLanguage);
       router.push(`/dashboard/articles/${article.id}`);
-    } catch {
-      alert('初稿生成失败，请稍后重试');
+    } catch (err: any) {
+      const apiMsg = err?.response?.data?.message;
+      alert(apiMsg || '初稿生成失败，请稍后重试');
       setDraftLoading(false);
     }
   }

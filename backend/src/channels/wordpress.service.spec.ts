@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { WordPressService } from './wordpress.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BillingService } from '../billing/billing.service';
 import { PublishStatus } from '@cms-ng/shared';
 
 describe('WordPressService', () => {
@@ -57,11 +58,22 @@ describe('WordPressService', () => {
       }),
     };
 
+    const billingService = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      checkBalance: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(null),
+      credit: jest.fn().mockResolvedValue(null),
+      estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0, breakdown: [], sufficientBalance: true, currentBalance: 100 }),
+      checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
+      getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.02 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WordPressService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: configService },
+        { provide: BillingService, useValue: billingService },
       ],
     }).compile();
 
@@ -78,7 +90,8 @@ describe('WordPressService', () => {
         if (key === 'WORDPRESS_SITE_URL') return '';
         return 'value';
       });
-      const svc = new WordPressService(prisma as any, configService as any);
+      const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
+      const svc = new WordPressService(prisma as any, configService as any, mockBilling as any);
       await expect(svc.publish('article-1')).rejects.toThrow('WordPress 配置不完整');
     });
 
@@ -87,7 +100,8 @@ describe('WordPressService', () => {
         if (key === 'WORDPRESS_USERNAME') return '';
         return 'value';
       });
-      const svc = new WordPressService(prisma as any, configService as any);
+      const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
+      const svc = new WordPressService(prisma as any, configService as any, mockBilling as any);
       await expect(svc.publish('article-1')).rejects.toThrow('WordPress 配置不完整');
     });
 
@@ -96,7 +110,8 @@ describe('WordPressService', () => {
         if (key === 'WORDPRESS_APP_PASSWORD') return '';
         return 'value';
       });
-      const svc = new WordPressService(prisma as any, configService as any);
+      const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
+      const svc = new WordPressService(prisma as any, configService as any, mockBilling as any);
       await expect(svc.publish('article-1')).rejects.toThrow('WordPress 配置不完整');
     });
   });

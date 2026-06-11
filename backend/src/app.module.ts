@@ -13,6 +13,7 @@ import { TrendingTopicsModule } from './trending-topics/trending-topics.module';
 import { ChannelsModule } from './channels/channels.module';
 import { AutoPublishModule } from './auto-publish/auto-publish.module';
 import { StorageModule } from './storage/storage.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StorageModule } from './storage/storage.module';
     TrendingTopicsModule,
     ChannelsModule,
     AutoPublishModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
