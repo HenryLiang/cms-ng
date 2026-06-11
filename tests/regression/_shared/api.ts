@@ -62,6 +62,48 @@ export async function patchArticle(api: APIRequestContext, token: string, id: st
   });
 }
 
+export async function reviewArticle(
+  api: APIRequestContext,
+  token: string,
+  id: string,
+  body: { decision: 'APPROVE' | 'REVISION'; comment?: string },
+) {
+  return api.patch(`/articles/${id}/review`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: body,
+  });
+}
+
+export async function reviewQueue(api: APIRequestContext, token: string) {
+  return api.get('/articles/review-queue', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function bootstrapStory(api: APIRequestContext, token: string, titleTag: string): Promise<string> {
+  const res = await api.post('/stories', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { title: `${titleTag}-${uniqueSuffix()}` },
+  });
+  if (!res.ok()) throw new Error(`bootstrapStory failed: ${res.status()} ${await res.text()}`);
+  const body = await res.json();
+  return body.id;
+}
+
+export async function registerUser(
+  api: APIRequestContext,
+  body: { email: string; name: string; password: string; role?: 'ADMIN' | 'EDITOR' | 'REPORTER' },
+) {
+  return api.post('/auth/register', { data: body });
+}
+
+export async function patchUser(api: APIRequestContext, token: string, id: string, body: any) {
+  return api.patch(`/users/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: body,
+  });
+}
+
 export async function getMe(api: APIRequestContext, token: string) {
   return api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } });
 }
