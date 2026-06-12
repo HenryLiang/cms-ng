@@ -47,6 +47,20 @@ coverage/
 # Playwright test runtime artifacts (re-generated on each run)
 tests/regression/results/
 
+# Playwright test screenshots (re-generated on each run)
+tests/regression/screenshots/
+
+# Playwright auto-generated HTML report
+playwright-report/
+
+# Subagent worktree type-check artifacts
+tests/tsconfig.tests.json
+tests/tsconfig.tests.tsbuildinfo
+
+# /tmp logs from E2E runs (qa-backend.log, dev-start.log, playwright-run.log, etc.)
+# These live in /tmp and are never tracked, but list patterns here for any project-local copies.
+# (no patterns needed — /tmp is outside the repo)
+
 # One-off debug screenshots (not test fixtures)
 login-page.png
 
