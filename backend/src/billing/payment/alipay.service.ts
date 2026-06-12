@@ -32,6 +32,10 @@ export class AlipayService {
           appId: this.appId,
           privateKey: this.privateKey,
           alipayPublicKey: this.publicKey || undefined,
+          // 关键:openssl pkcs8 命令生成的私钥是 PKCS#8 格式,
+          // 必须显式告诉 SDK,否则它默认按 PKCS#1 解析会报
+          // "error:1E08010C:DECODER routines::unsupported"
+          keyType: 'PKCS8',
           // 沙箱: ALIPAY_GATEWAY=https://openapi.alipaydev.com/gateway.do
           // 生产: 留空(默认 https://openapi.alipay.com/gateway.do)
           gateway: this.config.get<string>('ALIPAY_GATEWAY') || undefined,
