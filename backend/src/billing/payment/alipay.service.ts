@@ -32,10 +32,20 @@ export class AlipayService {
           appId: this.appId,
           privateKey: this.privateKey,
           alipayPublicKey: this.publicKey || undefined,
+          // 沙箱: ALIPAY_GATEWAY=https://openapi.alipaydev.com/gateway.do
+          // 生产: 留空(默认 https://openapi.alipay.com/gateway.do)
+          gateway: this.config.get<string>('ALIPAY_GATEWAY') || undefined,
         });
+        this.logger.log(
+          `Alipay configured: appId=${this.appId}, gateway=${this.config.get<string>('ALIPAY_GATEWAY') || 'https://openapi.alipay.com/gateway.do (default)'}`,
+        );
       } catch (e) {
         this.logger.warn(`Alipay SDK init failed: ${e}`);
       }
+    } else {
+      this.logger.log(
+        'Alipay not configured (missing ALIPAY_APP_ID or ALIPAY_PRIVATE_KEY). Online top-up via Alipay disabled.',
+      );
     }
   }
 
