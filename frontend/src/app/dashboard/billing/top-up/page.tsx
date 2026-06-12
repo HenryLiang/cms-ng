@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth-store';
 import {
   getTopUpRecords,
   manualTopUp,
+  createOnlineTopUp,
   type TopUpRecord,
 } from '@/lib/billing-api';
 
@@ -40,7 +41,7 @@ export default function TopUpPage() {
   const user = useAuthStore((s) => s.user);
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('manual');
+  const [paymentMethod, setPaymentMethod] = useState('alipay');
   const [records, setRecords] = useState<TopUpRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -79,19 +80,45 @@ export default function TopUpPage() {
 
     setSubmitting(true);
     try {
-      await manualTopUp({
-        targetUserId: user.id,
-        amount,
-        reason: '管理员手动充值',
-      });
-      alert(`充值成功！¥${amount.toFixed(2)} 已到账`);
-      setSelectedPackage(null);
-      setCustomAmount('');
-      await loadRecords();
+      if (paymentMethod === 'manual') {
+        // 管理员手动充值,绕过支付通道
+        await manualTopUp({
+          targetUserId: user.id,
+          amount,
+          reason: '管理员手动充值',
+        });
+        alert(`充值成功！¥${amount.toFixed(2)} 已到账`);
+        setSelectedPackage(null);
+        setCustomAmount('');
+        await loadRecords();
+      } else if (paymentMethod === 'alipay') {
+        // 支付宝:后端创建订单,返回支付 URL,前端跳转
+        const { paymentUrl } = await createOnlineTopUp({
+          amount,
+          paymentMethod: 'ALIPAY',
+        });
+        // 跳转后页面生命周期结束,不要 reset 状态
+        window.location.href = paymentUrl;
+        return;
+      } else if (paymentMethod === 'wechat') {
+        // 微信支付:后端返回二维码 URL,新窗口打开
+        const { qrCodeUrl } = await createOnlineTopUp({
+          amount,
+          paymentMethod: 'WECHAT_PAY',
+        });
+        if (qrCodeUrl) {
+          window.open(qrCodeUrl, '_blank', 'width=420,height=420');
+        }
+        alert('请用微信扫描二维码完成支付,支付成功后将自动到账');
+        await loadRecords();
+      }
     } catch (err) {
       alert(`充值失败: ${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
-      setSubmitting(false);
+      if (paymentMethod !== 'alipay') {
+        setSubmitting(false);
+      }
+      // alipay 分支跳转后,本页会被销毁,无需 reset
     }
   }
 

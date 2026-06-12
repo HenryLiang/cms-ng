@@ -152,6 +152,30 @@ export async function manualTopUp(data: {
   return res.data;
 }
 
+/**
+ * 在线支付创建订单（支付宝 / 微信）。
+ * 后端 controller 走 `dto.paymentMethod` 分发到 alipayService 或 wechatPayService。
+ * 返回的 paymentUrl 是支付宝 PC 网页支付跳转 URL；qrCodeUrl 仅微信支付有值。
+ */
+export interface CreateOnlineTopUpInput {
+  amount: number;
+  paymentMethod: 'ALIPAY' | 'WECHAT_PAY';
+  packageId?: string;
+}
+
+export interface CreateOnlineTopUpResult {
+  topUpRecordId: string;
+  paymentUrl: string;
+  qrCodeUrl?: string;
+}
+
+export async function createOnlineTopUp(
+  input: CreateOnlineTopUpInput,
+): Promise<CreateOnlineTopUpResult> {
+  const res = await api.post<CreateOnlineTopUpResult>('/billing/top-up/create', input);
+  return res.data;
+}
+
 export async function getTopUpRecords(
   page?: number,
   pageSize?: number,
