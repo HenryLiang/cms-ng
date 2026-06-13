@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
@@ -18,13 +19,16 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 export class TrendingTopicsService {
   private readonly proxyEnabled: boolean;
   private readonly proxyUrl: string | undefined;
+  private readonly rssHubUrl: string;
 
   constructor(
     private prisma: PrismaService,
     private aiService: AIService,
+    private config: ConfigService,
   ) {
-    this.proxyEnabled = (process.env.RSS_PROXY_ENABLED || '').toLowerCase() === 'true';
-    this.proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+    this.proxyEnabled = (this.config.get<string>('RSS_PROXY_ENABLED') || '').toLowerCase() === 'true';
+    this.proxyUrl = this.config.get<string>('HTTP_PROXY') || this.config.get<string>('http_proxy');
+    this.rssHubUrl = this.config.get<string>('RSS_HUB_URL') || 'http://localhost:1200';
   }
 
   /**
@@ -218,25 +222,25 @@ export class TrendingTopicsService {
     {
       key: 'zaobao',
       // 早报官方 .com.sg/rss/news.xml 已下线（2026 改版后全 404），改走 RSSHub
-      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/zaobao/realtime/china`,
+      url: `${this.rssHubUrl}/zaobao/realtime/china`,
       isGoogle: false,
       isRSSHub: true,
     },
     {
       key: '36kr',
-      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/36kr/news/latest`,
+      url: `${this.rssHubUrl}/36kr/news/latest`,
       isGoogle: false,
       isRSSHub: true,
     },
     {
       key: 'huxiu',
-      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/huxiu/article`,
+      url: `${this.rssHubUrl}/huxiu/article`,
       isGoogle: false,
       isRSSHub: true,
     },
     {
       key: 'douban-movie',
-      url: `${process.env.RSS_HUB_URL || 'http://localhost:1200'}/douban/movie/playing`,
+      url: `${this.rssHubUrl}/douban/movie/playing`,
       isGoogle: false,
       isRSSHub: true,
     },

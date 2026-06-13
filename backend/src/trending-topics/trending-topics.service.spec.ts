@@ -10,6 +10,7 @@ jest.mock('rss-parser', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { TrendingTopicsService } from './trending-topics.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -31,6 +32,7 @@ describe('TrendingTopicsService', () => {
         TrendingTopicsService,
         { provide: PrismaService, useValue: prisma },
         { provide: AIService, useValue: aiService },
+        { provide: ConfigService, useValue: { get: () => undefined } },
       ],
     }).compile();
 
