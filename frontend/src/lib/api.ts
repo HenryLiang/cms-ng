@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { reportApiError } from './api-error-toast';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -27,6 +28,8 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
+    } else {
+      reportApiError(error);
     }
     return Promise.reject(error);
   },
