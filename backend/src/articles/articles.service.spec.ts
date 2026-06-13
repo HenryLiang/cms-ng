@@ -6,6 +6,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ArticlesService } from './articles.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 
@@ -43,6 +44,7 @@ describe('ArticlesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ArticlesService,
+        ArticleAccessService,
         { provide: PrismaService, useValue: prisma },
         { provide: AIService, useValue: aiService },
       ],
