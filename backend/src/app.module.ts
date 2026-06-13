@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { validateEnv, formatValidationErrors } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
@@ -17,7 +18,22 @@ import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      // Validate critical env vars at boot. Fail fast with a readable message
+      // instead of mysterious runtime errors when something is missing.
+      validate: (rawEnv) => {
+        const result = validateEnv(rawEnv);
+        if (!result.success) {
+          // eslint-disable-next-line no-console
+          console.error(formatValidationErrors(result.errors));
+          // Throwing here causes NestFactory.create to reject; the message
+          // is already printed above so users see a clean error.
+          throw new Error('Invalid environment configuration');
+        }
+        return result.data as Record<string, unknown>;
+      },
+    }),
     PrismaModule,
     StorageModule,
     RedisModule,
