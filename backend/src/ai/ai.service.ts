@@ -42,6 +42,7 @@ import {
 } from './dto/writing-operations.dto';
 import { AIToolsService } from './tools/ai-tools.service';
 import { BillingService, InsufficientBalanceException } from '../billing/billing.service';
+import { PromptLoader } from './prompts/prompt-loader';
 
 /**
  * Module-level safety bounds for the image-fetch path in `uploadToStorage`.
@@ -63,6 +64,8 @@ export class AIService {
   private readonly searchProvider: string;
   /** HTTP(S) proxy agent — used when Wikipedia/RSS are blocked by DNS pollution. */
   private readonly proxyAgent?: HttpsProxyAgent<string>;
+  /** Loads AI prompt templates from disk. See ./prompts/prompt-loader.ts. */
+  private readonly prompts = new PromptLoader();
 
   constructor(
     private config: ConfigService,
@@ -277,14 +280,15 @@ export class AIService {
     const styleDesc = input.style
       ? styleMap[input.style] || input.style
       : '保持原意但改善表达';
+    const instructionSuffix = input.instruction
+      ? '；额外要求：' + input.instruction
+      : '';
 
-    const prompt = `请改写以下文字，让它读起来像真人记者写的，而不是 AI 生成的。
-要求：${styleDesc}${input.instruction ? '；额外要求：' + input.instruction : ''}
-
-原文：
-${input.text}
-
-改写要点：不要改写后变成标准的「机器人口吻」——保留原文的核心信息，但用更自然、有节奏感的新闻语言重新表达。直接输出改写后的文字。`;
+    const prompt = this.prompts.render('writing', 'rewrite', {
+      style: styleDesc,
+      instruction: instructionSuffix,
+      text: input.text,
+    });
 
     return this.callTextAI(
       userId,
@@ -303,13 +307,10 @@ ${input.text}
     input: ExpandTextInput,
   ): Promise<string> {
     const language = input.language;
-    const prompt = `请基于以下内容进行扩写，补充细节、数据或背景，但要像记者在写稿而不是 AI 在扩充文本。
-${input.instruction ? '额外要求：' + input.instruction : ''}
-
-原文：
-${input.text}
-
-注意：扩写后读起来应该像一篇连贯的新闻段落，而不是机械地插入补充信息。直接输出扩写后的文字。`;
+    const prompt = this.prompts.render('writing', 'expand', {
+      instruction: input.instruction ? '额外要求：' + input.instruction : '',
+      text: input.text,
+    });
 
     return this.callTextAI(
       userId,
@@ -331,12 +332,10 @@ ${input.text}
     const lengthHint = input.maxLength
       ? `控制在 ${input.maxLength} 字以内。`
       : '去除冗余，保留核心信息。';
-    const prompt = `请将以下文字精简。${lengthHint}
-
-原文：
-${input.text}
-
-精简后要保持原文的语感和节奏，不是机械地压缩——删掉水词、合并重复、保留最有信息量的句子。直接输出精简后的文字。`;
+    const prompt = this.prompts.render('writing', 'condense', {
+      lengthHint,
+      text: input.text,
+    });
 
     return this.callTextAI(
       userId,
@@ -355,12 +354,9 @@ ${input.text}
     input: PolishTextInput,
   ): Promise<string> {
     const language = input.language;
-    const prompt = `请润色以下文字，让它更流畅、更有节奏感，但不要变成 AI 那种「过度打磨」的感觉——保留一些自然的粗糙感。保持原意。
-
-原文：
-${input.text}
-
-直接输出润色后的文字。`;
+    const prompt = this.prompts.render('writing', 'polish', {
+      text: input.text,
+    });
 
     return this.callTextAI(
       userId,
