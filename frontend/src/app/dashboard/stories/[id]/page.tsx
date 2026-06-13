@@ -37,6 +37,7 @@ export default function StoryDetailPage() {
   const [story, setStory] = useState<Story | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +62,7 @@ export default function StoryDetailPage() {
   }, [storyId]);
 
   async function loadData() {
+    setLoadError(null);
     try {
       const [storyData, articlesData] = await Promise.all([
         getStory(storyId),
@@ -75,6 +77,22 @@ export default function StoryDetailPage() {
       if (storyData.contentLanguage) {
         setContentLanguage(storyData.contentLanguage);
       }
+    } catch (err: any) {
+      // 401 is handled globally by the api interceptor (redirect to /login).
+      // Map other common status codes to user-friendly messages; never let
+      // the error propagate as an unhandled rejection.
+      const status = err?.response?.status;
+      const apiMsg = err?.response?.data?.message;
+      if (status === 403) {
+        setLoadError(apiMsg || '您没有权限访问此选题');
+      } else if (status === 404) {
+        setLoadError('选题不存在');
+      } else if (status && status >= 500) {
+        setLoadError('服务器错误，请稍后重试');
+      } else {
+        setLoadError(apiMsg || '加载失败，请稍后重试');
+      }
+      setStory(null);
     } finally {
       setLoading(false);
     }
@@ -155,7 +173,7 @@ export default function StoryDetailPage() {
   if (!story) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-zinc-500">选题不存在</p>
+        <p className="text-zinc-500">{loadError ?? '选题不存在'}</p>
       </div>
     );
   }
