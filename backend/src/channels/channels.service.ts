@@ -3,16 +3,15 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { BillingService } from '../billing/billing.service';
 import {
   Platform,
   PublishStatus,
   PlatformMetadata,
-  UserRole,
   TransactionType,
   BillingCategory,
 } from '@cms-ng/shared';
@@ -28,6 +27,7 @@ export class ChannelsService {
     private prisma: PrismaService,
     private aiService: AIService,
     private billingService: BillingService,
+    private articleAccess: ArticleAccessService,
   ) {}
 
   getPlatforms(): PlatformMetadata[] {
@@ -38,22 +38,7 @@ export class ChannelsService {
     articleId: string,
     user: { userId: string; role: string },
   ) {
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
-      select: { authorId: true, editorId: true },
-    });
-    if (!article) throw new NotFoundException('Article not found');
-
-    const canAccess =
-      user.role === UserRole.ADMIN ||
-      article.authorId === user.userId ||
-      article.editorId === user.userId;
-
-    if (!canAccess) {
-      throw new ForbiddenException(
-        'You do not have permission to access this article',
-      );
-    }
+    return this.articleAccess.checkAccess(articleId, user);
   }
 
   async getPublishes(articleId: string) {
