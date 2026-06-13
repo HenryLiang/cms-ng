@@ -7,6 +7,8 @@ import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
 import { UserRole } from '@cms-ng/shared';
 import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck, Zap, Wallet } from 'lucide-react';
+import ToastHost from '@/components/toast-host';
+import ErrorBoundary from '@/components/error-boundary';
 
 const allNavItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
@@ -99,7 +101,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto bg-zinc-50">{children}</main>
+      <main className="flex-1 overflow-auto bg-zinc-50">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
+      <ToastHost />
     </div>
   );
 }
