@@ -18,6 +18,10 @@ import { FindAllArticlesDto } from './dto/find-all-articles.dto';
 import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
 import {
+  deserializeArticle,
+  serializeArticleInput,
+} from './article-serializer';
+import {
   RewriteTextDto,
   ExpandTextDto,
   CondenseTextDto,
@@ -113,18 +117,18 @@ export class ArticlesService {
       dto.contentLanguage ?? user?.preferredLanguage ?? ContentLanguage.TRADITIONAL_CHINESE_HK;
 
     const article = await this.prisma.article.create({
-      data: {
+      data: serializeArticleInput({
         storyId: dto.storyId,
         title: dto.title,
         subtitle: dto.subtitle,
         content: dto.content,
         excerpt: dto.excerpt,
         status: dto.status ?? ArticleStatus.DRAFT,
-        tags: JSON.stringify(dto.tags ?? []),
+        tags: dto.tags ?? [],
         authorId,
         version: 1,
         contentLanguage,
-      },
+      }),
       include: {
         author: { select: { id: true, name: true, email: true } },
         editor: { select: { id: true, name: true, email: true } },
@@ -141,7 +145,7 @@ export class ArticlesService {
       },
     });
 
-    return this.serializeArticle(article);
+    return deserializeArticle(article);
   }
 
   async findAll(
@@ -215,7 +219,7 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
-    return articles.map((a) => this.serializeArticle(a));
+    return articles.map((a) => deserializeArticle(a));
   }
 
   async findOne(id: string) {
@@ -229,7 +233,7 @@ export class ArticlesService {
       },
     });
     if (!article) throw new NotFoundException('Article not found');
-    return this.serializeArticle(article);
+    return deserializeArticle(article);
   }
 
   async update(id: string, dto: UpdateArticleDto) {
@@ -245,7 +249,7 @@ export class ArticlesService {
 
     const article = await this.prisma.article.update({
       where: { id },
-      data: {
+      data: serializeArticleInput({
         title: dto.title,
         subtitle: dto.subtitle,
         content: dto.content,
@@ -253,10 +257,10 @@ export class ArticlesService {
         status: dto.status,
         editorId: dto.editorId,
         coverImage: dto.coverImage,
-        tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
+        tags: dto.tags,
         contentLanguage: dto.contentLanguage,
         version: newVersion,
-      },
+      }),
       include: {
         author: { select: { id: true, name: true, email: true } },
         editor: { select: { id: true, name: true, email: true } },
@@ -275,7 +279,7 @@ export class ArticlesService {
       });
     }
 
-    return this.serializeArticle(article);
+    return deserializeArticle(article);
   }
 
   async remove(id: string) {
@@ -313,7 +317,7 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
-    return this.serializeArticle(updated);
+    return deserializeArticle(updated);
   }
 
   async submitReview(
@@ -373,7 +377,7 @@ export class ArticlesService {
 
     // TODO: store review comment in a separate ReviewComment table
     return {
-      article: this.serializeArticle(updated),
+      article: deserializeArticle(updated),
       decision,
       comment: comment || null,
     };
@@ -654,15 +658,6 @@ export class ArticlesService {
       },
     });
 
-    return this.serializeArticle(article);
-  }
-
-  private serializeArticle(article: any) {
-    return {
-      ...article,
-      tags: safeJsonParse(article.tags, []),
-      platforms: safeJsonParse(article.platforms, []),
-      aiGeneratedParts: safeJsonParse(article.aiGeneratedParts, []),
-    };
+    return deserializeArticle(article);
   }
 }
