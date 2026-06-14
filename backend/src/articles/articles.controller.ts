@@ -12,6 +12,7 @@ import {
 import { ArticlesService } from './articles.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
+import { FindAllArticlesDto } from './dto/find-all-articles.dto';
 import {
   RewriteTextDto,
   ExpandTextDto,
@@ -45,9 +46,9 @@ export class ArticlesController {
   @Get()
   findAll(
     @CurrentUser() user: { userId: string; role: string },
-    @Query('storyId') storyId?: string,
+    @Query() query: FindAllArticlesDto,
   ) {
-    return this.articlesService.findAll(user, { storyId });
+    return this.articlesService.findAll(user, query);
   }
 
   @Get('review-queue')

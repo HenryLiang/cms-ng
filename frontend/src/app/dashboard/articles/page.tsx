@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getArticles, type Article } from '@/lib/article-api';
+import { getArticles, type Article, type PaginatedMeta } from '@/lib/article-api';
 import { FileText, ArrowRight, Loader2 } from 'lucide-react';
 import LanguageBadge from '@/components/language-badge';
 
 export default function ArticlesPage() {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,8 +17,9 @@ export default function ArticlesPage() {
 
   async function loadArticles() {
     try {
-      const data = await getArticles();
+      const { data, meta } = await getArticles();
       setArticles(data);
+      setMeta(meta);
     } finally {
       setLoading(false);
     }
@@ -100,6 +102,12 @@ export default function ArticlesPage() {
           </div>
         )}
       </div>
+
+      {meta && articles.length > 0 && (
+        <p className="mt-4 text-xs text-zinc-400">
+          共 {meta.total} 篇 · 第 {meta.page} / {Math.max(meta.totalPages, 1)} 页
+        </p>
+      )}
     </div>
   );
 }
