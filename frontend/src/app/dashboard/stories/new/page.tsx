@@ -32,8 +32,11 @@ export default function NewStoryPage() {
         contentLanguage: user?.preferredLanguage,
       });
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || '创建失败');
+    } catch (err: unknown) {
+      const apiMsg = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
+      setError(apiMsg || '创建失败');
     } finally {
       setSubmitting(false);
     }

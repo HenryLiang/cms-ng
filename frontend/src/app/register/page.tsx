@@ -22,8 +22,13 @@ export default function RegisterPage() {
     try {
       await register(email, name, password);
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+    } catch (err: unknown) {
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
+      setError(apiMsg || 'Registration failed');
     } finally {
       setIsSubmitting(false);
     }

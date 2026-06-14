@@ -35,8 +35,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
       ]);
       setPlatforms(platformsData);
       setPublishes(publishesData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -55,8 +55,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
         const filtered = prev.filter((p) => p.platform !== platform);
         return [...filtered, updated];
       });
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setRegenerating((prev) => ({ ...prev, [platform]: false }));
     }
@@ -67,8 +67,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
     try {
       await deletePublish(articleId, publishId);
       setPublishes((prev) => prev.filter((p) => p.id !== publishId));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
@@ -80,8 +80,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
       setPublishes((prev) =>
         prev.map((p) => (p.id === publishId ? updated : p))
       );
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
@@ -93,8 +93,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
       setPublishes((prev) =>
         prev.map((p) => (p.platform === Platform.WORDPRESS ? updated : p))
       );
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setPublishing(false);
     }
