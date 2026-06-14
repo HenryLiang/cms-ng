@@ -1,0 +1,71 @@
+import { safeJsonParse } from '../common/json.utils';
+
+/**
+ * Article columns that are stored as JSON strings in MySQL but should
+ * be exposed to callers as arrays. Keep in sync with the Prisma schema
+ * (`backend/prisma/schema.prisma` → Article).
+ */
+export const ARTICLE_JSON_FIELDS = [
+  'tags',
+  'platforms',
+  'aiGeneratedParts',
+] as const;
+
+export type ArticleJsonField = (typeof ARTICLE_JSON_FIELDS)[number];
+
+/**
+ * Convert a Prisma Article row (or any object containing the JSON-string
+ * columns) into the shape callers expect:
+ *   - declared JSON fields: string → parsed array (or [] on null/missing/garbage)
+ *   - already-parsed arrays: passed through (idempotent)
+ *   - everything else: untouched (idels, foreign keys, relations, etc.)
+ *
+ * Mutates and returns the input for convenience. The mutation is
+ * safe because Prisma rows are fresh objects.
+ */
+export function deserializeArticle<T extends Record<string, any>>(
+  article: T,
+): T {
+  if (article == null) return article;
+  for (const field of ARTICLE_JSON_FIELDS) {
+    const value = article[field];
+    if (value == null) {
+      // null / undefined → empty array (matches Prisma `@default("[]")`)
+      (article as any)[field] = [];
+    } else if (typeof value === 'string') {
+      (article as any)[field] = safeJsonParse(value, []);
+    }
+    // already an array or object: leave alone
+  }
+  return article;
+}
+
+/**
+ * Convert a DTO / update payload into the data shape Prisma expects for
+ * the Article model. JSON fields are stringified; everything else is
+ * passed through.
+ *
+ * Semantics per JSON field:
+ *   - undefined: the key is left as `undefined` in the returned object so
+ *     Prisma treats the field as "do not update" (for `update`) or applies
+ *     the column default (for `create`).
+ *   - null: kept as `null` (Prisma writes SQL NULL).
+ *   - string: kept as-is (idempotent — no double encoding).
+ *   - array / object: JSON.stringify.
+ *
+ * Returns the same object (mutated) for convenience.
+ */
+export function serializeArticleInput<T extends Record<string, any>>(
+  input: T,
+): T {
+  for (const field of ARTICLE_JSON_FIELDS) {
+    if (!(field in input) || input[field] === undefined) continue;
+    const value = input[field];
+    if (value === null) continue; // explicit null stays null
+    if (typeof value === 'string') continue; // already serialized
+    if (Array.isArray(value) || typeof value === 'object') {
+      (input as any)[field] = JSON.stringify(value);
+    }
+  }
+  return input;
+}
