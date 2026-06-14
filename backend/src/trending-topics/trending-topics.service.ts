@@ -175,76 +175,85 @@ export class TrendingTopicsService {
     return { storyId: story.id, topicId };
   }
 
-  private readonly RSS_FEEDS = [
-    {
-      key: 'google-trends',
-      url: 'https://trends.google.com/trending/rss?geo=HK',
-      isGoogle: true,
-    },
-    // 原生 RSS 源（优先）
-    {
-      key: 'sina',
-      url: 'https://rss.sina.com.cn/news/china/focus15.xml',
-      isGoogle: false,
-    },
-    {
-      key: 'people',
-      url: 'http://www.people.com.cn/rss/politics.xml',
-      isGoogle: false,
-    },
-    {
-      key: 'bbc',
-      url: 'http://feeds.bbci.co.uk/news/rss.xml',
-      isGoogle: false,
-    },
-    {
-      key: 'chinanews',
-      url: 'http://www.chinanews.com/rss/scroll-news.xml',
-      isGoogle: false,
-    },
-    {
-      key: 'guardian',
-      url: 'https://www.theguardian.com/world/rss',
-      isGoogle: false,
-    },
-    {
-      key: 'nytimes',
-      url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
-      isGoogle: false,
-    },
-    {
-      key: 'economist',
-      url: 'https://www.economist.com/latest/rss.xml',
-      isGoogle: false,
-    },
-    { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
-    // RSSHub 源（网站无原生 RSS 时）
-    {
-      key: 'zaobao',
-      // 早报官方 .com.sg/rss/news.xml 已下线（2026 改版后全 404），改走 RSSHub
-      url: `${this.rssHubUrl}/zaobao/realtime/china`,
-      isGoogle: false,
-      isRSSHub: true,
-    },
-    {
-      key: '36kr',
-      url: `${this.rssHubUrl}/36kr/news/latest`,
-      isGoogle: false,
-      isRSSHub: true,
-    },
-    {
-      key: 'huxiu',
-      url: `${this.rssHubUrl}/huxiu/article`,
-      isGoogle: false,
-      isRSSHub: true,
-    },
-    {
-      key: 'douban-movie',
-      url: `${this.rssHubUrl}/douban/movie/playing`,
-      isGoogle: false,
-      isRSSHub: true,
-    },
-  ];
+  /**
+   * Lazy getter — the URLs are computed from `this.rssHubUrl`, which is
+   * initialized in the constructor body. A class field initializer runs
+   * before the constructor body, so referencing `this.rssHubUrl` there
+   * trips TS2729. Computing on access defers the read until after
+   * construction.
+   */
+  private get RSS_FEEDS() {
+    return [
+      {
+        key: 'google-trends',
+        url: 'https://trends.google.com/trending/rss?geo=HK',
+        isGoogle: true,
+      },
+      // 原生 RSS 源（优先）
+      {
+        key: 'sina',
+        url: 'https://rss.sina.com.cn/news/china/focus15.xml',
+        isGoogle: false,
+      },
+      {
+        key: 'people',
+        url: 'http://www.people.com.cn/rss/politics.xml',
+        isGoogle: false,
+      },
+      {
+        key: 'bbc',
+        url: 'http://feeds.bbci.co.uk/news/rss.xml',
+        isGoogle: false,
+      },
+      {
+        key: 'chinanews',
+        url: 'http://www.chinanews.com/rss/scroll-news.xml',
+        isGoogle: false,
+      },
+      {
+        key: 'guardian',
+        url: 'https://www.theguardian.com/world/rss',
+        isGoogle: false,
+      },
+      {
+        key: 'nytimes',
+        url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+        isGoogle: false,
+      },
+      {
+        key: 'economist',
+        url: 'https://www.economist.com/latest/rss.xml',
+        isGoogle: false,
+      },
+      { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
+      // RSSHub 源（网站无原生 RSS 时）
+      {
+        key: 'zaobao',
+        // 早报官方 .com.sg/rss/news.xml 已下线（2026 改版后全 404），改走 RSSHub
+        url: `${this.rssHubUrl}/zaobao/realtime/china`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+      {
+        key: '36kr',
+        url: `${this.rssHubUrl}/36kr/news/latest`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+      {
+        key: 'huxiu',
+        url: `${this.rssHubUrl}/huxiu/article`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+      {
+        key: 'douban-movie',
+        url: `${this.rssHubUrl}/douban/movie/playing`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+    ];
+  }
 
   async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
     const baseRequestOptions = this.getProxyRequestOptions();
