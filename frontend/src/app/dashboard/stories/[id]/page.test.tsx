@@ -76,7 +76,10 @@ describe('StoryDetailPage - error handling for getStory', () => {
       config: {} as any,
     };
     vi.mocked(storyApi.getStory).mockRejectedValue(axiosError);
-    vi.mocked(articleApi.getArticles).mockResolvedValue([]);
+    vi.mocked(articleApi.getArticles).mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    });
 
     render(<StoryDetailPage />);
 
@@ -100,7 +103,10 @@ describe('StoryDetailPage - error handling for getStory', () => {
       config: {} as any,
     };
     vi.mocked(storyApi.getStory).mockRejectedValue(axiosError);
-    vi.mocked(articleApi.getArticles).mockResolvedValue([]);
+    vi.mocked(articleApi.getArticles).mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    });
 
     render(<StoryDetailPage />);
 

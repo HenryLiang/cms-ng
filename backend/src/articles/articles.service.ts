@@ -7,11 +7,21 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
+import {
+  parsePaginationParams,
+  buildPaginatedResponse,
+  type PaginatedResponse,
+} from '../common/pagination';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
+import { FindAllArticlesDto } from './dto/find-all-articles.dto';
 import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
+import {
+  deserializeArticle,
+  serializeArticleInput,
+} from './article-serializer';
 import {
   RewriteTextDto,
   ExpandTextDto,
@@ -108,18 +118,18 @@ export class ArticlesService {
       dto.contentLanguage ?? user?.preferredLanguage ?? ContentLanguage.TRADITIONAL_CHINESE_HK;
 
     const article = await this.prisma.article.create({
-      data: {
+      data: serializeArticleInput({
         storyId: dto.storyId,
         title: dto.title,
         subtitle: dto.subtitle,
         content: dto.content,
         excerpt: dto.excerpt,
         status: dto.status ?? ArticleStatus.DRAFT,
-        tags: JSON.stringify(dto.tags ?? []),
+        tags: dto.tags ?? [],
         authorId,
         version: 1,
         contentLanguage,
-      },
+      }),
       include: {
         author: { select: { id: true, name: true, email: true } },
         editor: { select: { id: true, name: true, email: true } },
@@ -136,7 +146,7 @@ export class ArticlesService {
       },
     });
 
-    return this.serializeArticle(article);
+    return deserializeArticle(article);
   }
 
   async findAll(
@@ -144,6 +154,12 @@ export class ArticlesService {
     filters: { storyId?: string },
   ) {
     let where: Prisma.ArticleWhereInput = {};
+    query: FindAllArticlesDto = {},
+  ): Promise<PaginatedResponse<ReturnType<typeof this.serializeArticle>>> {
+    const { storyId } = query;
+    const { page, pageSize } = parsePaginationParams(query);
+
+    let where: any = {};
 
     if (user.role === UserRole.REPORTER) {
       where.authorId = user.userId;
@@ -166,20 +182,32 @@ export class ArticlesService {
     }
     // ADMIN sees everything
 
-    if (filters.storyId) {
-      where = { ...where, storyId: filters.storyId };
+    if (storyId) {
+      where = { ...where, storyId };
     }
 
-    const articles = await this.prisma.article.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        author: { select: { id: true, name: true, email: true } },
-        editor: { select: { id: true, name: true, email: true } },
-        story: { select: { id: true, title: true } },
-      },
-    });
-    return articles.map((a) => this.serializeArticle(a));
+    const skip = (page - 1) * pageSize;
+
+    const [articles, total] = await Promise.all([
+      this.prisma.article.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          author: { select: { id: true, name: true, email: true } },
+          editor: { select: { id: true, name: true, email: true } },
+          story: { select: { id: true, title: true } },
+        },
+      }),
+      this.prisma.article.count({ where }),
+    ]);
+
+    return buildPaginatedResponse(
+      articles.map((a) => this.serializeArticle(a)),
+      total,
+      { page, pageSize },
+    );
   }
 
   async getReviewQueue(editorId: string) {
@@ -195,7 +223,7 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
-    return articles.map((a) => this.serializeArticle(a));
+    return articles.map((a) => deserializeArticle(a));
   }
 
   async findOne(id: string) {
@@ -209,7 +237,7 @@ export class ArticlesService {
       },
     });
     if (!article) throw new NotFoundException('Article not found');
-    return this.serializeArticle(article);
+    return deserializeArticle(article);
   }
 
   async update(id: string, dto: UpdateArticleDto) {
@@ -225,7 +253,7 @@ export class ArticlesService {
 
     const article = await this.prisma.article.update({
       where: { id },
-      data: {
+      data: serializeArticleInput({
         title: dto.title,
         subtitle: dto.subtitle,
         content: dto.content,
@@ -233,10 +261,10 @@ export class ArticlesService {
         status: dto.status,
         editorId: dto.editorId,
         coverImage: dto.coverImage,
-        tags: dto.tags !== undefined ? JSON.stringify(dto.tags) : undefined,
+        tags: dto.tags,
         contentLanguage: dto.contentLanguage,
         version: newVersion,
-      },
+      }),
       include: {
         author: { select: { id: true, name: true, email: true } },
         editor: { select: { id: true, name: true, email: true } },
@@ -255,7 +283,7 @@ export class ArticlesService {
       });
     }
 
-    return this.serializeArticle(article);
+    return deserializeArticle(article);
   }
 
   async remove(id: string) {
@@ -293,7 +321,7 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
-    return this.serializeArticle(updated);
+    return deserializeArticle(updated);
   }
 
   async submitReview(
@@ -353,7 +381,7 @@ export class ArticlesService {
 
     // TODO: store review comment in a separate ReviewComment table
     return {
-      article: this.serializeArticle(updated),
+      article: deserializeArticle(updated),
       decision,
       comment: comment || null,
     };
@@ -660,5 +688,6 @@ export class ArticlesService {
       platforms: safeJsonParse(article.platforms, []),
       aiGeneratedParts: safeJsonParse(article.aiGeneratedParts, []),
     };
+    return deserializeArticle(article);
   }
 }

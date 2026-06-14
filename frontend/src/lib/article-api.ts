@@ -40,8 +40,28 @@ export interface UpdateArticleInput extends Partial<CreateArticleInput> {
   editorId?: string;
 }
 
-export async function getArticles(storyId?: string): Promise<Article[]> {
-  const res = await api.get('/articles', { params: { storyId } });
+export interface PaginatedMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: PaginatedMeta;
+}
+
+export interface GetArticlesParams {
+  storyId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function getArticles(
+  params: GetArticlesParams = {},
+): Promise<PaginatedResponse<Article>> {
+  const res = await api.get('/articles', { params });
   return res.data;
 }
 
