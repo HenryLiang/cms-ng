@@ -26,7 +26,10 @@ describe('article-api', () => {
 
       const result = await aiFactCheck('article-1');
 
-      expect(api.post).toHaveBeenCalledWith('/articles/article-1/ai-fact-check');
+      expect(api.post).toHaveBeenCalledWith(
+        '/articles/article-1/ai-fact-check',
+        { language: undefined },
+      );
       expect(result.score).toBe(85);
       expect(result.summary).toBe('Good quality');
       expect(result.findings).toHaveLength(1);
@@ -56,7 +59,10 @@ describe('article-api', () => {
 
       const result = await aiReviewReport('article-1');
 
-      expect(api.post).toHaveBeenCalledWith('/articles/article-1/ai-review');
+      expect(api.post).toHaveBeenCalledWith(
+        '/articles/article-1/ai-review',
+        { language: undefined },
+      );
       expect(result.overallScore).toBe(78);
       expect(result.summary).toBe('Good structure and language');
       expect(result.dimensions).toHaveLength(2);

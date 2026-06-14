@@ -25,7 +25,11 @@ describe('story-api', () => {
 
       const result = await generateResearchKit('story-1');
 
-      expect(api.post).toHaveBeenCalledWith('/stories/story-1/research');
+      expect(api.post).toHaveBeenCalledWith(
+        '/stories/story-1/research',
+        {},
+        { params: { language: undefined } },
+      );
       expect(result.timeline).toHaveLength(1);
       expect(result.people).toHaveLength(1);
       expect(result.data).toHaveLength(1);
