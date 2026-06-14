@@ -43,6 +43,7 @@ import {
 import { AIToolsService } from './tools/ai-tools.service';
 import { BillingService, InsufficientBalanceException } from '../billing/billing.service';
 import { PromptLoader } from './prompts/prompt-loader';
+import { AIOperationLogger } from '../common/ai-operation-logger';
 
 /**
  * Module-level safety bounds for the image-fetch path in `uploadToStorage`.
@@ -74,6 +75,7 @@ export class AIService {
     private billingService: BillingService,
     @Inject(CHAT_PROVIDER) private chatProvider: ChatCompletionProvider,
     @Inject(STORAGE_SERVICE) private storageService: StorageService,
+    private aiLog: AIOperationLogger,
   ) {
     this.seedreamApiKey = this.config.get<string>('SEEDREAM_API_KEY') || '';
     this.seedreamApiBase =
@@ -198,70 +200,47 @@ export class AIService {
     recentTopics: string[] = [],
     language?: ContentLanguage,
   ): Promise<StorySuggestion[]> {
-    const startTime = Date.now();
-
     const prompt = this.buildSuggestionPrompt(userProfile, recentTopics);
 
     // Pre-check balance (estimate ~2000 tokens for story suggestions)
     await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一位资深新闻编辑，擅长为记者发掘有价值的选题。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 对象格式，包含 suggestions 字段，不要包含任何其他文字。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      });
+    return this.aiLog.run({
+      userId,
+      agentType: 'STORY',
+      action: 'generate_story_suggestions',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一位资深新闻编辑，擅长为记者发掘有价值的选题。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 对象格式，包含 suggestions 字段，不要包含任何其他文字。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        });
 
-      const parsed = JSON.parse(response.content);
-      const suggestions: StorySuggestion[] = Array.isArray(parsed)
-        ? parsed
-        : parsed.suggestions || [];
+        const parsed = JSON.parse(response.content);
+        const suggestions: StorySuggestion[] = Array.isArray(parsed)
+          ? parsed
+          : parsed.suggestions || [];
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'STORY',
-          action: 'generate_story_suggestions',
-          prompt,
-          result: JSON.stringify(suggestions),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        description: 'AI 选题建议',
-      });
-
-      return suggestions.slice(0, 5);
-    } catch (error: any) {
-      this.logger.error('AI suggestion failed:', error.message);
-
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'STORY',
-          action: 'generate_story_suggestions',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          createdBy: userId,
-        },
-      });
-
-      return this.getFallbackSuggestions(userProfile);
-    }
+        return { result: suggestions.slice(0, 5), tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: this.getFallbackSuggestions(userProfile),
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          description: 'AI 选题建议',
+        }),
+    });
   }
 
   // ===== 文本改写 =====
@@ -374,7 +353,6 @@ export class AIService {
     articleId: string | undefined,
     input: GenerateHeadlinesInput,
   ): Promise<HeadlineOption[]> {
-    const startTime = Date.now();
     const language = input.language;
 
     const prompt = `请根据以下文章内容生成 ${input.count ?? 5} 个标题选项。
@@ -398,64 +376,44 @@ ${input.content.slice(0, 500)}
     // Pre-check balance (estimate ~2000 tokens for headline generation)
     await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一名有经验的新闻版面编辑，擅长起标题——不是 SEO 工具，是真正能抓人的标题。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.8,
-        response_format: { type: 'json_object' },
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'generate_headlines',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一名有经验的新闻版面编辑，擅长起标题——不是 SEO 工具，是真正能抓人的标题。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.8,
+          response_format: { type: 'json_object' },
+        });
 
-      const parsed = JSON.parse(response.content);
-      const headlines: HeadlineOption[] = Array.isArray(parsed)
-        ? parsed
-        : parsed.headlines || parsed.titles || [];
+        const parsed = JSON.parse(response.content);
+        const headlines: HeadlineOption[] = Array.isArray(parsed)
+          ? parsed
+          : parsed.headlines || parsed.titles || [];
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'generate_headlines',
-          prompt,
-          result: JSON.stringify(headlines),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
+        return { result: headlines.slice(0, input.count ?? 5), tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: this.getFallbackHeadlines(input.title),
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
           articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI 标题生成',
-      });
-
-      return headlines.slice(0, input.count ?? 5);
-    } catch (error: any) {
-      this.logger.error('Headline generation failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'generate_headlines',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return this.getFallbackHeadlines(input.title);
-    }
+          description: 'AI 标题生成',
+        }),
+    });
   }
 
   // ===== 摘要生成 =====
@@ -464,7 +422,6 @@ ${input.content.slice(0, 500)}
     articleId: string | undefined,
     input: GenerateExcerptInput,
   ): Promise<string> {
-    const startTime = Date.now();
     const language = input.language;
 
     const maxLen = input.maxLength ?? 200;
@@ -479,60 +436,38 @@ ${input.content.slice(0, 2000)}
     // Pre-check balance (estimate ~1500 tokens for excerpt generation)
     await this.checkAIBalance(userId, (1500 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一名新闻记者，擅长用一两句话把事件说清楚。${this.getLanguageInstruction(language)}。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.5,
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'generate_excerpt',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一名新闻记者，擅长用一两句话把事件说清楚。${this.getLanguageInstruction(language)}。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.5,
+        });
 
-      const result = response.content.trim();
-
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'generate_excerpt',
-          prompt,
-          result,
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
+        return { result: response.content.trim(), tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: input.content.slice(0, maxLen),
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
           articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI 摘要生成',
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error('Excerpt generation failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'generate_excerpt',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return input.content.slice(0, maxLen);
-    }
+          description: 'AI 摘要生成',
+        }),
+    });
   }
 
   // ===== 对话助手 =====
@@ -541,7 +476,6 @@ ${input.content.slice(0, 2000)}
     articleId: string | undefined,
     input: ChatInput,
   ): Promise<string> {
-    const startTime = Date.now();
     const language = input.language;
 
     const contextMessages: ChatMessage[] = [];
@@ -577,53 +511,31 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
     // Pre-check balance (estimate ~2000 tokens for chat)
     await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages,
-        temperature: 0.7,
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'chat_assistant',
+      prompt: JSON.stringify(messages),
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages,
+          temperature: 0.7,
+        });
 
-      const result = response.content.trim();
-
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'chat_assistant',
-          prompt: JSON.stringify(messages),
-          result,
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
+        return { result: response.content.trim(), tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: 'AI 助手暂时无法回答，请稍后重试。',
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
           articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI 对话助手',
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error('Chat assistant failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'chat_assistant',
-          prompt: JSON.stringify(messages),
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return 'AI 助手暂时无法回答，请稍后重试。';
-    }
+          description: 'AI 对话助手',
+        }),
+    });
   }
 
   // ===== 初稿生成 =====
@@ -632,7 +544,6 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
     articleId: string | undefined,
     input: GenerateDraftInput,
   ): Promise<DraftResult> {
-    const startTime = Date.now();
     const language = input.language;
 
     const tagsStr = input.storyTags.join(', ') || '未指定';
@@ -732,70 +643,50 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
     // Pre-check balance (estimate ~4000 tokens for draft generation)
     await this.checkAIBalance(userId, (4000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：\「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'generate_draft',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：\「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        });
 
-      const parsed = JSON.parse(response.content);
-      const result: DraftResult = {
-        title: parsed.title || input.currentTitle || input.storyTitle,
-        subtitle: parsed.subtitle,
-        content: this.sanitizeDraftHTML(parsed.content || ''),
-      };
+        const parsed = JSON.parse(response.content);
+        const result: DraftResult = {
+          title: parsed.title || input.currentTitle || input.storyTitle,
+          subtitle: parsed.subtitle,
+          content: this.sanitizeDraftHTML(parsed.content || ''),
+        };
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'generate_draft',
-          prompt,
-          result: JSON.stringify(result),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI 初稿生成',
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error('Draft generation failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'generate_draft',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return {
+        return { result, tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: {
         title: input.currentTitle || input.storyTitle,
         subtitle: '',
         content: '<p>AI 初稿生成暫時不可用，請稍後重試。</p>',
-      };
-    }
+      },
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          articleId,
+          description: 'AI 初稿生成',
+        }),
+    });
   }
 
   private sanitizeDraftHTML(html: string): string {
@@ -814,7 +705,6 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
     articleId: string | undefined,
     input: FactCheckInput,
   ): Promise<FactCheckResult> {
-    const startTime = Date.now();
     const language = input.language;
 
     const prompt = `请对以下新闻稿件进行事实核查分析。
@@ -860,70 +750,50 @@ type 取值说明：
     // Pre-check balance (estimate ~3000 tokens for fact check)
     await this.checkAIBalance(userId, (3000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一位资深新闻事实核查专家，擅长识别稿件中的事实性问题和风险。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'fact_check',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一位资深新闻事实核查专家，擅长识别稿件中的事实性问题和风险。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+        });
 
-      const parsed = JSON.parse(response.content);
-      const result: FactCheckResult = {
-        score: Math.min(100, Math.max(0, parsed.score ?? 50)),
-        summary: parsed.summary || '已完成事实核查分析',
-        findings: Array.isArray(parsed.findings) ? parsed.findings : [],
-      };
+        const parsed = JSON.parse(response.content);
+        const result: FactCheckResult = {
+          score: Math.min(100, Math.max(0, parsed.score ?? 50)),
+          summary: parsed.summary || '已完成事实核查分析',
+          findings: Array.isArray(parsed.findings) ? parsed.findings : [],
+        };
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'fact_check',
-          prompt,
-          result: JSON.stringify(result),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI 事实核查',
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error('Fact check failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'fact_check',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return {
+        return { result, tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: {
         score: 0,
         summary: '事实核查服务暂时不可用，请稍后重试',
         findings: [],
-      };
-    }
+      },
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          articleId,
+          description: 'AI 事实核查',
+        }),
+    });
   }
 
   // ===== Wikipedia 资料增强 =====
@@ -1154,7 +1024,6 @@ type 取值说明：
     userId: string,
     input: ResearchKitInput,
   ): Promise<ResearchKitResult> {
-    const startTime = Date.now();
     const language = input.language;
 
     // Pre-check balance BEFORE any expensive operations (estimate ~3000 tokens)
@@ -1235,81 +1104,57 @@ ${searchResults}${wikipediaSection}请基于上述搜索結果和 Wikipedia 資�
 - 如果某类信息无法获取，返回空数组
 - ${wikipediaSection ? '充分利用 Wikipedia 参考资料\n- ' : ''}不要编造`;
 
-    try {
-      // Step 3: 基于搜索结果整理资料包
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content: `今天是 ${currentDateStr}。你是一位资深新闻研究员，擅长整理背景资料。${this.getLanguageInstruction(language)}。\n\n【极其重要】你的回复必须且只能是一个有效的 JSON 对象，不要包含任何其他文字、解释、Markdown 代码块标记（如 \`\`\`json）。直接输出原始 JSON 字符串。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.4,
-      });
+    return this.aiLog.run({
+      userId,
+      agentType: 'RESEARCH',
+      action: 'generate_research_kit',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        // Step 3: 基于搜索结果整理资料包
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content: `今天是 ${currentDateStr}。你是一位资深新闻研究员，擅长整理背景资料。${this.getLanguageInstruction(language)}。\n\n【极其重要】你的回复必须且只能是一个有效的 JSON 对象，不要包含任何其他文字、解释、Markdown 代码块标记（如 \`\`\`json）。直接输出原始 JSON 字符串。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.4,
+        });
 
-      let content = response.content;
-      // 去除可能的 Markdown JSON 代码块包裹
-      content = content
-        .replace(/^```json\s*/, '')
-        .replace(/\s*```$/, '')
-        .trim();
-      const parsed = JSON.parse(content);
-      const result: ResearchKitResult = {
-        timeline: Array.isArray(parsed.timeline) ? parsed.timeline : [],
-        people: Array.isArray(parsed.people) ? parsed.people : [],
-        data: Array.isArray(parsed.data) ? parsed.data : [],
-        opinions: Array.isArray(parsed.opinions) ? parsed.opinions : [],
-        wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
-      };
+        let content = response.content;
+        // 去除可能的 Markdown JSON 代码块包裹
+        content = content
+          .replace(/^```json\s*/, '')
+          .replace(/\s*```$/, '')
+          .trim();
+        const parsed = JSON.parse(content);
+        const result: ResearchKitResult = {
+          timeline: Array.isArray(parsed.timeline) ? parsed.timeline : [],
+          people: Array.isArray(parsed.people) ? parsed.people : [],
+          data: Array.isArray(parsed.data) ? parsed.data : [],
+          opinions: Array.isArray(parsed.opinions) ? parsed.opinions : [],
+          wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
+        };
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'RESEARCH',
-          action: 'generate_research_kit',
-          prompt,
-          result: JSON.stringify(result),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        description: 'AI 资料搜集',
-      });
-
-      return result;
-    } catch (error: any) {
-      const errResponse = error.response?.data;
-      this.logger.error(
-        'Research kit generation failed:',
-        error.message,
-        errResponse ? JSON.stringify(errResponse) : '',
-      );
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'RESEARCH',
-          action: 'generate_research_kit',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          createdBy: userId,
-        },
-      });
-      return {
+        return { result, tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: {
         timeline: [],
         people: [],
         data: [],
         opinions: [],
         wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
-      };
-    }
+      },
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          description: 'AI 资料搜集',
+        }),
+    });
   }
 
   // ===== AI 预审报告 =====
@@ -1318,7 +1163,6 @@ ${searchResults}${wikipediaSection}请基于上述搜索結果和 Wikipedia 資�
     articleId: string | undefined,
     input: ReviewReportInput,
   ): Promise<ReviewReportResult> {
-    const startTime = Date.now();
     const language = input.language;
 
     const prompt = `请对以下新闻稿件进行综合性质量预审评估。
@@ -1367,87 +1211,67 @@ priority 取值说明：
     // Pre-check balance (estimate ~3000 tokens for review report)
     await this.checkAIBalance(userId, (3000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一名有经验的新闻总编，每天要看几十篇稿子、给记者反馈。你的评估报告要像真实的编辑批注——直击要害、不客套。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.4,
-        response_format: { type: 'json_object' },
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'review_report',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一名有经验的新闻总编，每天要看几十篇稿子、给记者反馈。你的评估报告要像真实的编辑批注——直击要害、不客套。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.4,
+          response_format: { type: 'json_object' },
+        });
 
-      const parsed = JSON.parse(response.content);
-      const result: ReviewReportResult = {
-        overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
-        summary: parsed.summary || '已完成稿件质量预审评估',
-        dimensions: Array.isArray(parsed.dimensions)
-          ? parsed.dimensions.map((d: any) => ({
-              name: d.name || '未知维度',
-              score: Math.min(100, Math.max(0, d.score ?? 50)),
-              maxScore: d.maxScore || 100,
-              comment: d.comment || '',
-            }))
-          : [],
-        suggestions: Array.isArray(parsed.suggestions)
-          ? parsed.suggestions.map((s: any) => ({
-              dimension: s.dimension || '综合',
-              priority: ['high', 'medium', 'low'].includes(s.priority)
-                ? s.priority
-                : 'medium',
-              suggestion: s.suggestion || '',
-            }))
-          : [],
-      };
+        const parsed = JSON.parse(response.content);
+        const result: ReviewReportResult = {
+          overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
+          summary: parsed.summary || '已完成稿件质量预审评估',
+          dimensions: Array.isArray(parsed.dimensions)
+            ? parsed.dimensions.map((d: any) => ({
+                name: d.name || '未知维度',
+                score: Math.min(100, Math.max(0, d.score ?? 50)),
+                maxScore: d.maxScore || 100,
+                comment: d.comment || '',
+              }))
+            : [],
+          suggestions: Array.isArray(parsed.suggestions)
+            ? parsed.suggestions.map((s: any) => ({
+                dimension: s.dimension || '综合',
+                priority: ['high', 'medium', 'low'].includes(s.priority)
+                  ? s.priority
+                  : 'medium',
+                suggestion: s.suggestion || '',
+              }))
+            : [],
+        };
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'review_report',
-          prompt,
-          result: JSON.stringify(result),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI 预审报告',
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error('Review report generation failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'review_report',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return {
+        return { result, tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: {
         overallScore: 0,
         summary: '预审报告生成失败，请稍后重试',
         dimensions: [],
         suggestions: [],
-      };
-    }
+      },
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          articleId,
+          description: 'AI 预审报告',
+        }),
+    });
   }
 
   async optimizeSEO(
@@ -1455,7 +1279,6 @@ priority 取值说明：
     articleId: string | undefined,
     input: OptimizeSEOInput,
   ): Promise<SEOResult> {
-    const startTime = Date.now();
     const language = input.language;
 
     const seoContext = language === ContentLanguage.SIMPLIFIED_CHINESE
@@ -1469,106 +1292,86 @@ priority 取值说明：
     // Pre-check balance (estimate ~3000 tokens for SEO optimization)
     await this.checkAIBalance(userId, (3000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一位新闻媒体的 SEO 运营专家，深知标题和关键词如何影响搜索流量。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.4,
-        response_format: { type: 'json_object' },
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'optimize_seo',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一位新闻媒体的 SEO 运营专家，深知标题和关键词如何影响搜索流量。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.4,
+          response_format: { type: 'json_object' },
+        });
 
-      const parsed = JSON.parse(response.content);
+        const parsed = JSON.parse(response.content);
 
-      const result: SEOResult = {
-        overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
-        readabilityScore: Math.min(
-          100,
-          Math.max(0, parsed.readabilityScore ?? 50),
-        ),
-        optimizedTitle: Array.isArray(parsed.optimizedTitle)
-          ? parsed.optimizedTitle
-              .map((t: any) => ({
-                title: t.title || '',
-                reasoning: t.reasoning || '',
-              }))
-              .filter((t: any) => t.title)
-          : [],
-        metaDescription: parsed.metaDescription || '',
-        keywords: Array.isArray(parsed.keywords)
-          ? parsed.keywords
-              .map((k: any) => ({
-                keyword: k.keyword || '',
-                searchVolume: ['high', 'medium', 'low'].includes(k.searchVolume)
-                  ? k.searchVolume
-                  : 'medium',
-              }))
-              .filter((k: any) => k.keyword)
-          : [],
-        suggestions: Array.isArray(parsed.suggestions)
-          ? parsed.suggestions
-              .map((s: any) => ({
-                category: s.category || '綜合',
-                priority: ['high', 'medium', 'low'].includes(s.priority)
-                  ? s.priority
-                  : 'medium',
-                suggestion: s.suggestion || '',
-              }))
-              .filter((s: any) => s.suggestion)
-          : [],
-      };
+        const result: SEOResult = {
+          overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
+          readabilityScore: Math.min(
+            100,
+            Math.max(0, parsed.readabilityScore ?? 50),
+          ),
+          optimizedTitle: Array.isArray(parsed.optimizedTitle)
+            ? parsed.optimizedTitle
+                .map((t: any) => ({
+                  title: t.title || '',
+                  reasoning: t.reasoning || '',
+                }))
+                .filter((t: any) => t.title)
+            : [],
+          metaDescription: parsed.metaDescription || '',
+          keywords: Array.isArray(parsed.keywords)
+            ? parsed.keywords
+                .map((k: any) => ({
+                  keyword: k.keyword || '',
+                  searchVolume: ['high', 'medium', 'low'].includes(k.searchVolume)
+                    ? k.searchVolume
+                    : 'medium',
+                }))
+                .filter((k: any) => k.keyword)
+            : [],
+          suggestions: Array.isArray(parsed.suggestions)
+            ? parsed.suggestions
+                .map((s: any) => ({
+                  category: s.category || '綜合',
+                  priority: ['high', 'medium', 'low'].includes(s.priority)
+                    ? s.priority
+                    : 'medium',
+                  suggestion: s.suggestion || '',
+                }))
+                .filter((s: any) => s.suggestion)
+            : [],
+        };
 
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'optimize_seo',
-          prompt,
-          result: JSON.stringify(result),
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: 'AI SEO 优化',
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error('SEO optimization failed:', error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action: 'optimize_seo',
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return {
+        return { result, tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: {
         overallScore: 0,
         readabilityScore: 0,
         optimizedTitle: [],
         metaDescription: '',
         keywords: [],
         suggestions: [],
-      };
-    }
+      },
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          articleId,
+          description: 'AI SEO 优化',
+        }),
+    });
   }
 
   // ===== 通用文本 AI 调用 =====
@@ -1580,65 +1383,41 @@ priority 取值说明：
     originalText: string,
     language?: ContentLanguage,
   ): Promise<string> {
-    const startTime = Date.now();
-
     // Pre-check balance (estimate ~2000 tokens for text operations)
     await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
 
-    try {
-      const response = await this.chatProvider.chatCompletion({
-        messages: [
-          {
-            role: 'system',
-            content:
-              `你是一位有十年新闻一线采写经验的记者。${this.getLanguageInstruction(language)}。\n\n【写作风格要求 - 必须遵守】\n- 像真人记者一样写作，不要有任何 AI 生成痕迹\n- 句子长短错落，避免每句话结构雷同或长度均匀\n- 使用新闻行业自然的表达方式，而非教科书式的标准句式\n- 允许使用口语化、接地气的表达，但保持新闻专业性\n- 避免以下 AI 典型特征：频繁使用「此外」「与此同时」「值得注意的是」「综上所述」等模板化过渡词；每段开头用同样的句式结构；堆砌形容词和修饰语；结尾用「让我们共同期待」等套话\n- 如果有数据或事实，自然地融入叙述中，不用「根据数据显示」这类生硬引出方式\n- 标题和导语要有记者个人判断和新闻敏感，而非中规中矩的概括\n\n直接输出处理后的文字，不要添加解释、说明或前缀标注。`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-      });
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action,
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一位有十年新闻一线采写经验的记者。${this.getLanguageInstruction(language)}。\n\n【写作风格要求 - 必须遵守】\n- 像真人记者一样写作，不要有任何 AI 生成痕迹\n- 句子长短错落，避免每句话结构雷同或长度均匀\n- 使用新闻行业自然的表达方式，而非教科书式的标准句式\n- 允许使用口语化、接地气的表达，但保持新闻专业性\n- 避免以下 AI 典型特征：频繁使用「此外」「与此同时」「值得注意的是」「综上所述」等模板化过渡词；每段开头用同样的句式结构；堆砌形容词和修饰语；结尾用「让我们共同期待」等套话\n- 如果有数据或事实，自然地融入叙述中，不用「根据数据显示」这类生硬引出方式\n- 标题和导语要有记者个人判断和新闻敏感，而非中规中矩的概括\n\n直接输出处理后的文字，不要添加解释、说明或前缀标注。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+        });
 
-      const result = response.content.trim();
-
-      const aiOp = await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action,
-          prompt,
-          result,
-          model: this.chatProvider.model,
-          tokensUsed: response.usage?.totalTokens,
-          durationMs: Date.now() - startTime,
+        return { result: response.content.trim(), tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: originalText,
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
           articleId,
-          createdBy: userId,
-        },
-      });
-
-      await this.deductLLMBilling({
-        userId,
-        aiOperationId: aiOp.id,
-        tokensUsed: response.usage?.totalTokens,
-        articleId,
-        description: `AI ${action}`,
-      });
-
-      return result;
-    } catch (error: any) {
-      this.logger.error(`${action} failed:`, error.message);
-      await this.prisma.aIOperation.create({
-        data: {
-          agentType: 'WRITING',
-          action,
-          prompt,
-          result: JSON.stringify({ error: error.message }),
-          model: this.chatProvider.model,
-          durationMs: Date.now() - startTime,
-          articleId,
-          createdBy: userId,
-        },
-      });
-      return originalText;
-    }
+          description: `AI ${action}`,
+        }),
+    });
   }
 
   private getFallbackHeadlines(title: string): HeadlineOption[] {
@@ -1800,25 +1579,29 @@ priority 取值说明：
       throw error;
     }
 
-    // Step 4: 记录 AI 操作
-    const aiOp = await this.prisma.aIOperation.create({
-      data: {
-        agentType: 'VISUAL',
-        action: 'generate_article_image',
-        prompt: `标题: ${articleTitle}\n风格: ${style}\n${customPrompt}`,
-        result: JSON.stringify({ imagePrompt, publicUrl }),
-        model: this.seedreamModel,
-        durationMs: Date.now() - startTime,
-        articleId,
-        createdBy: userId,
-      },
-    });
-
-    await this.deductImageBilling({
+    // Step 4: 记录 AI 操作 (uses the shared logger so the row has the same
+    // shape + duration bookkeeping as the other AI methods).
+    await this.aiLog.run({
       userId,
-      aiOperationId: aiOp.id,
       articleId,
-      description: 'AI 配图生成',
+      agentType: 'VISUAL',
+      action: 'generate_article_image',
+      prompt: `标题: ${articleTitle}\n风格: ${style}\n${customPrompt}`,
+      model: this.seedreamModel,
+      fn: async () => ({
+        result: { imagePrompt, publicUrl },
+        // image gen doesn't report token usage, so leave it undefined
+      }),
+      // If the audit row write itself fails, fall back to a plain object
+      // describing the partial result so the pipeline can still continue.
+      fallback: { imagePrompt: imagePrompt ?? '', publicUrl: publicUrl ?? '' },
+      onSuccess: (aiOpId) =>
+        this.deductImageBilling({
+          userId,
+          aiOperationId: aiOpId,
+          articleId,
+          description: 'AI 配图生成',
+        }),
     });
 
     this.logger.log(

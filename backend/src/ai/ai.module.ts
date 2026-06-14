@@ -11,6 +11,7 @@ import {
   OpenAIProvider,
 } from './providers';
 import { BillingModule } from '../billing/billing.module';
+import { AIOperationLogger } from '../common/ai-operation-logger';
 
 const chatProviderFactory = {
   provide: CHAT_PROVIDER,
@@ -31,7 +32,13 @@ const chatProviderFactory = {
 
 @Module({
   imports: [BillingModule],
-  providers: [chatProviderFactory, AIService, AIToolsService, TavilySearchTool],
-  exports: [AIService, AIToolsService],
+  providers: [
+    chatProviderFactory,
+    AIService,
+    AIToolsService,
+    TavilySearchTool,
+    AIOperationLogger,
+  ],
+  exports: [AIService, AIToolsService, AIOperationLogger],
 })
 export class AIModule {}
