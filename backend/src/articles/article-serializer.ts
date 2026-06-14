@@ -41,6 +41,19 @@ export function deserializeArticle<T extends Record<string, any>>(
 }
 
 /**
+ * Return type of {@link serializeArticleInput}. The three JSON-string
+ * fields (`tags`, `platforms`, `aiGeneratedParts`) are stringified, so
+ * the output type narrows those to `string` (or omits them when the
+ * input had `undefined`). All other fields pass through unchanged.
+ */
+export type SerializedArticleInput<T> = Omit<
+  T,
+  typeof ARTICLE_JSON_FIELDS[number]
+> & {
+  [K in typeof ARTICLE_JSON_FIELDS[number]]?: string;
+};
+
+/**
  * Convert a DTO / update payload into the data shape Prisma expects for
  * the Article model. JSON fields are stringified; everything else is
  * passed through.
@@ -53,11 +66,13 @@ export function deserializeArticle<T extends Record<string, any>>(
  *   - string: kept as-is (idempotent — no double encoding).
  *   - array / object: JSON.stringify.
  *
- * Returns the same object (mutated) for convenience.
+ * Returns the same object (mutated) for convenience. The return type
+ * narrows the three JSON fields to `string` so callers can pass the
+ * result directly to `prisma.article.create` / `update` without casts.
  */
 export function serializeArticleInput<T extends Record<string, any>>(
   input: T,
-): T {
+): SerializedArticleInput<T> {
   for (const field of ARTICLE_JSON_FIELDS) {
     if (!(field in input) || input[field] === undefined) continue;
     const value = input[field];
@@ -67,5 +82,5 @@ export function serializeArticleInput<T extends Record<string, any>>(
       (input as any)[field] = JSON.stringify(value);
     }
   }
-  return input;
+  return input as SerializedArticleInput<T>;
 }

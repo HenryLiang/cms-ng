@@ -151,15 +151,12 @@ export class ArticlesService {
 
   async findAll(
     user: { userId: string; role: string },
-    filters: { storyId?: string },
-  ) {
-    let where: Prisma.ArticleWhereInput = {};
     query: FindAllArticlesDto = {},
-  ): Promise<PaginatedResponse<ReturnType<typeof this.serializeArticle>>> {
+  ): Promise<PaginatedResponse<ReturnType<typeof deserializeArticle>>> {
     const { storyId } = query;
     const { page, pageSize } = parsePaginationParams(query);
 
-    let where: any = {};
+    let where: Prisma.ArticleWhereInput = {};
 
     if (user.role === UserRole.REPORTER) {
       where.authorId = user.userId;
@@ -204,7 +201,7 @@ export class ArticlesService {
     ]);
 
     return buildPaginatedResponse(
-      articles.map((a) => this.serializeArticle(a)),
+      articles.map((a) => deserializeArticle(a)),
       total,
       { page, pageSize },
     );
@@ -682,12 +679,10 @@ export class ArticlesService {
   private serializeArticle<T extends typeof ArticlesService.ArticleCommon>(
     article: T,
   ): T & { tags: string[]; platforms: string[]; aiGeneratedParts: string[] } {
-    return {
-      ...article,
-      tags: safeJsonParse(article.tags, []),
-      platforms: safeJsonParse(article.platforms, []),
-      aiGeneratedParts: safeJsonParse(article.aiGeneratedParts, []),
+    return deserializeArticle(article) as T & {
+      tags: string[];
+      platforms: string[];
+      aiGeneratedParts: string[];
     };
-    return deserializeArticle(article);
   }
 }
