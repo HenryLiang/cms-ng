@@ -18,6 +18,7 @@ import {
 } from './providers';
 import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
 import { BillingService } from '../billing/billing.service';
+import { AIOperationLogger } from '../common/ai-operation-logger';
 
 // axios is still used by searchWikipedia (GET requests)
 jest.mock('axios');
@@ -81,6 +82,7 @@ describe('AIService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AIService,
+        AIOperationLogger,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
@@ -1750,6 +1752,7 @@ describe('AIService — performSearch branch logic', () => {
     const module = await Test.createTestingModule({
       providers: [
         AIService,
+        AIOperationLogger,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
@@ -1808,6 +1811,7 @@ describe('AIService — performSearch branch logic', () => {
     const module = await Test.createTestingModule({
       providers: [
         AIService,
+        AIOperationLogger,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
@@ -1867,6 +1871,7 @@ describe('AIService — performSearch branch logic', () => {
     const module = await Test.createTestingModule({
       providers: [
         AIService,
+        AIOperationLogger,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
         { provide: AIToolsService, useValue: aiTools },
