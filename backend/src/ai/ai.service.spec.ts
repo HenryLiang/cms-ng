@@ -1543,6 +1543,7 @@ describe('AIService', () => {
       expect(result.wikipedia).toBeDefined();
       expect(result.wikipedia).toHaveLength(1);
       expect(result.wikipedia![0].title).toBe('香港房屋政策');
+      expect(result.wikipediaStatus).toBe('ok');
     });
 
     it('should gracefully degrade when Wikipedia search fails', async () => {
@@ -1562,6 +1563,7 @@ describe('AIService', () => {
 
       expect(result.timeline).toEqual([]);
       expect(result.wikipedia).toBeUndefined();
+      expect(result.wikipediaStatus).toBe('api_error');
       expect(mockChatProvider.chatCompletion).toHaveBeenCalled();
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });

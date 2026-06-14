@@ -98,6 +98,7 @@ export interface ResearchKitResult {
   opinions: ResearchKitOpinion[];
   relatedArticles?: string[];
   wikipedia?: WikipediaEntry[];
+  wikipediaStatus?: 'ok' | 'no_results' | 'api_error';
 }
 
 export async function generateResearchKit(storyId: string, language?: ContentLanguage): Promise<ResearchKitResult> {
