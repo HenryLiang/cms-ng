@@ -14,6 +14,7 @@ import { TrendingTopicsService } from './trending-topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
+import { SourcePaginationDto } from './dto/source-pagination.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('trending-topics')
@@ -91,113 +92,113 @@ export class TrendingTopicsController {
 
   @Get('sina')
   @ApiOperation({ summary: 'Fetch trending news from Sina' })
-  fetchSinaNews(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchSinaNews(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('sina', page, limit);
   }
 
   @Get('people')
   @ApiOperation({ summary: 'Fetch trending news from People' })
-  fetchPeopleNews(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchPeopleNews(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('people', page, limit);
   }
 
   @Get('bbc')
   @ApiOperation({ summary: 'Fetch trending news from BBC' })
-  fetchBBCNews(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchBBCNews(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('bbc', page, limit);
   }
 
   @Get('chinanews')
   @ApiOperation({ summary: 'Fetch trending news from China News' })
-  fetchChinanews(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchChinanews(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('chinanews', page, limit);
   }
 
   @Get('guardian')
   @ApiOperation({ summary: 'Fetch trending news from The Guardian' })
-  fetchGuardian(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchGuardian(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('guardian', page, limit);
   }
 
   @Get('nytimes')
   @ApiOperation({ summary: 'Fetch trending news from The New York Times' })
-  fetchNYTimes(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchNYTimes(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('nytimes', page, limit);
   }
 
   @Get('economist')
   @ApiOperation({ summary: 'Fetch trending news from The Economist' })
-  fetchEconomist(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchEconomist(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('economist', page, limit);
   }
 
   @Get('ft')
   @ApiOperation({ summary: 'Fetch trending news from Financial Times' })
-  fetchFT(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchFT(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('ft', page, limit);
   }
 
   @Get('zaobao')
   @ApiOperation({ summary: 'Fetch trending news from Lianhe Zaobao' })
-  fetchZaobao(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchZaobao(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('zaobao', page, limit);
   }
 
   @Get('weibo-hot')
   @ApiOperation({ summary: 'Fetch trending topics from Weibo' })
-  fetchWeiboHot(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchWeiboHot(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('weibo-hot', page, limit);
   }
 
   @Get('zhihu-hot')
   @ApiOperation({ summary: 'Fetch trending topics from Zhihu' })
-  fetchZhihuHot(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchZhihuHot(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('zhihu-hot', page, limit);
   }
 
   @Get('36kr')
   @ApiOperation({ summary: 'Fetch trending news from 36Kr' })
-  fetch36kr(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetch36kr(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('36kr', page, limit);
   }
 
   @Get('huxiu')
   @ApiOperation({ summary: 'Fetch trending news from Huxiu' })
-  fetchHuxiu(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchHuxiu(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('huxiu', page, limit);
   }
 
   @Get('douban-movie')
   @ApiOperation({ summary: 'Fetch trending movies from Douban' })
-  fetchDoubanMovie(@Query() query: any) {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
+  fetchDoubanMovie(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
     return this.topicsService.fetchNewsBySource('douban-movie', page, limit);
   }
 

@@ -77,12 +77,19 @@ export default function StoryDetailPage() {
       if (storyData.contentLanguage) {
         setContentLanguage(storyData.contentLanguage);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 401 is handled globally by the api interceptor (redirect to /login).
       // Map other common status codes to user-friendly messages; never let
       // the error propagate as an unhandled rejection.
-      const status = err?.response?.status;
-      const apiMsg = err?.response?.data?.message;
+      const status =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
       if (status === 403) {
         setLoadError(apiMsg || '您没有权限访问此选题');
       } else if (status === 404) {
@@ -133,8 +140,12 @@ export default function StoryDetailPage() {
     try {
       const result = await generateResearchKit(storyId, contentLanguage);
       setResearchKit(result);
-    } catch (err: any) {
-      const apiMsg = err?.response?.data?.message;
+    } catch (err: unknown) {
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
       alert(apiMsg || '资料搜集失败，请稍后重试');
     } finally {
       setResearchLoading(false);
@@ -147,8 +158,12 @@ export default function StoryDetailPage() {
     try {
       const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction, contentLanguage);
       router.push(`/dashboard/articles/${article.id}`);
-    } catch (err: any) {
-      const apiMsg = err?.response?.data?.message;
+    } catch (err: unknown) {
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
       alert(apiMsg || '初稿生成失败，请稍后重试');
       setDraftLoading(false);
     }

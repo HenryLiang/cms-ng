@@ -174,12 +174,19 @@ export default function ArticleEditorPage() {
       if (data.contentLanguage) {
         setContentLanguage(data.contentLanguage);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 401 is handled globally by the api interceptor (redirect to /login).
       // Map other common status codes to user-friendly messages; never let
       // the error propagate as an unhandled rejection.
-      const status = err?.response?.status;
-      const apiMsg = err?.response?.data?.message;
+      const status =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
       if (status === 403) {
         setLoadError(apiMsg || '您没有权限访问此稿件');
       } else if (status === 404) {
@@ -475,8 +482,14 @@ export default function ArticleEditorPage() {
       });
       setImageGenResult(result);
       setArticle((prev) => (prev ? { ...prev, coverImage: result.url } : prev));
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || '未知错误';
+    } catch (err: unknown) {
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
+      const errMsg = err instanceof Error ? err.message : undefined;
+      const msg = apiMsg || errMsg || '未知错误';
       console.error('AI 配图生成失败:', msg, err);
       alert(`图片生成失败：${msg}`);
     } finally {

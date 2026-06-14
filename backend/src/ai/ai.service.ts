@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { STORAGE_SERVICE } from '../storage/storage.service';
 import type { StorageService } from '../storage/storage.service';
@@ -16,6 +17,15 @@ import type {
   ChatMessage as ProviderChatMessage,
 } from './providers';
 import { CHAT_PROVIDER, KimiProvider } from './providers';
+import {
+  draftResultSchema,
+  factCheckResultSchema,
+  headlinesSchema,
+  researchKitResultSchema,
+  reviewReportResultSchema,
+  seoResultSchema,
+  storySuggestionsSchema,
+} from './zod-schemas';
 import { StorySuggestion } from './dto/story-suggestion.dto';
 import { ContentLanguage, TransactionType, BillingCategory } from '@cms-ng/shared';
 import {
@@ -34,6 +44,10 @@ import {
   FactCheckResult,
   ResearchKitInput,
   ResearchKitResult,
+  ResearchKitTimelineEvent,
+  ResearchKitPerson,
+  ResearchKitDataPoint,
+  ResearchKitOpinion,
   ReviewReportInput,
   ReviewReportResult,
   OptimizeSEOInput,
@@ -225,7 +239,18 @@ export class AIService {
           response_format: { type: 'json_object' },
         });
 
-        const parsed = JSON.parse(response.content);
+        let parsed: z.infer<typeof storySuggestionsSchema>;
+        try {
+          parsed = storySuggestionsSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (generateStorySuggestions): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
         const suggestions: StorySuggestion[] = Array.isArray(parsed)
           ? parsed
           : parsed.suggestions || [];
@@ -397,10 +422,23 @@ ${input.content.slice(0, 500)}
           response_format: { type: 'json_object' },
         });
 
-        const parsed = JSON.parse(response.content);
+        let parsed: z.infer<typeof headlinesSchema>;
+        try {
+          parsed = headlinesSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (generateHeadlines): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
         const headlines: HeadlineOption[] = Array.isArray(parsed)
           ? parsed
-          : parsed.headlines || parsed.titles || [];
+          : (parsed as { headlines?: HeadlineOption[] }).headlines ||
+            (parsed as { titles?: HeadlineOption[] }).titles ||
+            [];
 
         return { result: headlines.slice(0, input.count ?? 5), tokensUsed: response.usage?.totalTokens };
       },
@@ -664,10 +702,21 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
           response_format: { type: 'json_object' },
         });
 
-        const parsed = JSON.parse(response.content);
+        let parsed: z.infer<typeof draftResultSchema>;
+        try {
+          parsed = draftResultSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (generateDraft): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
         const result: DraftResult = {
           title: parsed.title || input.currentTitle || input.storyTitle,
-          subtitle: parsed.subtitle,
+          subtitle: parsed.subtitle ?? undefined,
           content: this.sanitizeDraftHTML(parsed.content || ''),
         };
 
@@ -771,7 +820,18 @@ type 取值说明：
           response_format: { type: 'json_object' },
         });
 
-        const parsed = JSON.parse(response.content);
+        let parsed: z.infer<typeof factCheckResultSchema>;
+        try {
+          parsed = factCheckResultSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (factCheck): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
         const result: FactCheckResult = {
           score: Math.min(100, Math.max(0, parsed.score ?? 50)),
           summary: parsed.summary || '已完成事实核查分析',
@@ -1129,12 +1189,27 @@ ${searchResults}${wikipediaSection}请基于上述搜索結果和 Wikipedia 資�
           .replace(/^```json\s*/, '')
           .replace(/\s*```$/, '')
           .trim();
-        const parsed = JSON.parse(content);
+        let parsed: z.infer<typeof researchKitResultSchema>;
+        try {
+          parsed = researchKitResultSchema.parse(JSON.parse(content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (generateResearchKit): ${msg}; raw[:200]=${content.slice(0, 200)}`,
+          );
+          throw err;
+        }
+        // After Zod validation, parsed entries have optional fields with passthrough
+// unknowns. Cast back to the ResearchKitResult shape — the consumer code reads
+// the same fields and the downstream pipeline gracefully handles missing
+// optional properties.
         const result: ResearchKitResult = {
-          timeline: Array.isArray(parsed.timeline) ? parsed.timeline : [],
-          people: Array.isArray(parsed.people) ? parsed.people : [],
-          data: Array.isArray(parsed.data) ? parsed.data : [],
-          opinions: Array.isArray(parsed.opinions) ? parsed.opinions : [],
+          timeline: Array.isArray(parsed.timeline) ? (parsed.timeline as ResearchKitTimelineEvent[]) : [],
+          people: Array.isArray(parsed.people) ? (parsed.people as ResearchKitPerson[]) : [],
+          data: Array.isArray(parsed.data) ? (parsed.data as ResearchKitDataPoint[]) : [],
+          opinions: Array.isArray(parsed.opinions) ? (parsed.opinions as ResearchKitOpinion[]) : [],
           wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
         };
 
@@ -1232,7 +1307,18 @@ priority 取值说明：
           response_format: { type: 'json_object' },
         });
 
-        const parsed = JSON.parse(response.content);
+        let parsed: z.infer<typeof reviewReportResultSchema>;
+        try {
+          parsed = reviewReportResultSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (generateReviewReport): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
         const result: ReviewReportResult = {
           overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
           summary: parsed.summary || '已完成稿件质量预审评估',
@@ -1313,7 +1399,18 @@ priority 取值说明：
           response_format: { type: 'json_object' },
         });
 
-        const parsed = JSON.parse(response.content);
+        let parsed: z.infer<typeof seoResultSchema>;
+        try {
+          parsed = seoResultSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (optimizeSEO): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
 
         const result: SEOResult = {
           overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),

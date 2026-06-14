@@ -685,16 +685,15 @@ describe('AIService', () => {
       expect(result.dimensions[1].score).toBe(0);
     });
 
-    it('should validate suggestion priority to high/medium/low', async () => {
+    it('should normalize null priority to medium and pass through valid priority', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse(JSON.stringify({
           overallScore: 50,
           summary: 'Test',
           dimensions: [],
           suggestions: [
-            { dimension: 'A', priority: 'invalid', suggestion: 'S1' },
+            { dimension: 'A', priority: null, suggestion: 'S1' },
             { dimension: 'B', priority: 'high', suggestion: 'S2' },
-            { dimension: 'C', priority: null, suggestion: 'S3' },
           ],
         })),
       );
@@ -706,7 +705,31 @@ describe('AIService', () => {
 
       expect(result.suggestions[0].priority).toBe('medium');
       expect(result.suggestions[1].priority).toBe('high');
-      expect(result.suggestions[2].priority).toBe('medium');
+    });
+
+    it('should fall back when LLM emits an invalid priority enum', async () => {
+      // Truly invalid priority values (e.g. "urgent") now fail Zod validation
+      // and trigger the static fallback rather than silently being mapped to
+      // 'medium' — this matches the LLM-drift defence in other AI sites.
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 50,
+          summary: 'Test',
+          dimensions: [],
+          suggestions: [
+            { dimension: 'A', priority: 'urgent', suggestion: 'S1' },
+          ],
+        })),
+      );
+
+      const result = await service.generateReviewReport('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(0);
+      expect(result.summary).toContain('失败');
+      expect(result.suggestions).toEqual([]);
     });
 
     it('should return fallback on API failure', async () => {
@@ -917,19 +940,18 @@ describe('AIService', () => {
       expect(result.suggestions[0].suggestion).toBe('有效建议');
     });
 
-    it('should default invalid searchVolume and priority to medium', async () => {
+    it('should default null searchVolume and priority to medium and pass through valid', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse(JSON.stringify({
           overallScore: 60,
           readabilityScore: 65,
           optimizedTitle: [],
           keywords: [
-            { keyword: 'K1', searchVolume: 'invalid_value' },
-            { keyword: 'K2', searchVolume: null },
-            { keyword: 'K3', searchVolume: 'high' },
+            { keyword: 'K1', searchVolume: null },
+            { keyword: 'K2', searchVolume: 'high' },
           ],
           suggestions: [
-            { category: 'C1', priority: 'invalid', suggestion: 'S1' },
+            { category: 'C1', priority: null, suggestion: 'S1' },
             { category: 'C2', priority: 'low', suggestion: 'S2' },
           ],
         })),
@@ -941,10 +963,33 @@ describe('AIService', () => {
       });
 
       expect(result.keywords[0].searchVolume).toBe('medium');
-      expect(result.keywords[1].searchVolume).toBe('medium');
-      expect(result.keywords[2].searchVolume).toBe('high');
+      expect(result.keywords[1].searchVolume).toBe('high');
       expect(result.suggestions[0].priority).toBe('medium');
       expect(result.suggestions[1].priority).toBe('low');
+    });
+
+    it('should fall back when LLM emits an invalid searchVolume or priority enum', async () => {
+      // Truly invalid enum values (e.g. "HUGE") now fail Zod validation and
+      // trigger the static fallback rather than being silently mapped.
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          readabilityScore: 65,
+          optimizedTitle: [],
+          keywords: [{ keyword: 'K1', searchVolume: 'HUGE' }],
+          suggestions: [{ category: 'C1', priority: 'urgent', suggestion: 'S1' }],
+        })),
+      );
+
+      const result = await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(0);
+      expect(result.readabilityScore).toBe(0);
+      expect(result.keywords).toEqual([]);
+      expect(result.suggestions).toEqual([]);
     });
 
     it('should return zero-value fallback on API failure', async () => {

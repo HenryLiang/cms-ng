@@ -346,8 +346,9 @@ function CreateTaskForm({
       };
       await createTask(input);
       onCreated();
-    } catch (error: any) {
-      alert(`创建失败: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      alert(`创建失败: ${message}`);
     } finally {
       setSubmitting(false);
     }
