@@ -64,12 +64,12 @@ export default function StoryDetailPage() {
   async function loadData() {
     setLoadError(null);
     try {
-      const [storyData, articlesData] = await Promise.all([
+      const [storyData, articlesResp] = await Promise.all([
         getStory(storyId),
-        getArticles(storyId),
+        getArticles({ storyId }),
       ]);
       setStory(storyData);
-      setArticles(articlesData);
+      setArticles(articlesResp.data);
       setTitle(storyData.title);
       setDescription(storyData.description || '');
       setAngle(storyData.angle || '');
