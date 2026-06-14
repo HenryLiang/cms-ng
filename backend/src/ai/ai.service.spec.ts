@@ -1090,8 +1090,8 @@ describe('AIService', () => {
         headers: { 'content-type': 'image/png' },
       });
       storageMock.put.mockResolvedValue({
-        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/generated_123.png',
-        key: 'cms-ng/articles/article-123/generated_123.png',
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/cover_a3f2b109.png',
+        key: 'cms-ng/articles/article-123/cover_a3f2b109.png',
       });
 
       const result = await service.generateArticleImage(
@@ -1102,10 +1102,10 @@ describe('AIService', () => {
         { style: 'news' },
       );
 
-      expect(result.url).toBe('https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/generated_123.png');
+      expect(result.url).toBe('https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/cover_a3f2b109.png');
       expect(result.prompt).toBe('A professional news photograph of a city skyline at dusk');
       expect(storageMock.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^cms-ng\/articles\/article-123\/generated_\d+\.png$/),
+        expect.stringMatching(/^cms-ng\/articles\/article-123\/cover_[0-9a-f]{8}\.png$/),
         expect.any(Buffer),
         'image/png',
       );
@@ -1293,8 +1293,8 @@ describe('AIService', () => {
         headers: { 'content-type': 'image/png' },
       });
       storageMock.put.mockResolvedValue({
-        url: 'https://bkt.example.com/cms-ng/articles/article-1/generated_1.png',
-        key: 'cms-ng/articles/article-1/generated_1.png',
+        url: 'https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png',
+        key: 'cms-ng/articles/article-1/cover_a3f2b109.png',
       });
 
       const url = await (service as any).uploadToStorage(
@@ -1302,9 +1302,9 @@ describe('AIService', () => {
         'article-1',
       );
 
-      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/generated_1.png');
+      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png');
       expect(storageMock.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^cms-ng\/articles\/article-1\/generated_\d+\.png$/),
+        expect.stringMatching(/^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.png$/),
         expect.any(Buffer),
         'image/png',
       );
@@ -1316,8 +1316,8 @@ describe('AIService', () => {
         headers: { 'content-type': 'image/jpeg' },
       });
       storageMock.put.mockResolvedValue({
-        url: 'https://bkt.example.com/cms-ng/articles/article-1/generated_1.jpg',
-        key: 'cms-ng/articles/article-1/generated_1.jpg',
+        url: 'https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.jpg',
+        key: 'cms-ng/articles/article-1/cover_a3f2b109.jpg',
       });
 
       const url = await (service as any).uploadToStorage(
@@ -1325,9 +1325,9 @@ describe('AIService', () => {
         'article-1',
       );
 
-      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/generated_1.jpg');
+      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.jpg');
       expect(storageMock.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^cms-ng\/articles\/article-1\/generated_\d+\.jpg$/),
+        expect.stringMatching(/^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.jpg$/),
         expect.any(Buffer),
         'image/jpeg',
       );
@@ -1339,8 +1339,8 @@ describe('AIService', () => {
         headers: { 'content-type': 'image/png' },
       });
       storageMock.put.mockResolvedValue({
-        url: 'https://bkt.example.com/cms-ng/articles/article-1/generated_1.png',
-        key: 'cms-ng/articles/article-1/generated_1.png',
+        url: 'https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png',
+        key: 'cms-ng/articles/article-1/cover_a3f2b109.png',
       });
 
       await (service as any).uploadToStorage(

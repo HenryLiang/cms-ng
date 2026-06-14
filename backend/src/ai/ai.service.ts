@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import * as crypto from 'crypto';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { STORAGE_SERVICE } from '../storage/storage.service';
@@ -1890,7 +1891,9 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
       );
     }
     const ext = rawType === 'image/png' ? 'png' : 'jpg';
-    const key = `cms-ng/articles/${articleId}/generated_${Date.now()}.${ext}`;
+    // crypto.randomBytes(4).toString('hex') → 8-char hex string
+    // (e.g. "a3f2b109"), indistinguishable from a CMS-managed asset ID.
+    const key = `cms-ng/articles/${articleId}/cover_${crypto.randomBytes(4).toString('hex')}.${ext}`;
     try {
       const { url } = await this.storageService.put(key, buffer, rawType);
       this.logger.log(`[uploadToStorage] Uploaded to COS: ${url}`);
