@@ -5,6 +5,7 @@ import {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatMessage,
+  ToolCall,
 } from './chat-completion.interface';
 
 /**
@@ -62,7 +63,12 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
 
       // Execute tools locally
       const toolResults: ChatMessage[] = [];
-      for (const tc of choice.message.tool_calls || []) {
+      // Cast at the HTTP boundary: axios returns `any` for response data,
+      // and `choice.message.tool_calls` follows the OpenAI-compatible tool
+      // call schema. The cast is the source of truth for the inner loop;
+      // strict runtime validation is tracked separately (see #82 sub-3 Zod).
+      const toolCalls: ToolCall[] = choice.message.tool_calls ?? [];
+      for (const tc of toolCalls) {
         const toolName = tc.function?.name;
         let toolArgs: Record<string, unknown> = {};
         try {
@@ -90,7 +96,7 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: choice.message.content || '',
-        tool_calls: choice.message.tool_calls,
+        tool_calls: toolCalls,
         reasoning_content: choice.message.reasoning_content || '',
       };
 
@@ -145,7 +151,7 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
     return {
       content: choice?.message?.content || '',
       reasoningContent: choice?.message?.reasoning_content || '',
-      toolCalls: choice?.message?.tool_calls,
+      toolCalls: choice?.message?.tool_calls as ToolCall[] | undefined,
       finishReason: choice?.finish_reason || 'stop',
       usage: data.usage
         ? {

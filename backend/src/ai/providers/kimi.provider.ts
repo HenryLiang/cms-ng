@@ -1,8 +1,10 @@
 import { ConfigService } from '@nestjs/config';
 import {
+  BuiltinFunctionTool,
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatMessage,
+  ToolCall,
 } from './chat-completion.interface';
 import { OpenAICompatibleProvider } from './openai-compatible.provider';
 
@@ -34,7 +36,7 @@ export class KimiProvider extends OpenAICompatibleProvider {
     req: ChatCompletionRequest,
     maxRounds = 3,
   ): Promise<ChatCompletionResponse> {
-    const builtinTools = [
+    const builtinTools: BuiltinFunctionTool[] = [
       { type: 'builtin_function', function: { name: '$web_search' } },
     ];
 
@@ -54,20 +56,20 @@ export class KimiProvider extends OpenAICompatibleProvider {
         return this.parseResponse(response.data);
       }
 
-      // Echo back tool arguments as content (Kimi handles execution server-side)
-      const toolMessages: ChatMessage[] = choice.message.tool_calls.map(
-        (tc: any) => ({
-          role: 'tool' as const,
-          tool_call_id: tc.id,
-          name: tc.function.name,
-          content: tc.function.arguments,
-        }),
-      );
+      // Echo back tool arguments as content (Kimi handles execution server-side).
+      // Cast at HTTP boundary — see OpenAICompatibleProvider for the rationale.
+      const toolCalls: ToolCall[] = choice.message.tool_calls ?? [];
+      const toolMessages: ChatMessage[] = toolCalls.map((tc) => ({
+        role: 'tool' as const,
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content: tc.function.arguments,
+      }));
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: choice.message.content || '',
-        tool_calls: choice.message.tool_calls,
+        tool_calls: toolCalls,
         reasoning_content: choice.message.reasoning_content || '',
       };
 
