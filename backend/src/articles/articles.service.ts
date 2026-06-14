@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -89,6 +90,7 @@ export class ArticlesService {
   constructor(
     private prisma: PrismaService,
     private aiService: AIService,
+    private articleAccess: ArticleAccessService,
   ) {}
 
   async create(authorId: string, dto: CreateArticleDto) {
@@ -263,22 +265,9 @@ export class ArticlesService {
   }
 
   async verifyAccess(id: string, user: { userId: string; role: string }) {
-    const article = await this.prisma.article.findUnique({
-      where: { id },
-      select: { authorId: true, editorId: true },
+    return this.articleAccess.checkAccess(id, user, {
+      errorMessage: 'You do not have permission to modify this article',
     });
-    if (!article) throw new NotFoundException('Article not found');
-
-    const canAccess =
-      user.role === UserRole.ADMIN ||
-      article.authorId === user.userId ||
-      article.editorId === user.userId;
-
-    if (!canAccess) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this article',
-      );
-    }
   }
 
   async assignEditor(id: string, editorId: string) {
@@ -587,25 +576,13 @@ export class ArticlesService {
     id: string,
     user: { userId: string; role: string },
   ) {
-    const article = await this.prisma.article.findUnique({
-      where: { id },
+    return this.articleAccess.findAndCheckAccess(id, user, {
       include: {
         author: { select: { id: true, name: true, email: true } },
         editor: { select: { id: true, name: true, email: true } },
         story: { select: { id: true, title: true } },
       },
     });
-    if (!article) throw new NotFoundException('Article not found');
-    if (
-      user.role !== UserRole.ADMIN &&
-      article.authorId !== user.userId &&
-      article.editorId !== user.userId
-    ) {
-      throw new ForbiddenException(
-        'You do not have permission to access this article',
-      );
-    }
-    return article;
   }
 
   async getVersions(articleId: string) {
