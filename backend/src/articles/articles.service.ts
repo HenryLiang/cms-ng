@@ -6,9 +6,15 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
+import {
+  parsePaginationParams,
+  buildPaginatedResponse,
+  type PaginatedResponse,
+} from '../common/pagination';
 import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
+import { FindAllArticlesDto } from './dto/find-all-articles.dto';
 import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
 import {
@@ -144,8 +150,11 @@ export class ArticlesService {
 
   async findAll(
     user: { userId: string; role: string },
-    filters: { storyId?: string },
-  ) {
+    query: FindAllArticlesDto = {},
+  ): Promise<PaginatedResponse<ReturnType<typeof this.serializeArticle>>> {
+    const { storyId } = query;
+    const { page, pageSize } = parsePaginationParams(query);
+
     let where: any = {};
 
     if (user.role === UserRole.REPORTER) {
@@ -169,20 +178,32 @@ export class ArticlesService {
     }
     // ADMIN sees everything
 
-    if (filters.storyId) {
-      where = { ...where, storyId: filters.storyId };
+    if (storyId) {
+      where = { ...where, storyId };
     }
 
-    const articles = await this.prisma.article.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        author: { select: { id: true, name: true, email: true } },
-        editor: { select: { id: true, name: true, email: true } },
-        story: { select: { id: true, title: true } },
-      },
-    });
-    return articles.map((a) => deserializeArticle(a));
+    const skip = (page - 1) * pageSize;
+
+    const [articles, total] = await Promise.all([
+      this.prisma.article.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          author: { select: { id: true, name: true, email: true } },
+          editor: { select: { id: true, name: true, email: true } },
+          story: { select: { id: true, title: true } },
+        },
+      }),
+      this.prisma.article.count({ where }),
+    ]);
+
+    return buildPaginatedResponse(
+      articles.map((a) => this.serializeArticle(a)),
+      total,
+      { page, pageSize },
+    );
   }
 
   async getReviewQueue(editorId: string) {

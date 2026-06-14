@@ -91,20 +91,26 @@ describe('ArticlesController', () => {
 
   describe('findAll', () => {
     it('should call findAll with user and storyId filter', async () => {
-      articlesService.findAll.mockResolvedValue([mockArticle()]);
+      articlesService.findAll.mockResolvedValue({
+        data: [mockArticle()],
+        meta: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      });
 
-      const result = await controller.findAll(mockUser, 's1');
+      const result = await controller.findAll(mockUser, { storyId: 's1' });
 
       expect(articlesService.findAll).toHaveBeenCalledWith(mockUser, { storyId: 's1' });
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('should work without storyId filter', async () => {
-      articlesService.findAll.mockResolvedValue([mockArticle()]);
+      articlesService.findAll.mockResolvedValue({
+        data: [mockArticle()],
+        meta: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      });
 
-      await controller.findAll(mockUser, undefined);
+      await controller.findAll(mockUser, {});
 
-      expect(articlesService.findAll).toHaveBeenCalledWith(mockUser, { storyId: undefined });
+      expect(articlesService.findAll).toHaveBeenCalledWith(mockUser, {});
     });
   });
 

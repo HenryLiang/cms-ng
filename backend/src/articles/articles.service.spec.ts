@@ -146,23 +146,37 @@ describe('ArticlesService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all articles for admin', async () => {
+    it('should return all articles for admin (paginated, default page=1 size=20)', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
+      prisma.article.count.mockResolvedValue(1);
 
       const result = await service.findAll({ userId: 'admin-id', role: 'ADMIN' }, {});
 
       expect(prisma.article.findMany).toHaveBeenCalledWith({
         where: {},
+        skip: 0,
+        take: 20,
         orderBy: { updatedAt: 'desc' },
         include: expect.any(Object),
       });
-      expect(result).toHaveLength(1);
+      expect(prisma.article.count).toHaveBeenCalledWith({ where: {} });
+      expect(result.data).toHaveLength(1);
+      expect(result.meta).toEqual({
+        page: 1,
+        pageSize: 20,
+        total: 1,
+        totalPages: 1,
+      });
     });
 
     it('should filter by storyId', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
+      prisma.article.count.mockResolvedValue(0);
 
-      await service.findAll({ userId: 'author-id', role: 'ADMIN' }, { storyId: 'story-id' });
+      await service.findAll(
+        { userId: 'author-id', role: 'ADMIN' },
+        { storyId: 'story-id' },
+      );
 
       expect(prisma.article.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -173,6 +187,7 @@ describe('ArticlesService', () => {
 
     it('should restrict reporter to own articles', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
+      prisma.article.count.mockResolvedValue(0);
 
       await service.findAll({ userId: 'author-id', role: 'REPORTER' }, {});
 
@@ -181,6 +196,26 @@ describe('ArticlesService', () => {
           where: { authorId: 'author-id' },
         }),
       );
+    });
+
+    it('should pass through explicit page and pageSize', async () => {
+      prisma.article.findMany.mockResolvedValue([mockArticle(), mockArticle()]);
+      prisma.article.count.mockResolvedValue(45);
+
+      const result = await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { page: 2, pageSize: 10 },
+      );
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 }),
+      );
+      expect(result.meta).toEqual({
+        page: 2,
+        pageSize: 10,
+        total: 45,
+        totalPages: 5,
+      });
     });
   });
 
