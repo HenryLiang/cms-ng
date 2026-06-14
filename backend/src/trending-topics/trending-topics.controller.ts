@@ -9,12 +9,15 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TrendingTopicsService } from './trending-topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 
+@ApiTags('trending-topics')
+@ApiBearerAuth('bearer')
 @Controller('trending-topics')
 export class TrendingTopicsController {
   private readonly SOURCE_KEYS = [
@@ -38,21 +41,25 @@ export class TrendingTopicsController {
   constructor(private topicsService: TrendingTopicsService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a curated trending topic' })
   create(@CurrentUser('userId') userId: string, @Body() dto: CreateTopicDto) {
     return this.topicsService.create(userId, dto);
   }
 
   @Get()
+  @ApiOperation({ summary: 'List all curated trending topics' })
   findAll() {
     return this.topicsService.findAll();
   }
 
   @Post('suggestions')
+  @ApiOperation({ summary: 'Generate AI topic suggestions' })
   generateSuggestions(@CurrentUser('userId') userId: string) {
     return this.topicsService.generateAISuggestions(userId);
   }
 
   @Get('google-trends')
+  @ApiOperation({ summary: 'Fetch Google Trends results' })
   fetchGoogleTrends(@Query() query: GoogleTrendsQueryDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
     const limit = Math.min(
@@ -68,6 +75,7 @@ export class TrendingTopicsController {
   }
 
   @Get('all-news')
+  @ApiOperation({ summary: 'Fetch trending news aggregated across all sources' })
   fetchAllTrendingNews(@Query() query: GoogleTrendsQueryDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
     const limit = Math.min(
@@ -82,6 +90,7 @@ export class TrendingTopicsController {
   }
 
   @Get('sina')
+  @ApiOperation({ summary: 'Fetch trending news from Sina' })
   fetchSinaNews(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -89,6 +98,7 @@ export class TrendingTopicsController {
   }
 
   @Get('people')
+  @ApiOperation({ summary: 'Fetch trending news from People' })
   fetchPeopleNews(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -96,6 +106,7 @@ export class TrendingTopicsController {
   }
 
   @Get('bbc')
+  @ApiOperation({ summary: 'Fetch trending news from BBC' })
   fetchBBCNews(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -103,6 +114,7 @@ export class TrendingTopicsController {
   }
 
   @Get('chinanews')
+  @ApiOperation({ summary: 'Fetch trending news from China News' })
   fetchChinanews(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -110,6 +122,7 @@ export class TrendingTopicsController {
   }
 
   @Get('guardian')
+  @ApiOperation({ summary: 'Fetch trending news from The Guardian' })
   fetchGuardian(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -117,6 +130,7 @@ export class TrendingTopicsController {
   }
 
   @Get('nytimes')
+  @ApiOperation({ summary: 'Fetch trending news from The New York Times' })
   fetchNYTimes(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -124,6 +138,7 @@ export class TrendingTopicsController {
   }
 
   @Get('economist')
+  @ApiOperation({ summary: 'Fetch trending news from The Economist' })
   fetchEconomist(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -131,6 +146,7 @@ export class TrendingTopicsController {
   }
 
   @Get('ft')
+  @ApiOperation({ summary: 'Fetch trending news from Financial Times' })
   fetchFT(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -138,6 +154,7 @@ export class TrendingTopicsController {
   }
 
   @Get('zaobao')
+  @ApiOperation({ summary: 'Fetch trending news from Lianhe Zaobao' })
   fetchZaobao(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -145,6 +162,7 @@ export class TrendingTopicsController {
   }
 
   @Get('weibo-hot')
+  @ApiOperation({ summary: 'Fetch trending topics from Weibo' })
   fetchWeiboHot(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -152,6 +170,7 @@ export class TrendingTopicsController {
   }
 
   @Get('zhihu-hot')
+  @ApiOperation({ summary: 'Fetch trending topics from Zhihu' })
   fetchZhihuHot(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -159,6 +178,7 @@ export class TrendingTopicsController {
   }
 
   @Get('36kr')
+  @ApiOperation({ summary: 'Fetch trending news from 36Kr' })
   fetch36kr(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -166,6 +186,7 @@ export class TrendingTopicsController {
   }
 
   @Get('huxiu')
+  @ApiOperation({ summary: 'Fetch trending news from Huxiu' })
   fetchHuxiu(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -173,6 +194,7 @@ export class TrendingTopicsController {
   }
 
   @Get('douban-movie')
+  @ApiOperation({ summary: 'Fetch trending movies from Douban' })
   fetchDoubanMovie(@Query() query: any) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 10));
@@ -180,11 +202,13 @@ export class TrendingTopicsController {
   }
 
   @Post('import-google-trend')
+  @ApiOperation({ summary: 'Import a Google Trend item as a curated topic' })
   importGoogleTrend(@CurrentUser('userId') userId: string, @Body() data: any) {
     return this.topicsService.importFromGoogleTrends(userId, data);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a curated trending topic by id' })
   findOne(@Param('id') id: string) {
     if (this.SOURCE_KEYS.includes(id)) {
       throw new BadRequestException(
@@ -198,6 +222,7 @@ export class TrendingTopicsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a curated trending topic' })
   update(
     @CurrentUser('userId') userId: string,
     @CurrentUser('role') role: string,
@@ -208,6 +233,7 @@ export class TrendingTopicsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a curated trending topic' })
   remove(
     @CurrentUser('userId') userId: string,
     @CurrentUser('role') role: string,
@@ -217,6 +243,7 @@ export class TrendingTopicsController {
   }
 
   @Post(':id/adopt')
+  @ApiOperation({ summary: 'Adopt a trending topic into a story' })
   adoptTopic(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.topicsService.adoptTopic(id, userId);
   }
