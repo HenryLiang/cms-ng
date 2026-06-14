@@ -292,7 +292,24 @@ export class StoriesService {
     return article;
   }
 
-  private serializeStory(story: any) {
+  /**
+   * Type alias for the common include shape used by create/findAll/update
+   * /assignEditor (`{ reporter, editor, _count }`). findOne uses
+   * `{ reporter, editor, articles: {...} }` instead — structurally
+   * compatible via the generic constraint because both share
+   * `reporter` and `editor`.
+   */
+  private static readonly STORY_COMMON_INCLUDE = {
+    reporter: { select: { id: true, name: true, email: true } },
+    editor: { select: { id: true, name: true, email: true } },
+  } as const;
+  private static readonly StoryCommon = {} as Prisma.StoryGetPayload<{
+    include: typeof StoriesService.STORY_COMMON_INCLUDE;
+  }>;
+
+  private serializeStory<T extends typeof StoriesService.StoryCommon>(
+    story: T,
+  ): T & { tags: string[] } {
     return {
       ...story,
       tags: safeJsonParse(story.tags, []),

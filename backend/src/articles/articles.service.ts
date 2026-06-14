@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
@@ -142,7 +143,7 @@ export class ArticlesService {
     user: { userId: string; role: string },
     filters: { storyId?: string },
   ) {
-    let where: any = {};
+    let where: Prisma.ArticleWhereInput = {};
 
     if (user.role === UserRole.REPORTER) {
       where.authorId = user.userId;
@@ -636,7 +637,23 @@ export class ArticlesService {
     return this.serializeArticle(article);
   }
 
-  private serializeArticle(article: any) {
+  /**
+   * Type alias for the common include shape used by 7 of 8 callers of
+   * serializeArticle. findOne adds `versions` to this, which is
+   * structurally compatible via the generic constraint.
+   */
+  private static readonly ARTICLE_COMMON_INCLUDE = {
+    author: { select: { id: true, name: true, email: true } },
+    editor: { select: { id: true, name: true, email: true } },
+    story: { select: { id: true, title: true } },
+  } as const;
+  private static readonly ArticleCommon = {} as Prisma.ArticleGetPayload<{
+    include: typeof ArticlesService.ARTICLE_COMMON_INCLUDE;
+  }>;
+
+  private serializeArticle<T extends typeof ArticlesService.ArticleCommon>(
+    article: T,
+  ): T & { tags: string[]; platforms: string[]; aiGeneratedParts: string[] } {
     return {
       ...article,
       tags: safeJsonParse(article.tags, []),
