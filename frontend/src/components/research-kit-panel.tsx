@@ -29,12 +29,16 @@ export default function ResearchKitPanel({
     (researchKit.wikipedia?.length ?? 0) > 0
   );
 
+  const hasWikipediaError = researchKit?.wikipediaStatus === 'api_error';
+  const wikiEntryCount = researchKit?.wikipedia?.length ?? 0;
   const tabs = [
     { key: 'timeline' as const, label: '事件时间线', icon: Clock, count: researchKit?.timeline.length ?? 0 },
     { key: 'people' as const, label: '关键人物', icon: Users, count: researchKit?.people.length ?? 0 },
     { key: 'data' as const, label: '核心数据', icon: BarChart3, count: researchKit?.data.length ?? 0 },
     { key: 'opinions' as const, label: '各方观点', icon: MessageSquare, count: researchKit?.opinions.length ?? 0 },
-    ...(researchKit?.wikipedia?.length ? [{ key: 'wikipedia' as const, label: 'Wikipedia', icon: Globe, count: researchKit.wikipedia.length }] : []),
+    // Always show Wikipedia tab — even when empty or errored — so the
+    // user can see the diagnostic message (wikipediaStatus).
+    { key: 'wikipedia' as const, label: hasWikipediaError ? 'Wikipedia ⚠️' : 'Wikipedia', icon: Globe, count: wikiEntryCount },
   ];
 
   return (
@@ -224,7 +228,22 @@ export default function ResearchKitPanel({
                     </div>
                   ))}
                   {(!researchKit!.wikipedia || researchKit!.wikipedia.length === 0) && (
-                    <p className="text-sm text-zinc-400 text-center py-4">暂无 Wikipedia 资料</p>
+                    <>
+                      {researchKit!.wikipediaStatus === 'api_error' ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                          <p className="text-sm font-medium text-amber-800">Wikipedia 获取失败</p>
+                          <p className="text-xs text-amber-600 mt-1">
+                            API 请求未成功（可能原因：代理未开启、网络不通、或 Wikipedia 限流）。系统已回退使用联网搜索结果。
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-zinc-400 text-center py-4">
+                          {researchKit!.wikipediaStatus === 'no_results'
+                            ? 'Wikipedia 未找到相关词条'
+                            : '暂无 Wikipedia 资料'}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}

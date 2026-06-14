@@ -77,6 +77,7 @@ export class AIService {
   private readonly seedreamApiBase: string;
   private readonly seedreamModel: string;
   private readonly searchProvider: string;
+  private readonly proxyEnabled: boolean;
   /** HTTP(S) proxy agent — used when Wikipedia/RSS are blocked by DNS pollution. */
   private readonly proxyAgent?: HttpsProxyAgent<string>;
   /** Loads AI prompt templates from disk. See ./prompts/prompt-loader.ts. */
@@ -99,10 +100,14 @@ export class AIService {
       this.config.get<string>('SEEDREAM_MODEL') || 'doubao-seedream-5-0-260128';
     this.searchProvider = this.config.get<string>('SEARCH_PROVIDER') || 'tavily';
 
+    // Align with trending-topics: RSS_PROXY_ENABLED must be 'true' for
+    // the proxy to be used for Wikipedia outbound calls.  When false (or
+    // unset), Wikipedia calls go direct — even if HTTP_PROXY is set.
+    this.proxyEnabled = (this.config.get<string>('RSS_PROXY_ENABLED') || '').toLowerCase() === 'true';
     const proxyUrl =
       this.config.get<string>('HTTP_PROXY') ||
       this.config.get<string>('http_proxy');
-    if (proxyUrl) {
+    if (this.proxyEnabled && proxyUrl) {
       this.proxyAgent = new HttpsProxyAgent(proxyUrl);
     }
   }
@@ -909,8 +914,11 @@ type 取值说明：
     return candidates.reduce((best, c) => (c.length > best.length ? c : best));
   }
 
-  private async searchWikipedia(title: string): Promise<WikipediaEntry[]> {
+  private async searchWikipedia(
+    title: string,
+  ): Promise<{ entries: WikipediaEntry[]; error?: string }> {
     const entries: WikipediaEntry[] = [];
+    const errors: string[] = [];
     const seenTitles = new Set<string>();
     const zhKeyword = this.extractWikipediaKeyword(title);
 
@@ -972,11 +980,30 @@ type 取值说明：
             }
           }
         }
-      } catch (err: any) {
-        if (err.response?.status !== 404) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // 404 from a Wikipedia API endpoint is normal (no article) — don't log.
+        if (
+          err &&
+          typeof err === 'object' &&
+          'response' in err &&
+          (err as any).response?.status !== 404
+        ) {
+          // Only warn; the caller can check `error` for diagnostics.
+        } else if (
+          !(err && typeof err === 'object' && 'response' in err)
+        ) {
+          // Non-HTTP error (network timeout, DNS, etc.)
           this.logger.warn(
-            `Wikipedia ${lang} search failed for "${query}": ${err.message}`,
+            `Wikipedia ${lang} search failed for "${query}": ${msg}`,
           );
+        }
+        // Collect every error except 404 so the caller can make a good
+        // wikipediaStatus decision.
+        if (
+          !(err && typeof err === 'object' && 'response' in err && (err as any).response?.status === 404)
+        ) {
+          errors.push(`[${lang}] ${msg}`);
         }
       }
       return null;
@@ -1001,7 +1028,10 @@ type 取值说明：
     }
     if (enEntry && !seenTitles.has(enEntry.title)) entries.push(enEntry);
 
-    return entries;
+    return {
+      entries,
+      ...(errors.length > 0 ? { error: errors.join('; ') } : {}),
+    };
   }
 
   /**
@@ -1095,10 +1125,24 @@ type 取值说明：
     // (was ~30-50s for Wikipedia + ~30s for Tavily; now bounded by the slower
     // of the two). Both fail-soft independently — a Wikipedia outage no
     // longer blocks the web search and vice versa.
-    const [wikipediaEntries, searchSummary] = await Promise.all([
-      this.searchWikipedia(input.storyTitle).catch(() => [] as WikipediaEntry[]),
+    const [wikiResult, searchSummary] = await Promise.all([
+      this.searchWikipedia(input.storyTitle).catch(
+        (err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Wikipedia search failed for "${input.storyTitle}": ${msg}`,
+          );
+          return { entries: [] as WikipediaEntry[], error: msg };
+        },
+      ),
       this.performSearch(input.storyTitle, language).catch(() => ''),
     ]);
+    const wikipediaEntries = wikiResult.entries;
+    const wikipediaStatus: ResearchKitResult['wikipediaStatus'] = wikiResult.error
+      ? 'api_error'
+      : wikipediaEntries.length > 0
+        ? 'ok'
+        : 'no_results';
 
     const tagsStr = input.storyTags.join(', ') || '未指定';
 
@@ -1211,6 +1255,7 @@ ${searchResults}${wikipediaSection}请基于上述搜索結果和 Wikipedia 資�
           data: Array.isArray(parsed.data) ? (parsed.data as ResearchKitDataPoint[]) : [],
           opinions: Array.isArray(parsed.opinions) ? (parsed.opinions as ResearchKitOpinion[]) : [],
           wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
+          wikipediaStatus,
         };
 
         return { result, tokensUsed: response.usage?.totalTokens };
@@ -1221,6 +1266,7 @@ ${searchResults}${wikipediaSection}请基于上述搜索結果和 Wikipedia 資�
         data: [],
         opinions: [],
         wikipedia: wikipediaEntries.length > 0 ? wikipediaEntries : undefined,
+        wikipediaStatus,
       },
       onSuccess: (aiOpId, tokensUsed) =>
         this.deductLLMBilling({

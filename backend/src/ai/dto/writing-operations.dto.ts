@@ -136,6 +136,8 @@ export interface ResearchKitResult {
   opinions: ResearchKitOpinion[];
   relatedArticles?: string[];
   wikipedia?: WikipediaEntry[];
+  /** Observability field: 'ok' = entries returned, 'no_results' = Wikipedia has no matching articles, 'api_error' = call failed (network/auth/429). */
+  wikipediaStatus?: 'ok' | 'no_results' | 'api_error';
 }
 
 export interface ResearchKitInput {

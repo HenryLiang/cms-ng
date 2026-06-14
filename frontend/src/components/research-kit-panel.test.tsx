@@ -8,6 +8,8 @@ describe('ResearchKitPanel', () => {
     people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
     data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
     opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
+    wikipedia: [] as any[],
+    wikipediaStatus: 'no_results' as const,
   };
 
   it('should render loading state', () => {
@@ -182,7 +184,7 @@ describe('ResearchKitPanel', () => {
     expect(wikiTab).toHaveTextContent('1');
   });
 
-  it('should not render Wikipedia tab when no wikipedia data', () => {
+  it('should render Wikipedia tab even when no wikipedia data (tab always visible)', () => {
     render(
       <ResearchKitPanel
         researchKit={mockResearchKit}
@@ -192,7 +194,7 @@ describe('ResearchKitPanel', () => {
         onGenerateDraft={vi.fn()}
       />,
     );
-    expect(screen.queryByText('Wikipedia')).not.toBeInTheDocument();
+    expect(screen.getByText('Wikipedia')).toBeInTheDocument();
   });
 
   it('should render Wikipedia entry details when tab clicked', () => {
@@ -286,13 +288,14 @@ describe('ResearchKitPanel', () => {
     expect(screen.getByText('基於資料生成初稿')).toBeInTheDocument();
   });
 
-  it('should show "no wikipedia data" message when wikipedia tab is empty', () => {
+  it('should render Wikipedia tab even when no wikipedia data (always visible)', () => {
     const withEmptyWiki = {
       timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
       people: [],
       data: [],
       opinions: [],
       wikipedia: [],
+      wikipediaStatus: 'no_results' as const,
     };
     render(
       <ResearchKitPanel
@@ -303,7 +306,36 @@ describe('ResearchKitPanel', () => {
         onGenerateDraft={vi.fn()}
       />,
     );
-    // Wikipedia tab should not appear when array is empty
-    expect(screen.queryByText('Wikipedia')).not.toBeInTheDocument();
+    // Wikipedia tab should appear even when empty (to show status)
+    expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+    // Click the tab to see the message
+    fireEvent.click(screen.getByText('Wikipedia'));
+    expect(screen.getByText('Wikipedia 未找到相关词条')).toBeInTheDocument();
+  });
+
+  it('should show Wikipedia API error with warning label when wikipediaStatus is api_error', () => {
+    const withApiError = {
+      timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
+      people: [],
+      data: [],
+      opinions: [],
+      wikipedia: [],
+      wikipediaStatus: 'api_error' as const,
+    };
+    render(
+      <ResearchKitPanel
+        researchKit={withApiError}
+        loading={false}
+        onGenerate={vi.fn()}
+        onClose={vi.fn()}
+        onGenerateDraft={vi.fn()}
+      />,
+    );
+    // Wikipedia tab should show warning indicator
+    expect(screen.getByText('Wikipedia ⚠️')).toBeInTheDocument();
+    // Click the tab to see the error message
+    fireEvent.click(screen.getByText('Wikipedia ⚠️'));
+    expect(screen.getByText('Wikipedia 获取失败')).toBeInTheDocument();
+    expect(screen.getByText(/代理未开启|网络不通|Wikipedia 限流/)).toBeInTheDocument();
   });
 });
