@@ -42,6 +42,8 @@ cms-ng/
 | **编辑审核台**  | 稿件审核工作流（review-queue）、分配编辑、退回修改、版本回滚                         |
 | **多平台分发**  | 5 个已实现 adapter：Website / Facebook / Instagram / 小红书 / WordPress REST API     |
 | **自动发布管道** | 定时/触发式任务，AI 选稿→研究→写稿→配图→入库→发布，全程可监控可中止（kill-switch）  |
+| **计费系统**    | 按量计费（AI LLM / AI 配图 / 发布 / 自动发布），支付宝 & 微信支付充值，余额预警        |
+| **对象存储**    | 腾讯云 COS 文件上传（封面图、配图），公开读私有写                                    |
 | **管理后台**    | 用户与角色管理（记者 / 编辑 / 管理员）                                               |
 | **邮件通知**    | SMTP 通道，审稿/自动发布失败等事件触发                                               |
 
@@ -197,6 +199,9 @@ npm run lint
 # 运行测试
 npm run test
 
+# 一键启动开发环境（推荐，支持 --backend-only / --frontend-only / --no-rsshub / --no-migrate）
+npm run dev:start
+
 # 数据库相关
 npm run db:generate   # Prisma Client 生成
 npm run db:migrate    # 创建并应用迁移
@@ -214,6 +219,26 @@ npm run test:cov          # 覆盖率
 npm run test:e2e          # E2E 测试
 npx jest src/auth/auth.service.spec.ts   # 单文件测试
 ```
+
+### 前端测试
+
+```bash
+cd frontend
+npm run test              # Vitest + jsdom
+npm run test:watch        # 监听模式
+npx vitest run src/lib/article-api.test.ts   # 单文件测试
+```
+
+### 全项目 E2E 回归测试（Playwright）
+
+```bash
+# 前提：dev 前端 :3000 和 QA 后端 :3002 均已运行（配置不自动启动 webServer）
+npx playwright test
+```
+
+- 测试文件：`tests/regression/*.spec.ts`（覆盖 smoke / auth / 文章工作流 / AI 能力 / 自动发布 / 多平台分发 / RBAC 等）
+- 共享夹具：`tests/regression/_shared/`（QA 后端 :3002，数据写入 `cms_ng_qa` 库，不影响 dev 库）
+- 报告：HTML 在 `tests/regression/results/html/`，JSON 摘要在 `tests/regression/results/run-summary.json`
 
 ---
 
@@ -239,9 +264,19 @@ AutoPublishRun       ──1:N── AutoPublishArticle   # 每次 run 处理多
                                               # 文章生命周期：PENDING → TOPIC_SELECTED
                                               #   → RESEARCHED → DRAFTED → IMAGED
                                               #   → SAVED → PUBLISHED（可任一阶段失败）
+
+User                 ──1:N── BillingTransaction    # 计费流水（append-only）
+                     ──1:1── BalanceAlert          # 余额预警配置
+                     ──1:N── TopUpRecord           # 充值记录
+
+BillingConfig        (各操作单价配置，category + itemKey 唯一)
+BillingTransaction   ──1:1── AIOperation           # AI 操作 → 计费流水
+                     ──1:1── PlatformPublish       # 平台发布 → 计费流水
+                     ──1:1── TopUpRecord           # 充值 → 计费流水
+KillSwitch           (紧急杀戮开关单例表，issue #48 P0 修复，MySQL 真源 + Redis 缓存)
 ```
 
-完整 Schema 见 `backend/prisma/schema.prisma`（10 张表）。
+完整 Schema 见 `backend/prisma/schema.prisma`（15 张表）。
 
 > **重要**：JSON 字符串数组字段（`tags` / `platforms` / `aiGeneratedParts` / `coverImages` / `adaptedTags` / `expertise` 等）以 `JSON` 类型存储为字符串，前后端都通过 `safeJsonParse<T>()`（`backend/src/common/json.utils.ts`）解析，解析失败自动回退到默认值。
 
@@ -267,6 +302,8 @@ AutoPublishRun       ──1:N── AutoPublishArticle   # 每次 run 处理多
 | 自动发布紧急      | `POST /auto-publish/kill-switch`，`GET /auto-publish/stats`                                            |
 | 热点聚合          | `GET /trending-topics`，`POST /trending-topics`，`GET /trending-topics/google-trends?geo=HK&timeRange=24h`，`GET /trending-topics/:source` |
 | 热点 AI 选题      | `POST /trending-topics/ai-suggestions`，`POST /trending-topics/:id/adopt`                              |
+| 计费              | `GET /billing/balance`，`GET /billing/transactions`，`POST /billing/estimate`，`GET /billing/config` |
+| 充值与支付        | `POST /billing/top-up`，`POST /billing/payment/alipay/callback`，`POST /billing/payment/wechat/callback` |
 
 ---
 
@@ -284,6 +321,7 @@ cms-ng/
 │   │       ├── articles/              # 稿件管理
 │   │       ├── review/                # 审核工作台
 │   │       ├── auto-publish/          # 自动发布管理
+│   │       ├── billing/               # 计费与充值
 │   │       ├── profile/               # 个人中心
 │   │       └── layout.tsx
 │   ├── src/components/                # 通用组件 + 富文本编辑器 + 角色守卫
@@ -309,6 +347,8 @@ cms-ng/
 │   │   │   ├── pipeline/steps/        # 7 个 step：选稿/研究/写稿/配图/入库/发布
 │   │   │   ├── auto-publish-scheduler.service.ts   # @nestjs/schedule 调度
 │   │   │   └── auto-publish.controller.ts          # 任务/执行/kill-switch
+│   │   ├── billing/                   # 计费系统（流水 / 充值 / 支付宝 / 微信支付 / 余额预警）
+│   │   ├── storage/                   # 腾讯云 COS 对象存储
 │   │   ├── redis/                     # RedisService（ioredis，fail-open）
 │   │   ├── prisma/                    # PrismaService 单例
 │   │   └── common/                    # 守卫 / 拦截器 / 过滤器 / 测试工具 / json.utils
@@ -395,7 +435,7 @@ cms-ng/
 | Docker 与 Docker Compose v2 | 跑 `docker compose`（不是老的 `docker-compose`）                |
 | 外部 MySQL 8 实例           | 已建库 `cms_ng`，账号可远程连接                                  |
 | 外部 Redis 实例             | 可选密码，URL 通过 `REDIS_URL` 注入                              |
-| `backend/.env` 文件        | 必须含 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET` / `KIMI_API_KEY` |
+| `backend/.env` 文件        | 必须含 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET` / 所选 AI Provider 的 API Key |
 | `frontend/.env.local` 文件  | 含 `NEXT_PUBLIC_API_URL=https://your-domain.com`                   |
 | 服务器 SSH 免密             | 脚本通过 SSH 推送本地构建产物到远程                               |
 
@@ -434,6 +474,16 @@ bash scripts/update-cms-ng.sh
 - `docker-compose.prod.yml`（prod）：仅 `backend` + `frontend` 两个应用容器；后端通过 `env_file: ./backend/.env` 注入配置（**和 dev 用同一份 `backend/.env`**，只是值不同）
 
 MySQL / Redis / （生产环境的）RSSHub 全部视为外部依赖，部署前先准备好，部署脚本不会去拉起它们。
+
+---
+
+## API 文档（Swagger UI）
+
+开发环境下，后端自动挂载 Swagger UI：
+
+- **地址**：`http://localhost:3001/api-docs`
+- **认证**：点击页面顶部 Authorize，粘贴 `/auth/login` 返回的 JWT（无需 "Bearer " 前缀）
+- **仅在非生产环境挂载**：生产环境（`NODE_ENV=production`）不注册该路由
 
 ---
 
