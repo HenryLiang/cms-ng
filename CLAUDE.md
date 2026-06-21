@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**01创作大脑 (CMS-NG)** — A universal AI-driven intelligent content creation platform built by HK01, designed to empower new media organizations with AI transformation. A monorepo covering story discovery, article writing with AI collaboration, editorial review, and multi-platform distribution.
+**01创作大脑 (CMS-NG)** — A universal AI-driven intelligent content creation platform, designed to empower new media organizations with AI transformation. A monorepo covering story discovery, article writing with AI collaboration, editorial review, and multi-platform distribution.
 
 - **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS v4 + TipTap rich text editor + Lucide icons
 - **Backend**: NestJS 11 + Prisma ORM + MySQL 8 + Redis (ioredis)
