@@ -25,20 +25,25 @@ npm run dev:frontend     # Frontend only (dev-start.sh --frontend-only)
 npm run build            # Build all packages (respects Turbo dependency order)
 npm run lint             # Lint all packages
 npm run test             # Run all tests
+npm run start            # turbo run start (run built apps)
 npm run db:generate      # Regenerate Prisma Client
 npm run db:migrate       # Create + apply migration
 npm run db:studio        # Visual DB editor (Prisma Studio)
-npm run db:seed          # Wired in package.json (runs backend/prisma/seed.ts) but the seed file
-                         # is NOT currently committed — the command will fail until it's added.
+npm run db:seed          # Wired in package.json as `cd backend && npx ts-node prisma/seed.ts`, but
+                         # backend/prisma/seed.ts is NOT committed (and not on disk) — the command
+                         # will fail. A committed alternative, backend/prisma/seed-billing-config.ts,
+                         # seeds billing config: `cd backend && npx ts-node prisma/seed-billing-config.ts`.
 ```
 
-Turbo task config (`turbo.json`): `build` and `test` have `dependsOn: ["^build"]` — the shared package is built before backend/frontend tests run.
+Turbo task config (`turbo.json`): `build`, `test`, and `lint` all have `dependsOn: ["^build"]` — the shared package is built before backend/frontend tests run.
 
 ### Frontend (`frontend/`)
 
 ```bash
 cd frontend && npm run dev          # Next.js dev server (port 3000)
 cd frontend && npm run build        # Production build
+cd frontend && npm run start        # Next.js production server
+cd frontend && npm run lint         # ESLint
 cd frontend && npm run test         # Vitest + jsdom
 cd frontend && npm run test:watch   # Watch mode
 cd frontend && npx vitest run src/lib/article-api.test.ts   # Single file
@@ -50,15 +55,19 @@ cd frontend && npx vitest run src/lib/article-api.test.ts   # Single file
 
 ```bash
 cd backend && npm run start:dev     # NestJS dev server with hot reload (port 3001)
+cd backend && npm run start:debug   # NestJS with --debug --watch
+cd backend && npm run start:prod    # node dist/main (production)
 cd backend && npm run build         # Production build
+cd backend && npm run format        # Prettier
 cd backend && npm run test          # Jest (unit tests)
 cd backend && npm run test:watch    # Watch mode
 cd backend && npm run test:cov      # Coverage report
+cd backend && npm run test:debug    # node --inspect-brk + jest --runInBand
 cd backend && npx jest src/auth/auth.service.spec.ts   # Single file
 cd backend && npm run test:e2e      # E2E tests (config: test/jest-e2e.json)
 ```
 
-**Test conventions**: Unit test files are `*.spec.ts` (not `.test.ts`). Root dir is `src/`. E2E tests live in `backend/test/` and use `*.e2e-spec.ts`. `test-helpers.ts` in `src/common/` provides `createMock<T>()`, `UUID_REGEX`, and a fixed `now` timestamp fixture.
+**Test conventions**: Unit test files are `*.spec.ts` (not `.test.ts`). Root dir is `src/`. E2E tests live in `backend/test/` and use `*.e2e-spec.ts`. `test-helpers.ts` in `src/common/` provides `createMock<T>()`, `UUID_REGEX`, and a fixed `now` timestamp fixture. The NestJS bootstrap (`main.ts`), root module (`app.module.ts`), `app.controller.ts`, and `app.service.ts` sit directly in `backend/src/` — not a subdirectory.
 
 ### Database (Prisma)
 
@@ -94,54 +103,57 @@ cms-ng/
 │   │   ├── ai/            # AI service + tool registry (see AI Layer below)
 │   │   ├── channels/      # Multi-platform publishing (platform adapters + WordPress service)
 │   │   ├── auto-publish/  # Scheduled/triggered publishing pipeline (see Auto-Publishing below)
-│   │   ├── trending-topics/ # Hot topic aggregation (Google Trends + RSS)
+│   │   ├── trending-topics/ # Hot topic aggregation (Google Trends RSS + native RSS + RSSHub)
 │   │   ├── billing/       # Billing, transactions, Alipay/WeChat Pay integration, cost estimation
 │   │   ├── storage/       # COS (腾讯云对象存储) file uploads — CosStorageService + StorageService
 │   │   ├── redis/         # RedisService wrapper around ioredis (cache + transient state)
-│   │   ├── config/        # Zod-based env validation at boot (env.validation.ts)
-│   │   ├── common/        # Guards, interceptors, filters, test-helpers, json.utils
+│   │   ├── config/        # Manual env validation at boot (env.validation.ts)
+│   │   ├── common/        # Guards, interceptors, filters, test-helpers, json.utils, ai-operation-logger
 │   │   ├── types/         # Backend-specific type definitions
 │   │   └── prisma/        # PrismaService singleton
 │   ├── prisma/
-│   │   ├── schema.prisma  # Single source of truth for DB schema (~458 lines, 15 tables incl. KillSwitch singleton)
+│   │   ├── schema.prisma  # Single source of truth for DB schema (~457 lines, 15 tables incl. KillSwitch singleton)
 │   │   └── migrations/
 │   └── test/              # E2E tests (jest-e2e.json)
 ├── packages/shared/src/index.ts  # Shared enums: UserRole, ArticleStatus, Platform, ContentLanguage,
 │                                 #   PublishStatus, AgentType, TransactionType, TransactionStatus,
 │                                 #   PaymentMethod, BillingCategory, AutoTaskStatus, ScheduleType,
 │                                 #   RunStatus, ArticleRunStatus, TriggerType
-│                                 # Shared interfaces: User, Story, Article, PlatformPublish, AIOperation,
-│                                 #   AutoPublishTask/Run/Article, BillingConfigItem, BillingTransactionRecord,
-│                                 #   BalanceInfo, CostEstimate, TopUpRecordInfo, ApiResponse<T>
+│                                 # Shared interfaces (non-exhaustive — grep the source for the full list):
+│                                 #   User, Story, Article, PlatformPublish, PlatformMetadata, AIOperation,
+│                                 #   AutoPublishTask/Run/Article, AutoPublishScheduleConfig/TopicStrategy/
+│                                 #   ContentConfig/FilterConfig/PublishConfig/RetryConfig, BillingConfigItem,
+│                                 #   BillingTransactionRecord, BalanceInfo, CostEstimate, TopUpRecordInfo, ApiResponse<T>
 ├── docker-compose.yml            # Dev: RSSHub :1200 only (MySQL/Redis are external)
 ├── docker-compose.prod.yml       # Prod: backend + frontend containers; backend reads env from backend/.env via env_file
 └── scripts/
     ├── dev-start.sh              # One-command dev environment launcher (with --backend-only etc.)
     ├── update-cms-ng.sh          # One-command production deploy/update script
+    ├── check-tiptap-dedup.sh     # Checks for duplicate TipTap extensions in the frontend bundle
     └── agent/                    # Agent helper scripts (setup, login, token retrieval)
 ```
 
 ### Env Validation at Boot
 
-`backend/src/config/env.validation.ts` uses Zod to validate critical env vars (`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`) at startup via NestJS `ConfigModule.forRoot({ validate })`. If any required var is missing or invalid, the app fails fast with a readable error message instead of a mysterious runtime crash. Optional vars (SMTP, billing keys) are validated at their respective modules.
+`backend/src/config/env.validation.ts` uses a **manual `validateEnv()` function** (a `REQUIRED_VARS` list of `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET` plus targeted hand-written checks) run via NestJS `ConfigModule.forRoot({ validate })` — **not Zod**. If any required var is missing or invalid, the app fails fast with a readable error message instead of a mysterious runtime crash. It also enforces: `JWT_SECRET` ≥ 16 chars, `DATABASE_URL` must start with `mysql://`, and `AI_PROVIDER` must be one of `deepseek`/`kimi`/`openai` with its matching API key present. Optional vars (SMTP, billing keys) are validated lazily at their respective modules. Note: `zod` is declared in `backend/package.json` but is neither installed nor used — a dead-dependency candidate for removal.
 
 ### AI Layer
 
 `backend/src/ai/` has two distinct subsystems:
 
-1. **LLM calls** (`ai.service.ts` + `providers/`): Provider-agnostic architecture — `AIService` is a facade that delegates to a `ChatCompletionProvider` (injected via `CHAT_PROVIDER` DI token). Available providers: `DeepSeekProvider` (default), `KimiProvider`, `OpenAIProvider` — all extend `OpenAICompatibleProvider`. Switch via `AI_PROVIDER` env var. Exposes operations: rewrite, expand, condense, polish, generate-headlines, generate-excerpt, chat, generate-draft, fact-check, research-kit, review-report, SEO optimize. All operations are logged to the `AIOperation` table.
+1. **LLM calls** (`ai.service.ts` + `providers/`): Provider-agnostic architecture — `AIService` is a facade that delegates to a `ChatCompletionProvider` (injected via `CHAT_PROVIDER` DI token). Available providers: `DeepSeekProvider` (default), `KimiProvider`, `OpenAIProvider` — all extend `OpenAICompatibleProvider`. Switch via `AI_PROVIDER` env var. Exposes operations: rewrite, expand, condense, polish, generate-headlines, generate-excerpt, generate-story-suggestions, chat, generate-draft, fact-check, research-kit, review-report, SEO optimize. All operations are logged to the `AIOperation` table via the injected `AIOperationLogger` (`backend/src/common/ai-operation-logger.ts`), which wraps each call in `aiLog.run(...)`.
 
-2. **Tool registry** (`tools/`): `AIToolsService` is a plugin registry implementing `ToolExecutor` / `ToolDefinition` interfaces. Current tool: `TavilySearchTool`. To add a new tool, implement the `ToolExecutor` interface and register it in `AIToolsService`'s constructor. Tools are exposed to the LLM via function-calling when `SEARCH_PROVIDER=tavily`.
+2. **Tool registry** (`tools/`): `AIToolsService` is a plugin registry implementing `ToolExecutor` / `ToolDefinition` interfaces. Current tool: `TavilySearchTool`. To add a new tool, implement the `ToolExecutor` interface and register it in `AIToolsService`'s constructor. Tools are exposed to the LLM via function-calling inside the private `performSearch` helper (used by research-kit/fact-check) when `SEARCH_PROVIDER` is not `kimi`; the `kimi` branch additionally requires the active provider to be `KimiProvider`.
 
-`SEEDREAM_API_KEY` enables image generation via the Seedream (Doubao) API, handled directly in `ai.service.ts`.
+Seedream (Doubao) image generation is handled directly in `ai.service.ts` and is enabled by `SEEDREAM_API_KEY` (with `SEEDREAM_API_BASE` and `SEEDREAM_MODEL`, all read in the `AIService` constructor). `KimiProvider` reads `KIMI_MODEL` (default `kimi-for-coding`) and forces `temperature=1` when `model === 'kimi-k2.6'`.
 
 ### Platform Publishing (Channels)
 
 `backend/src/channels/` has two layers:
 
-1. **Platform adapters** (`platforms/`): Adapter pattern — `platform.adapter.ts` defines the interface and `platform-registry.ts` maps `Platform` enum values to adapter instances. Currently registered adapters: **Website, Facebook, Instagram, Xiaohongshu (小红书), WordPress** (`adapters/*.adapter.ts`). The `Platform` enum in `@cms-ng/shared` also lists `X`, `THREADS`, `LINKEDIN`, `YOUTUBE`, `PUSH` — these are reserved values with no adapter implementation yet; calling `PlatformRegistry.getAdapter()` returns `undefined` for them. Articles go through `PlatformPublish` records with per-platform adapted title/content/excerpt.
+1. **Platform adapters** (`platforms/`): Adapter pattern — `platform.adapter.ts` defines the interface and `platform-registry.ts` maps `Platform` enum values to adapter instances. Currently registered adapters: **Website, Facebook, Instagram, Xiaohongshu (小红书), WordPress** (`adapters/*.adapter.ts`). The `Platform` enum in `@cms-ng/shared` also lists `X`, `THREADS`, `LINKEDIN`, `YOUTUBE`, `PUSH` — these are reserved values with no adapter implementation yet; calling `PlatformRegistry.getAdapter()` returns `undefined` for them. `PlatformRegistry` also exposes `hasAdapter(platform)` and `getSupportedPlatforms()`. Articles go through `PlatformPublish` records with per-platform adapted title/content/excerpt. Per-platform metadata (title/content length limits, media support, aspect ratios, style guides) for **all** platforms — including reserved ones with no adapter — lives in `platforms/constants.ts` as `PLATFORM_METADATA`; adapters pull their `metadata` field from there.
 
-2. **WordPress service** (`wordpress.service.ts`): Dedicated service for WordPress REST API integration (publishing articles to WordPress sites).
+2. **WordPress service** (`wordpress.service.ts`): Dedicated service for WordPress REST API integration (publishing articles to WordPress sites). WordPress is the only platform with BOTH a `PlatformAdapter` (LLM-adapted SEO content + HTML) and a publish service; the other registered platforms (Website, Facebook, Instagram, Xiaohongshu) have adapters only — there is no `facebook.service.ts` etc.
 
 ### Auto-Publishing System
 
@@ -149,15 +161,15 @@ Automated content pipeline for scheduled/triggered article publishing without hu
 
 - **`auto-publish.service.ts`** — CRUD over `AutoPublishTask` / `AutoPublishRun` / `AutoPublishArticle` and manual-trigger entry point.
 - **`auto-publish-scheduler.service.ts`** — Uses `@nestjs/schedule` to fire tasks on `FIXED_TIME` / `INTERVAL` / `CRON` schedules and hand them to the pipeline.
-- **`pipeline/pipeline.service.ts`** + **`pipeline/steps/`** — The pipeline is a sequence of step classes implementing `step.interface.ts`. Each step advances an `AutoPublishArticle` through one stage of the lifecycle below; failures are recorded in `failedStep` and the run continues to the next article.
-- **Core entities** (defined in `packages/shared/`):
+- **`pipeline/pipeline.service.ts`** + **`pipeline/steps/`** — The pipeline is a sequence of step classes implementing `pipeline/step.interface.ts` (the interface lives one level above `steps/`; implementations are `pipeline/steps/*.step.ts`). The pipeline has 8 steps in order: `BillingCheckStep` (runs first, pre-check, does not advance status) → topic → research → article-generation → article-save → image-generation → publish → `NotificationStep` (runs last, does not advance status). Most steps advance an `AutoPublishArticle` through one stage of the lifecycle below; failures are recorded in `failedStep` and the run continues to the next article.
+- **Core entities**: conceptual INTERFACES are in `packages/shared/src/index.ts`, but the backend uses Prisma-generated types directly (the persistence models — source of truth — are `AutoPublishTask`/`AutoPublishRun`/`AutoPublishArticle` in `schema.prisma`; the backend does not import the shared interfaces).
   - `AutoPublishTask` — Task configuration (schedule, topic strategy, content config, filter rules, publish target)
   - `AutoPublishRun` — Execution record for a task run (status, counts, error logs)
   - `AutoPublishArticle` — Individual article tracking through the pipeline
-- **Article lifecycle**: `PENDING → TOPIC_SELECTED → RESEARCHED → DRAFTED → IMAGED → SAVED → PUBLISHED` (can fail at any step, tracked in `failedStep`)
+- **Article lifecycle**: `PENDING → TOPIC_SELECTED → RESEARCHED → DRAFTED → SAVED → IMAGED → PUBLISHED` (the article is saved to the DB before images are generated). `ArticleRunStatus` also has `FAILED` (can fail at any step, tracked in `failedStep`) and `WITHDRAWN` (published auto-publish articles can be withdrawn via `POST /auto-publish/articles/:id/withdraw`).
 - **Schedule types**: `FIXED_TIME` (specific times), `INTERVAL` (every N hours), `CRON` (cron expressions)
 - **Trigger types**: `SCHEDULED` (timer-based) | `MANUAL` (user-initiated)
-- **Config components**:
+- **Config components** (defined in `packages/shared/`, but not imported by the backend — `PipelineContext` in `step.interface.ts` re-defines `contentConfig`/`publishConfig` inline):
   - `AutoPublishScheduleConfig` — When to run (times, timezone)
   - `AutoPublishTopicStrategy` — How to select topics (fixed keywords, trending sources)
   - `AutoPublishContentConfig` — Content generation params (style, max length, language, system prompt)
@@ -165,35 +177,35 @@ Automated content pipeline for scheduled/triggered article publishing without hu
   - `AutoPublishPublishConfig` — Target platform/WordPress site
   - `AutoPublishRetryConfig` — Retry policy on failure
 
-**Kill switch (紧急杀戮开关)**: `POST /auto-publish/kill-switch` toggles a global pause on the auto-publish pipeline. Backed by the `KillSwitch` singleton table (MySQL is the source of truth, Redis caches it). When `enabled=true`, the scheduler skips all task runs in-flight and new runs fail fast. Used for emergency shutdown (issue #48 P0 fix).
+**Kill switch (紧急杀戮开关)**: `POST /auto-publish/kill-switch` (admin-only, `@Roles ADMIN`) toggles a global pause on the auto-publish pipeline. Backed by the `KillSwitch` singleton table (`schema.prisma`, fixed id `auto-publish`). **MySQL is the SOLE source of truth** — `isKillSwitchActive` (`auto-publish-scheduler.service.ts`) reads the DB directly and deliberately does NOT consult Redis (per the issue #48 P0 fix; its own comment says 不读 Redis). When `enabled=true`, the scheduler skips **newly-triggered** runs (cron-fire check + `runTask` entry check); it does NOT interrupt runs already in flight — the article batch loop has no per-step kill-switch check, so a started run processes its entire batch. New runs are a silent skip (`return`, no Run record), not a fail-fast. Redis is written best-effort but is not read by the canonical path (the one retry-path Redis read checks `=== "true"` against a written `"1"` and never matches — dead code).
 
 ### Billing & Payments
 
 `backend/src/billing/` manages usage-based billing with the following:
 
-- **Transaction tracking**: `TransactionType` enum covers `TOP_UP`, `AI_LLM`, `AI_IMAGE`, `PUBLISH`, `AUTO_PUBLISH`, `REFUND`, `ADJUSTMENT`. Each operation is recorded with unit price, quantity, and balance-after.
-- **Payment integration**: Alipay and WeChat Pay support via `billing/payment/`. Controlled by `BILLING_ENABLED` env var.
-- **Cost estimation**: `POST /billing/estimate` returns cost breakdowns before executing billable operations.
-- **Balance management**: Users have a balance field; `BalanceInfo` includes alert thresholds and recent transaction history.
+- **Transaction tracking**: `TransactionType` enum covers `TOP_UP`, `AI_LLM`, `AI_IMAGE`, `PUBLISH`, `AUTO_PUBLISH`, `REFUND`, `ADJUSTMENT`. Each operation is recorded with unit price, quantity, and balance-after. Related shared enums: `TransactionStatus` (`PENDING`/`COMPLETED`/`FAILED`/`REFUNDED`), `PaymentMethod`, `BillingCategory`. `BillingTransactionRecord` carries an `idempotencyKey` (`@unique`) for safe retry/dedup.
+- **Payment integration**: Alipay and WeChat Pay support via `billing/payment/`. Billing is **enabled by default**; set `BILLING_ENABLED=false` to disable (`billing.service.ts` reads `BILLING_ENABLED !== 'false'`).
+- **Endpoints**: `POST /billing/estimate` returns cost breakdowns before executing billable operations. Full surface: `GET /billing/{balance,transactions,transactions/team,config,alert,report,top-up/records}`, `POST /billing/{estimate,top-up/manual,top-up/create,refund}`, `PUT /billing/{config/:itemKey,alert}`, and payment callbacks `POST /billing/payment/{alipay,wechat}/notify`.
+- **Balance management**: Users have a balance field; `BalanceInfo` includes an `alertThreshold` and recent transaction history.
 - Frontend client: `frontend/src/lib/billing-api.ts`.
 
 ### Storage (COS)
 
 `backend/src/storage/` provides file upload to 腾讯云 COS (Cloud Object Storage):
 
-- **`CosStorageService`** — Direct COS SDK integration (PutObject, GetObject, DeleteObject). Bucket is configured for public-read/private-write so frontend and WordPress can read via `https://` URLs directly.
-- **`StorageService`** — Abstraction layer that may wrap `CosStorageService` or other providers.
+- **`CosStorageService`** — Direct COS SDK integration (`put`/PutObject and `delete`/DeleteObject only; **no `GetObject`** — reads happen via public `https://` URLs). Bucket is configured for public-read/private-write so frontend and WordPress can read via `https://` directly.
+- **`StorageService`** — The storage interface (`put`/`delete`); `CosStorageService` is the sole implementation, aliased to the `STORAGE_SERVICE` DI token via `useExisting`.
 - CORS must be configured on the COS bucket to allow `localhost:3000` (dev) and production frontend domain for GET requests.
 
 ### Email Notifications
 
-SMTP-based email notifications are configured via `SMTP_*` env vars. Used for review assignments, auto-publish failures, and other operational alerts. All SMTP vars are optional — the app boots without them and surfaces errors only when a module attempts to send mail.
+SMTP-based email notifications are configured via `SMTP_*` env vars and sent **inline via `nodemailer` directly in `auto-publish/pipeline/pipeline.service.ts`** (a run-summary email; there is no dedicated `MailerService`/`NotificationService` module, and the `NotificationStep` only logs — actual email happens at the run level after all articles complete). No review-assignment or other operational email exists. All SMTP vars are optional — the app boots without them and surfaces errors only when a module attempts to send mail.
 
 ### Trending Topics
 
-`trending-topics.service.ts` aggregates hot topics from two sources: Google Trends (`google-trends-api` package) and RSS feeds (`rss-parser` with `https-proxy-agent` for proxy support). RSSHub (in `docker-compose.yml` at `:1200`) provides a local RSS aggregator that the service can consume from.
+`trending-topics.service.ts` aggregates from **12 hard-coded feeds via `rss-parser`** (with `https-proxy-agent` for proxy support): 1 Google Trends (parsed from its public RSS URL — the `google-trends-api` package is declared but unused, a dead-dependency candidate) + 8 native RSS (sina, people, chinanews, bbc, guardian, nytimes, economist, ft) + 4 RSSHub-proxied (zaobao, 36kr, huxiu, douban-movie). RSSHub (in `docker-compose.yml` at `:1200`) provides a local RSS aggregator the service can consume from. Gotcha: zaobao's native feed is dead since the 2026 redesign (code comment: 早报官方 .com.sg/rss/news.xml 已下线) — it MUST stay on RSSHub.
 
-**代理开关**: 海外 RSS 源（Google Trends、BBC、Guardian 等）的代理由 `RSS_PROXY_ENABLED` 环境变量控制。设为 `true` 时才会读取 `HTTP_PROXY` 走代理（开发环境大陆需要），设为 `false` 则直连（生产环境新加坡不需要）。本地 RSSHub 源始终不走代理。
+**代理开关**: 海外源（Google Trends + 5 个海外 native feeds：bbc/guardian/nytimes/economist/ft）的代理由 `RSS_PROXY_ENABLED` 环境变量控制。设为 `true` 时才会读取 `HTTP_PROXY`（或小写 `http_proxy`）走代理（开发环境大陆需要），设为 `false` 则直连（生产环境新加坡不需要）。3 个国内 native feeds（sina/people/chinanews）与全部 4 个 RSSHub feeds 始终直连（`isRSSHub:true` 强制直连）。
 
 ### Key Backend Conventions
 
@@ -201,22 +213,35 @@ SMTP-based email notifications are configured via `SMTP_*` env vars. Used for re
 - `PrismaService` extends `PrismaClient` and is provided globally via `PrismaModule`.
 - Use `@cms-ng/shared` enums rather than redefining status/role values in either app.
 - The shared package must be built (`cd packages/shared && npm run build`) before backend/frontend can import from it. Turbo's `^build` dependency handles this automatically during `npm run build` / `npm run test`.
-- **JSON string arrays**: Schema fields like `tags`, `platforms`, `aiGeneratedParts`, `coverImages`, `adaptedTags`, and `expertise` are stored as JSON strings (`@default("[]")`), not native arrays. Always use `safeJsonParse<T>()` from `backend/src/common/json.utils.ts` to parse them safely (returns fallback on parse failure). The frontend also needs to handle these — parse with a try/catch or import the utility from shared.
-- **API responses**: Use the `ApiResponse<T>` generic interface from `@cms-ng/shared` for standardized responses: `{ success: boolean, data?: T, error?: { code, message }, meta?: { page, pageSize, total } }`.
+- **JSON string arrays**: Schema fields like `tags`, `platforms`, `aiGeneratedParts`, `coverImages`, `adaptedTags`, and `expertise` are stored as JSON strings (`@default("[]")`), not native arrays (zero `Json`-type fields exist in the schema). Always use `safeJsonParse<T>(value, fallback: T): T` from `backend/src/common/json.utils.ts` to parse them safely (returns fallback on null/undefined OR parse failure). `safeJsonParse` is **backend-only** — `@cms-ng/shared` does not export it; the frontend must implement its own try/catch parse.
+- **API responses**: Use the `ApiResponse<T>` generic interface from `@cms-ng/shared` for standardized responses: `{ success: boolean, data?: T, error?: { code, message }, meta?: { page?, pageSize?, total? } }` (each `meta` inner field is independently optional).
 - **Swagger/OpenAPI**: Controllers and DTOs are decorated with `@ApiTags`, `@ApiOperation`, `@ApiProperty` etc. Swagger UI is available at `/api-docs` in dev (non-production). Keep decorators in sync with actual behavior.
-- **Env validation**: `ConfigModule.forRoot` in `app.module.ts` runs Zod validation at boot. Required vars (`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`) cause a fast-fail; optional vars (SMTP, billing, COS) are validated lazily by their modules.
+- **Env validation**: `ConfigModule.forRoot` in `app.module.ts` runs the manual `validateEnv()` at boot (see "Env Validation at Boot" above — not Zod). Required vars (`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`) cause a fast-fail; optional vars (SMTP, billing, COS) are validated lazily by their modules.
 
 ### Key Frontend Conventions
 
 - App Router routes: `app/login`, `app/register`, `app/dashboard/` with nested segments — `articles/`, `stories/`, `review/`, `profile/`, `auto-publish/`, `billing/` — each with their own `page.tsx` + `layout.tsx`.
-- Server Components by default; add `'use client'` only when needed (event handlers, hooks, browser APIs).
+- Server Components where feasible (root layout, home page, a few presentational panels), but most dashboard pages and components use `'use client'` (~29 of 36 non-test `.tsx` files) because they need hooks/event handlers. Add `'use client'` only when a component needs browser APIs, state, or event handlers.
 - All API calls go through `src/lib/api.ts` — an Axios instance that attaches the JWT from `localStorage` and redirects to `/login` on 401.
 - Domain-specific API modules wrap the base `api` client: `article-api.ts`, `story-api.ts`, `topic-api.ts`, `channel-api.ts`, `review-api.ts`, `auth-api.ts`, `users-api.ts`, `auto-publish-api.ts`, `billing-api.ts`.
-- **TanStack Query** (`@tanstack/react-query`) is the canonical data-fetching/caching layer wrapped around the Axios modules — use it for server state, Zustand only for client state.
-- **Toast notifications**: `useToastStore` (Zustand) manages a toast queue. Use `reportApiError(error)` from `src/lib/api-error-toast.ts` to automatically map Axios errors to user-facing toast messages (handles 401, 403, 404, 5xx, network errors).
-- **Error boundary**: `error-boundary.tsx` provides a React error boundary for catching render errors.
-- `auth-store.ts` uses Zustand with `persist` middleware (localStorage) + a `_hasHydrated` flag to avoid flash-of-login-state on page load.
+- **Data fetching**: components call the `@/lib/*-api` Axios modules directly, typically inside `useEffect` + `useState` (no caching/dedup/invalidation layer). `@tanstack/react-query` is listed in `frontend/package.json` but is **NOT used anywhere** — there is no `QueryClientProvider`; `AuthProvider` (`frontend/src/components/auth-provider.tsx`, mounted in `app/layout.tsx`) is the only provider and just calls `useAuthStore.fetchUser()` on mount. Zustand (`auth-store`, `toast-store`) is the only state library actually in use.
+- **Toast notifications**: `useToastStore` (Zustand) manages a toast queue. Use `reportApiError(error)` from `src/lib/api-error-toast.ts` to map Axios errors to user-facing toasts (handles 403, 404, 5xx, network, and generic 4xx). **401 is NOT toasted** by `reportApiError` — the `api.ts` response interceptor handles 401 by clearing the token and redirecting to `/login`, calling `reportApiError` only for non-401 errors.
+- **Error boundary**: `error-boundary.tsx` provides a React error boundary for catching render errors; it (with `ToastHost`) is mounted in `app/dashboard/layout.tsx` wrapping `{children}`.
+- `auth-store.ts` uses Zustand with `persist` middleware (localStorage) + a `_hasHydrated` flag to avoid flash-of-login-state on page load. `partialize` persists only `accessToken` + `isAuthenticated` (not `user`), so `user` is null on rehydration until `fetchUser()` resolves.
 - **Next.js 16 has breaking changes**: `frontend/CLAUDE.md` re-exports `frontend/AGENTS.md`, so when working in `frontend/` that note loads automatically. Read `node_modules/next/dist/docs/` before writing Next.js-specific code.
+
+### API Endpoints
+
+Backend base URL (dev): `http://localhost:3001`. All endpoints require a JWT Bearer token **except** `POST /auth/login` and `POST /auth/register`. Explore interactively at `/api-docs` (dev). Compact map (see controllers/Swagger for the full surface):
+
+- **auth**: `POST /auth/{register,login,refresh}`, `GET /auth/me`
+- **users**: `GET /users` (list), `GET /users/editors`, `GET|PATCH /users/:id`
+- **stories**: `POST /stories` (create), `GET /stories` (list), `GET|PATCH|DELETE /stories/:id`, `PATCH /stories/:id/assign-editor`, `POST /stories/:id/{research,draft}`
+- **articles**: `POST|GET /articles`, `GET /articles/review-queue`, `GET|PATCH|DELETE /articles/:id`, `GET /articles/:id/versions`, `POST /articles/:id/rollback/:version`, `PATCH /articles/:id/{assign-editor,review}`, `POST /articles/:id/ai-{rewrite,expand,condense,polish,headlines,excerpt,chat,draft,fact-check,review,seo,generate-image}`
+- **channels**: `GET /channels/platforms`, `GET /channels/:articleId/publishes`, `POST /channels/:articleId/{adapt,publish-wordpress}`, `PATCH|DELETE /channels/:articleId/publishes/:publishId`
+- **auto-publish**: `POST|GET|PATCH|DELETE /auto-publish/tasks` + `POST /tasks/:id/{toggle,run}`, `GET /auto-publish/{runs,stats}` + `GET /runs/:id` + `GET /runs/:runId/articles`, `POST /auto-publish/articles/:id/{withdraw,retry}`, `POST /auto-publish/kill-switch`
+- **trending-topics**: `GET /trending-topics/{google-trends,all-news,sina,people,bbc,chinanews,guardian,nytimes,economist,ft,zaobao,weibo-hot,zhihu-hot,36kr,huxiu,douban-movie}` (per-source feeds), `POST /trending-topics/suggestions` (AI story suggestions), `POST /trending-topics/import-google-trend`, `GET|PATCH|DELETE /trending-topics/:id`, `POST /trending-topics/:id/adopt`
+- **billing**: see "Billing & Payments" above
 
 ## Environment Setup
 
@@ -302,11 +327,15 @@ WECHAT_PAY_SERIAL_NO=
 WECHAT_PAY_PRIVATE_KEY_PATH=
 ```
 
+> **URL-encoding gotcha**: if a `DATABASE_URL`/`REDIS_URL` password contains reserved chars (`@`, `:`, `/`, etc.) it must be URL-encoded (e.g. `@` → `%40`) or the connection silently fails. A passworded Redis uses `redis://:PASS@HOST:6379`.
+
 ### Frontend (`frontend/.env.local`)
 
 ```env
 NEXT_PUBLIC_API_URL="http://localhost:3001"
 ```
+
+Template: `frontend/.env.example` — copy with `cp frontend/.env.example frontend/.env.local`.
 
 ### Infrastructure
 
@@ -320,23 +349,25 @@ MySQL 8 and Redis are **external middleware** — they are no longer part of `do
 
 ## Important Notes
 
-- **Node version**: >= 20 (developed on v23.9.0). Some packages log engine warnings but function correctly.
+- **Node version**: >= 20 (developed on v23.9.0). This is a prose requirement — no `engines` field is set in any `package.json`, so Node 18 won't be warned. Some packages log engine warnings but function correctly.
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.
 - **Article status workflow**: `DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED → ARCHIVED` (can be sent back to `REVISION` from review states). Additional states: `PIPELINE_FAILED` (auto-publish pipeline failures), `AUTO_PUBLISHED` (articles published via automation without human review). Editors and admins can approve; reporters can only submit for review.
-- **Production deploy**: `docker-compose.prod.yml` builds backend + frontend containers (MySQL/Redis are external). The backend container reads `backend/.env` via `env_file:` — make sure that file exists on the deploy host with real `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, and AI provider keys (see `backend/.env.example`). `scripts/update-cms-ng.sh` is a one-command deploy script (backup → pull → build → migrate → restart) and validates these vars before running.
+- **Production deploy**: `docker-compose.prod.yml` builds backend + frontend containers (MySQL/Redis are external). The backend container reads `backend/.env` via `env_file:` — make sure that file exists on the deploy host with real `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, and AI provider keys (see `backend/.env.example`). `scripts/update-cms-ng.sh` is a one-command deploy script (validate → backup → pull → restore-env → build → start → migrate → verify). **Migrate runs AFTER containers start**, via `docker compose exec backend npx prisma migrate deploy` (NOT `migrate dev` — it only applies existing migrations, won't create new ones). The script validates `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, and `KIMI_API_KEY` before running — note it hardcodes `KIMI_API_KEY` even though the default `AI_PROVIDER` is `deepseek`, so a non-kimi deploy must still set `KIMI_API_KEY` or the pre-check fails. It also health-checks the backend for up to 30s and auto-rolls-back on failure, writes backups to `backups/YYYYMMDD-HHMMSS/` (env + DB dump), requires SSH passwordless access, and verifies with `curl http://localhost:3001/users` (5xx-free). Prod exposes `:3000` (frontend) and `:3001` (backend) directly on `SERVER_IP`.
 - **Swagger UI**: Available at `http://localhost:3001/api-docs` in dev (mounted only when `NODE_ENV !== 'production'`). Useful for exploring endpoints and testing without a frontend. Bearer auth is pre-configured — paste a JWT from `/auth/login` (no "Bearer " prefix needed).
+- **CI/CD**: No GitHub Actions / no `.github` directory — all tests run locally (`npm run test` / `npx playwright test`); production deploys are manual via `scripts/update-cms-ng.sh` over SSH, not CI. PRs are not auto-tested or gated.
+- **License**: UNLICENSED (private project).
 
 ## Testing (E2E / Regression)
 
 Project-wide functional regression tests run on **Playwright** (`playwright.config.ts` at repo root):
 
 - **Location**: `tests/regression/` — `*.spec.ts` files covering smoke, auth/i18n, article workflow, AI capabilities, auto-publish, channels adapters, channels wordpress, cross-module flows, stories/trending, trending RSS proxy, users/RBAC, safejson rebrand, boundary compat, wikipedia research.
-- **Shared helpers**: `tests/regression/_shared/` — `api.ts` (API client), `fixtures.ts` (test fixtures + QA backend on :3002 + `cms_ng_qa` DB).
+- **Shared helpers**: `tests/regression/_shared/` — `api.ts` (typed API client over the QA backend); `fixtures.ts` (test fixtures, QA backend base URL `:3002`, and a `pageWithQA` fixture that seeds the JWT and rewrites every `:3001` call to `:3002`). The `cms_ng_qa` DB is named in the `playwright.config.ts` header comment and in individual specs; the QA backend's `DATABASE_URL` must point at it.
 - **Strategy**: Real Next.js 16 frontend on :3000 is exercised; all API calls are transparently rewritten to QA backend on :3002 (see `fixtures.ts`). Data flows to `cms_ng_qa` DB, not the dev DB.
-- **Run**: `npx playwright test` (assumes both dev frontend :3000 and QA backend :3002 are already running — config does NOT auto-start webServers).
+- **Run**: `npx playwright test` (assumes both dev frontend :3000 and QA backend :3002 are already running — config does NOT auto-start webServers). The QA backend on `:3002` is a separate NestJS process you start manually with `PORT=3002` and a `DATABASE_URL` pointing at the `cms_ng_qa` database (remote MySQL `43.134.11.194:3306` in current QA). Seed the 6 canonical QA accounts (`qa-admin`/`editor`/`reporter-sc`/`reporter-en`/`reporter-hk`/`reporter-none`, password `Test@2026`) before first run — a `seed-qa.ts` is referenced in `docs/superpowers/plans/` but is not yet committed, so accounts may need manual seeding until it lands.
 - **Reports**: HTML at `tests/regression/results/html/`, JSON summary at `tests/regression/results/run-summary.json`, artifacts (screenshots/videos/traces) at `tests/regression/results/artifacts/`.
-- **Project config**: Chromium only (`workers: 3`, `fullyParallel: true`, 60s test timeout, 10s expect timeout, 1440×900 viewport, headless).
+- **Project config**: Chromium only (`workers: 3`, `fullyParallel: true`, 60s test timeout, 10s expect timeout, 10s action timeout, 20s navigation timeout, 1440×900 viewport, headless). Emits HTML + JSON + `list` reporters; trace/screenshot/video are `retain-on-failure` / `only-on-failure`.
 
 ## Scripts
 
@@ -350,7 +381,9 @@ Beyond `dev-start.sh` and `update-cms-ng.sh`:
 `docs/` holds PRDs, architecture reviews, and DB schema notes — start there when reasoning about scope or schema rather than rediscovering from code:
 
 - `PRD-auto-publish-pipeline.md` — auto-publish system PRD
+- `01-cms-ng-overview.md`, `product-introduction.md`, `project_management.md` — product/overview context
 - `architecture-review.md`, `project_architecture_assessment.md` — architecture audits + open tech debt
 - `database.md` — DB schema overview
 - `ai-image-generation-fsd.md`, `ai-image-generation-interaction.md`, `ai-image-development-tasks.md` — image generation feature spec
-- `test-handoff-*.md`, `qa/`, `testing/` — QA handoffs and test plans
+- `quality-report.md`, `superpowers/` — quality reports + agent/superpowers plans
+- `test-handoff-ai-fact-check.md`, `test-handoff-ai-research-kit.md`, `qa/`, `testing/` — QA handoffs and test plans
