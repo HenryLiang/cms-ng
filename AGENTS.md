@@ -389,3 +389,17 @@ Beyond `dev-start.sh` and `update-cms-ng.sh`:
 - `ai-image-generation-fsd.md`, `ai-image-generation-interaction.md`, `ai-image-development-tasks.md` — image generation feature spec
 - `quality-report.md`, `superpowers/` — quality reports + agent/superpowers plans
 - `test-handoff-ai-fact-check.md`, `test-handoff-ai-research-kit.md`, `qa/`, `testing/` — QA handoffs and test plans
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub (`HenryLiang/cms-ng`) and are managed via the `gh` CLI. External pull requests are NOT a triage surface — `/triage` processes issues only. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles map to label strings as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
