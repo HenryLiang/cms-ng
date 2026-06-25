@@ -50,6 +50,9 @@ tests/regression/results/
 # Playwright test screenshots (re-generated on each run)
 tests/regression/screenshots/
 
+# Frontend Playwright run artifacts (screenshots etc., re-generated on each run)
+frontend/test-run/
+
 # Playwright auto-generated HTML report
 playwright-report/
 
