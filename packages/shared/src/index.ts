@@ -314,6 +314,64 @@ export interface AutoPublishRun {
   articles?: AutoPublishArticle[];
 }
 
+// ===== Pipeline 执行追踪 (Execution Trace) =====
+
+export interface StepTraceEntry {
+  step: string;
+  status: 'success' | 'failed' | 'skipped';
+  startedAt: string;
+  completedAt?: string;
+  durationMs: number;
+  metadata?: Record<string, unknown>;
+  decisions?: string[];
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+
+export type PipelineStepName =
+  | 'billing_check'
+  | 'topic-collection'
+  | 'research'
+  | 'article-generation'
+  | 'article-save'
+  | 'image-generation'
+  | 'publish'
+  | 'notification';
+
+export interface TopicCollectionTraceMetadata {
+  sources: {
+    fixedKeywords: { count: number; items: string[] };
+    trendingTopics: { count: number; items: string[] };
+  };
+  rawCandidateCount: number;
+  afterFilterCount: number;
+  afterDedupCount: number;
+  selectionMethod?: string;
+  todayArticleCount?: number;
+  selectedIndex?: number;
+  allCandidates?: string[];
+}
+
+export interface ResearchTraceMetadata {
+  researchKit: {
+    timelineCount: number;
+    peopleCount: number;
+    dataCount: number;
+    opinionsCount: number;
+  };
+  searchSources: string[];
+  fullResearchKit?: Record<string, unknown>;
+}
+
+export interface BillingCheckTraceMetadata {
+  balanceCheckEnabled: boolean;
+  currentBalance?: number;
+  estimatedCost?: number;
+  breakdown?: Array<Record<string, unknown>>;
+}
+
 // ===== 自动发布文章追踪 =====
 export interface AutoPublishArticle {
   id: string;
@@ -326,6 +384,8 @@ export interface AutoPublishArticle {
   failedStep?: string;
   errorMessage?: string;
   retryCount: number;
+  executionTrace?: StepTraceEntry[] | null;
+  totalDurationMs?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -94,6 +94,12 @@ export class AutoPublishController {
     return this.service.findRunArticles(runId);
   }
 
+  @Get('articles/:id/trace')
+  @ApiOperation({ summary: 'Get the execution trace for a single auto-publish article' })
+  async findArticleTrace(@Param('id') id: string) {
+    return this.service.findArticleTrace(id);
+  }
+
   @Post('articles/:id/withdraw')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Withdraw a single auto-publish article' })

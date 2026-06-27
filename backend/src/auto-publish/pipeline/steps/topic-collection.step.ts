@@ -13,6 +13,8 @@ export class TopicCollectionStep implements PipelineStep {
   constructor(private prisma: PrismaService) {}
 
   async execute(ctx: PipelineContext): Promise<PipelineContext> {
+    const trace = ctx.trace?.[ctx.trace.length - 1];
+
     const task = await this.prisma.autoPublishTask.findUnique({
       where: { id: ctx.taskId },
     });
@@ -31,10 +33,12 @@ export class TopicCollectionStep implements PipelineStep {
     }>(task.filterConfig, { blockedCategories: [], blockedKeywords: [], allowedChannels: [] });
 
     const candidates: string[] = [];
+    const fixedKeywordItems = strategy.fixedKeywords || [];
+    let trendingItems: string[] = [];
 
     // 1. Fixed keywords
-    if (strategy.fixedKeywords?.length) {
-      candidates.push(...strategy.fixedKeywords);
+    if (fixedKeywordItems.length) {
+      candidates.push(...fixedKeywordItems);
     }
 
     // 2. Trending topics
@@ -44,7 +48,8 @@ export class TopicCollectionStep implements PipelineStep {
         orderBy: { heatScore: 'desc' },
         take: 20,
       });
-      candidates.push(...trending.map((t) => t.title));
+      trendingItems = trending.map((t) => t.title);
+      candidates.push(...trendingItems);
     }
 
     // 3. Filter
@@ -53,6 +58,9 @@ export class TopicCollectionStep implements PipelineStep {
       ...(filter.blockedCategories || []),
     ].map((w) => w.toLowerCase());
 
+    const filteredOut = candidates.filter((topic) =>
+      blockedWords.some((bw) => topic.toLowerCase().includes(bw)),
+    );
     const filtered = candidates.filter(
       (topic) =>
         !blockedWords.some((bw) => topic.toLowerCase().includes(bw)),
@@ -69,9 +77,30 @@ export class TopicCollectionStep implements PipelineStep {
       select: { topic: true },
     });
     const recentTopics = new Set(recent.map((a) => a.topic?.toLowerCase()));
+    const dedupedOut = filtered.filter((t) => recentTopics.has(t.toLowerCase()));
     const unique = filtered.filter((t) => !recentTopics.has(t.toLowerCase()));
 
     if (!unique.length) {
+      if (trace) {
+        trace.metadata = {
+          sources: {
+            fixedKeywords: { count: fixedKeywordItems.length, items: fixedKeywordItems },
+            trendingTopics: { count: trendingItems.length, items: trendingItems },
+          },
+          rawCandidateCount: candidates.length,
+          afterFilterCount: filtered.length,
+          afterDedupCount: unique.length,
+        };
+        trace.decisions = [
+          ...(filteredOut.length
+            ? [`Filtered out ${filteredOut.length} topic(s) by blockedKeywords: ${filteredOut.join(', ')}`]
+            : []),
+          ...(dedupedOut.length
+            ? [`Dedup removed ${dedupedOut.length} topic(s) written in last 24h: ${dedupedOut.join(', ')}`]
+            : []),
+          'No available topics after filtering and deduplication',
+        ];
+      }
       throw new Error('No available topics after filtering and deduplication');
     }
 
@@ -82,7 +111,33 @@ export class TopicCollectionStep implements PipelineStep {
         createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
       },
     });
-    const selectedTopic = unique[todayCount % unique.length];
+    const selectedIndex = todayCount % unique.length;
+    const selectedTopic = unique[selectedIndex];
+
+    if (trace) {
+      trace.metadata = {
+        sources: {
+          fixedKeywords: { count: fixedKeywordItems.length, items: fixedKeywordItems },
+          trendingTopics: { count: trendingItems.length, items: trendingItems },
+        },
+        rawCandidateCount: candidates.length,
+        afterFilterCount: filtered.length,
+        afterDedupCount: unique.length,
+        selectionMethod: 'round-robin',
+        todayArticleCount: todayCount,
+        selectedIndex,
+        allCandidates: unique,
+      };
+      trace.decisions = [
+        ...(filteredOut.length
+          ? [`Filtered out ${filteredOut.length} topic(s) by blockedKeywords: ${filteredOut.join(', ')}`]
+          : []),
+        ...(dedupedOut.length
+          ? [`Dedup removed ${dedupedOut.length} topic(s) written in last 24h: ${dedupedOut.join(', ')}`]
+          : []),
+        `Selected "${selectedTopic}" via round-robin (index ${selectedIndex} of ${unique.length} candidates)`,
+      ];
+    }
 
     this.logger.log(`Selected topic: "${selectedTopic}"`);
     ctx.topic = selectedTopic;

@@ -17,6 +17,7 @@ import { WordPressService } from '../channels/wordpress.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { safeJsonParse } from '../common/json.utils';
+import type { StepTraceEntry } from './pipeline/step.interface';
 
 @Injectable()
 export class AutoPublishService {
@@ -242,16 +243,53 @@ export class AutoPublishService {
       ...run,
       errorLog: run.errorLog ? safeJsonParse(run.errorLog, []) : [],
       taskName: run.task.name,
+      articles: run.articles.map((a) => ({
+        ...a,
+        executionTrace: a.executionTrace
+          ? safeJsonParse<StepTraceEntry[]>(a.executionTrace, [])
+          : null,
+      })),
     };
   }
 
   // ===== Article tracking =====
 
   async findRunArticles(runId: string) {
-    return this.prisma.autoPublishArticle.findMany({
+    const articles = await this.prisma.autoPublishArticle.findMany({
       where: { runId },
       orderBy: { createdAt: 'asc' },
     });
+
+    return articles.map((a) => ({
+      ...a,
+      executionTrace: a.executionTrace
+        ? safeJsonParse<StepTraceEntry[]>(a.executionTrace, [])
+        : null,
+    }));
+  }
+
+  async findArticleTrace(articleId: string) {
+    const article = await this.prisma.autoPublishArticle.findUnique({
+      where: { id: articleId },
+      select: {
+        id: true,
+        topic: true,
+        status: true,
+        failedStep: true,
+        errorMessage: true,
+        retryCount: true,
+        totalDurationMs: true,
+        executionTrace: true,
+      },
+    });
+    if (!article) throw new NotFoundException('Auto-publish article not found');
+
+    return {
+      ...article,
+      executionTrace: article.executionTrace
+        ? safeJsonParse<StepTraceEntry[]>(article.executionTrace, [])
+        : [],
+    };
   }
 
   async withdrawArticle(id: string) {

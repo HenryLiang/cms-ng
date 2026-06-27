@@ -18,6 +18,7 @@ export class ArticleSaveStep implements PipelineStep {
     this.logger.log(`Saving article: "${ctx.draft.title}"`);
 
     // 1. Create or find a Story for this topic
+    let storyCreated = false;
     let story = await this.prisma.story.findFirst({
       where: {
         title: ctx.topic,
@@ -26,6 +27,7 @@ export class ArticleSaveStep implements PipelineStep {
     });
 
     if (!story) {
+      storyCreated = true;
       story = await this.prisma.story.create({
         data: {
           title: ctx.topic,
@@ -76,6 +78,22 @@ export class ArticleSaveStep implements PipelineStep {
       where: { id: ctx.articleId },
       data: { articleId: article.id },
     });
+
+    // Trace observability
+    const trace = ctx.trace?.[ctx.trace.length - 1];
+    if (trace) {
+      trace.metadata = {
+        storyId: story.id,
+        articleId: article.id,
+        storyCreated,
+      };
+      trace.decisions = [
+        storyCreated
+          ? `Created new story "${ctx.topic}"`
+          : `Reused existing story "${ctx.topic}"`,
+        `Article saved: id=${article.id}`,
+      ];
+    }
 
     this.logger.log(`Article saved: id=${article.id}, title="${article.title}"`);
     return ctx;

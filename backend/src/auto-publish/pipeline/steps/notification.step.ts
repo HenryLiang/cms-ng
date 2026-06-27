@@ -12,6 +12,18 @@ export class NotificationStep implements PipelineStep {
   constructor(private config: ConfigService) {}
 
   async execute(ctx: PipelineContext): Promise<PipelineContext> {
+    // Trace observability
+    const trace = ctx.trace?.[ctx.trace.length - 1];
+    if (trace) {
+      trace.metadata = {
+        topic: ctx.topic,
+        draftTitle: ctx.draft?.title,
+      };
+      trace.decisions = [
+        `Pipeline completed for topic="${ctx.topic}", title="${ctx.draft?.title}"`,
+      ];
+    }
+
     // MVP: log notification. Email notification will be handled at the
     // run level (after all articles complete), not per-article.
     this.logger.log(

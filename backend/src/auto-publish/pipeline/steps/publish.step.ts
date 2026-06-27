@@ -61,6 +61,19 @@ export class PublishStep implements PipelineStep {
       data: { platformPublishId: result.id },
     });
 
+    // Trace observability
+    const trace = ctx.trace?.[ctx.trace.length - 1];
+    if (trace) {
+      trace.metadata = {
+        platform: ctx.publishConfig.platform,
+        platformPublishId: publish.id,
+        publishedUrl: result.publishedUrl || null,
+      };
+      trace.decisions = [
+        `Published to ${ctx.publishConfig.platform}: ${result.publishedUrl || 'pending'}`,
+      ];
+    }
+
     this.logger.log(
       `Article published to WordPress: ${result.publishedUrl || 'pending'}`,
     );

@@ -1,6 +1,23 @@
 import { ArticleRunStatus } from '@cms-ng/shared';
 
 /**
+ * A single step's execution trace — timing, decisions, metadata, and errors.
+ */
+export interface StepTraceEntry {
+  step: string;
+  status: 'success' | 'failed' | 'skipped';
+  startedAt: string;
+  completedAt?: string;
+  durationMs: number;
+  metadata?: Record<string, unknown>;
+  decisions?: string[];
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+
+/**
  * Context passed through the pipeline — each step reads inputs and writes outputs.
  */
 export interface PipelineContext {
@@ -38,6 +55,9 @@ export interface PipelineContext {
   savedArticleId?: string; // CMS Article.id
   savedStoryId?: string;
   platformPublishId?: string;
+
+  // Observability — step trace collector (initialized by pipeline engine)
+  trace?: StepTraceEntry[];
 }
 
 /**

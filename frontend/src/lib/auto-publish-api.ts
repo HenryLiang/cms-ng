@@ -21,6 +21,20 @@ function headers() {
 
 // ── Types ──
 
+export interface StepTraceEntry {
+  step: string;
+  status: 'success' | 'failed' | 'skipped';
+  startedAt: string;
+  completedAt?: string;
+  durationMs: number;
+  metadata?: Record<string, unknown>;
+  decisions?: string[];
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+
 export interface AutoPublishTask {
   id: string;
   name: string;
@@ -89,6 +103,8 @@ export interface AutoPublishArticle {
   failedStep?: string;
   errorMessage?: string;
   retryCount: number;
+  executionTrace?: StepTraceEntry[] | null;
+  totalDurationMs?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -242,6 +258,24 @@ export async function getRunArticles(runId: string): Promise<AutoPublishArticle[
     { headers: headers() },
   );
   if (!res.ok) throw new Error('Failed to fetch run articles');
+  return res.json();
+}
+
+export async function getArticleTrace(articleId: string): Promise<{
+  id: string;
+  topic?: string;
+  status: string;
+  failedStep?: string;
+  errorMessage?: string;
+  retryCount: number;
+  totalDurationMs?: number;
+  executionTrace: StepTraceEntry[];
+}> {
+  const res = await fetch(
+    `${API_BASE}/auto-publish/articles/${articleId}/trace`,
+    { headers: headers() },
+  );
+  if (!res.ok) throw new Error('Failed to fetch article trace');
   return res.json();
 }
 

@@ -313,6 +313,8 @@ model AutoPublishArticle {
   failedStep        String?
   errorMessage      String?          @db.Text
   retryCount        Int              @default(0)
+  executionTrace    String?          @db.LongText
+  totalDurationMs   Int?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
