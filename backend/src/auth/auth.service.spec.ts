@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { RegistrationService } from './registration.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 
@@ -15,6 +16,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let jwtService: { sign: jest.Mock; verify: jest.Mock };
+  let registrationService: { isRegistrationOpen: jest.Mock; setRegistrationOpen: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
@@ -22,12 +24,17 @@ describe('AuthService', () => {
       sign: jest.fn().mockReturnValue('test_jwt_token'),
       verify: jest.fn(),
     };
+    registrationService = {
+      isRegistrationOpen: jest.fn().mockResolvedValue(true), // default-open
+      setRegistrationOpen: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwtService },
+        { provide: RegistrationService, useValue: registrationService },
       ],
     }).compile();
 
@@ -94,6 +101,29 @@ describe('AuthService', () => {
         }),
       );
       expect(result.accessToken).toBe('test_jwt_token');
+    });
+
+    it('should throw ForbiddenException when registration is closed (gate before any DB write)', async () => {
+      registrationService.isRegistrationOpen.mockResolvedValue(false);
+
+      await expect(service.register(dto)).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('registration status (delegates to RegistrationService)', () => {
+    it('getRegistrationStatus should return { registrationOpen } from the service', async () => {
+      registrationService.isRegistrationOpen.mockResolvedValue(true);
+      await expect(service.getRegistrationStatus()).resolves.toEqual({ registrationOpen: true });
+      expect(registrationService.isRegistrationOpen).toHaveBeenCalled();
+    });
+
+    it('setRegistrationStatus should delegate and return { registrationOpen: enabled }', async () => {
+      const result = await service.setRegistrationStatus(false, 'admin-id', '维护');
+      expect(registrationService.setRegistrationOpen).toHaveBeenCalledWith(false, 'admin-id', '维护');
+      expect(result).toEqual({ registrationOpen: false });
     });
   });
 

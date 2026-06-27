@@ -25,3 +25,26 @@ export async function getCurrentUser(): Promise<User> {
 export function logoutClient(): void {
   localStorage.removeItem('accessToken');
 }
+
+export interface RegistrationStatus {
+  registrationOpen: boolean;
+}
+
+/** 注册是否开放（公开接口，无需登录）。用于注册页决定渲染表单还是「已关闭」面板。 */
+export async function getRegistrationStatus(): Promise<RegistrationStatus> {
+  const { data } = await api.get<RegistrationStatus>('/auth/registration/status');
+  return data;
+}
+
+/** 开/关注册（管理员）。返回切换后的开放状态。 */
+export async function toggleRegistration(
+  enabled: boolean,
+  reason?: string,
+): Promise<RegistrationStatus> {
+  const { data } = await api.post<RegistrationStatus>('/auth/registration/toggle', {
+    enabled,
+    reason,
+  });
+  return data;
+}
+

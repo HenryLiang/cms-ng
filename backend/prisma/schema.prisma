@@ -455,3 +455,18 @@ model KillSwitch {
 
   @@map("kill_switches")
 }
+
+// 注册开关单例表 — 管理员控制注册功能的开/关
+// 语义与 KillSwitch 相反：enabled=true 表示注册【开放】，默认 true（保持现有行为）
+// MySQL 为唯一真源，不读 Redis（注册状态为冷路径，无需缓存）
+model RegistrationSwitch {
+  id        String    @id // 单例 key：'registration'
+  enabled   Boolean   @default(true) // true = 注册开放（与 KillSwitch 语义相反）
+  enabledAt DateTime? // 最近一次切换时间（审计）
+  enabledBy String?
+  reason    String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("registration_switches")
+}

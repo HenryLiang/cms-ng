@@ -7,6 +7,7 @@ import { UserRole } from '@cms-ng/shared';
 
 const ROLE_ROUTE_MAP: Record<string, UserRole[]> = {
   '/dashboard/review': [UserRole.EDITOR, UserRole.ADMIN],
+  '/dashboard/settings': [UserRole.ADMIN],
 };
 
 export function useRoleGuard() {

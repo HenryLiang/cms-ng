@@ -2,11 +2,13 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegistrationService } from './registration.service';
 import * as bcrypt from 'bcryptjs';
 
 // 默认密码 123456 的 bcrypt 哈希（开发测试环境统一使用）
@@ -18,9 +20,14 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private registrationService: RegistrationService,
   ) {}
 
   async register(dto: RegisterDto) {
+    if (!(await this.registrationService.isRegistrationOpen())) {
+      throw new ForbiddenException('注册功能已关闭，暂不接受新用户注册');
+    }
+
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -54,6 +61,17 @@ export class AuthService {
     });
 
     return { user, accessToken: token };
+  }
+
+  /** 注册是否开放（委派 RegistrationService）。 */
+  async getRegistrationStatus() {
+    return { registrationOpen: await this.registrationService.isRegistrationOpen() };
+  }
+
+  /** 开/关注册（委派 RegistrationService）。返回切换后的开放状态。 */
+  async setRegistrationStatus(enabled: boolean, operatorId: string, reason?: string) {
+    await this.registrationService.setRegistrationOpen(enabled, operatorId, reason);
+    return { registrationOpen: enabled };
   }
 
   async login(dto: LoginDto) {
