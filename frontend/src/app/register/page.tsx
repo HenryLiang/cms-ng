@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
+import { getRegistrationStatus } from '@/lib/auth-api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,6 +15,29 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 注册开关状态：默认开放。拉取失败时静默当作开放（后端 register() gate 才是真守卫）。
+  const [statusChecked, setStatusChecked] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getRegistrationStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setRegistrationOpen(status.registrationOpen);
+        setStatusChecked(true);
+      })
+      .catch(() => {
+        // 拉取失败当作开放：后端 gate 是真守卫，前端不阻断注册页渲染。
+        if (cancelled) return;
+        setRegistrationOpen(true);
+        setStatusChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +57,36 @@ export default function RegisterPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (!statusChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
+  if (!registrationOpen) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
+        <div className="w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-sm">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">01创作大脑</h1>
+            <p className="mt-2 text-sm text-zinc-500">注册已关闭</p>
+          </div>
+          <div className="rounded-lg bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+            管理员已暂时关闭注册功能，请稍后再试。
+          </div>
+          <p className="text-center text-sm text-zinc-500">
+            已有账户？{' '}
+            <Link href="/login" className="font-medium text-zinc-900 hover:underline">
+              登录
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">

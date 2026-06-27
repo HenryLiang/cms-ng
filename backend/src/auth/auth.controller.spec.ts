@@ -9,6 +9,8 @@ describe('AuthController', () => {
     login: jest.Mock;
     refresh: jest.Mock;
     getCurrentUser: jest.Mock;
+    getRegistrationStatus: jest.Mock;
+    setRegistrationStatus: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -17,6 +19,8 @@ describe('AuthController', () => {
       login: jest.fn(),
       refresh: jest.fn(),
       getCurrentUser: jest.fn(),
+      getRegistrationStatus: jest.fn(),
+      setRegistrationStatus: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -78,6 +82,40 @@ describe('AuthController', () => {
 
       expect(authService.refresh).toHaveBeenCalledWith('old.jwt.token');
       expect(result.accessToken).toBe('new_jwt_token');
+    });
+  });
+
+  // ===== 注册功能开放开关 =====
+  describe('registrationStatus (GET /auth/registration/status)', () => {
+    it('should call authService.getRegistrationStatus and return result', async () => {
+      authService.getRegistrationStatus.mockResolvedValue({ registrationOpen: true });
+
+      const result = await controller.registrationStatus();
+
+      expect(authService.getRegistrationStatus).toHaveBeenCalled();
+      expect(result).toEqual({ registrationOpen: true });
+    });
+  });
+
+  describe('toggleRegistration (POST /auth/registration/toggle)', () => {
+    it('should call authService.setRegistrationStatus with enabled, userId, reason', async () => {
+      authService.setRegistrationStatus.mockResolvedValue({ registrationOpen: false });
+
+      const result = await controller.toggleRegistration(
+        'admin-id',
+        { enabled: false, reason: '维护收口' } as any,
+      );
+
+      expect(authService.setRegistrationStatus).toHaveBeenCalledWith(false, 'admin-id', '维护收口');
+      expect(result).toEqual({ registrationOpen: false });
+    });
+
+    it('should pass undefined reason when omitted from dto', async () => {
+      authService.setRegistrationStatus.mockResolvedValue({ registrationOpen: true });
+
+      await controller.toggleRegistration('admin-id', { enabled: true } as any);
+
+      expect(authService.setRegistrationStatus).toHaveBeenCalledWith(true, 'admin-id', undefined);
     });
   });
 });

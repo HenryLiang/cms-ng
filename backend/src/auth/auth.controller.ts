@@ -1,11 +1,14 @@
 import { Controller, Post, Body, Get, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UserRole } from '@cms-ng/shared';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ToggleRegistrationDto } from './dto/toggle-registration.dto';
 import { CurrentUser } from './current-user.decorator';
 import { Public } from './public.decorator';
+import { Roles } from './roles.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -42,5 +45,24 @@ export class AuthController {
   @ApiOperation({ summary: 'Get the currently authenticated user profile' })
   async getMe(@CurrentUser('userId') userId: string) {
     return this.authService.getCurrentUser(userId);
+  }
+
+  // ===== 注册功能开放开关 =====
+  @Public()
+  @Get('registration/status')
+  @ApiOperation({ summary: 'Check whether registration is open (public)' })
+  async registrationStatus() {
+    return this.authService.getRegistrationStatus();
+  }
+
+  @Post('registration/toggle')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Open/close registration (admin only)' })
+  async toggleRegistration(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ToggleRegistrationDto,
+  ) {
+    return this.authService.setRegistrationStatus(dto.enabled, userId, dto.reason);
   }
 }

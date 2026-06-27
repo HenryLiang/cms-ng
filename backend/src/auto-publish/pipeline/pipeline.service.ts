@@ -8,7 +8,7 @@ import {
   TransactionType,
   BillingCategory,
 } from '@cms-ng/shared';
-import { PipelineStep, PipelineContext } from './step.interface';
+import { PipelineStep, PipelineContext, StepTraceEntry } from './step.interface';
 import { RedisService } from '../../redis/redis.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { BillingService } from '../../billing/billing.service';
@@ -357,9 +357,22 @@ export class PipelineService {
         });
       }
 
+      // Initialize trace for this attempt
+      ctx.trace = [];
+
       try {
         let currentCtx = ctx;
         for (const step of this.steps) {
+          // Create trace entry for this step
+          const traceEntry: StepTraceEntry = {
+            step: step.name,
+            status: 'success',
+            startedAt: new Date().toISOString(),
+            durationMs: 0,
+            decisions: [],
+            metadata: {},
+          };
+
           // Update status to indicate we're working on this step
           await this.prisma.autoPublishArticle.update({
             where: { id: ctx.articleId },
@@ -369,9 +382,21 @@ export class PipelineService {
             },
           });
 
+          const t0 = Date.now();
           try {
             currentCtx = await step.execute(currentCtx);
+            traceEntry.durationMs = Date.now() - t0;
+            traceEntry.completedAt = new Date().toISOString();
           } catch (stepError: any) {
+            traceEntry.durationMs = Date.now() - t0;
+            traceEntry.completedAt = new Date().toISOString();
+            traceEntry.status = 'failed';
+            traceEntry.error = {
+              message: stepError.message,
+              stack: stepError.stack,
+            };
+            currentCtx.trace!.push(traceEntry);
+
             // Notification step is non-critical (issue #56): its failure
             // (e.g., SMTP timeout) should NOT mark the run FAILED because
             // the article has already been published. Log + continue.
@@ -382,14 +407,20 @@ export class PipelineService {
               );
               // Deduct billing even if notification fails (article was published)
               await this.deductAutoPublishBilling(currentCtx);
+              // Persist trace even on notification failure
+              await this.persistTrace(ctx);
               return; // treat article as published-successfully
             }
             throw stepError;
           }
+
+          currentCtx.trace!.push(traceEntry);
         }
 
         // All steps succeeded — deduct billing
         await this.deductAutoPublishBilling(currentCtx);
+        // Persist execution trace
+        await this.persistTrace(ctx);
         return; // success
       } catch (error: any) {
         lastError = error;
@@ -399,17 +430,35 @@ export class PipelineService {
       }
     }
 
-    // All retries exhausted — update tracking record
+    // All retries exhausted — update tracking record with trace
+    const totalDurationMs = ctx.trace?.reduce((sum, e) => sum + e.durationMs, 0) ?? 0;
     await this.prisma.autoPublishArticle.update({
       where: { id: ctx.articleId },
       data: {
         status: ArticleRunStatus.FAILED,
         failedStep: this.getFailedStep(ctx),
         errorMessage: lastError?.message || 'Unknown error',
+        executionTrace: ctx.trace ? JSON.stringify(ctx.trace) : null,
+        totalDurationMs,
       },
     });
 
     throw lastError || new Error('Pipeline failed with unknown error');
+  }
+
+  /**
+   * Persist the execution trace to the tracking record.
+   */
+  private async persistTrace(ctx: PipelineContext): Promise<void> {
+    const totalDurationMs =
+      ctx.trace?.reduce((sum, e) => sum + e.durationMs, 0) ?? 0;
+    await this.prisma.autoPublishArticle.update({
+      where: { id: ctx.articleId },
+      data: {
+        executionTrace: ctx.trace ? JSON.stringify(ctx.trace) : null,
+        totalDurationMs,
+      },
+    });
   }
 
   /**
@@ -465,15 +514,14 @@ export class PipelineService {
   }
 
   /**
-   * Determine which step failed based on the current context state.
+   * Determine which step failed based on the execution trace or context state.
    */
   private getFailedStep(ctx: PipelineContext): string {
-    // billing_check is a pre-check that doesn't mutate ctx;
-    // if it fails, no fields are populated yet — same signature as topic-collection failure.
-    // The pipeline engine records the actual step name from the error path, so this
-    // fallback only applies when the context has zero signals. In practice the
-    // billing_check step throws before any other step runs, and the error message
-    // itself contains "Insufficient balance" which is sufficient for diagnosis.
+    // Prefer trace data — it records the actual failed step name
+    const failedEntry = ctx.trace?.find((e) => e.status === 'failed');
+    if (failedEntry) return failedEntry.step;
+
+    // Fallback: heuristic based on context state
     if (!ctx.topic) return 'billing_check/topic-collection';
     if (!ctx.researchData) return 'research';
     if (!ctx.draft) return 'article-generation';

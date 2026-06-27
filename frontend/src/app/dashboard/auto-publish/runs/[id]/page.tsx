@@ -10,38 +10,41 @@ import {
   type AutoPublishRun,
   type AutoPublishArticle,
 } from '@/lib/auto-publish-api';
+import ExecutionTraceViewer from '@/components/execution-trace-viewer';
 import {
   ArrowLeft,
   Loader2,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   Clock,
   Undo2,
   RefreshCw,
-  ExternalLink,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
-const STEP_LABELS: Record<string, string> = {
-  PENDING: '等待',
-  TOPIC_SELECTED: '选题',
-  RESEARCHED: '调研',
-  DRAFTED: '写作',
-  IMAGED: '配图',
-  SAVED: '保存',
-  PUBLISHED: '发布',
-  FAILED: '失败',
-  WITHDRAWN: '已撤回',
-};
-
-const STEP_ORDER = [
-  'TOPIC_SELECTED',
-  'RESEARCHED',
-  'DRAFTED',
-  'IMAGED',
-  'SAVED',
-  'PUBLISHED',
+// Pipeline steps in actual execution order (matching backend)
+const PIPELINE_STEPS = [
+  'billing_check',
+  'topic-collection',
+  'research',
+  'article-generation',
+  'article-save',
+  'image-generation',
+  'publish',
+  'notification',
 ];
+
+const PIPELINE_STEP_LABELS: Record<string, string> = {
+  billing_check: '计费',
+  'topic-collection': '选题',
+  research: '调研',
+  'article-generation': '写作',
+  'article-save': '保存',
+  'image-generation': '配图',
+  publish: '发布',
+  notification: '通知',
+};
 
 export default function RunDetailPage() {
   const params = useParams();
@@ -51,23 +54,21 @@ export default function RunDetailPage() {
   const [articles, setArticles] = useState<AutoPublishArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadData();
-  }, [id]);
+  const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
 
   async function loadData() {
     try {
-      const [runData, articlesData] = await Promise.all([
-        getRun(id),
-        getRun(id).then((r) => r.articles || []),
-      ]);
+      const runData = await getRun(id);
       setRun(runData);
-      setArticles(articlesData);
+      setArticles(runData.articles || []);
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    loadData();
+  }, [id]);
 
   async function handleWithdraw(articleId: string) {
     if (!confirm('确定从 WordPress 撤回这篇文章？')) return;
@@ -234,27 +235,34 @@ export default function RunDetailPage() {
                 </div>
               </div>
 
-              {/* Pipeline Progress */}
-              <div className="flex items-center gap-1">
-                {STEP_ORDER.map((step, i) => {
-                  const stepIndex = STEP_ORDER.indexOf(article.status);
-                  const isCompleted =
-                    article.status === 'PUBLISHED' ||
-                    article.status === 'WITHDRAWN' ||
-                    stepIndex > i;
-                  const isCurrent =
-                    stepIndex === i &&
-                    article.status !== 'PUBLISHED' &&
-                    article.status !== 'WITHDRAWN' &&
-                    article.status !== 'FAILED';
-                  const isFailed =
-                    article.status === 'FAILED' &&
-                    article.failedStep === step.toLowerCase().replace('_', '-');
+              {/* Pipeline Progress (8 steps matching backend order) */}
+              <div className="flex items-center gap-0.5">
+                {PIPELINE_STEPS.map((step, i) => {
+                  // Map article status to pipeline step index
+                  const statusStepMap: Record<string, number> = {
+                    TOPIC_SELECTED: 1,
+                    RESEARCHED: 2,
+                    DRAFTED: 3,
+                    SAVED: 4,
+                    IMAGED: 5,
+                    PUBLISHED: 7,
+                  };
+                  const currentStepIdx = article.status === 'PUBLISHED' || article.status === 'WITHDRAWN'
+                    ? 7
+                    : statusStepMap[article.status] ?? -1;
+
+                  const isCompleted = currentStepIdx >= i || article.status === 'WITHDRAWN';
+                  const isCurrent = currentStepIdx === i && article.status !== 'PUBLISHED' && article.status !== 'WITHDRAWN' && article.status !== 'FAILED';
+                  const isFailed = article.status === 'FAILED' && article.failedStep === step;
+
+                  // Get duration from trace if available
+                  const traceEntry = article.executionTrace?.find((t) => t.step === step);
+                  const duration = traceEntry ? `${(traceEntry.durationMs / 1000).toFixed(1)}s` : undefined;
 
                   return (
-                    <div key={step} className="flex items-center gap-1 flex-1">
+                    <div key={step} className="flex flex-col items-center flex-1" title={`${PIPELINE_STEP_LABELS[step]}${duration ? ` (${duration})` : ''}`}>
                       <div
-                        className={`h-2 flex-1 rounded-full transition-colors ${
+                        className={`h-1.5 w-full rounded-full transition-colors ${
                           isFailed
                             ? 'bg-red-400'
                             : isCompleted
@@ -265,7 +273,7 @@ export default function RunDetailPage() {
                         }`}
                       />
                       <span
-                        className={`text-[10px] whitespace-nowrap ${
+                        className={`text-[9px] mt-0.5 whitespace-nowrap ${
                           isFailed
                             ? 'text-red-600 font-medium'
                             : isCompleted
@@ -275,12 +283,43 @@ export default function RunDetailPage() {
                                 : 'text-zinc-400'
                         }`}
                       >
-                        {STEP_LABELS[step]}
+                        {PIPELINE_STEP_LABELS[step]}
                       </span>
                     </div>
                   );
                 })}
               </div>
+
+              {/* Trace viewer toggle */}
+              {article.executionTrace && article.executionTrace.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-zinc-100">
+                  <button
+                    onClick={() => setExpandedArticle(expandedArticle === article.id ? null : article.id)}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    {expandedArticle === article.id ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                    {expandedArticle === article.id ? '收起执行详情' : '查看执行详情'}
+                    {article.totalDurationMs != null && (
+                      <span className="ml-1 text-zinc-400">
+                        ({(article.totalDurationMs / 1000).toFixed(1)}s)
+                      </span>
+                    )}
+                  </button>
+
+                  {expandedArticle === article.id && (
+                    <div className="mt-3">
+                      <ExecutionTraceViewer
+                        trace={article.executionTrace}
+                        totalDurationMs={article.totalDurationMs || 0}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 

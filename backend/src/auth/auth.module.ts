@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { RegistrationService } from './registration.service';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
@@ -23,6 +24,7 @@ import { RolesGuard } from './roles.guard';
   ],
   providers: [
     AuthService,
+    RegistrationService,
     JwtStrategy,
     {
       provide: APP_GUARD,

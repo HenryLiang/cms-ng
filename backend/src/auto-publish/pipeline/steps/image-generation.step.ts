@@ -24,6 +24,9 @@ export class ImageGenerationStep implements PipelineStep {
 
     this.logger.log(`Generating cover image for: "${ctx.draft.title}"`);
 
+    let imageSuccess = false;
+    let imageFailureReason: string | undefined;
+
     try {
       const result = await this.aiService.generateArticleImage(
         ctx.userId,
@@ -33,6 +36,7 @@ export class ImageGenerationStep implements PipelineStep {
         { style: 'news', aspectRatio: '16:9' },
       );
       ctx.coverImageUrl = result.url;
+      imageSuccess = true;
 
       // Update the saved article with the cover image URL
       await this.prisma.article.update({
@@ -43,9 +47,26 @@ export class ImageGenerationStep implements PipelineStep {
       this.logger.log(`Cover image generated: ${result.url}`);
     } catch (error: any) {
       // Image generation is non-critical — log warning but don't fail the pipeline
+      imageFailureReason = error.message;
       this.logger.warn(
         `Cover image generation failed (non-critical): ${error.message}`,
       );
+    }
+
+    // Trace observability
+    const trace = ctx.trace?.[ctx.trace.length - 1];
+    if (trace) {
+      trace.metadata = {
+        coverImageUrl: ctx.coverImageUrl || null,
+        imageGenerationAttempted: true,
+        imageGenerationSuccess: imageSuccess,
+        ...(imageFailureReason ? { failureReason: imageFailureReason } : {}),
+      };
+      trace.decisions = [
+        imageSuccess
+          ? `Cover image generated: ${ctx.coverImageUrl}`
+          : `Image generation failed (non-critical): ${imageFailureReason}`,
+      ];
     }
 
     return ctx;
