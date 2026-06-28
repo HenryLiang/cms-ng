@@ -7,6 +7,12 @@ export async function getEditors() {
   return data;
 }
 
+// All users — used by the admin manual top-up target picker (GET /users is editor/admin-only).
+export async function getUsers(): Promise<User[]> {
+  const { data } = await api.get('/users');
+  return data;
+}
+
 export interface UpdateUserData {
   name?: string;
   department?: string;
