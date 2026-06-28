@@ -24,13 +24,21 @@ export class TopicCollectionStep implements PipelineStep {
       fixedKeywords: string[];
       useTrending: boolean;
       trendingSources: string[];
-    }>(task.topicStrategy, { fixedKeywords: [], useTrending: false, trendingSources: [] });
+    }>(task.topicStrategy, {
+      fixedKeywords: [],
+      useTrending: false,
+      trendingSources: [],
+    });
 
     const filter = safeJsonParse<{
       blockedCategories: string[];
       blockedKeywords: string[];
       allowedChannels: string[];
-    }>(task.filterConfig, { blockedCategories: [], blockedKeywords: [], allowedChannels: [] });
+    }>(task.filterConfig, {
+      blockedCategories: [],
+      blockedKeywords: [],
+      allowedChannels: [],
+    });
 
     const candidates: string[] = [];
     const fixedKeywordItems = strategy.fixedKeywords || [];
@@ -62,8 +70,7 @@ export class TopicCollectionStep implements PipelineStep {
       blockedWords.some((bw) => topic.toLowerCase().includes(bw)),
     );
     const filtered = candidates.filter(
-      (topic) =>
-        !blockedWords.some((bw) => topic.toLowerCase().includes(bw)),
+      (topic) => !blockedWords.some((bw) => topic.toLowerCase().includes(bw)),
     );
 
     // 4. Dedup — skip topics written in last 24h
@@ -77,15 +84,37 @@ export class TopicCollectionStep implements PipelineStep {
       select: { topic: true },
     });
     const recentTopics = new Set(recent.map((a) => a.topic?.toLowerCase()));
-    const dedupedOut = filtered.filter((t) => recentTopics.has(t.toLowerCase()));
+    const dedupedOut = filtered.filter((t) =>
+      recentTopics.has(t.toLowerCase()),
+    );
     const unique = filtered.filter((t) => !recentTopics.has(t.toLowerCase()));
 
-    if (!unique.length) {
+    // Fallback: if dedup emptied the pool but filtered candidates exist, reuse them
+    // rather than failing the run. This handles the case where the only available
+    // trending topics were all written in the last 24h — better to publish a
+    // (possibly duplicate) topic than to fail the entire pipeline.
+    let selectedPool = unique;
+    let dedupFallbackUsed = false;
+    if (!unique.length && filtered.length) {
+      selectedPool = filtered;
+      dedupFallbackUsed = true;
+      this.logger.warn(
+        `All ${filtered.length} candidate(s) were deduped in last 24h — falling back to filtered pool to avoid empty selection`,
+      );
+    }
+
+    if (!selectedPool.length) {
       if (trace) {
         trace.metadata = {
           sources: {
-            fixedKeywords: { count: fixedKeywordItems.length, items: fixedKeywordItems },
-            trendingTopics: { count: trendingItems.length, items: trendingItems },
+            fixedKeywords: {
+              count: fixedKeywordItems.length,
+              items: fixedKeywordItems,
+            },
+            trendingTopics: {
+              count: trendingItems.length,
+              items: trendingItems,
+            },
           },
           rawCandidateCount: candidates.length,
           afterFilterCount: filtered.length,
@@ -93,10 +122,14 @@ export class TopicCollectionStep implements PipelineStep {
         };
         trace.decisions = [
           ...(filteredOut.length
-            ? [`Filtered out ${filteredOut.length} topic(s) by blockedKeywords: ${filteredOut.join(', ')}`]
+            ? [
+                `Filtered out ${filteredOut.length} topic(s) by blockedKeywords: ${filteredOut.join(', ')}`,
+              ]
             : []),
           ...(dedupedOut.length
-            ? [`Dedup removed ${dedupedOut.length} topic(s) written in last 24h: ${dedupedOut.join(', ')}`]
+            ? [
+                `Dedup removed ${dedupedOut.length} topic(s) written in last 24h: ${dedupedOut.join(', ')}`,
+              ]
             : []),
           'No available topics after filtering and deduplication',
         ];
@@ -111,13 +144,16 @@ export class TopicCollectionStep implements PipelineStep {
         createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
       },
     });
-    const selectedIndex = todayCount % unique.length;
-    const selectedTopic = unique[selectedIndex];
+    const selectedIndex = todayCount % selectedPool.length;
+    const selectedTopic = selectedPool[selectedIndex];
 
     if (trace) {
       trace.metadata = {
         sources: {
-          fixedKeywords: { count: fixedKeywordItems.length, items: fixedKeywordItems },
+          fixedKeywords: {
+            count: fixedKeywordItems.length,
+            items: fixedKeywordItems,
+          },
           trendingTopics: { count: trendingItems.length, items: trendingItems },
         },
         rawCandidateCount: candidates.length,
@@ -126,16 +162,26 @@ export class TopicCollectionStep implements PipelineStep {
         selectionMethod: 'round-robin',
         todayArticleCount: todayCount,
         selectedIndex,
-        allCandidates: unique,
+        allCandidates: selectedPool,
+        dedupFallbackUsed,
       };
       trace.decisions = [
         ...(filteredOut.length
-          ? [`Filtered out ${filteredOut.length} topic(s) by blockedKeywords: ${filteredOut.join(', ')}`]
+          ? [
+              `Filtered out ${filteredOut.length} topic(s) by blockedKeywords: ${filteredOut.join(', ')}`,
+            ]
           : []),
         ...(dedupedOut.length
-          ? [`Dedup removed ${dedupedOut.length} topic(s) written in last 24h: ${dedupedOut.join(', ')}`]
+          ? [
+              `Dedup removed ${dedupedOut.length} topic(s) written in last 24h: ${dedupedOut.join(', ')}`,
+            ]
           : []),
-        `Selected "${selectedTopic}" via round-robin (index ${selectedIndex} of ${unique.length} candidates)`,
+        ...(dedupFallbackUsed
+          ? [
+              `Fallback: reused ${filtered.length} deduped candidate(s) to avoid empty selection`,
+            ]
+          : []),
+        `Selected "${selectedTopic}" via round-robin (index ${selectedIndex} of ${selectedPool.length} candidates)`,
       ];
     }
 

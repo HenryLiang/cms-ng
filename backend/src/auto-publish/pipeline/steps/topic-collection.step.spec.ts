@@ -133,6 +133,32 @@ describe('TopicCollectionStep', () => {
       expect(result.topic).toBe('AI');
     });
 
+    it('should fall back to deduped candidates when all unique topics are exhausted', async () => {
+      const ctx = createCtx();
+
+      const task = {
+        topicStrategy: JSON.stringify({
+          fixedKeywords: ['科技'],
+          useTrending: false,
+        }),
+        filterConfig: JSON.stringify({
+          blockedKeywords: [],
+        }),
+      };
+
+      // '科技' was written in last 24h → dedup removes it from unique pool.
+      // With the fallback, the step should reuse '科技' rather than fail.
+      mockPrisma.autoPublishTask.findUnique.mockResolvedValue(task);
+      mockPrisma.autoPublishArticle.findMany.mockResolvedValue([
+        { topic: '科技' },
+      ]);
+      mockPrisma.autoPublishArticle.count.mockResolvedValue(0);
+
+      const result = await step.execute(ctx);
+
+      expect(result.topic).toBe('科技');
+    });
+
     it('should throw error when all keywords are filtered', async () => {
       const ctx = createCtx();
 
