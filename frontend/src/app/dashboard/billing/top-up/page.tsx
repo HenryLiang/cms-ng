@@ -16,6 +16,8 @@ import {
   createOnlineTopUp,
   type TopUpRecord,
 } from '@/lib/billing-api';
+import { getUsers } from '@/lib/users-api';
+import type { User } from '@/types/auth';
 
 const packages = [
   { name: '试用包', amount: 100, bonus: 0 },
@@ -39,16 +41,55 @@ const statusLabels: Record<string, string> = {
 
 export default function TopUpPage() {
   const user = useAuthStore((s) => s.user);
+  const isAdmin = useAuthStore((s) => s.isAdmin());
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('alipay');
   const [records, setRecords] = useState<TopUpRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [targetUserId, setTargetUserId] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
+  // Records are admin-only (getTopUpRecords is @Roles ADMIN). Non-admins must skip the call,
+  // otherwise they get a 403 toast on page load (api.ts reports all non-401 errors).
   useEffect(() => {
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     loadRecords();
-  }, []);
+  }, [isAdmin]);
+
+  // Defensive: a non-admin can never reach 'manual' (button hidden, default 'alipay'),
+  // but if role/payment state ever disagree, fall back to a visible method.
+  useEffect(() => {
+    if (!isAdmin && paymentMethod === 'manual') {
+      setPaymentMethod('alipay');
+    }
+  }, [isAdmin, paymentMethod]);
+
+  // Load the user list for the manual top-up target picker (admin only).
+  useEffect(() => {
+    if (!isAdmin || paymentMethod !== 'manual' || users.length > 0) return;
+    let cancelled = false;
+    setUsersLoading(true);
+    getUsers()
+      .then((data) => {
+        if (!cancelled) setUsers(data);
+      })
+      .catch(() => {
+        if (!cancelled) setUsers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setUsersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, paymentMethod, users.length]);
 
   async function loadRecords() {
     try {
@@ -64,13 +105,19 @@ export default function TopUpPage() {
       return packages[selectedPackage].amount;
     }
     const custom = parseFloat(customAmount);
-    return isNaN(custom) || custom < 10 ? 0 : custom;
+    const minAmount = paymentMethod === 'manual' ? 0.01 : 10;
+    return isNaN(custom) || custom < minAmount ? 0 : custom;
   }
 
   async function handleTopUp() {
     const amount = getSelectedAmount();
+    const minAmount = paymentMethod === 'manual' ? 0.01 : 10;
     if (amount <= 0) {
-      alert('请选择或输入充值金额（最低 ¥10）');
+      alert(`请选择或输入充值金额（最低 ¥${minAmount}）`);
+      return;
+    }
+    if (paymentMethod === 'manual' && !targetUserId) {
+      alert('请选择充值目标用户');
       return;
     }
     if (!user?.id) {
@@ -81,15 +128,17 @@ export default function TopUpPage() {
     setSubmitting(true);
     try {
       if (paymentMethod === 'manual') {
-        // 管理员手动充值,绕过支付通道
+        // 管理员手动充值:为所选目标账户充值,绕过支付通道
+        const target = users.find((u) => u.id === targetUserId);
         await manualTopUp({
-          targetUserId: user.id,
+          targetUserId,
           amount,
-          reason: '管理员手动充值',
+          reason: `管理员手动充值${target ? `（${target.name}）` : ''}`,
         });
-        alert(`充值成功！¥${amount.toFixed(2)} 已到账`);
+        alert(`充值成功！¥${amount.toFixed(2)} 已到账${target ? `（${target.name}）` : ''}`);
         setSelectedPackage(null);
         setCustomAmount('');
+        setTargetUserId('');
         await loadRecords();
       } else if (paymentMethod === 'alipay') {
         // 支付宝:后端创建订单,返回支付 URL,前端跳转
@@ -159,7 +208,7 @@ export default function TopUpPage() {
             )}
             <p className="text-xs text-zinc-500">{pkg.name}</p>
             <p className="mt-1 text-xl font-semibold text-zinc-900">¥{pkg.amount.toLocaleString()}</p>
-            {pkg.bonus > 0 && (
+            {pkg.bonus > 0 && paymentMethod !== 'manual' && (
               <p className="mt-1 text-xs font-medium text-emerald-600">
                 赠送 ¥{pkg.bonus}
               </p>
@@ -175,13 +224,13 @@ export default function TopUpPage() {
           <span className="text-sm text-zinc-500">¥</span>
           <input
             type="number"
-            min={10}
+            min={paymentMethod === 'manual' ? 0.01 : 10}
             value={customAmount}
             onChange={(e) => {
               setCustomAmount(e.target.value);
               setSelectedPackage(null);
             }}
-            placeholder="最低 ¥10"
+            placeholder={paymentMethod === 'manual' ? '最低 ¥0.01' : '最低 ¥10'}
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
           />
         </div>
@@ -191,25 +240,53 @@ export default function TopUpPage() {
       <div className="mb-6">
         <label className="block text-xs font-medium text-zinc-700 mb-2">支付方式</label>
         <div className="flex gap-3">
-          {paymentMethods.map((method) => {
-            const Icon = method.icon;
-            return (
-              <button
-                key={method.id}
-                onClick={() => setPaymentMethod(method.id)}
-                className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
-                  paymentMethod === method.id
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {method.label}
-              </button>
-            );
-          })}
+          {paymentMethods
+            .filter((m) => m.id !== 'manual' || isAdmin)
+            .map((method) => {
+              const Icon = method.icon;
+              return (
+                <button
+                  key={method.id}
+                  onClick={() => setPaymentMethod(method.id)}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
+                    paymentMethod === method.id
+                      ? 'border-zinc-900 bg-zinc-900 text-white'
+                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {method.label}
+                </button>
+              );
+            })}
         </div>
       </div>
+
+      {/* Target User (admin manual top-up only) */}
+      {paymentMethod === 'manual' && (
+        <div className="mb-6 max-w-md">
+          <label htmlFor="target-user" className="block text-xs font-medium text-zinc-700 mb-1">
+            充值目标用户
+          </label>
+          <select
+            id="target-user"
+            value={targetUserId}
+            onChange={(e) => setTargetUserId(e.target.value)}
+            disabled={usersLoading}
+            className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+          >
+            <option value="">{usersLoading ? '加载中…' : '请选择用户'}</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}（{u.email}）
+              </option>
+            ))}
+          </select>
+          {users.length === 0 && !usersLoading && (
+            <p className="mt-1 text-xs text-amber-600">未找到可充值的用户</p>
+          )}
+        </div>
+      )}
 
       {/* Submit Button */}
       <div className="mb-10">
@@ -227,7 +304,8 @@ export default function TopUpPage() {
         </button>
       </div>
 
-      {/* Top-up History */}
+      {/* Top-up History (admin only — getTopUpRecords is @Roles ADMIN) */}
+      {isAdmin && (
       <div className="rounded-lg border border-zinc-200 bg-white">
         <div className="border-b border-zinc-100 px-6 py-4">
           <h2 className="text-sm font-semibold text-zinc-900">充值记录</h2>
@@ -284,6 +362,7 @@ export default function TopUpPage() {
           </table>
         )}
       </div>
+      )}
     </div>
   );
 }
