@@ -360,8 +360,7 @@ cms-ng/
 │   └── src/index.ts                   # 共享枚举（UserRole/ArticleStatus/Platform/...）与接口
 │
 ├── docker-compose.yml                 # dev：仅编排 RSSHub
-├── docker-compose.prod.yml            # prod：backend + frontend 容器，通过 env_file 读 backend/.env
-└── scripts/update-cms-ng.sh           # 一键部署脚本（备份→pull→build→migrate→restart）
+└── scripts/cms-ng-service.sh          # 服务管理脚本 (start/stop/restart/status/logs, --prod 生产发布)
 ```
 
 ---
@@ -426,54 +425,179 @@ cms-ng/
 
 ## 生产部署
 
-项目自带一键部署脚本 `scripts/update-cms-ng.sh`，封装了 **备份 → 拉代码 → 构建 → 数据库迁移 → 重启 → 验证** 的完整链路。
+生产环境采用 **nginx 反代 + 宿主机进程** 架构（非 Docker 编排应用本身），由 `scripts/cms-ng-service.sh --prod` 统一管理发布流程：**前置检查 → 构建 → 停旧进程 → 启动 backend/frontend 为 nohup 后台进程 + RSSHub 容器 → 数据库迁移 → 健康检查 → admin 初始化**。
 
-### 1. 部署前必备
+### 1. 架构
+
+```
+nginx (80/443) ──┬──> 127.0.0.1:3000  (frontend, next start)
+                 └──> 127.0.0.1:3001  (backend, node dist/src/main)
+rsshub (docker, :1200)
+MySQL / Redis     (外部中间件)
+```
+
+### 2. 部署前必备
 
 | 必备项 | 说明                                                                 |
 | ------ | -------------------------------------------------------------------- |
-| Docker 与 Docker Compose v2 | 跑 `docker compose`（不是老的 `docker-compose`）                |
-| 外部 MySQL 8 实例           | 已建库 `cms_ng`，账号可远程连接                                  |
-| 外部 Redis 实例             | 可选密码，URL 通过 `REDIS_URL` 注入                              |
-| `backend/.env` 文件        | 必须含 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET` / 所选 AI Provider 的 API Key |
-| `frontend/.env.local` 文件  | 含 `NEXT_PUBLIC_API_URL=https://your-domain.com`                   |
-| 服务器 SSH 免密             | 脚本通过 SSH 推送本地构建产物到远程                               |
+| Node.js ≥ 20 | 宿主机直接运行 backend (`node dist/src/main`) 与 frontend (`next start`) |
+| nginx        | 反代 `:80`/`:443` → `127.0.0.1:3000` / `127.0.0.1:3001`（站点配置示例见下方第 6 节） |
+| 外部 MySQL 8 | 已建库 `cms_ng`，账号可远程连接                                  |
+| 外部 Redis   | 可选密码，URL 通过 `REDIS_URL` 注入                              |
+| `backend/.env` | 必须含 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET` 及所选 AI Provider 的 API Key |
+| Docker       | 仅用于 RSSHub 容器（`docker-compose.yml`）                       |
 
-> 脚本会先 `grep -E "^${var}="` 校验 `backend/.env` 是否含必要变量，缺失即报错退出。
+> 脚本会 `grep -E "^${var}="` 校验 `backend/.env` 是否含必要变量，缺失即 fail-fast。
 
-### 2. 执行部署
+### 3. 标准发布流程（每次更新代码后执行）
+
+这是**唯一的发布入口**——每次代码更新后按以下步骤操作，无需手动 build/migrate/重启：
 
 ```bash
-# 在本地仓库根目录
-bash scripts/update-cms-ng.sh
+# 1. 拉取最新代码
+cd /data/cms-ng && git pull origin main
+
+# 2. 检查 .env 是否需要更新（对照模板）
+diff backend/.env.example backend/.env
+
+# 3. 如有 schema 变更，先在开发环境创建迁移并提交：
+#    cd backend && npx prisma migrate dev --name <描述>
+#    （生产环境只用 migrate deploy，不会创建新迁移）
+
+# 4. 执行完整发布（构建 + 启动 + 迁移 + 验证 + admin 初始化）
+./scripts/cms-ng-service.sh start --prod
+
+# 5. 验证发布结果
+./scripts/cms-ng-service.sh status --prod
 ```
 
-脚本大致流程：
+脚本自动完成的 7 个步骤：
 
-1. 备份 `backend/.env` + 数据库到 `backups/YYYYMMDD-HHMMSS/`
-2. `git pull` 拉取最新代码
-3. 构建前后端 Docker 镜像
-4. `docker compose -f docker-compose.prod.yml up -d` 启动容器
-5. `npx prisma migrate deploy` 应用数据库迁移
-6. 探活 backend 容器（最多 30s），失败自动回滚
-7. `curl http://localhost:3001/users` 验证 API 5xx-free
+1. **前置检查** — node 可用、`backend/.env` 存在且含 `DATABASE_URL`/`REDIS_URL`/`JWT_SECRET`
+2. **构建** — `shared` → `backend` (nest build) → `frontend` (next build)
+3. **停止旧进程** — 按 PID 文件停 backend/frontend，并 pkill 兜底清理遗留进程
+4. **启动** — backend (`nohup node dist/src/main`)、frontend (`nohup npm run start`) 为后台进程；`docker compose up -d` 拉起 RSSHub 容器
+5. **数据库迁移** — 等待 backend 就绪后 `npx prisma migrate deploy`（只应用已有迁移，不创建新迁移）
+6. **健康检查** — frontend `/login` (HTTP 200) + backend `/users` (HTTP 401 无 token 为正常)
+7. **admin 初始化** — 注册或确认 admin 账号
 
-### 3. 部署后端点
+### 4. 日常运维命令
 
-| 端点                                    | 用途                                              |
-| --------------------------------------- | ------------------------------------------------- |
-| `http://SERVER_IP:3000`                 | 前端（Next.js）                                   |
-| `http://SERVER_IP:3001`                 | 后端 API                                          |
-| `http://SERVER_IP:1200`（如本机起）     | RSSHub（prod 通常不与 app 同节点）                |
+```bash
+# 完整发布 (构建 + 启动 + 迁移 + 验证) —— 标准发布入口
+./scripts/cms-ng-service.sh start --prod
 
-### 4. 容器编排边界
+# 快速重启 (跳过构建，仅停旧进程+启动，适用于改 .env / nginx 配置后重启)
+./scripts/cms-ng-service.sh start --prod --no-build
 
-仓库内 Docker Compose 只编排**应用层**，**不编排数据中间件**：
+# 查看状态 (进程 + 健康检查)
+./scripts/cms-ng-service.sh status --prod
 
-- `docker-compose.yml`（dev）：仅 `rsshub` 一个服务
-- `docker-compose.prod.yml`（prod）：仅 `backend` + `frontend` 两个应用容器；后端通过 `env_file: ./backend/.env` 注入配置（**和 dev 用同一份 `backend/.env`**，只是值不同）
+# 查看日志 (Ctrl+C 退出)
+./scripts/cms-ng-service.sh logs --prod backend
+./scripts/cms-ng-service.sh logs --prod frontend
+./scripts/cms-ng-service.sh logs --prod rsshub
 
-MySQL / Redis / （生产环境的）RSSHub 全部视为外部依赖，部署前先准备好，部署脚本不会去拉起它们。
+# 停止 / 重启
+./scripts/cms-ng-service.sh stop --prod
+./scripts/cms-ng-service.sh restart --prod
+```
+
+**`--no-build` 何时用**：仅重启服务且代码未变更时（如改了 `.env`、调整 nginx 配置后重启）。不适用于 schema 变更、依赖更新、任何代码改动。
+
+### 5. 日志与 PID 文件
+
+| 服务 | 日志文件 | PID 文件 |
+| ---- | -------- | -------- |
+| backend | `.cms-ng-backend.log` | `.cms-ng-backend.pid` |
+| frontend | `.cms-ng-frontend.log` | `.cms-ng-frontend.pid` |
+| dev (合并) | `.cms-ng-dev.log` | `.cms-ng-dev.pid` |
+
+> 也可用 `./scripts/cms-ng-service.sh logs --prod <服务名>` 实时查看。
+
+### 6. nginx 站点配置参考
+
+生产 nginx 反代 `:80`/`:443` → `127.0.0.1:3000` / `127.0.0.1:3001`，配置文件 `/etc/nginx/conf.d/cms-ng.conf`：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # 替换为实际域名或 IP
+
+    # 前端
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300s;
+    }
+
+    # 后端 API (路径前缀匹配)
+    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|uploads) {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+}
+
+# HTTPS (可选，需 SSL 证书)
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / { proxy_pass http://127.0.0.1:3000; /* 同上 proxy_set_header ... */ }
+    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|uploads) {
+        proxy_pass http://127.0.0.1:3001; /* 同上 proxy_set_header ... */
+    }
+}
+```
+
+修改 nginx 配置后：`nginx -t && systemctl reload nginx`。
+
+### 7. 部署后端点
+
+| 端点 | 用途 | 健康期望 |
+| ---- | ---- | -------- |
+| `http://SERVER_IP` (nginx 80) | 前端入口 | 307 → `/dashboard` 或 200 |
+| `http://SERVER_IP/login` | 登录页 | 200 |
+| `http://SERVER_IP/users` (无 token) | 后端 API | 401 (无 token 为正常) |
+| `http://SERVER_IP:3000` | 前端直连（调试） | 200 |
+| `http://SERVER_IP:3001` | 后端直连（调试） | 401 |
+| `http://SERVER_IP:1200` | RSSHub（容器） | 200 |
+
+### 8. 故障排查
+
+| 现象 | 排查步骤 |
+| ---- | -------- |
+| `start --prod` 后服务未响应 | `logs --prod backend` / `logs --prod frontend` 查日志；`ss -ltnp \| grep -E ':3000\|:3001'` 查端口占用 |
+| 数据库迁移失败 | 脚本不中断（Warning 提示），手动重试：`cd backend && npx prisma migrate deploy`；确认 `DATABASE_URL` 可达 |
+| 页面 502 | `nginx -t && systemctl status nginx`；检查 `/etc/nginx/conf.d/cms-ng.conf` 反代目标是否正确 |
+| 端口冲突 (3000/3001 被占) | `stop --prod` 后重新 `start --prod`；或手动 `pkill -f "node dist/src/main"; pkill -f "next start"` |
+| RSSHub 容器未启动 | 非致命，手动拉起：`docker compose -f docker-compose.yml up -d` |
+| 构建失败 | 确认 `packages/shared` 已构建（`cd packages/shared && npm run build`）；检查 node 版本 ≥ 20 |
+
+### 9. 容器编排边界
+
+仓库内 Docker Compose **仅编排 RSSHub**（开发与生产共用 `docker-compose.yml`），**不编排应用本身与数据中间件**：
+
+- 应用（backend + frontend）以宿主机进程运行，由 nginx 反代
+- MySQL / Redis 为外部依赖，部署前先准备好
+- RSSHub 唯一进容器的应用层服务（`docker-compose.yml`，端口 `1200`）
 
 ---
 

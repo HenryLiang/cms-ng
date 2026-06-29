@@ -126,11 +126,10 @@ cms-ng/
 │                                 #   AutoPublishTask/Run/Article, AutoPublishScheduleConfig/TopicStrategy/
 │                                 #   ContentConfig/FilterConfig/PublishConfig/RetryConfig, BillingConfigItem,
 │                                 #   BillingTransactionRecord, BalanceInfo, CostEstimate, TopUpRecordInfo, ApiResponse<T>
-├── docker-compose.yml            # Dev: RSSHub :1200 only (MySQL/Redis are external)
-├── docker-compose.prod.yml       # Prod: backend + frontend containers; backend reads env from backend/.env via env_file
+├── docker-compose.yml            # Dev: RSSHub :1200 only (MySQL/Redis are external; app runs on host in both dev and prod)
 └── scripts/
     ├── dev-start.sh              # One-command dev environment launcher (with --backend-only etc.)
-    ├── update-cms-ng.sh          # One-command production deploy/update script
+    ├── cms-ng-service.sh         # Service manager: start/stop/restart/status/logs, --prod = host-process release (nginx + node/next + rsshub)
     ├── check-tiptap-dedup.sh     # Checks for duplicate TipTap extensions in the frontend bundle
     └── agent/                    # Agent helper scripts (setup, login, token retrieval)
 ```
@@ -345,9 +344,9 @@ MySQL 8 and Redis are **external middleware** — they are no longer part of `do
 
 - **MySQL 8** (external): set `DATABASE_URL` in `backend/.env`. Any reachable MySQL 8 host works — local install, `mysql8` Docker container you manage, cloud RDS, etc. Use the URL form `mysql://USER:PASS@HOST:PORT/cms_ng`.
 - **Redis** (external): set `REDIS_URL` the same way. `RedisService` fail-opens to a no-op (warn log only) if the URL is unset or unreachable, so missing Redis won't crash the backend.
-- **RSSHub** (containerized, optional): `docker-compose up -d rsshub` runs the only service still in `docker-compose.yml` (port `1200`). Used by `trending-topics` for RSS ingestion. Prod compose does not include RSSHub — point at it via `RSS_HUB_URL` if needed.
+- **RSSHub** (containerized, optional): `docker compose up -d` runs the only service in `docker-compose.yml` (port `1200`). Used by `trending-topics` for RSS ingestion. Point at it via `RSS_HUB_URL` if it runs on another host.
 
-`backend/.env` is the **single source of truth** for backend config in both dev and prod. The prod compose (`docker-compose.prod.yml`) injects it into the backend container via `env_file: ./backend/.env`, so the same file you run locally is what runs in production (substitute real secrets, of course). Template: `backend/.env.example`. Both files are gitignored except the `.example`.
+`backend/.env` is the **single source of truth** for backend config in both dev and prod. The `cms-ng-service.sh start --prod` flow runs the backend (`node dist/src/main`) and frontend (`next start`) as host processes reading `backend/.env` directly, so the same file you run locally is what runs in production (substitute real secrets, of course). Template: `backend/.env.example`. Both files are gitignored except the `.example`.
 
 ## Important Notes
 
@@ -355,9 +354,9 @@ MySQL 8 and Redis are **external middleware** — they are no longer part of `do
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.
 - **Article status workflow**: `DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED → ARCHIVED` (can be sent back to `REVISION` from review states). Additional states: `PIPELINE_FAILED` (auto-publish pipeline failures), `AUTO_PUBLISHED` (articles published via automation without human review). Editors and admins can approve; reporters can only submit for review.
-- **Production deploy**: `docker-compose.prod.yml` builds backend + frontend containers (MySQL/Redis are external). The backend container reads `backend/.env` via `env_file:` — make sure that file exists on the deploy host with real `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, and AI provider keys (see `backend/.env.example`). `scripts/update-cms-ng.sh` is a one-command deploy script (validate → backup → pull → restore-env → build → start → migrate → verify). **Migrate runs AFTER containers start**, via `docker compose exec backend npx prisma migrate deploy` (NOT `migrate dev` — it only applies existing migrations, won't create new ones). The script validates `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, and `KIMI_API_KEY` before running — note it hardcodes `KIMI_API_KEY` even though the default `AI_PROVIDER` is `deepseek`, so a non-kimi deploy must still set `KIMI_API_KEY` or the pre-check fails. It also health-checks the backend for up to 30s and auto-rolls-back on failure, writes backups to `backups/YYYYMMDD-HHMMSS/` (env + DB dump), requires SSH passwordless access, and verifies with `curl http://localhost:3001/users` (5xx-free). Prod exposes `:3000` (frontend) and `:3001` (backend) directly on `SERVER_IP`.
+- **Production deploy**: Production runs as host processes fronted by nginx (reverse proxy `:80`/`:443` → `127.0.0.1:3000` frontend + `127.0.0.1:3001` backend). `scripts/cms-ng-service.sh start --prod` is the **sole release entry point** and the standard SOP: `git pull` → `diff backend/.env.example backend/.env` → `./scripts/cms-ng-service.sh start --prod` → `status --prod` verify. The script runs: preflight (`backend/.env` present with `DATABASE_URL`/`REDIS_URL`/`JWT_SECRET`) → build (shared + `nest build` + `next build`) → stop old processes → start backend (`node dist/src/main`) + frontend (`next start`) as `nohup` background processes + RSSHub container → `prisma migrate deploy` → health check → admin init. `--no-build` skips build for config-only restarts (not for code/schema/dep changes). **Migrate runs AFTER the backend starts**, via `npx prisma migrate deploy` in the backend dir (NOT `migrate dev` — only applies existing migrations). Prod PID files: `.cms-ng-backend.pid` / `.cms-ng-frontend.pid`; logs: `.cms-ng-backend.log` / `.cms-ng-frontend.log` (view via `logs --prod backend|frontend|rsshub`). nginx config at `/etc/nginx/conf.d/cms-ng.conf`. Frontend `/` returns 307 to `/dashboard`; `/login` returns 200. Backend `:3001/users` returns 401 without a JWT (healthy). nginx exposes `:80`/`:443` on `SERVER_IP`.
 - **Swagger UI**: Available at `http://localhost:3001/api-docs` in dev (mounted only when `NODE_ENV !== 'production'`). Useful for exploring endpoints and testing without a frontend. Bearer auth is pre-configured — paste a JWT from `/auth/login` (no "Bearer " prefix needed).
-- **CI/CD**: No GitHub Actions / no `.github` directory — all tests run locally (`npm run test` / `npx playwright test`); production deploys are manual via `scripts/update-cms-ng.sh` over SSH, not CI. PRs are not auto-tested or gated.
+- **CI/CD**: No GitHub Actions / no `.github` directory — all tests run locally (`npm run test` / `npx playwright test`); production deploys are manual via `scripts/cms-ng-service.sh start --prod`, not CI. PRs are not auto-tested or gated.
 - **License**: UNLICENSED (private project).
 
 ## Testing (E2E / Regression)
@@ -373,9 +372,10 @@ Project-wide functional regression tests run on **Playwright** (`playwright.conf
 
 ## Scripts
 
-Beyond `dev-start.sh` and `update-cms-ng.sh`:
+Beyond `dev-start.sh` and `cms-ng-service.sh`:
 
 - `scripts/check-tiptap-dedup.sh` — checks for duplicate TipTap extensions in the frontend bundle.
+- `scripts/cms-ng-service.sh` — service manager (start/stop/restart/status/logs); `--prod` runs the host-process release (nginx + `node dist/src/main` + `next start` + rsshub container).
 - `scripts/agent/` — Agent helper scripts (`cms-ng.sh`, `get-token.sh`, `install.sh`, `login.sh`, `setup-agent-env.sh`) + `examples/` + `SKILL.md` for setting up CI/automation agent environments.
 
 ## Documentation

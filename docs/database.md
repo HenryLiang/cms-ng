@@ -88,7 +88,7 @@ backend/prisma/schema.prisma
 
 ## 容器化范围
 
-仓库内 docker-compose 文件不再编排数据中间件：
+仓库内 docker-compose 文件仅编排 RSSHub，不再编排应用本身与数据中间件：
 
-- `docker-compose.yml`（dev）：仅 `rsshub` 一个服务
-- `docker-compose.prod.yml`（prod）：仅 `backend` + `frontend` 两个应用容器；backend 通过 `env_file: ./backend/.env` 直接注入配置（模板见 `backend/.env.example`）
+- `docker-compose.yml`：仅 `rsshub` 一个服务（dev 与 prod 共用，端口 `1200`）
+- 应用（backend + frontend）以宿主机进程运行，由 nginx 反代；生产发布由 `scripts/cms-ng-service.sh --prod` 管理（模板见 `backend/.env.example`）

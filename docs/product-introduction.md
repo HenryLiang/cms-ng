@@ -108,7 +108,7 @@ CMS-NG 不是单一的"AI 写作工具"，而是一套**面向新闻编辑部的
 
 - **SMTP 邮件通道**：稿件审核流转、自动发布成功 / 失败、关键异常事件触发邮件；
 - **审计日志**：`AIOperation` 表完整记录每一次 AI 调用（prompt / 响应 / 耗时 / token），可用于复盘与合规审计；
-- **一键部署脚本**：`scripts/update-cms-ng.sh` 封装"备份 → 拉代码 → 构建 → 迁移 → 重启 → 探活"完整链路，单条命令即可完成生产更新。
+- **生产发布脚本**：`scripts/cms-ng-service.sh start --prod` 封装"前置检查 → 构建 → 停旧 → 启动 → 迁移 → 健康检查 → admin 初始化"完整链路，单条命令即可完成生产发布。
 
 ---
 
@@ -202,7 +202,7 @@ export enum UserRole {
 
 ### 2.3 部署与运维创新
 
-- **外部中间件策略**：Docker Compose 只编排应用层（dev：RSSHub；prod：backend + frontend），MySQL / Redis / 生产 RSSHub 全部视为外部依赖，**不与具体云厂商绑定**——同一份 `docker-compose.prod.yml` 既能跑在阿里云也能跑在 AWS 上；
+- **外部中间件策略**：应用以宿主机进程运行（nginx 反代 + `node dist/src/main` / `next start`），MySQL / Redis 全部视为外部依赖，**不与具体云厂商绑定**；Docker Compose 仅编排 RSSHub 一个服务；
 - **地域感知的代理开关**：`RSS_PROXY_ENABLED` + `HTTP_PROXY` 一对环境变量即可在"大陆开发（走代理）"与"海外生产（直连）"之间切换，**业务代码零修改**；
 - **AI Provider 切换零成本**：`AI_PROVIDER=deepseek|kimi|openai` 切换后，prompt、Tool、审计、调用统计全部沿用。
 
@@ -343,12 +343,14 @@ auto-publish ──依赖──▶ ai (generate-draft / research-kit / generate-
 | 开发 | 前端 (3000) + 后端 (3001) + RSSHub (1200) | MySQL/Redis 用外部实例 |
 | 生产 | 前端 + 后端 (Docker) | MySQL/Redis/RSSHub 全外部，env_file 注入 |
 
-**生产部署脚本** `scripts/update-cms-ng.sh` 实现 5 步原子化发布：
-1. 备份 `backend/.env` + 数据库
-2. `git pull` 拉取最新代码
-3. 构建前后端 Docker 镜像
-4. `docker compose -f docker-compose.prod.yml up -d` 启动
-5. 探活 + 5xx 校验，失败自动回滚
+**生产部署脚本** `scripts/cms-ng-service.sh start --prod` 实现 7 步发布流程：
+1. 前置检查（node 可用、`backend/.env` 含必要变量）
+2. 构建（shared → backend `nest build` → frontend `next build`）
+3. 停止旧进程（按 PID 文件 + pkill 兜底）
+4. 启动 backend / frontend 为 nohup 后台进程 + RSSHub 容器
+5. 数据库迁移（`npx prisma migrate deploy`）
+6. 健康检查（frontend `/login` + backend `/users`）
+7. admin 账号初始化
 
 ---
 
