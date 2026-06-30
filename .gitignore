@@ -84,3 +84,6 @@ login-page.png
 .cms-ng-dev.log
 
 .alipay-sandbox/
+
+# Local data (not tracked in git)
+data/
