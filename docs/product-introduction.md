@@ -21,7 +21,7 @@ CMS-NG 不是单一的"AI 写作工具"，而是一套**面向新闻编辑部的
 记者是系统的一线使用者，目标是让"找选题—写稿件—配图—提交审核"的链路尽可能顺滑。
 
 - **选题中心**：支持手动录入、AI 智能推荐、12 路 RSS 源（含 Google Trends / BBC / 纽约时报 / 联合早报 / 36 氪 / 虎嗅等）一键导入、24h 去重；
-- **稿件管理**：覆盖 DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → REVISION → APPROVED → PUBLISHED → ARCHIVED 共 9 个状态的全生命周期；
+- **稿件管理**：覆盖 DRAFT → WRITING → {AI_OPTIMIZING →} PENDING_REVIEW → IN_REVIEW → REVISION → {PENDING_REVIEW →} APPROVED → PUBLISHED → ARCHIVED 共 9 个状态的全生命周期。**`AI_OPTIMIZING` 是可选环节**——记者可在 `WRITING` 或 `REVISION` 状态下直接提交进入 `PENDING_REVIEW`，跳过 AI 优化；`DRAFT → PENDING_REVIEW` 仍被禁止，稿件必须至少经过一次 `WRITING`；
 - **版本快照与回滚**：每轮 AI 操作或人工修改都生成独立 `ArticleVersion`，支持任意历史版本一键回滚；
 - **AI 配图**：基于文章标题与摘要自动生成提示词，调用字节火山引擎 Seedream 模型产出封面图，并自动上传至对象存储；
 - **个人专长与偏好**：记者可设置 `expertise`（擅长领域）与 `preferredLanguage`（语言风格），AI 推荐时自动加权。
