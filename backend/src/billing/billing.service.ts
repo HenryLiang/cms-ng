@@ -438,6 +438,15 @@ export class BillingService {
         estimatedCost = aiCost * batchSize + publishPrice * batchSize + surchargePrice;
         break;
       }
+      case EstimateOperationType.X_TRENDING: {
+        // X (twitterapi.io) 数据源拉取 — 缓存命中免费，仅缓存未命中时扣费。
+        // 一次拉取（趋势榜单或聚合账号推文）按一次调用计费。
+        const config = await this.getConfigSafe('x_trending_fetch');
+        const price = config?.unitPrice || 0.05;
+        breakdown.push({ item: 'X 数据源拉取', quantity: 1, unitPrice: price, subtotal: price });
+        estimatedCost += price;
+        break;
+      }
     }
 
     return {

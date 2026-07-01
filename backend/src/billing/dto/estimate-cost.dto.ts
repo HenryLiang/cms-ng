@@ -14,6 +14,7 @@ export enum EstimateOperationType {
   AI_IMAGE = 'AI_IMAGE',
   PUBLISH = 'PUBLISH',
   AUTO_PUBLISH = 'AUTO_PUBLISH',
+  X_TRENDING = 'X_TRENDING',
 }
 
 export class EstimateCostDto {

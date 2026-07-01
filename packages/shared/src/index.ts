@@ -75,6 +75,7 @@ export enum TransactionType {
   AI_IMAGE = 'AI_IMAGE',
   PUBLISH = 'PUBLISH',
   AUTO_PUBLISH = 'AUTO_PUBLISH',
+  DATA_FETCH = 'DATA_FETCH',
   REFUND = 'REFUND',
   ADJUSTMENT = 'ADJUSTMENT',
 }

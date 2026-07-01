@@ -439,6 +439,22 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
+  /** 通用导入：source 由调用方传入（x-trends / x-accounts / 任意）。与 importFromGoogleTrends 同构。 */
+  async importTopic(userId: string, data: any) {
+    const topic = await this.prisma.trendingTopic.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        source: data.source || 'imported',
+        heatScore: data.heatScore ?? 50,
+        tags: JSON.stringify(data.tags ?? []),
+        status: 'OPEN',
+        createdBy: userId,
+      },
+    });
+    return this.serializeTopic(topic);
+  }
+
   private normalizeNewsItems(
     newsItemField: any,
   ): { title: string; source: string; snippet: string; url: string }[] {
