@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { TrendingTopicsController } from './trending-topics.controller';
 import { TrendingTopicsService } from './trending-topics.service';
+import { TwitterService } from './twitter.service';
 
 jest.mock('https-proxy-agent', () => ({
   HttpsProxyAgent: jest.fn(),
@@ -18,7 +19,17 @@ describe('TrendingTopicsController', () => {
     generateAISuggestions: jest.Mock;
     fetchGoogleTrends: jest.Mock;
     importFromGoogleTrends: jest.Mock;
+    importTopic: jest.Mock;
     adoptTopic: jest.Mock;
+  };
+  let twitterService: {
+    getWoeids: jest.Mock;
+    fetchTrends: jest.Mock;
+    fetchAggregatedAccounts: jest.Mock;
+    fetchAccountTweets: jest.Mock;
+    listAccounts: jest.Mock;
+    addAccount: jest.Mock;
+    removeAccount: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -31,12 +42,25 @@ describe('TrendingTopicsController', () => {
       generateAISuggestions: jest.fn(),
       fetchGoogleTrends: jest.fn(),
       importFromGoogleTrends: jest.fn(),
+      importTopic: jest.fn(),
       adoptTopic: jest.fn(),
+    };
+    twitterService = {
+      getWoeids: jest.fn(),
+      fetchTrends: jest.fn(),
+      fetchAggregatedAccounts: jest.fn(),
+      fetchAccountTweets: jest.fn(),
+      listAccounts: jest.fn(),
+      addAccount: jest.fn(),
+      removeAccount: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TrendingTopicsController],
-      providers: [{ provide: TrendingTopicsService, useValue: topicsService }],
+      providers: [
+        { provide: TrendingTopicsService, useValue: topicsService },
+        { provide: TwitterService, useValue: twitterService },
+      ],
     }).compile();
 
     controller = module.get<TrendingTopicsController>(TrendingTopicsController);
@@ -149,6 +173,50 @@ describe('TrendingTopicsController', () => {
 
       expect(topicsService.importFromGoogleTrends).toHaveBeenCalledWith('user-id', { title: 'Trend' });
       expect(result.id).toBe('t1');
+    });
+  });
+
+  describe('importTopic', () => {
+    it('should call topicsService.importTopic with source', async () => {
+      topicsService.importTopic.mockResolvedValue({ id: 't2' });
+
+      const result = await controller.importTopic('user-id', { title: 'X', source: 'x-trends' });
+
+      expect(topicsService.importTopic).toHaveBeenCalledWith('user-id', { title: 'X', source: 'x-trends' });
+      expect(result.id).toBe('t2');
+    });
+  });
+
+  describe('X (Twitter) endpoints', () => {
+    it('fetchXTrends delegates to twitterService with parsed woeid', async () => {
+      twitterService.fetchTrends.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchXTrends('user-id', '23424977', { page: '2', limit: '5' } as any);
+      expect(twitterService.fetchTrends).toHaveBeenCalledWith('user-id', 23424977, 2, 5);
+    });
+
+    it('fetchXTrends defaults woeid to 1 when unparseable', async () => {
+      twitterService.fetchTrends.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchXTrends('user-id', 'abc', {} as any);
+      expect(twitterService.fetchTrends).toHaveBeenCalledWith('user-id', 1, 1, 10);
+    });
+
+    it('xTrendWoeids delegates to twitterService.getWoeids', () => {
+      twitterService.getWoeids.mockReturnValue([{ woeid: 1, label: '全球' }]);
+      const result = controller.xTrendWoeids();
+      expect(twitterService.getWoeids).toHaveBeenCalled();
+      expect(result).toEqual([{ woeid: 1, label: '全球' }]);
+    });
+
+    it('fetchXAccounts delegates to twitterService.fetchAggregatedAccounts', async () => {
+      twitterService.fetchAggregatedAccounts.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20, totalPages: 1 });
+      await controller.fetchXAccounts('user-id', { page: '1', limit: '20' } as any);
+      expect(twitterService.fetchAggregatedAccounts).toHaveBeenCalledWith('user-id', 1, 20);
+    });
+
+    it('fetchXAccountTweets delegates to twitterService.fetchAccountTweets', async () => {
+      twitterService.fetchAccountTweets.mockResolvedValue([]);
+      await controller.fetchXAccountTweets('user-id', 'elonmusk', '5');
+      expect(twitterService.fetchAccountTweets).toHaveBeenCalledWith('elonmusk', 5, 'user-id', true);
     });
   });
 

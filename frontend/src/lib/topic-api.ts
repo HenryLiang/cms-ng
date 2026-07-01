@@ -118,3 +118,81 @@ export async function importGoogleTrend(data: GoogleTrendItem): Promise<Trending
   const res = await api.post('/trending-topics/import-google-trend', data);
   return res.data;
 }
+
+/** 通用导入：source 由调用方传入（x-trends / x-accounts / 任意）。 */
+export async function importTopic(
+  data: GoogleTrendItem & { source?: string },
+): Promise<TrendingTopic> {
+  const res = await api.post('/trending-topics/import', data);
+  return res.data;
+}
+
+// ─── X (Twitter) 数据源 ───
+
+export interface XWoeid {
+  woeid: number;
+  label: string;
+}
+
+export interface XWatchAccount {
+  id: string;
+  userName: string;
+  displayName?: string | null;
+  category?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getXTrends(
+  woeid: number,
+  page = 1,
+  limit = 10,
+): Promise<PaginatedNewsResponse> {
+  const res = await api.get('/trending-topics/x-trends', {
+    params: { woeid, page, limit },
+  });
+  return res.data;
+}
+
+export async function getXWoeids(): Promise<XWoeid[]> {
+  const res = await api.get('/trending-topics/x-trends/woeids');
+  return res.data;
+}
+
+export async function getXAccounts(
+  page = 1,
+  limit = 20,
+): Promise<PaginatedNewsResponse> {
+  const res = await api.get('/trending-topics/x-accounts', {
+    params: { page, limit },
+  });
+  return res.data;
+}
+
+export async function getXAccountTweets(
+  userName: string,
+  limit?: number,
+): Promise<GoogleTrendItem[]> {
+  const res = await api.get(`/trending-topics/x-accounts/${userName}`, {
+    params: limit ? { limit } : {},
+  });
+  return res.data;
+}
+
+export async function getXWatchAccounts(): Promise<XWatchAccount[]> {
+  const res = await api.get('/trending-topics/x-watch');
+  return res.data;
+}
+
+export async function addXWatchAccount(data: {
+  userName: string;
+  displayName?: string;
+  category?: string;
+}): Promise<XWatchAccount> {
+  const res = await api.post('/trending-topics/x-watch', data);
+  return res.data;
+}
+
+export async function removeXWatchAccount(id: string): Promise<void> {
+  await api.delete(`/trending-topics/x-watch/${id}`);
+}

@@ -11,11 +11,14 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TrendingTopicsService } from './trending-topics.service';
+import { TwitterService } from './twitter.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
 import { SourcePaginationDto } from './dto/source-pagination.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '@cms-ng/shared';
 
 @ApiTags('trending-topics')
 @ApiBearerAuth('bearer')
@@ -35,11 +38,16 @@ export class TrendingTopicsController {
     '36kr',
     'huxiu',
     'douban-movie',
+    'x-trends',
+    'x-accounts',
   ];
   private readonly UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  constructor(private topicsService: TrendingTopicsService) {}
+  constructor(
+    private topicsService: TrendingTopicsService,
+    private twitterService: TwitterService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a curated trending topic' })
@@ -202,10 +210,86 @@ export class TrendingTopicsController {
     return this.topicsService.fetchNewsBySource('douban-movie', page, limit);
   }
 
+  // ─── X (Twitter) 数据源 ───
+
+  @Get('x-trends/woeids')
+  @ApiOperation({ summary: 'List configurable X trend regions (WOEIDs)' })
+  xTrendWoeids() {
+    return this.twitterService.getWoeids();
+  }
+
+  @Get('x-trends')
+  @ApiOperation({ summary: 'Fetch X (Twitter) trending topics by WOEID' })
+  fetchXTrends(
+    @CurrentUser('userId') userId: string,
+    @Query('woeid') woeid: string,
+    @Query() query: SourcePaginationDto,
+  ) {
+    const w = parseInt(woeid as any, 10) || 1;
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    return this.twitterService.fetchTrends(userId, w, page, limit);
+  }
+
+  @Get('x-accounts')
+  @ApiOperation({ summary: 'Fetch latest tweets from all watched X accounts' })
+  fetchXAccounts(
+    @CurrentUser('userId') userId: string,
+    @Query() query: SourcePaginationDto,
+  ) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 20));
+    return this.twitterService.fetchAggregatedAccounts(userId, page, limit);
+  }
+
+  @Get('x-accounts/:userName')
+  @ApiOperation({ summary: 'Fetch latest tweets from a specific X account by userName' })
+  fetchXAccountTweets(
+    @CurrentUser('userId') userId: string,
+    @Param('userName') userName: string,
+    @Query('limit') limit: string,
+  ) {
+    // 不传 limit → 返回 API 一次给出的全部推文；传了则按该值切片
+    const lim = limit ? Math.max(1, parseInt(limit as any, 10)) : undefined;
+    return this.twitterService.fetchAccountTweets(
+      userName,
+      Number.isFinite(lim) ? lim : undefined,
+      userId,
+      true,
+    );
+  }
+
+  @Get('x-watch')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '[Admin] List watched X accounts' })
+  listXWatchAccounts() {
+    return this.twitterService.listAccounts();
+  }
+
+  @Post('x-watch')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '[Admin] Add an X account to the watch list' })
+  addXWatchAccount(@Body() body: { userName: string; displayName?: string; category?: string }) {
+    return this.twitterService.addAccount(body.userName, body.displayName, body.category);
+  }
+
+  @Delete('x-watch/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: '[Admin] Remove an X account from the watch list' })
+  removeXWatchAccount(@Param('id') id: string) {
+    return this.twitterService.removeAccount(id);
+  }
+
   @Post('import-google-trend')
   @ApiOperation({ summary: 'Import a Google Trend item as a curated topic' })
   importGoogleTrend(@CurrentUser('userId') userId: string, @Body() data: any) {
     return this.topicsService.importFromGoogleTrends(userId, data);
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: 'Import any trending item (e.g. X trend/tweet) as a curated topic' })
+  importTopic(@CurrentUser('userId') userId: string, @Body() data: any) {
+    return this.topicsService.importTopic(userId, data);
   }
 
   @Get(':id')

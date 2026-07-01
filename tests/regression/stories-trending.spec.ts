@@ -579,6 +579,71 @@ test.describe('TRD: Trending Topics 热点聚合', () => {
       console.log(`  [TRD-008] adopt failed: HTTP ${adopt.status()} ${(await adopt.text()).slice(0, 200)}`);
     }
   });
+
+  // ─── X (twitterapi.io) 数据源 ───
+  // 真实调用需 QA 后端配 TWITTERAPI_IO_API_KEY；未配时端点返 503，标软失败不误红。
+
+  test('TC-TRD-009: GET /trending-topics/x-trends/woeids 返回地域列表', async ({ api }) => {
+    const { token } = await loginByApi('admin');
+    const r = await api.get('/trending-topics/x-trends/woeids', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(r.ok()).toBe(true);
+    const body = await r.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body[0]).toHaveProperty('woeid');
+    expect(body[0]).toHaveProperty('label');
+  });
+
+  test('TC-TRD-010: GET /trending-topics/x-trends?woeid=1（外部 API 软失败）', async ({ api }) => {
+    const { token } = await loginByApi('admin');
+    const r = await api.get('/trending-topics/x-trends?woeid=1&limit=5', {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 45000,
+    });
+    if (r.ok()) {
+      const body = await r.json();
+      const items = body.items ?? body.data?.items ?? body.data;
+      soft('x-trends returns items array', Array.isArray(items), `body: ${JSON.stringify(body).slice(0, 200)}`);
+    } else {
+      // 503 = 未配 API key；402/400 = 余额不足；其他 = 真异常
+      soft('x-trends fetch', false, `HTTP ${r.status()} body=${(await r.text()).slice(0, 200)}`);
+    }
+  });
+
+  test('TC-TRD-011: GET /trending-topics/x-accounts（聚合 watch 账号，外部 API 软失败）', async ({ api }) => {
+    const { token } = await loginByApi('admin');
+    const r = await api.get('/trending-topics/x-accounts?limit=5', {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 45000,
+    });
+    if (r.ok()) {
+      const body = await r.json();
+      const items = body.items ?? body.data?.items ?? body.data;
+      soft('x-accounts returns items array', Array.isArray(items), `body: ${JSON.stringify(body).slice(0, 200)}`);
+    } else {
+      soft('x-accounts fetch', false, `HTTP ${r.status()} body=${(await r.text()).slice(0, 200)}`);
+    }
+  });
+
+  test('TC-TRD-012: POST /trending-topics/import 通用导入（X 条目）', async ({ api }) => {
+    const { token } = await loginByApi('admin');
+    const r = await api.post('/trending-topics/import', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        title: topicTitle('x-import'),
+        description: 'X 趋势导入测试',
+        source: 'x-trends',
+        heatScore: 60,
+        tags: ['#QA'],
+      },
+    });
+    expect(r.ok()).toBe(true);
+    const topic = await r.json();
+    expect(topic.id).toBeTruthy();
+    expect(topic.source).toBe('x-trends');
+  });
 });
 
 // =====================================================================

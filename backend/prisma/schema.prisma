@@ -220,6 +220,19 @@ model TrendingTopic {
   @@map("trending_topics")
 }
 
+// ─── X (Twitter) 数据源 — 热门账号 watch 清单 ───
+
+model TwitterWatchAccount {
+  id          String   @id @default(uuid())
+  userName    String   @unique // X handle，不含 @
+  displayName String?
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("twitter_watch_accounts")
+}
+
 // ─── Auto-Publishing Pipeline ───
 
 enum AutoTaskStatus {
@@ -335,6 +348,7 @@ enum TransactionType {
   AI_IMAGE
   PUBLISH
   AUTO_PUBLISH
+  DATA_FETCH
   REFUND
   ADJUSTMENT
 }

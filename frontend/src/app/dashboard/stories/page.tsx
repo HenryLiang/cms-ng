@@ -12,9 +12,16 @@ import {
   getGoogleTrends,
   getNewsBySource,
   importGoogleTrend,
+  importTopic,
+  getXTrends,
+  getXWoeids,
+  getXAccountTweets,
+  getXWatchAccounts,
   type TrendingTopic,
   type StorySuggestion,
   type GoogleTrendItem,
+  type XWoeid,
+  type XWatchAccount,
 } from '@/lib/topic-api';
 import {
   Plus,
@@ -29,6 +36,7 @@ import {
   TrendingUp,
   Globe,
   Newspaper,
+  Bird,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -53,6 +61,13 @@ export default function StoryHubPage() {
   const [newsPage, setNewsPage] = useState(1);
   const [newsPagination, setNewsPagination] = useState({ total: 0, totalPages: 1, limit: 10 });
 
+  // X (Twitter) 数据源 state
+  const [xWoeids, setXWoeids] = useState<XWoeid[]>([{ woeid: 1, label: '全球' }]);
+  const [selectedWoeid, setSelectedWoeid] = useState(1);
+  const [xAccountInput, setXAccountInput] = useState('');
+  const [xWatchAccounts, setXWatchAccounts] = useState<XWatchAccount[]>([]);
+  const [selectedXAccount, setSelectedXAccount] = useState('');
+
   const NEWS_SOURCES = [
     { key: 'google-trends', label: 'Google Trends', icon: TrendingUp },
     { key: 'sina', label: '新浪新闻', icon: Newspaper },
@@ -67,6 +82,8 @@ export default function StoryHubPage() {
     { key: '36kr', label: '36氪', icon: Newspaper },
     { key: 'huxiu', label: '虎嗅', icon: Newspaper },
     { key: 'douban-movie', label: '豆瓣热映', icon: Newspaper },
+    { key: 'x-trends', label: 'X 趋势', icon: Bird },
+    { key: 'x-accounts', label: 'X 热门账号', icon: Bird },
   ] as const;
 
   // Create form state
@@ -77,6 +94,12 @@ export default function StoryHubPage() {
 
   useEffect(() => {
     loadTopics();
+    getXWoeids()
+      .then(setXWoeids)
+      .catch(() => {});
+    getXWatchAccounts()
+      .then(setXWatchAccounts)
+      .catch(() => {});
   }, []);
 
   async function loadTopics() {
@@ -160,6 +183,14 @@ export default function StoryHubPage() {
         const res = await getGoogleTrends(selectedGeo, selectedTimeRange, page, 10);
         setNewsSourceItems(res.items);
         setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+      } else if (sourceKey === 'x-trends') {
+        const res = await getXTrends(selectedWoeid, page, 10);
+        setNewsSourceItems(res.items);
+        setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+      } else if (sourceKey === 'x-accounts') {
+        // 不自动拉取 — 用户需先选账号或输入账号后再搜索
+        setNewsSourceItems([]);
+        setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
       } else {
         const res = await getNewsBySource(sourceKey, page, 10);
         setNewsSourceItems(res.items);
@@ -180,11 +211,55 @@ export default function StoryHubPage() {
 
   async function handleImportNewsItem(item: GoogleTrendItem) {
     try {
-      await importGoogleTrend(item);
+      // X 数据用通用 import（保留 source）；其他沿用 google-trend 导入
+      if (item.source === 'x-trends' || (item.source && item.source !== 'google-trends')) {
+        await importTopic(item);
+      } else {
+        await importGoogleTrend(item);
+      }
       await loadTopics();
     } catch {
       // ignore
     }
+  }
+
+  // X 趋势：切换 WOEID 后重新拉取
+  async function handleXWoeidChange(woeid: number) {
+    setSelectedWoeid(woeid);
+    await handleLoadNewsSource('x-trends');
+  }
+
+  // X 热门账号：拉取单个账号最新推文（供下拉选择 / 输入搜索共用）
+  async function fetchXAccount(handle: string) {
+    const clean = handle.replace(/^@/, '').trim();
+    if (!clean) return;
+    setNewsSourceLoading(true);
+    try {
+      const items = await getXAccountTweets(clean);
+      setNewsSourceItems(items);
+      setNewsPagination({ total: items.length, totalPages: 1, limit: items.length });
+    } catch {
+      setNewsSourceItems([]);
+      setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
+    } finally {
+      setNewsSourceLoading(false);
+    }
+  }
+
+  // 下拉选择 watch 账号
+  async function handleXAccountSelect(userName: string) {
+    setSelectedXAccount(userName);
+    setXAccountInput(''); // 下拉与输入框互斥
+    if (userName) await fetchXAccount(userName);
+  }
+
+  // 输入框搜索
+  async function handleXAccountSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const handle = xAccountInput.replace(/^@/, '').trim();
+    if (!handle) return;
+    setSelectedXAccount(''); // 输入与下拉互斥
+    await fetchXAccount(handle);
   }
 
   if (loading) {
@@ -410,6 +485,15 @@ export default function StoryHubPage() {
             totalPages={newsPagination.totalPages}
             total={newsPagination.total}
             onPageChange={handlePageChange}
+            xWoeids={xWoeids}
+            selectedWoeid={selectedWoeid}
+            onWoeidChange={handleXWoeidChange}
+            xWatchAccounts={xWatchAccounts}
+            selectedXAccount={selectedXAccount}
+            onXAccountSelect={handleXAccountSelect}
+            xAccountInput={xAccountInput}
+            onXAccountInputChange={setXAccountInput}
+            onXAccountSubmit={handleXAccountSubmit}
           />
         ) : showAISuggestions ? (
           <AIRecommendationsPanel
@@ -594,6 +678,15 @@ function NewsSourcePanel({
   totalPages,
   total,
   onPageChange,
+  xWoeids,
+  selectedWoeid,
+  onWoeidChange,
+  xWatchAccounts,
+  selectedXAccount,
+  onXAccountSelect,
+  xAccountInput,
+  onXAccountInputChange,
+  onXAccountSubmit,
 }: {
   sourceKey: string;
   items: GoogleTrendItem[];
@@ -606,6 +699,15 @@ function NewsSourcePanel({
   totalPages: number;
   total: number;
   onPageChange: (page: number) => void;
+  xWoeids: XWoeid[];
+  selectedWoeid: number;
+  onWoeidChange: (woeid: number) => void;
+  xWatchAccounts: XWatchAccount[];
+  selectedXAccount: string;
+  onXAccountSelect: (userName: string) => void;
+  xAccountInput: string;
+  onXAccountInputChange: (v: string) => void;
+  onXAccountSubmit: (e: React.FormEvent) => void;
 }) {
   const sourceConfig = {
     'google-trends': { label: 'Google Trends', color: 'text-orange-600', icon: TrendingUp },
@@ -621,6 +723,8 @@ function NewsSourcePanel({
     '36kr': { label: '36氪', color: 'text-sky-600', icon: Newspaper },
     'huxiu': { label: '虎嗅', color: 'text-amber-600', icon: Newspaper },
     'douban-movie': { label: '豆瓣热映', color: 'text-green-600', icon: Newspaper },
+    'x-trends': { label: 'X 趋势', color: 'text-black', icon: Bird },
+    'x-accounts': { label: 'X 热门账号', color: 'text-sky-600', icon: Bird },
   };
 
   const config = sourceConfig[sourceKey as keyof typeof sourceConfig] || { label: sourceKey, color: 'text-zinc-600', icon: Newspaper };
@@ -645,6 +749,8 @@ function NewsSourcePanel({
   };
 
   const showMeta = sourceKey === 'google-trends';
+  const isXTrends = sourceKey === 'x-trends';
+  const isXAccounts = sourceKey === 'x-accounts';
 
   return (
     <div className="max-w-2xl">
@@ -663,13 +769,69 @@ function NewsSourcePanel({
         </button>
       </div>
 
+      {/* X 趋势：WOEID 地域切换器 */}
+      {isXTrends && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-xs text-zinc-500">地域</span>
+          <select
+            value={selectedWoeid}
+            onChange={(e) => onWoeidChange(Number(e.target.value))}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-700"
+          >
+            {xWoeids.map((w) => (
+              <option key={w.woeid} value={w.woeid}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* X 热门账号：下拉选 watch 账号 + 输入框搜索，点 tab 不自动拉取 */}
+      {isXAccounts && (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-500">关注账号</span>
+            <select
+              value={selectedXAccount}
+              onChange={(e) => onXAccountSelect(e.target.value)}
+              className="flex-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-700"
+            >
+              <option value="">— 选择账号 —</option>
+              {xWatchAccounts.map((a) => (
+                <option key={a.id} value={a.userName}>
+                  @{a.userName}
+                  {a.displayName ? ` · ${a.displayName}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <form onSubmit={onXAccountSubmit} className="flex items-center gap-2">
+            <input
+              value={xAccountInput}
+              onChange={(e) => onXAccountInputChange(e.target.value)}
+              placeholder="或输入 @username 搜索"
+              className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+            >
+              搜索
+            </button>
+          </form>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
-          <p className="text-zinc-500">暂无数据，请稍后重试</p>
+          <p className="text-zinc-500">
+            {isXAccounts ? '请从上方选择账号，或输入 @username 后搜索' : '暂无数据，请稍后重试'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
