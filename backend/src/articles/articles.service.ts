@@ -50,6 +50,7 @@ export class ArticlesService {
     [ArticleStatus.DRAFT]: [ArticleStatus.WRITING, ArticleStatus.ARCHIVED],
     [ArticleStatus.WRITING]: [
       ArticleStatus.AI_OPTIMIZING,
+      ArticleStatus.PENDING_REVIEW,
       ArticleStatus.DRAFT,
       ArticleStatus.ARCHIVED,
     ],
@@ -77,6 +78,7 @@ export class ArticlesService {
     [ArticleStatus.ARCHIVED]: [],
     [ArticleStatus.REVISION]: [
       ArticleStatus.WRITING,
+      ArticleStatus.PENDING_REVIEW,
       ArticleStatus.DRAFT,
       ArticleStatus.ARCHIVED,
     ],

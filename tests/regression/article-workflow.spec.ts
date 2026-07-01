@@ -319,12 +319,28 @@ test.describe('§8.3 自动发布新状态', () => {
 });
 
 // ===========================================================================
-// §8.4 状态机非法跳转 — TC-ART-012 (11x11 枚举)
-// 关键发现：当前实现**无显式 transition 校验**，所有 (from, to) 组合都通过。
-// 这与 PRD §8.4 的设计预期（P0 阻塞项）不一致 — 见报告 REG-20260602-ART-001
+// §8.4 状态机 — TC-ART-012 (11x11 枚举)
+// 后端实现显式 transition 校验（articles.service.ts VALID_TRANSITIONS）。
+// "AI_OPTIMIZING 是可选环节"：WRITING/REVISION 可直接 → PENDING_REVIEW，
+// 但 DRAFT 仍必须经 WRITING 才能进 PENDING_REVIEW。
 // ===========================================================================
 
-test.describe('§8.4 状态机非法跳转枚举（11×11=121 对）', () => {
+// 显式允许的转换对（白名单之外的转换应返回 400）
+const LEGAL_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  DRAFT: new Set(['WRITING', 'ARCHIVED']),
+  WRITING: new Set(['AI_OPTIMIZING', 'PENDING_REVIEW', 'DRAFT', 'ARCHIVED']),
+  AI_OPTIMIZING: new Set(['PENDING_REVIEW', 'WRITING', 'DRAFT']),
+  PENDING_REVIEW: new Set(['IN_REVIEW', 'REVISION', 'DRAFT']),
+  IN_REVIEW: new Set(['APPROVED', 'REVISION', 'PENDING_REVIEW']),
+  APPROVED: new Set(['PUBLISHED', 'REVISION', 'IN_REVIEW']),
+  PUBLISHED: new Set(['ARCHIVED']),
+  ARCHIVED: new Set([]),
+  REVISION: new Set(['WRITING', 'PENDING_REVIEW', 'DRAFT', 'ARCHIVED']),
+  AUTO_PUBLISHED: new Set(['ARCHIVED', 'PUBLISHED']),
+  PIPELINE_FAILED: new Set(['DRAFT', 'ARCHIVED']),
+};
+
+test.describe('§8.4 状态机合法/非法跳转枚举（11×11=121 对）', () => {
   // 为节省时间，对每个 from 状态各创建一个 article，逐个尝试所有 to
   const FROM_STATUSES: ArticleStatus[] = [
     'DRAFT', 'WRITING', 'AI_OPTIMIZING', 'PENDING_REVIEW', 'IN_REVIEW',
@@ -337,21 +353,26 @@ test.describe('§8.4 状态机非法跳转枚举（11×11=121 对）', () => {
       const storyId = await bootstrapStory(token, `qa-art-fsm-${from.toLowerCase()}`);
       const id = await createArticle(token, storyId, `qa-art-fsm ${from}`, from);
 
+      const legal = LEGAL_TRANSITIONS[from] ?? new Set<string>();
+
       for (const to of ARTICLE_STATUSES) {
         const r = await withRetry(() => api.patch(`/articles/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
           data: { status: to },
         }));
         const body = await r.json().catch(() => null);
+        const isLegal = from === to || legal.has(to); // 同状态自迁 = no-op, 后端视为合法
+        const expectedStatus = isLegal ? 200 : 400;
         // 记录实际行为
         test.info().annotations.push({
           type: `transition-${from}-to-${to}`,
-          description: `actual=${r.status()}`,
+          description: `actual=${r.status()} (expected=${expectedStatus}, legal=${isLegal})`,
         });
-        // 实际：所有 (from, to) 都返回 200
-        expect.soft(r.status(), `transition ${from} → ${to} should be allowed (current impl has no FSM validator)`)
-          .toBeLessThan(400);
-        expect.soft(body?.status, `article state after PATCH should be ${to}`).toBe(to);
+        expect.soft(r.status(), `${from} → ${to} should ${isLegal ? 'succeed' : 'fail with 400'}`)
+          .toBe(expectedStatus);
+        if (isLegal) {
+          expect.soft(body?.status, `article state after PATCH should be ${to}`).toBe(to);
+        }
       }
     });
   }
