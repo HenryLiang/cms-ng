@@ -13,6 +13,7 @@ import {
   type ResearchKitResult,
 } from '@/lib/story-api';
 import { getArticles, createArticle, type Article } from '@/lib/article-api';
+import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
 import { useAuthStore } from '@/store/auth-store';
 import {
   ArrowLeft,
@@ -56,10 +57,23 @@ export default function StoryDetailPage() {
   const [angle, setAngle] = useState('');
   const [status, setStatus] = useState<Story['status']>('DRAFT');
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
+  const [authors, setAuthors] = useState<AuthorSummary[]>([]);
+  const [authorSlug, setAuthorSlug] = useState('');
+  const [authorsAvailable, setAuthorsAvailable] = useState(true);
 
   useEffect(() => {
     loadData();
   }, [storyId]);
+
+  // Fetch author personas once for the author-style dropdown.
+  useEffect(() => {
+    getAuthors()
+      .then((info) => {
+        setAuthors(info.authors);
+        setAuthorsAvailable(info.source === 'disk' && info.authors.length > 0);
+      })
+      .catch(() => setAuthorsAvailable(false));
+  }, []);
 
   async function loadData() {
     setLoadError(null);
@@ -156,7 +170,7 @@ export default function StoryDetailPage() {
     if (!researchKit) return;
     setDraftLoading(true);
     try {
-      const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction, contentLanguage);
+      const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction, contentLanguage, authorSlug);
       router.push(`/dashboard/articles/${article.id}`);
     } catch (err: unknown) {
       const apiMsg =
@@ -269,6 +283,24 @@ export default function StoryDetailPage() {
                     <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>繁体中文（香港）</option>
                     <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>繁体中文（粤语）</option>
                     <option value={ContentLanguage.ENGLISH}>English</option>
+                  </select>
+                  <select
+                    value={authorSlug}
+                    onChange={(e) => setAuthorSlug(e.target.value)}
+                    disabled={!authorsAvailable}
+                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400 disabled:opacity-50"
+                    title={
+                      authorsAvailable
+                        ? '作者风格：选中的作者文风将应用到生成的初稿'
+                        : '未检测到作者风格数据，将使用默认生成方式'
+                    }
+                  >
+                    <option value="">默认风格</option>
+                    {authors.map((a) => (
+                      <option key={a.slug} value={a.slug}>
+                        {a.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 {story.description && (

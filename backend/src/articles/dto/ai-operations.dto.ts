@@ -39,6 +39,16 @@ export class RewriteTextDto {
   style?: 'serious' | 'casual' | 'academic' | 'concise';
 
   @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the rewrite adopts that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
+
+  @ApiProperty({
     description: 'Output language for the rewritten text',
     enum: ContentLanguage,
     example: ContentLanguage.ENGLISH,
@@ -75,6 +85,16 @@ export class ExpandTextDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the expand adopts that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class CondenseTextDto {
@@ -103,6 +123,16 @@ export class CondenseTextDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the condense adopts that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class PolishTextDto {
@@ -122,6 +152,16 @@ export class PolishTextDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the polish adopts that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class GenerateHeadlinesDto {
@@ -143,6 +183,16 @@ export class GenerateHeadlinesDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, headlines are generated in that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class GenerateExcerptDto {
@@ -164,6 +214,16 @@ export class GenerateExcerptDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the excerpt is generated in that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class ChatMessageDto {
@@ -204,6 +264,16 @@ export class ChatWithAIDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the assistant replies in that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class GenerateDraftDto {
@@ -225,6 +295,16 @@ export class GenerateDraftDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the draft is generated in that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  authorSlug?: string;
 }
 
 export class FactCheckDto {

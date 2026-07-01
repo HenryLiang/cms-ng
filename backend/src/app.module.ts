@@ -15,6 +15,7 @@ import { ChannelsModule } from './channels/channels.module';
 import { AutoPublishModule } from './auto-publish/auto-publish.module';
 import { StorageModule } from './storage/storage.module';
 import { BillingModule } from './billing/billing.module';
+import { AuthorStyleModule } from './authors/author-style.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { BillingModule } from './billing/billing.module';
     ChannelsModule,
     AutoPublishModule,
     BillingModule,
+    AuthorStyleModule,
   ],
   controllers: [AppController],
   providers: [AppService],

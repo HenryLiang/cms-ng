@@ -31,6 +31,7 @@ import {
   type SEOResult,
   type GenerateImageResult,
 } from '@/lib/article-api';
+import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
 import { ContentLanguage } from '@cms-ng/shared';
 import { getEditors } from '@/lib/users-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
@@ -83,6 +84,11 @@ export default function ArticleEditorPage() {
   const [content, setContent] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
+  // Author-style persona selector. authorSlug='' means "use default generation".
+  // Loaded once on mount from GET /authors; degrades gracefully when no data on disk.
+  const [authors, setAuthors] = useState<AuthorSummary[]>([]);
+  const [authorSlug, setAuthorSlug] = useState<string>('');
+  const [authorsAvailable, setAuthorsAvailable] = useState<boolean>(true);
 
   // AI Quick Mode state
   const [selectedText, setSelectedText] = useState('');
@@ -157,6 +163,21 @@ export default function ArticleEditorPage() {
   useEffect(() => {
     loadArticle();
   }, [articleId]);
+
+  // Fetch author personas once. When the backend reports no data on disk
+  // (source='fallback'), the picker is disabled and authorSlug stays '' so
+  // all AI ops use the default generation style.
+  useEffect(() => {
+    getAuthors()
+      .then((info) => {
+        setAuthors(info.authors);
+        setAuthorsAvailable(info.source === 'disk' && info.authors.length > 0);
+      })
+      .catch(() => {
+        // Network/backend error — disable the picker rather than blocking editing.
+        setAuthorsAvailable(false);
+      });
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -333,16 +354,16 @@ export default function ArticleEditorPage() {
       let result = '';
       switch (operation) {
         case 'rewrite':
-          result = await aiRewrite(articleId, text, style as any, undefined, contentLanguage);
+          result = await aiRewrite(articleId, text, style as any, undefined, contentLanguage, authorSlug);
           break;
         case 'expand':
-          result = await aiExpand(articleId, text, undefined, contentLanguage);
+          result = await aiExpand(articleId, text, undefined, contentLanguage, authorSlug);
           break;
         case 'condense':
-          result = await aiCondense(articleId, text, undefined, contentLanguage);
+          result = await aiCondense(articleId, text, undefined, contentLanguage, authorSlug);
           break;
         case 'polish':
-          result = await aiPolish(articleId, text, contentLanguage);
+          result = await aiPolish(articleId, text, contentLanguage, authorSlug);
           break;
       }
       setAiResult(result);
@@ -376,7 +397,7 @@ export default function ArticleEditorPage() {
     setHeadlinesLoading(true);
     setShowHeadlines(true);
     try {
-      const result = await aiHeadlines(articleId, 5, contentLanguage);
+      const result = await aiHeadlines(articleId, 5, contentLanguage, authorSlug);
       setHeadlines(result);
     } catch {
       setHeadlines([]);
@@ -394,7 +415,7 @@ export default function ArticleEditorPage() {
   async function handleGenerateExcerpt() {
     setExcerptLoading(true);
     try {
-      const result = await aiExcerpt(articleId, 200, contentLanguage);
+      const result = await aiExcerpt(articleId, 200, contentLanguage, authorSlug);
       setExcerpt(result);
     } finally {
       setExcerptLoading(false);
@@ -405,7 +426,7 @@ export default function ArticleEditorPage() {
   async function handleGenerateDraft() {
     setDraftLoading(true);
     try {
-      const result = await aiGenerateDraft(articleId, undefined, contentLanguage);
+      const result = await aiGenerateDraft(articleId, undefined, contentLanguage, authorSlug);
       setDraftResult(result);
       setShowDraftPreview(true);
     } catch {
@@ -508,7 +529,7 @@ export default function ArticleEditorPage() {
       const reply = await aiChat(articleId, [
         ...chatMessages,
         { role: 'user', content: userMsg },
-      ], contentLanguage);
+      ], contentLanguage, authorSlug);
       setChatMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
     } finally {
       setChatLoading(false);
@@ -604,6 +625,24 @@ export default function ArticleEditorPage() {
                 <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>繁体中文（香港）</option>
                 <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>繁体中文（粤语）</option>
                 <option value={ContentLanguage.ENGLISH}>English</option>
+              </select>
+              <select
+                value={authorSlug}
+                onChange={(e) => setAuthorSlug(e.target.value)}
+                disabled={!authorsAvailable}
+                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400 disabled:opacity-50"
+                title={
+                  authorsAvailable
+                    ? '作者风格：选中的作者文风将应用到所有生成/编辑类 AI 操作'
+                    : '未检测到作者风格数据，将使用默认生成方式'
+                }
+              >
+                <option value="">默认风格</option>
+                {authors.map((a) => (
+                  <option key={a.slug} value={a.slug}>
+                    {a.name}
+                  </option>
+                ))}
               </select>
             </div>
             <p className="text-xs text-zinc-500">

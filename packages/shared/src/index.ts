@@ -258,6 +258,9 @@ export interface AutoPublishContentConfig {
   maxLength: number;
   language: ContentLanguage;
   systemPrompt?: string;
+  /** Optional author persona slug (e.g. 'author-luxun') from data/authors/.
+   *  When set, auto-published drafts adopt that author's voice. */
+  authorSlug?: string;
 }
 
 export interface AutoPublishFilterConfig {

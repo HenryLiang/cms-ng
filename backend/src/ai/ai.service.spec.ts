@@ -19,6 +19,13 @@ import {
 import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
 import { BillingService } from '../billing/billing.service';
 import { AIOperationLogger } from '../common/ai-operation-logger';
+import { AuthorStyleService } from '../authors/author-style.service';
+
+/** Shared mock for AuthorStyleService. Returns '' (no persona) so the system
+ *  prompts in these tests are unchanged — author-style injection is opt-in via
+ *  authorSlug, which the existing tests don't set. */
+const authorStyleMock = { getSystemPrompt: async () => '' };
+const AUTHOR_STYLE_PROVIDER = { provide: AuthorStyleService, useValue: authorStyleMock };
 
 // axios is still used by searchWikipedia (GET requests)
 jest.mock('axios');
@@ -89,6 +96,7 @@ describe('AIService', () => {
         { provide: CHAT_PROVIDER, useValue: mockChatProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
+        AUTHOR_STYLE_PROVIDER,
       ],
     }).compile();
 
@@ -1806,6 +1814,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: CHAT_PROVIDER, useValue: kimiProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
+        AUTHOR_STYLE_PROVIDER,
       ],
     }).compile();
 
@@ -1865,6 +1874,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: CHAT_PROVIDER, useValue: mockProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
+        AUTHOR_STYLE_PROVIDER,
       ],
     }).compile();
 
@@ -1925,6 +1935,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: CHAT_PROVIDER, useValue: mockProvider },
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
+        AUTHOR_STYLE_PROVIDER,
       ],
     }).compile();
 

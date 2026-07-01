@@ -52,6 +52,7 @@ export interface AutoPublishTask {
     maxLength: number;
     language: string;
     systemPrompt?: string;
+    authorSlug?: string;
   };
   filterConfig: {
     blockedCategories: string[];
@@ -135,6 +136,7 @@ export interface CreateTaskInput {
     maxLength: number;
     language: string;
     systemPrompt?: string;
+    authorSlug?: string;
   };
   filterConfig?: {
     blockedCategories?: string[];

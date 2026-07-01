@@ -59,6 +59,7 @@ import { AIToolsService } from './tools/ai-tools.service';
 import { BillingService, InsufficientBalanceException } from '../billing/billing.service';
 import { PromptLoader } from './prompts/prompt-loader';
 import { AIOperationLogger } from '../common/ai-operation-logger';
+import { AuthorStyleService } from '../authors/author-style.service';
 
 /**
  * Module-level safety bounds for the image-fetch path in `uploadToStorage`.
@@ -92,6 +93,7 @@ export class AIService {
     @Inject(CHAT_PROVIDER) private chatProvider: ChatCompletionProvider,
     @Inject(STORAGE_SERVICE) private storageService: StorageService,
     private aiLog: AIOperationLogger,
+    private authorStyle: AuthorStyleService,
   ) {
     this.seedreamApiKey = this.config.get<string>('SEEDREAM_API_KEY') || '';
     this.seedreamApiBase =
@@ -214,6 +216,23 @@ export class AIService {
     return map[language ?? ContentLanguage.TRADITIONAL_CHINESE_HK];
   }
 
+  /**
+   * Returns the author-persona fragment to prepend to a system message.
+   *
+   * Contract: returns '' when authorSlug is absent, unknown, or the author
+   * data directory is missing — so every caller can unconditionally append
+   * the result to its system message and degrade gracefully to the default
+   * generation style. Mirrors getLanguageInstruction()'s "fragment string"
+   * pattern, but async because the persona is read from disk (cached 30s).
+   */
+  private async getAuthorPersonaInstruction(authorSlug?: string): Promise<string> {
+    const prompt = await this.authorStyle.getSystemPrompt(authorSlug);
+    if (!prompt) return '';
+    // Wrap the raw persona with a clear directive so the LLM treats it as a
+    // voice override layered on top of the operation-specific persona.
+    return `\n\n【作者风格 - 必须模仿】\n请严格按照以下作者的人设、文风、语气与领域偏好来撰写内容，与下面的操作要求叠加生效：\n\n${prompt}`;
+  }
+
   async generateStorySuggestions(
     userId: string,
     userProfile: { name: string; expertise: string[]; department?: string },
@@ -307,6 +326,7 @@ export class AIService {
       prompt,
       input.text,
       language,
+      input.authorSlug,
     );
   }
 
@@ -329,6 +349,7 @@ export class AIService {
       prompt,
       input.text,
       language,
+      input.authorSlug,
     );
   }
 
@@ -354,6 +375,7 @@ export class AIService {
       prompt,
       input.text,
       language,
+      input.authorSlug,
     );
   }
 
@@ -375,6 +397,7 @@ export class AIService {
       prompt,
       input.text,
       language,
+      input.authorSlug,
     );
   }
 
@@ -406,6 +429,7 @@ ${input.content.slice(0, 500)}
 
     // Pre-check balance (estimate ~2000 tokens for headline generation)
     await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
+    const authorPersona = await this.getAuthorPersonaInstruction(input.authorSlug);
 
     return this.aiLog.run({
       userId,
@@ -420,7 +444,7 @@ ${input.content.slice(0, 500)}
             {
               role: 'system',
               content:
-                `你是一名有经验的新闻版面编辑，擅长起标题——不是 SEO 工具，是真正能抓人的标题。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
+                `你是一名有经验的新闻版面编辑，擅长起标题——不是 SEO 工具，是真正能抓人的标题。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。`,
             },
             { role: 'user', content: prompt },
           ],
@@ -479,6 +503,7 @@ ${input.content.slice(0, 2000)}
 
     // Pre-check balance (estimate ~1500 tokens for excerpt generation)
     await this.checkAIBalance(userId, (1500 / 1000) * 0.02);
+    const authorPersona = await this.getAuthorPersonaInstruction(input.authorSlug);
 
     return this.aiLog.run({
       userId,
@@ -493,7 +518,7 @@ ${input.content.slice(0, 2000)}
             {
               role: 'system',
               content:
-                `你是一名新闻记者，擅长用一两句话把事件说清楚。${this.getLanguageInstruction(language)}。`,
+                `你是一名新闻记者，擅长用一两句话把事件说清楚。${this.getLanguageInstruction(language)}。${authorPersona}`,
             },
             { role: 'user', content: prompt },
           ],
@@ -535,11 +560,15 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
       });
     }
 
+    // Pre-check balance (estimate ~2000 tokens for chat)
+    await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
+    const authorPersona = await this.getAuthorPersonaInstruction(input.authorSlug);
+
     const messages: ProviderChatMessage[] = [
       {
         role: 'system',
         content:
-          `你是一名有经验的新闻编辑，帮同事改稿。说话直接、有用、不绕弯子，就像在编辑部茶水间聊天。${this.getLanguageInstruction(language)}。
+          `你是一名有经验的新闻编辑，帮同事改稿。说话直接、有用、不绕弯子，就像在编辑部茶水间聊天。${this.getLanguageInstruction(language)}。${authorPersona}
 
 沟通原则：
 - 像同事给建议，不像 AI 写模板
@@ -551,9 +580,6 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
       ...contextMessages,
       ...input.messages,
     ];
-
-    // Pre-check balance (estimate ~2000 tokens for chat)
-    await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
 
     return this.aiLog.run({
       userId,
@@ -686,6 +712,7 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
 
     // Pre-check balance (estimate ~4000 tokens for draft generation)
     await this.checkAIBalance(userId, (4000 / 1000) * 0.02);
+    const authorPersona = await this.getAuthorPersonaInstruction(input.authorSlug);
 
     return this.aiLog.run({
       userId,
@@ -700,7 +727,7 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
             {
               role: 'system',
               content:
-                `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：\「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
+                `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：\「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
             },
             { role: 'user', content: prompt },
           ],
@@ -1526,9 +1553,11 @@ priority 取值说明：
     prompt: string,
     originalText: string,
     language?: ContentLanguage,
+    authorSlug?: string,
   ): Promise<string> {
     // Pre-check balance (estimate ~2000 tokens for text operations)
     await this.checkAIBalance(userId, (2000 / 1000) * 0.02);
+    const authorPersona = await this.getAuthorPersonaInstruction(authorSlug);
 
     return this.aiLog.run({
       userId,
@@ -1543,7 +1572,7 @@ priority 取值说明：
             {
               role: 'system',
               content:
-                `你是一位有十年新闻一线采写经验的记者。${this.getLanguageInstruction(language)}。\n\n【写作风格要求 - 必须遵守】\n- 像真人记者一样写作，不要有任何 AI 生成痕迹\n- 句子长短错落，避免每句话结构雷同或长度均匀\n- 使用新闻行业自然的表达方式，而非教科书式的标准句式\n- 允许使用口语化、接地气的表达，但保持新闻专业性\n- 避免以下 AI 典型特征：频繁使用「此外」「与此同时」「值得注意的是」「综上所述」等模板化过渡词；每段开头用同样的句式结构；堆砌形容词和修饰语；结尾用「让我们共同期待」等套话\n- 如果有数据或事实，自然地融入叙述中，不用「根据数据显示」这类生硬引出方式\n- 标题和导语要有记者个人判断和新闻敏感，而非中规中矩的概括\n\n直接输出处理后的文字，不要添加解释、说明或前缀标注。`,
+                `你是一位有十年新闻一线采写经验的记者。${this.getLanguageInstruction(language)}。${authorPersona}\n\n【写作风格要求 - 必须遵守】\n- 像真人记者一样写作，不要有任何 AI 生成痕迹\n- 句子长短错落，避免每句话结构雷同或长度均匀\n- 使用新闻行业自然的表达方式，而非教科书式的标准句式\n- 允许使用口语化、接地气的表达，但保持新闻专业性\n- 避免以下 AI 典型特征：频繁使用「此外」「与此同时」「值得注意的是」「综上所述」等模板化过渡词；每段开头用同样的句式结构；堆砌形容词和修饰语；结尾用「让我们共同期待」等套话\n- 如果有数据或事实，自然地融入叙述中，不用「根据数据显示」这类生硬引出方式\n- 标题和导语要有记者个人判断和新闻敏感，而非中规中矩的概括\n\n直接输出处理后的文字，不要添加解释、说明或前缀标注。`,
             },
             { role: 'user', content: prompt },
           ],

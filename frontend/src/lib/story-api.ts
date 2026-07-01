@@ -111,7 +111,8 @@ export async function generateDraftFromResearchKit(
   researchKit: ResearchKitResult,
   instruction?: string,
   language?: ContentLanguage,
+  authorSlug?: string,
 ): Promise<{ article: { id: string; title: string } }> {
-  const res = await api.post(`/stories/${storyId}/draft`, { researchKit, instruction, language });
+  const res = await api.post(`/stories/${storyId}/draft`, { researchKit, instruction, language, authorSlug });
   return res.data;
 }

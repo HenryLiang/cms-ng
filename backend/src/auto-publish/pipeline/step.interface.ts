@@ -33,6 +33,7 @@ export interface PipelineContext {
     maxLength: number;
     language: string;
     systemPrompt?: string;
+    authorSlug?: string;
   };
   publishConfig: {
     platform: string;

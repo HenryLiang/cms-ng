@@ -109,6 +109,7 @@ export class StoriesController {
       dto.researchKit,
       dto.instruction,
       dto.language,
+      dto.authorSlug,
     );
     return { article };
   }

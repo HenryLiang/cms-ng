@@ -109,23 +109,41 @@ export async function aiRewrite(
   style?: string,
   instruction?: string,
   language?: ContentLanguage,
+  authorSlug?: string,
 ): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-rewrite`, { text, style, instruction, language });
+  const res = await api.post(`/articles/${id}/ai-rewrite`, { text, style, instruction, language, authorSlug });
   return res.data.result;
 }
 
-export async function aiExpand(id: string, text: string, instruction?: string, language?: ContentLanguage): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-expand`, { text, instruction, language });
+export async function aiExpand(
+  id: string,
+  text: string,
+  instruction?: string,
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-expand`, { text, instruction, language, authorSlug });
   return res.data.result;
 }
 
-export async function aiCondense(id: string, text: string, maxLength?: number, language?: ContentLanguage): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-condense`, { text, maxLength, language });
+export async function aiCondense(
+  id: string,
+  text: string,
+  maxLength?: number,
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-condense`, { text, maxLength, language, authorSlug });
   return res.data.result;
 }
 
-export async function aiPolish(id: string, text: string, language?: ContentLanguage): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-polish`, { text, language });
+export async function aiPolish(
+  id: string,
+  text: string,
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-polish`, { text, language, authorSlug });
   return res.data.result;
 }
 
@@ -135,13 +153,23 @@ export interface HeadlineOption {
   reasoning: string;
 }
 
-export async function aiHeadlines(id: string, count?: number, language?: ContentLanguage): Promise<HeadlineOption[]> {
-  const res = await api.post(`/articles/${id}/ai-headlines`, { count, language });
+export async function aiHeadlines(
+  id: string,
+  count?: number,
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<HeadlineOption[]> {
+  const res = await api.post(`/articles/${id}/ai-headlines`, { count, language, authorSlug });
   return res.data.headlines;
 }
 
-export async function aiExcerpt(id: string, maxLength?: number, language?: ContentLanguage): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-excerpt`, { maxLength, language });
+export async function aiExcerpt(
+  id: string,
+  maxLength?: number,
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-excerpt`, { maxLength, language, authorSlug });
   return res.data.excerpt;
 }
 
@@ -150,8 +178,13 @@ export interface ChatMessage {
   content: string;
 }
 
-export async function aiChat(id: string, messages: ChatMessage[], language?: ContentLanguage): Promise<string> {
-  const res = await api.post(`/articles/${id}/ai-chat`, { messages, language });
+export async function aiChat(
+  id: string,
+  messages: ChatMessage[],
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<string> {
+  const res = await api.post(`/articles/${id}/ai-chat`, { messages, language, authorSlug });
   return res.data.reply;
 }
 
@@ -161,8 +194,13 @@ export interface DraftResult {
   content: string;
 }
 
-export async function aiGenerateDraft(id: string, instruction?: string, language?: ContentLanguage): Promise<DraftResult> {
-  const res = await api.post(`/articles/${id}/ai-draft`, { instruction, language });
+export async function aiGenerateDraft(
+  id: string,
+  instruction?: string,
+  language?: ContentLanguage,
+  authorSlug?: string,
+): Promise<DraftResult> {
+  const res = await api.post(`/articles/${id}/ai-draft`, { instruction, language, authorSlug });
   return res.data;
 }
 

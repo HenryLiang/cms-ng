@@ -403,6 +403,7 @@ export class ArticlesService {
       text: dto.text,
       instruction: dto.instruction,
       style: dto.style,
+      authorSlug: dto.authorSlug,
     }, dto.language);
     return { result };
   }
@@ -417,6 +418,7 @@ export class ArticlesService {
       text: dto.text,
       instruction: dto.instruction,
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
     return { result };
   }
@@ -431,6 +433,7 @@ export class ArticlesService {
       text: dto.text,
       maxLength: dto.maxLength,
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
     return { result };
   }
@@ -444,6 +447,7 @@ export class ArticlesService {
     const result = await this.aiService.polishText(user.userId, id, {
       text: dto.text,
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
     return { result };
   }
@@ -460,6 +464,7 @@ export class ArticlesService {
       content: article.content,
       count: dto.count,
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
     return { headlines: result };
   }
@@ -475,6 +480,7 @@ export class ArticlesService {
       content: article.content,
       maxLength: dto.maxLength,
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
     return { excerpt: result };
   }
@@ -493,6 +499,7 @@ export class ArticlesService {
         content: article.content,
       },
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
     return { reply: result };
   }
@@ -520,6 +527,7 @@ export class ArticlesService {
       currentSubtitle: article.subtitle || undefined,
       instruction: dto.instruction,
       language: dto.language,
+      authorSlug: dto.authorSlug,
     });
 
     return result;

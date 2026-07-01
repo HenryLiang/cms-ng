@@ -5,23 +5,33 @@ export interface RewriteTextInput {
   instruction?: string;
   style?: 'serious' | 'casual' | 'academic' | 'concise';
   language?: ContentLanguage;
+  /** Optional author persona slug (e.g. 'author-luxun') from data/authors/.
+   *  When set, the author's system_prompt.md is prepended to the system
+   *  message so the rewrite adopts that author's voice. */
+  authorSlug?: string;
 }
 
 export interface ExpandTextInput {
   text: string;
   instruction?: string;
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface CondenseTextInput {
   text: string;
   maxLength?: number;
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface PolishTextInput {
   text: string;
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface GenerateHeadlinesInput {
@@ -30,6 +40,8 @@ export interface GenerateHeadlinesInput {
   content: string;
   count?: number;
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface HeadlineOption {
@@ -43,6 +55,8 @@ export interface GenerateExcerptInput {
   content: string;
   maxLength?: number;
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface ChatMessage {
@@ -58,6 +72,8 @@ export interface ChatInput {
     content: string;
   };
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface GenerateDraftInput {
@@ -70,6 +86,8 @@ export interface GenerateDraftInput {
   instruction?: string;
   researchKit?: ResearchKitResult;
   language?: ContentLanguage;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
 }
 
 export interface DraftResult {

@@ -231,6 +231,7 @@ describe('StoriesController', () => {
         dto.researchKit,
         dto.instruction,
         undefined,
+        undefined,
       );
       expect(result.article.id).toBe('article-id');
     });
@@ -246,6 +247,7 @@ describe('StoriesController', () => {
         'user-id',
         'story-id',
         dto.researchKit,
+        undefined,
         undefined,
         undefined,
       );

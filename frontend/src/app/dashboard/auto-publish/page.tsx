@@ -15,6 +15,7 @@ import {
   type AutoPublishStats,
   type CreateTaskInput,
 } from '@/lib/auto-publish-api';
+import { getAuthors } from '@/lib/authors-api';
 import {
   Plus,
   Loader2,
@@ -308,9 +309,23 @@ function CreateTaskForm({
   const [style, setStyle] = useState('news_brief');
   const [maxLength, setMaxLength] = useState(800);
   const [language, setLanguage] = useState('TRADITIONAL_CHINESE_HK');
+  // Author-style persona for auto-published drafts. '' = default generation.
+  const [authorSlug, setAuthorSlug] = useState('');
+  const [authors, setAuthors] = useState<{ slug: string; name: string }[]>([]);
+  const [authorsAvailable, setAuthorsAvailable] = useState(true);
   const [batchSize, setBatchSize] = useState(1);
   const [blockedKeywords, setBlockedKeywords] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Fetch author personas once for the author-style dropdown.
+  useEffect(() => {
+    getAuthors()
+      .then((info) => {
+        setAuthors(info.authors);
+        setAuthorsAvailable(info.source === 'disk' && info.authors.length > 0);
+      })
+      .catch(() => setAuthorsAvailable(false));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -332,6 +347,7 @@ function CreateTaskForm({
           style,
           maxLength,
           language,
+          authorSlug: authorSlug || undefined,
         },
         filterConfig: {
           blockedKeywords: blockedKeywords.split(',').map((k) => k.trim()).filter(Boolean),
@@ -432,7 +448,7 @@ function CreateTaskForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className="block text-xs font-medium text-zinc-700 mb-1">文章风格</label>
           <select
@@ -468,6 +484,27 @@ function CreateTaskForm({
             <option value="SIMPLIFIED_CHINESE">简体中文</option>
             <option value="TRADITIONAL_CHINESE_CANTONESE">粤语书面语</option>
             <option value="ENGLISH">English</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-zinc-700 mb-1">作者风格</label>
+          <select
+            value={authorSlug}
+            onChange={(e) => setAuthorSlug(e.target.value)}
+            disabled={!authorsAvailable}
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400 disabled:opacity-50"
+            title={
+              authorsAvailable
+                ? '选中的作者文风将应用到自动生成的初稿'
+                : '未检测到作者风格数据，将使用默认生成方式'
+            }
+          >
+            <option value="">默认风格</option>
+            {authors.map((a) => (
+              <option key={a.slug} value={a.slug}>
+                {a.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>

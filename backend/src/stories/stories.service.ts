@@ -255,6 +255,7 @@ export class StoriesService {
     researchKit: ResearchKitResult,
     instruction?: string,
     language?: ContentLanguage,
+    authorSlug?: string,
   ) {
     const story = await this.prisma.story.findUnique({
       where: { id: storyId },
@@ -272,6 +273,7 @@ export class StoriesService {
       instruction,
       researchKit,
       language,
+      authorSlug,
     });
 
     // 2. Create article from draft

@@ -11,6 +11,7 @@ import {
   OpenAIProvider,
 } from './providers';
 import { BillingModule } from '../billing/billing.module';
+import { AuthorStyleModule } from '../authors/author-style.module';
 import { AIOperationLogger } from '../common/ai-operation-logger';
 
 const chatProviderFactory = {
@@ -31,7 +32,7 @@ const chatProviderFactory = {
 };
 
 @Module({
-  imports: [BillingModule],
+  imports: [BillingModule, AuthorStyleModule],
   providers: [
     chatProviderFactory,
     AIService,

@@ -33,4 +33,14 @@ export class GenerateDraftFromResearchKitDto {
   @IsIn(Object.values(ContentLanguage))
   @IsOptional()
   language?: ContentLanguage;
+
+  @ApiProperty({
+    description:
+      'Optional author persona slug (e.g. "author-luxun") from data/authors/. When set, the draft adopts that author\'s voice.',
+    example: 'author-luxun',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  authorSlug?: string;
 }
