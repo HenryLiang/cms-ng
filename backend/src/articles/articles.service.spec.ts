@@ -702,6 +702,49 @@ describe('ArticlesService', () => {
 
       await expect(service.submitReview('nonexistent', 'editor-id', 'APPROVE')).rejects.toThrow(NotFoundException);
     });
+
+    // Regression: clicking "审核通过" on a PENDING_REVIEW article (default first item
+    // in the review queue) must NOT 400. PENDING_REVIEW should auto-claim into
+    // IN_REVIEW before the decision is applied.
+    it('should auto-claim PENDING_REVIEW into IN_REVIEW when submitting APPROVE', async () => {
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'PENDING_REVIEW', editorId: null });
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'APPROVED', editorId: 'editor-id' }));
+
+      const result = await service.submitReview('article-id', 'editor-id', 'APPROVE');
+
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'APPROVED', editorId: 'editor-id' }),
+        }),
+      );
+      expect(result.decision).toBe('APPROVE');
+    });
+
+    it('should auto-claim PENDING_REVIEW into IN_REVIEW when submitting REVISION', async () => {
+      // REVISION on PENDING_REVIEW is already legal in the matrix, but the
+      // auto-claim path should still set editorId on the update.
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'PENDING_REVIEW', editorId: null });
+      prisma.article.update.mockResolvedValue(mockArticle({ status: 'REVISION', editorId: 'editor-id' }));
+
+      const result = await service.submitReview('article-id', 'editor-id', 'REVISION', '请补充细节');
+
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'REVISION', editorId: 'editor-id' }),
+        }),
+      );
+      expect(result.decision).toBe('REVISION');
+    });
+
+    it('should still reject illegal transitions like DRAFT -> APPROVED', async () => {
+      // Sanity: the auto-claim must not weaken the state machine for
+      // genuinely illegal transitions (DRAFT, PUBLISHED, ARCHIVED, ...).
+      prisma.article.findUnique.mockResolvedValue({ id: 'article-id', status: 'DRAFT', editorId: 'editor-id' });
+
+      await expect(
+        service.submitReview('article-id', 'editor-id', 'APPROVE'),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('getVersions', () => {

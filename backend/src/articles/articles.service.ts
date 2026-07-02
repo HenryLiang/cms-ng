@@ -360,10 +360,22 @@ export class ArticlesService {
       newStatus = ArticleStatus.REVISION;
     }
 
-    // Validate state-machine transition: only articles currently in review
-    // (IN_REVIEW) can be reviewed. Anything else (DRAFT, PUBLISHED, ARCHIVED, ...)
-    // is an illegal review target.
-    this.validateStateTransition(article.status, newStatus);
+    // Validate state-machine transition. An editor submitting a review on
+    // a PENDING_REVIEW article implicitly claims it (PENDING_REVIEW ->
+    // IN_REVIEW) before the decision is applied. The IN_REVIEW state is
+    // transient — a single DB update below lands on `newStatus` — but
+    // validating the two-hop transition keeps the invariant "an article
+    // is approved only after an editor has claimed it" intact while
+    // preserving the one-click UX.
+    if (
+      article.status === ArticleStatus.PENDING_REVIEW &&
+      newStatus === ArticleStatus.APPROVED
+    ) {
+      this.validateStateTransition(article.status, ArticleStatus.IN_REVIEW);
+      this.validateStateTransition(ArticleStatus.IN_REVIEW, newStatus);
+    } else {
+      this.validateStateTransition(article.status, newStatus);
+    }
 
     const updated = await this.prisma.article.update({
       where: { id },
