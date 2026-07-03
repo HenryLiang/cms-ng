@@ -38,6 +38,7 @@ export interface GoogleTrendItem {
   }[];
   coverImage?: string;
   year?: number;
+  type?: string;
 }
 
 export interface PaginatedNewsResponse {

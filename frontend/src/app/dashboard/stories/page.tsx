@@ -938,6 +938,11 @@ function NewsSourcePanel({
                         {item.year > 0 ? `${item.year}年` : `公元前${Math.abs(item.year)}年`}
                       </span>
                     )}
+                    {isThisDay && item.type && (
+                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-600">
+                        {item.type}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-sm text-zinc-600">{item.description}</p>
                   {isThisDay && item.coverImage && (
