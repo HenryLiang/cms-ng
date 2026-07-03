@@ -17,6 +17,7 @@ import {
   getXWoeids,
   getXAccountTweets,
   getXWatchAccounts,
+  getThisDay,
   type TrendingTopic,
   type StorySuggestion,
   type GoogleTrendItem,
@@ -39,6 +40,7 @@ import {
   Bird,
   ChevronLeft,
   ChevronRight,
+  Calendar,
 } from 'lucide-react';
 
 export default function StoryHubPage() {
@@ -68,6 +70,13 @@ export default function StoryHubPage() {
   const [xWatchAccounts, setXWatchAccounts] = useState<XWatchAccount[]>([]);
   const [selectedXAccount, setSelectedXAccount] = useState('');
 
+  // 当年今日 state（默认 CN / 今天）
+  const [selectedThisDayRegion, setSelectedThisDayRegion] = useState('CN');
+  const [selectedThisDayDate, setSelectedThisDayDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
   const NEWS_SOURCES = [
     { key: 'google-trends', label: 'Google Trends', icon: TrendingUp },
     { key: 'sina', label: '新浪新闻', icon: Newspaper },
@@ -84,6 +93,7 @@ export default function StoryHubPage() {
     { key: 'douban-movie', label: '豆瓣热映', icon: Newspaper },
     { key: 'x-trends', label: 'X 趋势', icon: Bird },
     { key: 'x-accounts', label: 'X 热门账号', icon: Bird },
+    { key: 'this-day', label: '当年今日', icon: Calendar },
   ] as const;
 
   // Create form state
@@ -191,6 +201,10 @@ export default function StoryHubPage() {
         // 不自动拉取 — 用户需先选账号或输入账号后再搜索
         setNewsSourceItems([]);
         setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
+      } else if (sourceKey === 'this-day') {
+        const res = await getThisDay(selectedThisDayRegion, selectedThisDayDate, page, 10);
+        setNewsSourceItems(res.items);
+        setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
       } else {
         const res = await getNewsBySource(sourceKey, page, 10);
         setNewsSourceItems(res.items);
@@ -260,6 +274,40 @@ export default function StoryHubPage() {
     if (!handle) return;
     setSelectedXAccount(''); // 输入与下拉互斥
     await fetchXAccount(handle);
+  }
+
+  // 当年今日：切换地区（直接用新值拉取，避免 setState 闭包旧值）
+  async function handleThisDayRegionChange(region: string) {
+    setSelectedThisDayRegion(region);
+    setNewsSourceLoading(true);
+    setNewsPage(1);
+    try {
+      const res = await getThisDay(region, selectedThisDayDate, 1, 10);
+      setNewsSourceItems(res.items);
+      setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+    } catch {
+      setNewsSourceItems([]);
+      setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
+    } finally {
+      setNewsSourceLoading(false);
+    }
+  }
+
+  // 当年今日：切换日期
+  async function handleThisDayDateChange(date: string) {
+    setSelectedThisDayDate(date);
+    setNewsSourceLoading(true);
+    setNewsPage(1);
+    try {
+      const res = await getThisDay(selectedThisDayRegion, date, 1, 10);
+      setNewsSourceItems(res.items);
+      setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+    } catch {
+      setNewsSourceItems([]);
+      setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
+    } finally {
+      setNewsSourceLoading(false);
+    }
   }
 
   if (loading) {
@@ -494,6 +542,10 @@ export default function StoryHubPage() {
             xAccountInput={xAccountInput}
             onXAccountInputChange={setXAccountInput}
             onXAccountSubmit={handleXAccountSubmit}
+            selectedThisDayRegion={selectedThisDayRegion}
+            onThisDayRegionChange={handleThisDayRegionChange}
+            selectedThisDayDate={selectedThisDayDate}
+            onThisDayDateChange={handleThisDayDateChange}
           />
         ) : showAISuggestions ? (
           <AIRecommendationsPanel
@@ -687,6 +739,10 @@ function NewsSourcePanel({
   xAccountInput,
   onXAccountInputChange,
   onXAccountSubmit,
+  selectedThisDayRegion,
+  onThisDayRegionChange,
+  selectedThisDayDate,
+  onThisDayDateChange,
 }: {
   sourceKey: string;
   items: GoogleTrendItem[];
@@ -708,6 +764,10 @@ function NewsSourcePanel({
   xAccountInput: string;
   onXAccountInputChange: (v: string) => void;
   onXAccountSubmit: (e: React.FormEvent) => void;
+  selectedThisDayRegion: string;
+  onThisDayRegionChange: (region: string) => void;
+  selectedThisDayDate: string;
+  onThisDayDateChange: (date: string) => void;
 }) {
   const sourceConfig = {
     'google-trends': { label: 'Google Trends', color: 'text-orange-600', icon: TrendingUp },
@@ -725,6 +785,7 @@ function NewsSourcePanel({
     'douban-movie': { label: '豆瓣热映', color: 'text-green-600', icon: Newspaper },
     'x-trends': { label: 'X 趋势', color: 'text-black', icon: Bird },
     'x-accounts': { label: 'X 热门账号', color: 'text-sky-600', icon: Bird },
+    'this-day': { label: '当年今日', color: 'text-amber-600', icon: Calendar },
   };
 
   const config = sourceConfig[sourceKey as keyof typeof sourceConfig] || { label: sourceKey, color: 'text-zinc-600', icon: Newspaper };
@@ -751,6 +812,7 @@ function NewsSourcePanel({
   const showMeta = sourceKey === 'google-trends';
   const isXTrends = sourceKey === 'x-trends';
   const isXAccounts = sourceKey === 'x-accounts';
+  const isThisDay = sourceKey === 'this-day';
 
   return (
     <div className="max-w-2xl">
@@ -823,6 +885,30 @@ function NewsSourcePanel({
         </div>
       )}
 
+      {/* 当年今日：地区 + 日期切换器 */}
+      {isThisDay && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-zinc-500">地区</span>
+          <select
+            value={selectedThisDayRegion}
+            onChange={(e) => onThisDayRegionChange(e.target.value)}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-700"
+          >
+            <option value="CN">中国</option>
+            <option value="HK">香港</option>
+            <option value="US">美国</option>
+            <option value="EU">欧洲</option>
+          </select>
+          <span className="text-xs text-zinc-500 ml-2">日期</span>
+          <input
+            type="date"
+            value={selectedThisDayDate}
+            onChange={(e) => onThisDayDateChange(e.target.value)}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-700"
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
@@ -841,14 +927,29 @@ function NewsSourcePanel({
               className="rounded-lg border border-zinc-200 bg-white p-5 hover:shadow-sm transition-shadow"
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base font-medium text-zinc-900">{item.title}</h3>
                     <span className="rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-600">
                       热度 {item.heatScore}
                     </span>
+                    {isThisDay && item.year && (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                        {item.year > 0 ? `${item.year}年` : `公元前${Math.abs(item.year)}年`}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-sm text-zinc-600">{item.description}</p>
+                  {isThisDay && item.coverImage && (
+                    // Wikipedia 外部缩略图，用 next/image 需配 remotePatterns，暂用 img
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.coverImage}
+                      alt=""
+                      loading="lazy"
+                      className="mt-3 h-32 w-auto rounded-lg border border-zinc-200 object-cover"
+                    />
+                  )}
                   {item.tags && item.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {item.tags.slice(0, 5).map((tag, j) => (
@@ -856,6 +957,24 @@ function NewsSourcePanel({
                           {tag}
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {isThisDay && item.articles && item.articles.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-zinc-400 mb-1">相关词条</p>
+                      <div className="flex flex-wrap gap-2">
+                        {item.articles.filter((a) => a.url).slice(0, 5).map((a, j) => (
+                          <a
+                            key={j}
+                            href={a.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            {a.title}
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

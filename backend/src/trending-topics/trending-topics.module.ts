@@ -4,10 +4,11 @@ import { TrendingTopicsController } from './trending-topics.controller';
 import { AIModule } from '../ai/ai.module';
 import { BillingModule } from '../billing/billing.module';
 import { TwitterService } from './twitter.service';
+import { WikipediaService } from './wikipedia.service';
 
 @Module({
   imports: [AIModule, BillingModule],
   controllers: [TrendingTopicsController],
-  providers: [TrendingTopicsService, TwitterService],
+  providers: [TrendingTopicsService, TwitterService, WikipediaService],
 })
 export class TrendingTopicsModule {}

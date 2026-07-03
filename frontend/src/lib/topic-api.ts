@@ -36,6 +36,8 @@ export interface GoogleTrendItem {
     snippet: string;
     url: string;
   }[];
+  coverImage?: string;
+  year?: number;
 }
 
 export interface PaginatedNewsResponse {
@@ -55,7 +57,7 @@ export interface CreateTopicInput {
   status?: TopicStatus;
 }
 
-export interface UpdateTopicInput extends Partial<CreateTopicInput> {}
+export type UpdateTopicInput = Partial<CreateTopicInput>;
 
 export async function getTopics(): Promise<TrendingTopic[]> {
   const res = await api.get('/trending-topics');
@@ -110,6 +112,20 @@ export async function getNewsBySource(
 ): Promise<PaginatedNewsResponse> {
   const res = await api.get(`/trending-topics/${source}`, {
     params: { page, limit },
+  });
+  return res.data;
+}
+
+// ─── 当年今日 / 历史上的今天（Wikipedia On This Day）───
+
+export async function getThisDay(
+  region: string,
+  date?: string,
+  page = 1,
+  limit = 10,
+): Promise<PaginatedNewsResponse> {
+  const res = await api.get('/trending-topics/this-day', {
+    params: { region, date, page, limit },
   });
   return res.data;
 }
