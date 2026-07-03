@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { TrendingTopicsController } from './trending-topics.controller';
 import { TrendingTopicsService } from './trending-topics.service';
 import { TwitterService } from './twitter.service';
+import { WikipediaService } from './wikipedia.service';
 
 jest.mock('https-proxy-agent', () => ({
   HttpsProxyAgent: jest.fn(),
@@ -31,6 +32,9 @@ describe('TrendingTopicsController', () => {
     addAccount: jest.Mock;
     removeAccount: jest.Mock;
   };
+  let wikipediaService: {
+    fetchOnThisDay: jest.Mock;
+  };
 
   beforeEach(async () => {
     topicsService = {
@@ -54,12 +58,16 @@ describe('TrendingTopicsController', () => {
       addAccount: jest.fn(),
       removeAccount: jest.fn(),
     };
+    wikipediaService = {
+      fetchOnThisDay: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TrendingTopicsController],
       providers: [
         { provide: TrendingTopicsService, useValue: topicsService },
         { provide: TwitterService, useValue: twitterService },
+        { provide: WikipediaService, useValue: wikipediaService },
       ],
     }).compile();
 
@@ -110,6 +118,7 @@ describe('TrendingTopicsController', () => {
     it('should throw BadRequestException for known source keys', () => {
       expect(() => controller.findOne('bbc')).toThrow(BadRequestException);
       expect(() => controller.findOne('bbc')).toThrow("Invalid topic ID: 'bbc' is a data source name");
+      expect(() => controller.findOne('this-day')).toThrow("Invalid topic ID: 'this-day' is a data source name");
     });
   });
 
@@ -217,6 +226,20 @@ describe('TrendingTopicsController', () => {
       twitterService.fetchAccountTweets.mockResolvedValue([]);
       await controller.fetchXAccountTweets('user-id', 'elonmusk', '5');
       expect(twitterService.fetchAccountTweets).toHaveBeenCalledWith('elonmusk', 5, 'user-id', true);
+    });
+  });
+
+  describe('this-day (Wikipedia On This Day)', () => {
+    it('fetchThisDay delegates to wikipediaService with defaults (region→CN)', async () => {
+      wikipediaService.fetchOnThisDay.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchThisDay(undefined as any, undefined, { page: '1', limit: '10' } as any);
+      expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith('CN', undefined, 1, 10);
+    });
+
+    it('fetchThisDay passes region/date/page/limit', async () => {
+      wikipediaService.fetchOnThisDay.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchThisDay('HK', '2026-07-03', { page: '2', limit: '5' } as any);
+      expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith('HK', '2026-07-03', 2, 5);
     });
   });
 

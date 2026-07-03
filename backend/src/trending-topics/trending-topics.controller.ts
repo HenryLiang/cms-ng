@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TrendingTopicsService } from './trending-topics.service';
 import { TwitterService } from './twitter.service';
+import { WikipediaService } from './wikipedia.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
@@ -40,6 +41,7 @@ export class TrendingTopicsController {
     'douban-movie',
     'x-trends',
     'x-accounts',
+    'this-day',
   ];
   private readonly UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,6 +49,7 @@ export class TrendingTopicsController {
   constructor(
     private topicsService: TrendingTopicsService,
     private twitterService: TwitterService,
+    private wikipediaService: WikipediaService,
   ) {}
 
   @Post()
@@ -290,6 +293,20 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Import any trending item (e.g. X trend/tweet) as a curated topic' })
   importTopic(@CurrentUser('userId') userId: string, @Body() data: any) {
     return this.topicsService.importTopic(userId, data);
+  }
+
+  // ─── 当年今日 / 历史上的今天（Wikipedia On This Day）───
+
+  @Get('this-day')
+  @ApiOperation({ summary: 'Fetch "On this day" historical events by region (Wikipedia)' })
+  fetchThisDay(
+    @Query('region') region: string,
+    @Query('date') date: string | undefined,
+    @Query() query: SourcePaginationDto,
+  ) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    return this.wikipediaService.fetchOnThisDay(region || 'CN', date, page, limit);
   }
 
   @Get(':id')
