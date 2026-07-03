@@ -127,6 +127,7 @@ describe('WikipediaService', () => {
           url: 'https://zh.wikipedia.org/wiki/穆爾西',
         },
       ]);
+      expect(modern.type).toBe('事件'); // 5 类型合并后的类型标签
     });
 
     it('sorts by heatScore descending (modern events rank higher than ancient)', async () => {
@@ -268,6 +269,52 @@ describe('WikipediaService', () => {
       expect(redis.del).toHaveBeenCalledWith('wiki:otd:zh:zh-cn:7-3');
       expect(fetchMock).toHaveBeenCalled();
       expect(redis.set).toHaveBeenCalledWith('wiki:otd:zh:zh-cn:7-3', expect.any(String), 86400);
+    });
+
+    it('merges all 5 types with type labels (events/selected/births/deaths/holidays)', async () => {
+      fetchMock.mockImplementation((url: string) => {
+        const m = /\/onthisday\/(\w+)\//.exec(url);
+        const type = m ? m[1] : 'events';
+        const data: Record<string, any[]> = {
+          events: [{ text: '某事件', year: 2000, pages: [] }],
+          selected: [{ text: '某精选', year: 1990, pages: [] }],
+          births: [{ text: '某人生日', year: 1980, pages: [] }],
+          deaths: [{ text: '某人逝世', year: 1970, pages: [] }],
+          holidays: [{ text: '某节日', pages: [] }], // 无 year
+        };
+        return Promise.resolve({ ok: true, json: async () => ({ [type]: data[type] || [] }) });
+      });
+
+      const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
+
+      expect(fetchMock).toHaveBeenCalledTimes(5); // 5 类型并发
+      const types = result.items.map((i: any) => i.type);
+      expect(types).toEqual(expect.arrayContaining(['事件', '精选', '出生', '逝世', '节日']));
+      // holidays 无 year → title 无年份前缀、year undefined
+      const holiday = result.items.find((i: any) => i.type === '节日');
+      expect(holiday.title).toBe('某节日');
+      expect(holiday.year).toBeUndefined();
+    });
+
+    it('skips a failed type but keeps others (partial failure tolerated)', async () => {
+      // events 失败，其他 4 类型成功
+      fetchMock.mockImplementation((url: string) => {
+        if (url.includes('/events/')) {
+          return Promise.resolve({ ok: false, status: 500, text: async () => 'err' });
+        }
+        const m = /\/onthisday\/(\w+)\//.exec(url);
+        const type = m ? m[1] : 'events';
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ [type]: [{ text: `${type}条目`, year: 2000, pages: [] }] }),
+        });
+      });
+
+      const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
+
+      const types = result.items.map((i: any) => i.type);
+      expect(types).not.toContain('事件'); // events 失败跳过
+      expect(types).toEqual(expect.arrayContaining(['精选', '出生', '逝世', '节日']));
     });
   });
 
