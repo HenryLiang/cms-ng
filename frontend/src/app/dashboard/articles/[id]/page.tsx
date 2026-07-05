@@ -1051,7 +1051,7 @@ export default function ArticleEditorPage() {
         </div>
 
         {/* Right sidebar */}
-        <aside className="w-80 border-l border-zinc-200 bg-zinc-50 p-4 overflow-auto flex flex-col">
+        <aside className="w-[30rem] border-l border-zinc-200 bg-zinc-50 p-4 overflow-auto flex flex-col">
           <div className="space-y-6 flex-1">
             {/* Excerpt */}
             <div>
