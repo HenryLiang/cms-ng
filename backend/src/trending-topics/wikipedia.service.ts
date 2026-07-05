@@ -67,7 +67,17 @@ export class WikipediaService {
       (this.config.get<string>('WIKIPEDIA_PROXY_ENABLED') || '').toLowerCase() === 'true';
     this.proxyUrl =
       this.config.get<string>('HTTP_PROXY') || this.config.get<string>('http_proxy') || undefined;
+    // Wikipedia User-Agent 政策 (https://meta.wikimedia.org/wiki/User-Agent_policy) 要求
+    // UA 括号内必须包含 URL 或联系邮箱，否则会被 Varnish 直接 403（错误页 <title>Wikimedia Error</title>）。
+    // 不合规 UA 例：'CMS-NG/1.0 (content creation platform)' → 403；
+    // 合规 UA 例：'CMS-NG/1.0 (https://cms-ng.example.com; admin@cms-ng.example.com)'。
+    // 优先读 WIKIPEDIA_USER_AGENT 环境变量（生产应配置真实联系信息），未配置时回退到内置合规 UA。
+    this.userAgent =
+      this.config.get<string>('WIKIPEDIA_USER_AGENT') ||
+      'CMS-NG/1.0 (https://github.com/HenryLiang/cms-ng; cms-ng@example.com)';
   }
+
+  private readonly userAgent: string;
 
   /**
    * 拉取「历史上的今天」事件列表。
@@ -155,7 +165,7 @@ export class WikipediaService {
     const init: any = {
       method: 'GET',
       headers: {
-        'User-Agent': 'CMS-NG/1.0 (content creation platform)',
+        'User-Agent': this.userAgent,
         ...(variant ? { 'Accept-Language': variant } : {}),
       },
       signal: AbortSignal.timeout(15000),
