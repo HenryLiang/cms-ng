@@ -205,11 +205,11 @@ enum TopicStatus {
 
 model TrendingTopic {
   id              String      @id @default(uuid())
-  title           String
+  title           String      @db.Text
   description     String?     @db.Text
   source          String?
   heatScore       Int         @default(0)
-  tags            String      @default("[]")
+  tags            String      @default("[]") @db.VarChar(1000)
   status          TopicStatus @default(OPEN)
   suggestedAngles String?     @db.Text
   createdBy       String
