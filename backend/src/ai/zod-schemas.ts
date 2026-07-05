@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Zod schemas for the 7 LLM JSON parse sites in ai.service.ts.
+ * Zod schemas for the 8 LLM JSON parse sites in ai.service.ts.
  *
  * Why: previously the code did `const parsed = JSON.parse(response.content)`
  * and then read `parsed.foo` fields without runtime validation. If the LLM
@@ -151,4 +151,43 @@ export const seoResultSchema = z.object({
   metaDescription: z.string().nullish(),
   keywords: z.array(seoKeywordSchema).nullish(),
   suggestions: z.array(seoSuggestionSchema).nullish(),
+});
+
+// ===== Site 8: optimizeGEO =====
+// GEO (Generative Engine Optimization) — mirrors SEOResult's per-element
+// nullish-tolerance + enum-as-string pattern so the downstream guards in
+// ai.service.ts can normalize LLM drift (e.g. entity type 'number' → 'stat')
+// without throwing a hard fallback.
+const geoSuggestedQuestionSchema = z.object({
+  question: z.string().nullish(),
+  answerSnippet: z.string().nullish(),
+});
+
+const geoKeyStatementSchema = z.object({
+  statement: z.string().nullish(),
+  reason: z.string().nullish(),
+});
+
+const geoEntitySchema = z.object({
+  name: z.string().nullish(),
+  // person|org|place|date|stat — kept as string (not enum) so LLM drift like
+  // 'number' / 'organization' normalizes downstream instead of throwing.
+  type: z.string().nullish(),
+});
+
+const geoSuggestionSchema = z.object({
+  category: z.string().nullish(),
+  priority: prioritySchema.nullish(),
+  suggestion: z.string().nullish(),
+});
+
+export const geoResultSchema = z.object({
+  overallScore: z.number().nullish(),
+  citationScore: z.number().nullish(),
+  answerReadinessScore: z.number().nullish(),
+  optimizedSummary: z.string().nullish(),
+  suggestedQuestions: z.array(geoSuggestedQuestionSchema).nullish(),
+  keyStatements: z.array(geoKeyStatementSchema).nullish(),
+  entities: z.array(geoEntitySchema).nullish(),
+  suggestions: z.array(geoSuggestionSchema).nullish(),
 });

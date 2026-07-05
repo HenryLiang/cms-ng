@@ -1080,6 +1080,320 @@ describe('AIService', () => {
     });
   });
 
+  describe('optimizeGEO', () => {
+    it('should return full GEO result on success', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 72,
+          citationScore: 68,
+          answerReadinessScore: 75,
+          optimizedSummary: 'AI 可引用摘要片段',
+          suggestedQuestions: [
+            { question: '问题1', answerSnippet: '答案1' },
+            { question: '问题2', answerSnippet: '答案2' },
+          ],
+          keyStatements: [
+            { statement: '关键陈述1', reason: '理由1' },
+          ],
+          entities: [
+            { name: '张三', type: 'person' },
+            { name: '北京', type: 'place' },
+          ],
+          suggestions: [
+            { category: '事实密度', priority: 'high', suggestion: '补充数据' },
+            { category: '结构化', priority: 'low', suggestion: '加小标题' },
+          ],
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: '测试文章',
+        content: '<p>文章正文内容</p>',
+      });
+
+      expect(result.overallScore).toBe(72);
+      expect(result.citationScore).toBe(68);
+      expect(result.answerReadinessScore).toBe(75);
+      expect(result.optimizedSummary).toBe('AI 可引用摘要片段');
+      expect(result.suggestedQuestions).toHaveLength(2);
+      expect(result.suggestedQuestions[0].question).toBe('问题1');
+      expect(result.keyStatements).toHaveLength(1);
+      expect(result.keyStatements[0].statement).toBe('关键陈述1');
+      expect(result.entities).toHaveLength(2);
+      expect(result.entities[0].type).toBe('person');
+      expect(result.suggestions).toHaveLength(2);
+      expect(result.suggestions[0].priority).toBe('high');
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should clamp all three scores to 0-100', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 150,
+          citationScore: -10,
+          answerReadinessScore: 200,
+          optimizedSummary: '',
+          suggestedQuestions: [],
+          keyStatements: [],
+          entities: [],
+          suggestions: [],
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(100);
+      expect(result.citationScore).toBe(0);
+      expect(result.answerReadinessScore).toBe(100);
+    });
+
+    it('should default scores to 50 when missing', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          optimizedSummary: '',
+          suggestedQuestions: [],
+          keyStatements: [],
+          entities: [],
+          suggestions: [],
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(50);
+      expect(result.citationScore).toBe(50);
+      expect(result.answerReadinessScore).toBe(50);
+    });
+
+    it('should handle non-array fields gracefully', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          citationScore: 70,
+          answerReadinessScore: 65,
+          optimizedSummary: '摘要',
+          suggestedQuestions: null,
+          keyStatements: 'invalid',
+          entities: undefined,
+          suggestions: null,
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.suggestedQuestions).toEqual([]);
+      expect(result.keyStatements).toEqual([]);
+      expect(result.entities).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+    });
+
+    it('should filter out entries with empty question/statement/name/suggestion', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70,
+          citationScore: 72,
+          answerReadinessScore: 75,
+          optimizedSummary: '摘要',
+          suggestedQuestions: [
+            { question: '', answerSnippet: '空问题应被过滤' },
+            { question: '有效问题', answerSnippet: '保留' },
+          ],
+          keyStatements: [
+            { statement: '', reason: '空陈述应被过滤' },
+            { statement: '有效陈述', reason: '保留' },
+          ],
+          entities: [
+            { name: '', type: 'person' },
+            { name: '有效实体', type: 'org' },
+          ],
+          suggestions: [
+            { category: 'A', priority: 'high', suggestion: '' },
+            { category: 'B', priority: 'medium', suggestion: '有效建议' },
+          ],
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.suggestedQuestions).toHaveLength(1);
+      expect(result.suggestedQuestions[0].question).toBe('有效问题');
+      expect(result.keyStatements).toHaveLength(1);
+      expect(result.keyStatements[0].statement).toBe('有效陈述');
+      expect(result.entities).toHaveLength(1);
+      expect(result.entities[0].name).toBe('有效实体');
+      expect(result.suggestions).toHaveLength(1);
+      expect(result.suggestions[0].suggestion).toBe('有效建议');
+    });
+
+    it('should default null priority to medium and normalize drifted entity type to stat', async () => {
+      // GEO entity `type` is a plain string in zod (NOT an enum), so LLM drift
+      // like 'number' / 'organization' normalizes downstream to a valid enum
+      // value ('stat') instead of triggering a hard fallback — this is the
+      // key behavioral difference from SEO's enum-typed searchVolume.
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          citationScore: 65,
+          answerReadinessScore: 70,
+          optimizedSummary: '摘要',
+          suggestedQuestions: [],
+          keyStatements: [],
+          entities: [
+            { name: 'E1', type: 'number' },
+            { name: 'E2', type: 'organization' },
+            { name: 'E3', type: 'person' },
+          ],
+          suggestions: [
+            { category: 'C1', priority: null, suggestion: 'S1' },
+            { category: 'C2', priority: 'low', suggestion: 'S2' },
+          ],
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.entities[0].type).toBe('stat');
+      expect(result.entities[1].type).toBe('stat');
+      expect(result.entities[2].type).toBe('person');
+      expect(result.suggestions[0].priority).toBe('medium');
+      expect(result.suggestions[1].priority).toBe('low');
+    });
+
+    it('should fall back when LLM emits an invalid priority enum', async () => {
+      // priority IS an enum in zod (prioritySchema), so 'urgent' fails Zod
+      // validation and triggers the static fallback — same as SEO.
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 60,
+          citationScore: 65,
+          answerReadinessScore: 70,
+          optimizedSummary: '摘要',
+          suggestedQuestions: [],
+          keyStatements: [],
+          entities: [],
+          suggestions: [{ category: 'C1', priority: 'urgent', suggestion: 'S1' }],
+        })),
+      );
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(0);
+      expect(result.citationScore).toBe(0);
+      expect(result.answerReadinessScore).toBe(0);
+      expect(result.optimizedSummary).toBe('');
+      expect(result.suggestedQuestions).toEqual([]);
+      expect(result.keyStatements).toEqual([]);
+      expect(result.entities).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+    });
+
+    it('should return zero-value fallback on API failure', async () => {
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+
+      const result = await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      expect(result.overallScore).toBe(0);
+      expect(result.citationScore).toBe(0);
+      expect(result.answerReadinessScore).toBe(0);
+      expect(result.optimizedSummary).toBe('');
+      expect(result.suggestedQuestions).toEqual([]);
+      expect(result.keyStatements).toEqual([]);
+      expect(result.entities).toEqual([]);
+      expect(result.suggestions).toEqual([]);
+      expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should strip HTML tags from content before sending to AI', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70,
+          citationScore: 70,
+          answerReadinessScore: 70,
+          optimizedSummary: '',
+          suggestedQuestions: [],
+          keyStatements: [],
+          entities: [],
+          suggestions: [],
+        })),
+      );
+
+      await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: '<p>Paragraph 1</p><h2>Heading</h2><p>Paragraph 2</p>',
+      });
+
+      const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
+      const prompt = callArgs[0].messages[1].content;
+      expect(prompt).not.toContain('<p>');
+      expect(prompt).not.toContain('<h2>');
+      expect(prompt).toContain('Paragraph 1');
+      expect(prompt).toContain('Heading');
+    });
+
+    it('should include language-specific GEO context in prompt', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70,
+          citationScore: 70,
+          answerReadinessScore: 70,
+          optimizedSummary: '',
+          suggestedQuestions: [],
+          keyStatements: [],
+          entities: [],
+          suggestions: [],
+        })),
+      );
+
+      // Simplified Chinese
+      await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+        language: 'SIMPLIFIED_CHINESE' as any,
+      });
+      let prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('中国内地 AI 搜索');
+
+      mockChatProvider.chatCompletion.mockClear();
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(JSON.stringify({
+          overallScore: 70, citationScore: 70, answerReadinessScore: 70,
+          optimizedSummary: '', suggestedQuestions: [], keyStatements: [],
+          entities: [], suggestions: [],
+        })),
+      );
+
+      // English
+      await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+        language: 'ENGLISH' as any,
+      });
+      prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('英语 AI 搜索');
+    });
+  });
+
   describe('generateArticleImage', () => {
     it('should complete full image generation flow', async () => {
       // Step 1: buildImagePrompt — chatProvider.chatCompletion

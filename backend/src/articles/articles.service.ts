@@ -34,6 +34,7 @@ import {
   FactCheckDto,
   ReviewReportDto,
   OptimizeSEODto,
+  OptimizeGEODto,
 } from './dto/ai-operations.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
 
@@ -584,6 +585,21 @@ export class ArticlesService {
   ) {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.optimizeSEO(user.userId, id, {
+      title: article.title,
+      subtitle: article.subtitle || undefined,
+      content: article.content,
+      language: dto.language,
+    });
+    return result;
+  }
+
+  async aiOptimizeGEO(
+    id: string,
+    user: { userId: string; role: string },
+    dto: OptimizeGEODto,
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const result = await this.aiService.optimizeGEO(user.userId, id, {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
