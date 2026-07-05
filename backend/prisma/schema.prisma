@@ -38,12 +38,12 @@ model User {
 
 model Story {
   id              String           @id @default(uuid())
-  title           String
+  title           String           @db.Text
   description     String?          @db.Text
   angle           String?
   status          ArticleStatus    @default(DRAFT)
   priority        Int              @default(0)
-  tags            String           @default("[]")
+  tags            String           @default("[]") @db.VarChar(1000)
   contentLanguage ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
   deadline        DateTime?
   createdAt       DateTime         @default(now())
