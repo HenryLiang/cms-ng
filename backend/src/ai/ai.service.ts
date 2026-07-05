@@ -21,6 +21,7 @@ import { CHAT_PROVIDER, KimiProvider } from './providers';
 import {
   draftResultSchema,
   factCheckResultSchema,
+  geoResultSchema,
   headlinesSchema,
   researchKitResultSchema,
   reviewReportResultSchema,
@@ -52,7 +53,9 @@ import {
   ReviewReportInput,
   ReviewReportResult,
   OptimizeSEOInput,
+  OptimizeGEOInput,
   SEOResult,
+  GEOResult,
   WikipediaEntry,
 } from './dto/writing-operations.dto';
 import { AIToolsService } from './tools/ai-tools.service';
@@ -1541,6 +1544,133 @@ priority 取值说明：
           tokensUsed,
           articleId,
           description: 'AI SEO 优化',
+        }),
+    });
+  }
+
+  // ===== AI GEO 优化（生成式引擎优化） =====
+  // Mirrors optimizeSEO: aiLog.run + zod parse + per-element normalize + clamp +
+  // fallback + LLM billing. GEO targets generative AI search engines
+  // (ChatGPT/Perplexity/Kimi/豆包) citation readiness, distinct from SEO's
+  // traditional search ranking focus.
+  async optimizeGEO(
+    userId: string,
+    articleId: string | undefined,
+    input: OptimizeGEOInput,
+  ): Promise<GEOResult> {
+    const language = input.language;
+
+    const geoContext = language === ContentLanguage.SIMPLIFIED_CHINESE
+      ? '针对中国内地 AI 搜索场景（Kimi/豆包/文心一言/DeepSeek），实体与事实需符合简体中文语境'
+      : language === ContentLanguage.ENGLISH
+      ? '针对英语 AI 搜索场景（ChatGPT/Perplexity/Claude），实体与事实需符合英语语境'
+      : '针对 LC 传媒 AI 搜索场景，实体与事实需符合繁简体中文语境';
+
+    const prompt = `你是一位新闻媒体的 GEO（生成式引擎优化）专家，深谙 ChatGPT/Perplexity/Kimi 等生成式 AI 如何抽取与引用网页内容。分析下面这篇稿子，评估它被 AI 搜索引擎引用的潜力并给出优化建议。${geoContext}。\n\n稿件标题：${input.title}\n${input.subtitle ? '副标题：' + input.subtitle : ''}\n正文内容：\n${input.content.replace(/<[^>]+>/g, '').slice(0, 3000)}\n\n请输出以下 JSON 格式：\n{\n  "overallScore": 72,\n  "citationScore": 68,\n  "answerReadinessScore": 75,\n  "optimizedSummary": "一段结构化的 AI 可引用答案片段，120字以内，可直接被生成式 AI 抽取为答案",\n  "suggestedQuestions": [\n    {\n      "question": "用户可能在 AI 搜索中提问的自然语言问题",\n      "answerSnippet": "稿件中能回答该问题的片段"\n    }\n  ],\n  "keyStatements": [\n    {\n      "statement": "稿件中最可能被 AI 引用的关键陈述",\n      "reason": "为何该句易被引用"\n    }\n  ],\n  "entities": [\n    {\n      "name": "实体名称",\n      "type": "person"\n    }\n  ],\n  "suggestions": [\n    {\n      "category": "事实密度",\n      "priority": "high",\n      "suggestion": "具体优化建议"\n    }\n  ]\n}\n\n字段说明：\n- overallScore: 综合适答度评分（0-100），衡量稿件被生成式 AI 引用的整体潜力\n- citationScore: 可引用度（0-100），内容是否容易被 AI 直接引用\n- answerReadinessScore: 答案就绪度（0-100），是否含可直接抽取为答案的片段\n- optimizedSummary: 一段结构化的 AI 可引用答案片段，120字以内，便于 AI 直接抽取\n- suggestedQuestions: 稿件能回答的 3-5 个自然语言问题，模拟用户在 AI 搜索中的真实问法，每个含对应答案片段\n- keyStatements: 2-4 个最可能被 AI 引用的关键陈述，每个含引用理由\n- entities: 稿件中的核心实体清单（人名/机构/地名/日期/数据），type 取 person/org/place/date/stat\n- suggestions: 具体优化建议列表，按优先级分类（high/medium/low）\n\ncategory 建议取值：事实密度 / 引用来源 / 结构化 / 实体清晰 / 问答覆盖 / 摘要可引用性\n\npriority 取值说明：\n- high：重要问题，建议优先修改\n- medium：一般问题，建议考虑改进\n- low：轻微问题，可酌情优化\n\n注意：${this.getLanguageInstruction(language)}。optimizedSummary 应为可直接当答案的结构化片段，不要写成元描述。suggestedQuestions 的问题应是用户真实问法而非关键词堆砌。entities 仅包含稿件中可验证的实体。`;
+
+    // Pre-check balance (estimate ~3000 tokens for GEO optimization)
+    await this.checkAIBalance(userId, (3000 / 1000) * 0.02);
+
+    return this.aiLog.run({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'optimize_geo',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content:
+                `你是一位新闻媒体的 GEO（生成式引擎优化）运营专家，深谙生成式 AI 如何抽取与引用网页内容。${this.getLanguageInstruction(language)}。输出必须是有效的 JSON 格式。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.4,
+          response_format: { type: 'json_object' },
+        });
+
+        let parsed: z.infer<typeof geoResultSchema>;
+        try {
+          parsed = geoResultSchema.parse(JSON.parse(response.content));
+        } catch (err) {
+          const msg = err instanceof z.ZodError
+            ? `zod issues: ${err.issues.slice(0, 3).map(i => i.path.join('.') + ': ' + i.message).join('; ')}`
+            : (err as Error).message;
+          this.logger.warn(
+            `AI JSON schema validation failed (optimizeGEO): ${msg}; raw[:200]=${response.content.slice(0, 200)}`,
+          );
+          throw err;
+        }
+
+        const result: GEOResult = {
+          overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
+          citationScore: Math.min(100, Math.max(0, parsed.citationScore ?? 50)),
+          answerReadinessScore: Math.min(
+            100,
+            Math.max(0, parsed.answerReadinessScore ?? 50),
+          ),
+          optimizedSummary: parsed.optimizedSummary || '',
+          suggestedQuestions: Array.isArray(parsed.suggestedQuestions)
+            ? parsed.suggestedQuestions
+                .map((q: any) => ({
+                  question: q.question || '',
+                  answerSnippet: q.answerSnippet || '',
+                }))
+                .filter((q: any) => q.question)
+            : [],
+          keyStatements: Array.isArray(parsed.keyStatements)
+            ? parsed.keyStatements
+                .map((s: any) => ({
+                  statement: s.statement || '',
+                  reason: s.reason || '',
+                }))
+                .filter((s: any) => s.statement)
+            : [],
+          entities: Array.isArray(parsed.entities)
+            ? parsed.entities
+                .map((e: any) => ({
+                  name: e.name || '',
+                  type: ['person', 'org', 'place', 'date', 'stat'].includes(e.type)
+                    ? e.type
+                    : 'stat',
+                }))
+                .filter((e: any) => e.name)
+            : [],
+          suggestions: Array.isArray(parsed.suggestions)
+            ? parsed.suggestions
+                .map((s: any) => ({
+                  category: s.category || '综合',
+                  priority: ['high', 'medium', 'low'].includes(s.priority)
+                    ? s.priority
+                    : 'medium',
+                  suggestion: s.suggestion || '',
+                }))
+                .filter((s: any) => s.suggestion)
+            : [],
+        };
+
+        return { result, tokensUsed: response.usage?.totalTokens };
+      },
+      fallback: {
+        overallScore: 0,
+        citationScore: 0,
+        answerReadinessScore: 0,
+        optimizedSummary: '',
+        suggestedQuestions: [],
+        keyStatements: [],
+        entities: [],
+        suggestions: [],
+      },
+      onSuccess: (aiOpId, tokensUsed) =>
+        this.deductLLMBilling({
+          userId,
+          aiOperationId: aiOpId,
+          tokensUsed,
+          articleId,
+          description: 'AI GEO 优化',
         }),
     });
   }

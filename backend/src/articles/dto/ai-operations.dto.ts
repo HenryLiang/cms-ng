@@ -342,3 +342,15 @@ export class OptimizeSEODto {
   @IsOptional()
   language?: ContentLanguage;
 }
+
+export class OptimizeGEODto {
+  @ApiProperty({
+    description: 'Output language for the GEO (generative engine optimization) suggestions',
+    enum: ContentLanguage,
+    example: ContentLanguage.ENGLISH,
+    required: false,
+  })
+  @IsIn(Object.values(ContentLanguage))
+  @IsOptional()
+  language?: ContentLanguage;
+}

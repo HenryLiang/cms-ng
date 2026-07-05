@@ -26,6 +26,7 @@ import {
   FactCheckDto,
   ReviewReportDto,
   OptimizeSEODto,
+  OptimizeGEODto,
 } from './dto/ai-operations.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -250,6 +251,16 @@ export class ArticlesController {
     @Body() dto: OptimizeSEODto,
   ) {
     return this.articlesService.aiOptimizeSEO(id, user, dto);
+  }
+
+  @Post(':id/ai-geo')
+  @ApiOperation({ summary: 'AI: optimize the article for GEO (generative engine optimization)' })
+  aiOptimizeGEO(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: OptimizeGEODto,
+  ) {
+    return this.articlesService.aiOptimizeGEO(id, user, dto);
   }
 
   @Post(':id/ai-generate-image')

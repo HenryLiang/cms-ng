@@ -20,6 +20,7 @@ import {
   aiFactCheck,
   aiReviewReport,
   aiOptimizeSEO,
+  aiOptimizeGEO,
   aiGenerateImage,
   type Article,
   type ArticleVersion,
@@ -29,6 +30,7 @@ import {
   type FactCheckResult,
   type ReviewReportResult,
   type SEOResult,
+  type GEOResult,
   type GenerateImageResult,
 } from '@/lib/article-api';
 import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
@@ -38,6 +40,7 @@ import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-e
 import FactCheckPanel from '@/components/fact-check-panel';
 import ReviewReportPanel from '@/components/review-report-panel';
 import SEOPanel from '@/components/seo-panel';
+import GEOPanel from '@/components/geo-panel';
 import ChannelPanel from '@/components/channels/channel-panel';
 import {
   ArrowLeft,
@@ -66,6 +69,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Image,
+  Bot,
 } from 'lucide-react';
 
 export default function ArticleEditorPage() {
@@ -128,6 +132,11 @@ export default function ArticleEditorPage() {
   const [showSEO, setShowSEO] = useState(false);
   const [seoResult, setSeoResult] = useState<SEOResult | null>(null);
   const [seoLoading, setSeoLoading] = useState(false);
+
+  // AI GEO state
+  const [showGEO, setShowGEO] = useState(false);
+  const [geoResult, setGeoResult] = useState<GEOResult | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
 
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -488,6 +497,20 @@ export default function ArticleEditorPage() {
       alert('SEO 分析失败，请稍后重试');
     } finally {
       setSeoLoading(false);
+    }
+  }
+
+  // ===== AI GEO =====
+  async function handleOptimizeGEO() {
+    setGeoLoading(true);
+    try {
+      const result = await aiOptimizeGEO(articleId, contentLanguage);
+      setGeoResult(result);
+      setShowGEO(true);
+    } catch {
+      alert('GEO 分析失败，请稍后重试');
+    } finally {
+      setGeoLoading(false);
     }
   }
 
@@ -1124,6 +1147,18 @@ export default function ArticleEditorPage() {
                   AI SEO优化
                 </button>
                 <button
+                  onClick={handleOptimizeGEO}
+                  disabled={geoLoading}
+                  className="flex w-full items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                >
+                  {geoLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bot className="h-4 w-4" />
+                  )}
+                  AI GEO优化
+                </button>
+                <button
                   onClick={() => setShowImageGen(true)}
                   disabled={imageGenLoading}
                   className="flex w-full items-center gap-2 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100 disabled:opacity-50"
@@ -1167,6 +1202,15 @@ export default function ArticleEditorPage() {
                 result={seoResult}
                 onClose={() => setShowSEO(false)}
                 onApplyTitle={(newTitle) => setTitle(newTitle)}
+              />
+            )}
+
+            {/* GEO Result Panel */}
+            {showGEO && geoResult && (
+              <GEOPanel
+                result={geoResult}
+                onClose={() => setShowGEO(false)}
+                onApplySummary={(summary) => setExcerpt(summary)}
               />
             )}
           </div>

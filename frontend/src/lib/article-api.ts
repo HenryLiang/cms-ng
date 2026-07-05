@@ -272,6 +272,47 @@ export async function aiOptimizeSEO(id: string, language?: ContentLanguage): Pro
   return res.data;
 }
 
+// ===== AI GEO (Generative Engine Optimization) =====
+// Mirrors the backend GEOResult in ai/dto/writing-operations.dto.ts. When one
+// changes, both should change together.
+
+export interface GEOEntity {
+  name: string;
+  type: 'person' | 'org' | 'place' | 'date' | 'stat';
+}
+
+export interface GEOSuggestion {
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestion: string;
+}
+
+export interface GEOSuggestedQuestion {
+  question: string;
+  answerSnippet: string;
+}
+
+export interface GEOKeyStatement {
+  statement: string;
+  reason: string;
+}
+
+export interface GEOResult {
+  overallScore: number;
+  citationScore: number;
+  answerReadinessScore: number;
+  optimizedSummary: string;
+  suggestedQuestions: GEOSuggestedQuestion[];
+  keyStatements: GEOKeyStatement[];
+  entities: GEOEntity[];
+  suggestions: GEOSuggestion[];
+}
+
+export async function aiOptimizeGEO(id: string, language?: ContentLanguage): Promise<GEOResult> {
+  const res = await api.post(`/articles/${id}/ai-geo`, { language });
+  return res.data;
+}
+
 // ===== AI Image Generation =====
 
 export interface GenerateImageInput {

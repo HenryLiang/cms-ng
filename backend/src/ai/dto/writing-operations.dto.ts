@@ -219,3 +219,47 @@ export interface OptimizeSEOInput {
   content: string;
   language?: ContentLanguage;
 }
+
+// ===== GEO (Generative Engine Optimization) =====
+// Mirrors the SEO DTO shapes but with GEO-specific fields. The TS interfaces
+// here are the source of truth for the backend; the frontend mirrors them in
+// article-api.ts and the zod schema mirrors them in zod-schemas.ts. When one
+// changes, all three should change together.
+export interface GEOEntity {
+  name: string;
+  type: 'person' | 'org' | 'place' | 'date' | 'stat';
+}
+
+export interface GEOSuggestion {
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestion: string;
+}
+
+export interface GEOSuggestedQuestion {
+  question: string;
+  answerSnippet: string;
+}
+
+export interface GEOKeyStatement {
+  statement: string;
+  reason: string;
+}
+
+export interface GEOResult {
+  overallScore: number;
+  citationScore: number;
+  answerReadinessScore: number;
+  optimizedSummary: string;
+  suggestedQuestions: GEOSuggestedQuestion[];
+  keyStatements: GEOKeyStatement[];
+  entities: GEOEntity[];
+  suggestions: GEOSuggestion[];
+}
+
+export interface OptimizeGEOInput {
+  title: string;
+  subtitle?: string;
+  content: string;
+  language?: ContentLanguage;
+}
