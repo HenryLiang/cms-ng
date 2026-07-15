@@ -7,16 +7,7 @@ import {
   type BillingTransaction,
   type TransactionSummary,
 } from '@/lib/billing-api';
-
-const typeLabels: Record<string, string> = {
-  TOP_UP: '充值',
-  AI_LLM: 'AI调用',
-  AI_IMAGE: '图片生成',
-  PUBLISH: '发布',
-  AUTO_PUBLISH: '自动发布',
-  REFUND: '退款',
-  ADJUSTMENT: '调整',
-};
+import { transactionTypeLabels } from '@/lib/transaction-labels';
 
 const typeOptions = [
   { value: '', label: '全部' },
@@ -177,7 +168,7 @@ export default function TransactionsPage() {
                     <td className="px-6 py-3 text-zinc-500">{formatDate(tx.createdAt)}</td>
                     <td className="px-6 py-3">
                       <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                        {typeLabels[tx.type] || tx.type}
+                        {transactionTypeLabels[tx.type] || tx.type}
                       </span>
                     </td>
                     <td className="px-6 py-3 text-zinc-700">{tx.description}</td>
