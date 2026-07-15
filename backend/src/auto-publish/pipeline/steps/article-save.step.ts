@@ -54,7 +54,12 @@ export class ArticleSaveStep implements PipelineStep {
         tags: JSON.stringify(ctx.draft.tags || []),
         platforms: JSON.stringify([ctx.publishConfig.platform]),
         coverImage: ctx.coverImageUrl || null,
-        aiGeneratedParts: JSON.stringify(['title', 'subtitle', 'content', 'excerpt']),
+        aiGeneratedParts: JSON.stringify([
+          'title',
+          'subtitle',
+          'content',
+          'excerpt',
+        ]),
         contentLanguage: ctx.contentConfig.language as any,
         publishedAt: new Date(),
       },
@@ -95,7 +100,9 @@ export class ArticleSaveStep implements PipelineStep {
       ];
     }
 
-    this.logger.log(`Article saved: id=${article.id}, title="${article.title}"`);
+    this.logger.log(
+      `Article saved: id=${article.id}, title="${article.title}"`,
+    );
     return ctx;
   }
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@cms-ng/shared';
@@ -16,8 +20,9 @@ export interface CheckAccessOptions {
   errorMessage?: string;
 }
 
-export interface FindAndCheckAccessOptions<I extends Prisma.ArticleInclude>
-  extends CheckAccessOptions {
+export interface FindAndCheckAccessOptions<
+  I extends Prisma.ArticleInclude,
+> extends CheckAccessOptions {
   include: I;
 }
 
@@ -77,7 +82,7 @@ export class ArticleAccessService {
     if (!article) throw new NotFoundException('Article not found');
 
     this.assertCanAccess(article.authorId, article.editorId, user, options);
-    return article as Prisma.ArticleGetPayload<{ include: I }>;
+    return article;
   }
 
   private assertCanAccess(

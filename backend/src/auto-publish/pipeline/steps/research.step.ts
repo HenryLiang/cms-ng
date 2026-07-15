@@ -18,13 +18,13 @@ export class ResearchStep implements PipelineStep {
 
     this.logger.log(`Researching topic: "${ctx.topic}"`);
 
-    const researchKit = (await this.aiService.generateResearchKit(ctx.userId, {
+    const researchKit = await this.aiService.generateResearchKit(ctx.userId, {
       storyTitle: ctx.topic,
       storyDescription: '',
       storyAngle: '',
       storyTags: [],
       language: (ctx.contentConfig.language as ContentLanguage) || undefined,
-    })) as ResearchKitResult;
+    });
 
     ctx.researchData = researchKit;
 

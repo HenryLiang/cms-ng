@@ -22,9 +22,7 @@ export type SerializableBillingTransaction = {
   createdAt: Date;
 };
 
-export function serializeBillingTransaction(
-  t: SerializableBillingTransaction,
-) {
+export function serializeBillingTransaction(t: SerializableBillingTransaction) {
   return {
     id: t.id,
     userId: t.userId,

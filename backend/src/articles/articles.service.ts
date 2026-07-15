@@ -47,45 +47,52 @@ export class ArticlesService {
   // Note: keys/values are `string` rather than the `ArticleStatus` enum from
   // @cms-ng/shared to avoid TS2345 mismatches with Prisma's own enum
   // (two distinct TypeScript enum types with identical runtime values).
-  private static readonly VALID_TRANSITIONS: Record<string, readonly string[]> = {
-    [ArticleStatus.DRAFT]: [ArticleStatus.WRITING, ArticleStatus.ARCHIVED],
-    [ArticleStatus.WRITING]: [
-      ArticleStatus.AI_OPTIMIZING,
-      ArticleStatus.PENDING_REVIEW,
-      ArticleStatus.DRAFT,
-      ArticleStatus.ARCHIVED,
-    ],
-    [ArticleStatus.AI_OPTIMIZING]: [
-      ArticleStatus.PENDING_REVIEW,
-      ArticleStatus.WRITING,
-      ArticleStatus.DRAFT,
-    ],
-    [ArticleStatus.PENDING_REVIEW]: [
-      ArticleStatus.IN_REVIEW,
-      ArticleStatus.REVISION,
-      ArticleStatus.DRAFT,
-    ],
-    [ArticleStatus.IN_REVIEW]: [
-      ArticleStatus.APPROVED,
-      ArticleStatus.REVISION,
-      ArticleStatus.PENDING_REVIEW,
-    ],
-    [ArticleStatus.APPROVED]: [
-      ArticleStatus.PUBLISHED,
-      ArticleStatus.REVISION,
-      ArticleStatus.IN_REVIEW,
-    ],
-    [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
-    [ArticleStatus.ARCHIVED]: [],
-    [ArticleStatus.REVISION]: [
-      ArticleStatus.WRITING,
-      ArticleStatus.PENDING_REVIEW,
-      ArticleStatus.DRAFT,
-      ArticleStatus.ARCHIVED,
-    ],
-    [ArticleStatus.AUTO_PUBLISHED]: [ArticleStatus.ARCHIVED, ArticleStatus.PUBLISHED],
-    [ArticleStatus.PIPELINE_FAILED]: [ArticleStatus.DRAFT, ArticleStatus.ARCHIVED],
-  };
+  private static readonly VALID_TRANSITIONS: Record<string, readonly string[]> =
+    {
+      [ArticleStatus.DRAFT]: [ArticleStatus.WRITING, ArticleStatus.ARCHIVED],
+      [ArticleStatus.WRITING]: [
+        ArticleStatus.AI_OPTIMIZING,
+        ArticleStatus.PENDING_REVIEW,
+        ArticleStatus.DRAFT,
+        ArticleStatus.ARCHIVED,
+      ],
+      [ArticleStatus.AI_OPTIMIZING]: [
+        ArticleStatus.PENDING_REVIEW,
+        ArticleStatus.WRITING,
+        ArticleStatus.DRAFT,
+      ],
+      [ArticleStatus.PENDING_REVIEW]: [
+        ArticleStatus.IN_REVIEW,
+        ArticleStatus.REVISION,
+        ArticleStatus.DRAFT,
+      ],
+      [ArticleStatus.IN_REVIEW]: [
+        ArticleStatus.APPROVED,
+        ArticleStatus.REVISION,
+        ArticleStatus.PENDING_REVIEW,
+      ],
+      [ArticleStatus.APPROVED]: [
+        ArticleStatus.PUBLISHED,
+        ArticleStatus.REVISION,
+        ArticleStatus.IN_REVIEW,
+      ],
+      [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
+      [ArticleStatus.ARCHIVED]: [],
+      [ArticleStatus.REVISION]: [
+        ArticleStatus.WRITING,
+        ArticleStatus.PENDING_REVIEW,
+        ArticleStatus.DRAFT,
+        ArticleStatus.ARCHIVED,
+      ],
+      [ArticleStatus.AUTO_PUBLISHED]: [
+        ArticleStatus.ARCHIVED,
+        ArticleStatus.PUBLISHED,
+      ],
+      [ArticleStatus.PIPELINE_FAILED]: [
+        ArticleStatus.DRAFT,
+        ArticleStatus.ARCHIVED,
+      ],
+    };
 
   /**
    * Throws BadRequestException if the transition from→to is not in the
@@ -118,7 +125,9 @@ export class ArticlesService {
       select: { preferredLanguage: true },
     });
     const contentLanguage =
-      dto.contentLanguage ?? user?.preferredLanguage ?? ContentLanguage.TRADITIONAL_CHINESE_HK;
+      dto.contentLanguage ??
+      user?.preferredLanguage ??
+      ContentLanguage.TRADITIONAL_CHINESE_HK;
 
     const article = await this.prisma.article.create({
       data: serializeArticleInput({
@@ -414,12 +423,17 @@ export class ArticlesService {
     dto: RewriteTextDto,
   ) {
     await this.verifyAccess(id, user);
-    const result = await this.aiService.rewriteText(user.userId, id, {
-      text: dto.text,
-      instruction: dto.instruction,
-      style: dto.style,
-      authorSlug: dto.authorSlug,
-    }, dto.language);
+    const result = await this.aiService.rewriteText(
+      user.userId,
+      id,
+      {
+        text: dto.text,
+        instruction: dto.instruction,
+        style: dto.style,
+        authorSlug: dto.authorSlug,
+      },
+      dto.language,
+    );
     return { result };
   }
 

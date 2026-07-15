@@ -20,7 +20,8 @@ export class CreateTopUpDto {
   paymentMethod: string;
 
   @ApiProperty({
-    description: 'Optional pricing package identifier the top-up is associated with',
+    description:
+      'Optional pricing package identifier the top-up is associated with',
     example: 'pkg-starter-100',
     required: false,
   })

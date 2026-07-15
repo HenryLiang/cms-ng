@@ -36,7 +36,8 @@ export class EstimateCostDto {
   articleId?: string;
 
   @ApiProperty({
-    description: 'List of platform identifiers the cost is being estimated for (publish operations)',
+    description:
+      'List of platform identifiers the cost is being estimated for (publish operations)',
     example: ['WEBSITE', 'XIAOHONGSHU'],
     required: false,
     type: [String],
@@ -58,7 +59,8 @@ export class EstimateCostDto {
   estimatedTokens?: number;
 
   @ApiProperty({
-    description: 'Number of items in the batch (used for AUTO_PUBLISH operations)',
+    description:
+      'Number of items in the batch (used for AUTO_PUBLISH operations)',
     example: 5,
     minimum: 1,
     required: false,

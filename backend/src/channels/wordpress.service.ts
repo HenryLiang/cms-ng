@@ -1,12 +1,12 @@
-import {
-  Injectable,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
-import { PublishStatus, TransactionType, BillingCategory } from '@cms-ng/shared';
+import {
+  PublishStatus,
+  TransactionType,
+  BillingCategory,
+} from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()
@@ -19,8 +19,13 @@ export class WordPressService {
 
   private fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), WordPressService.FETCH_TIMEOUT_MS);
-    return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+    const timer = setTimeout(
+      () => controller.abort(),
+      WordPressService.FETCH_TIMEOUT_MS,
+    );
+    return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+      clearTimeout(timer),
+    );
   }
 
   constructor(
@@ -30,11 +35,16 @@ export class WordPressService {
   ) {
     this.siteUrl = this.configService.get<string>('WORDPRESS_SITE_URL', '');
     this.username = this.configService.get<string>('WORDPRESS_USERNAME', '');
-    this.appPassword = this.configService.get<string>('WORDPRESS_APP_PASSWORD', '');
+    this.appPassword = this.configService.get<string>(
+      'WORDPRESS_APP_PASSWORD',
+      '',
+    );
   }
 
   private getAuthHeader(): string {
-    const credentials = Buffer.from(`${this.username}:${this.appPassword}`).toString('base64');
+    const credentials = Buffer.from(
+      `${this.username}:${this.appPassword}`,
+    ).toString('base64');
     return `Basic ${credentials}`;
   }
 
@@ -62,7 +72,10 @@ export class WordPressService {
         });
 
         if (searchRes.ok) {
-          const existing = await searchRes.json() as Array<{ id: number; name: string }>;
+          const existing = (await searchRes.json()) as Array<{
+            id: number;
+            name: string;
+          }>;
           const match = existing.find(
             (t) => t.name.toLowerCase() === name.toLowerCase(),
           );
@@ -73,20 +86,25 @@ export class WordPressService {
         }
 
         // 不存在则创建
-        const createRes = await this.fetchWithTimeout(`${this.siteUrl}/wp-json/wp/v2/tags`, {
-          method: 'POST',
-          headers: {
-            Authorization: auth,
-            'Content-Type': 'application/json',
+        const createRes = await this.fetchWithTimeout(
+          `${this.siteUrl}/wp-json/wp/v2/tags`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: auth,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name }),
           },
-          body: JSON.stringify({ name }),
-        });
+        );
 
         if (createRes.ok) {
-          const created = await createRes.json() as { id: number };
+          const created = (await createRes.json()) as { id: number };
           tagIds.push(created.id);
         } else {
-          this.logger.warn(`Failed to create tag "${name}": ${createRes.status}`);
+          this.logger.warn(
+            `Failed to create tag "${name}": ${createRes.status}`,
+          );
         }
       } catch (error: any) {
         this.logger.warn(`Error resolving tag "${name}": ${error.message}`);
@@ -99,7 +117,9 @@ export class WordPressService {
   /**
    * 上传图片到 WordPress 媒体库，返回 media ID 和 WordPress 托管 URL
    */
-  private async uploadImage(imageUrl: string): Promise<{ id: number; sourceUrl: string } | null> {
+  private async uploadImage(
+    imageUrl: string,
+  ): Promise<{ id: number; sourceUrl: string } | null> {
     const auth = this.getAuthHeader();
 
     try {
@@ -110,35 +130,49 @@ export class WordPressService {
       }
 
       const imageBuffer = await imageRes.arrayBuffer();
-      const contentType = (imageRes.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
+      const contentType = (imageRes.headers.get('content-type') || 'image/jpeg')
+        .split(';')[0]
+        .trim();
 
       const urlPath = new URL(imageUrl).pathname;
       let filename = urlPath.split('/').pop() || 'cover';
       const extMap: Record<string, string> = {
-        'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
-        'image/webp': '.webp', 'image/svg+xml': '.svg', 'image/avif': '.avif',
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/gif': '.gif',
+        'image/webp': '.webp',
+        'image/svg+xml': '.svg',
+        'image/avif': '.avif',
       };
       const ext = extMap[contentType] || '.jpg';
       if (!filename.includes('.')) {
         filename = `${filename}${ext}`;
       }
 
-      const uploadRes = await this.fetchWithTimeout(`${this.siteUrl}/wp-json/wp/v2/media`, {
-        method: 'POST',
-        headers: {
-          Authorization: auth,
-          'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${filename}"`,
+      const uploadRes = await this.fetchWithTimeout(
+        `${this.siteUrl}/wp-json/wp/v2/media`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: auth,
+            'Content-Type': contentType,
+            'Content-Disposition': `attachment; filename="${filename}"`,
+          },
+          body: imageBuffer,
         },
-        body: imageBuffer,
-      });
+      );
 
       if (uploadRes.ok) {
-        const media = await uploadRes.json() as { id: number; source_url: string };
+        const media = (await uploadRes.json()) as {
+          id: number;
+          source_url: string;
+        };
         return { id: media.id, sourceUrl: media.source_url };
       } else {
         const errorText = await uploadRes.text();
-        this.logger.warn(`Failed to upload image to WordPress: ${uploadRes.status} ${errorText}`);
+        this.logger.warn(
+          `Failed to upload image to WordPress: ${uploadRes.status} ${errorText}`,
+        );
         return null;
       }
     } catch (error: any) {
@@ -166,7 +200,9 @@ export class WordPressService {
       if (absoluteUrl.startsWith('data:')) continue;
 
       if (absoluteUrl.startsWith(this.siteUrl)) {
-        this.logger.debug(`Skipping already-WordPress-hosted image: ${absoluteUrl}`);
+        this.logger.debug(
+          `Skipping already-WordPress-hosted image: ${absoluteUrl}`,
+        );
         continue;
       }
 
@@ -187,10 +223,7 @@ export class WordPressService {
   /**
    * 发布文章到 WordPress
    */
-  async publish(
-    articleId: string,
-    wpStatus: 'publish' | 'draft' = 'publish',
-  ) {
+  async publish(articleId: string, wpStatus: 'publish' | 'draft' = 'publish') {
     this.ensureConfigured();
 
     // 获取文章和 PlatformPublish 记录
@@ -207,7 +240,10 @@ export class WordPressService {
     if (!publish) {
       throw new BadRequestException('请先生成 WordPress 适配内容');
     }
-    if (publish.status !== PublishStatus.READY && publish.status !== PublishStatus.PUBLISHED) {
+    if (
+      publish.status !== PublishStatus.READY &&
+      publish.status !== PublishStatus.PUBLISHED
+    ) {
       throw new BadRequestException('适配内容未就绪，请先生成或重新生成');
     }
 
@@ -252,21 +288,28 @@ export class WordPressService {
       }
 
       // 发布到 WordPress
-      const res = await this.fetchWithTimeout(`${this.siteUrl}/wp-json/wp/v2/posts`, {
-        method: 'POST',
-        headers: {
-          Authorization: this.getAuthHeader(),
-          'Content-Type': 'application/json',
+      const res = await this.fetchWithTimeout(
+        `${this.siteUrl}/wp-json/wp/v2/posts`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: this.getAuthHeader(),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(postData),
         },
-        body: JSON.stringify(postData),
-      });
+      );
 
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(`WordPress API 错误 (${res.status}): ${errorText}`);
       }
 
-      const wpPost = await res.json() as { id: number; link: string; slug: string };
+      const wpPost = (await res.json()) as {
+        id: number;
+        link: string;
+        slug: string;
+      };
 
       // 更新 PlatformPublish 记录
       // notes 存储 wpPostId 以便撤回时直接删除
@@ -283,7 +326,11 @@ export class WordPressService {
       this.logger.log(`Article published to WordPress: ${wpPost.link}`);
 
       // Deduct billing for WordPress publish (non-blocking)
-      await this.deductWordPressBilling(article.authorId, publish.id, articleId);
+      await this.deductWordPressBilling(
+        article.authorId,
+        publish.id,
+        articleId,
+      );
 
       return {
         ...updated,
@@ -309,7 +356,10 @@ export class WordPressService {
    * @param publishedUrl 已发布文章的 URL
    * @param publishNotes publish 时存储在 notes 字段的 JSON（含 wpPostId, wpSlug）
    */
-  async deletePost(publishedUrl: string, publishNotes?: string | null): Promise<void> {
+  async deletePost(
+    publishedUrl: string,
+    publishNotes?: string | null,
+  ): Promise<void> {
     this.ensureConfigured();
 
     if (!publishedUrl) {
@@ -321,7 +371,10 @@ export class WordPressService {
 
     // 1. Try to get wpPostId from stored notes
     if (publishNotes) {
-      const stored = safeJsonParse<{ wpPostId?: number; wpSlug?: string }>(publishNotes, {});
+      const stored = safeJsonParse<{ wpPostId?: number; wpSlug?: string }>(
+        publishNotes,
+        {},
+      );
       if (stored.wpPostId) {
         const deleted = await this.tryDeleteById(stored.wpPostId, auth);
         if (deleted) return;
@@ -344,18 +397,22 @@ export class WordPressService {
           { headers: { Authorization: auth } },
         );
         if (lookupRes.ok) {
-          const posts = await lookupRes.json() as Array<{ id: number }>;
+          const posts = (await lookupRes.json()) as Array<{ id: number }>;
           if (posts.length > 0) {
             await this.tryDeleteById(posts[0].id, auth);
             return;
           }
         }
       } catch (error: any) {
-        this.logger.warn(`Error looking up post by slug "${slug}": ${error.message}`);
+        this.logger.warn(
+          `Error looking up post by slug "${slug}": ${error.message}`,
+        );
       }
     }
 
-    this.logger.warn(`Cannot delete WordPress post from URL: ${publishedUrl} (no match)`);
+    this.logger.warn(
+      `Cannot delete WordPress post from URL: ${publishedUrl} (no match)`,
+    );
   }
 
   /**
@@ -375,10 +432,14 @@ export class WordPressService {
         return true;
       }
       const errorBody = await res.text();
-      this.logger.warn(`WordPress DELETE post/${postId} failed (${res.status}): ${errorBody}`);
+      this.logger.warn(
+        `WordPress DELETE post/${postId} failed (${res.status}): ${errorBody}`,
+      );
       return false;
     } catch (error: any) {
-      this.logger.warn(`Error deleting WordPress post ${postId}: ${error.message}`);
+      this.logger.warn(
+        `Error deleting WordPress post ${postId}: ${error.message}`,
+      );
       return false;
     }
   }
@@ -421,12 +482,14 @@ export class WordPressService {
       if (!this.billingService.isEnabled()) return;
 
       const configKey = 'publish_wordpress';
-      let unitPrice = 0.10; // default fallback
+      let unitPrice = 0.1; // default fallback
       try {
         const config = await this.billingService.getConfig(configKey);
         unitPrice = config.unitPrice;
       } catch {
-        this.logger.debug(`Billing config "${configKey}" not found, using default ¥${unitPrice}`);
+        this.logger.debug(
+          `Billing config "${configKey}" not found, using default ¥${unitPrice}`,
+        );
       }
 
       if (unitPrice <= 0) return;

@@ -36,7 +36,9 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Refresh an existing (possibly expired) access token' })
+  @ApiOperation({
+    summary: 'Refresh an existing (possibly expired) access token',
+  })
   async refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.token);
   }
@@ -63,6 +65,10 @@ export class AuthController {
     @CurrentUser('userId') userId: string,
     @Body() dto: ToggleRegistrationDto,
   ) {
-    return this.authService.setRegistrationStatus(dto.enabled, userId, dto.reason);
+    return this.authService.setRegistrationStatus(
+      dto.enabled,
+      userId,
+      dto.reason,
+    );
   }
 }

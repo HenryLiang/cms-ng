@@ -115,8 +115,7 @@ export class AutoPublishService {
       data.topicStrategy = JSON.stringify(dto.topicStrategy);
     if (dto.contentConfig)
       data.contentConfig = JSON.stringify(dto.contentConfig);
-    if (dto.filterConfig)
-      data.filterConfig = JSON.stringify(dto.filterConfig);
+    if (dto.filterConfig) data.filterConfig = JSON.stringify(dto.filterConfig);
     if (dto.publishConfig)
       data.publishConfig = JSON.stringify(dto.publishConfig);
     if (dto.retryConfig) data.retryConfig = JSON.stringify(dto.retryConfig);
@@ -376,15 +375,16 @@ export class AutoPublishService {
         this.prisma.autoPublishArticle.count(),
       ]);
 
-    const [successArticles, failedArticles, killSwitchActive] = await Promise.all([
-      this.prisma.autoPublishArticle.count({
-        where: { status: ArticleRunStatus.PUBLISHED },
-      }),
-      this.prisma.autoPublishArticle.count({
-        where: { status: ArticleRunStatus.FAILED },
-      }),
-      this.scheduler.isKillSwitchActive(),
-    ]);
+    const [successArticles, failedArticles, killSwitchActive] =
+      await Promise.all([
+        this.prisma.autoPublishArticle.count({
+          where: { status: ArticleRunStatus.PUBLISHED },
+        }),
+        this.prisma.autoPublishArticle.count({
+          where: { status: ArticleRunStatus.FAILED },
+        }),
+        this.scheduler.isKillSwitchActive(),
+      ]);
 
     return {
       totalTasks,

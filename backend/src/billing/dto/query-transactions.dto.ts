@@ -39,7 +39,8 @@ export class QueryTransactionsDto {
   type?: TransactionType;
 
   @ApiProperty({
-    description: 'ISO 8601 date string for the inclusive start of the time range',
+    description:
+      'ISO 8601 date string for the inclusive start of the time range',
     example: '2026-01-01',
     required: false,
   })

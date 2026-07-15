@@ -49,7 +49,9 @@ export class ArticlesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List articles the current user can access, paginated' })
+  @ApiOperation({
+    summary: 'List articles the current user can access, paginated',
+  })
   findAll(
     @CurrentUser() user: { userId: string; role: string },
     @Query() query: FindAllArticlesDto,
@@ -59,7 +61,9 @@ export class ArticlesController {
 
   @Get('review-queue')
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
-  @ApiOperation({ summary: 'List articles awaiting editorial review (editor/admin)' })
+  @ApiOperation({
+    summary: 'List articles awaiting editorial review (editor/admin)',
+  })
   getReviewQueue(@CurrentUser('userId') editorId: string) {
     return this.articlesService.getReviewQueue(editorId);
   }
@@ -96,7 +100,9 @@ export class ArticlesController {
   }
 
   @Get(':id/versions')
-  @ApiOperation({ summary: 'List version history for an article (with access check)' })
+  @ApiOperation({
+    summary: 'List version history for an article (with access check)',
+  })
   async getVersions(
     @Param('id') id: string,
     @CurrentUser() user: { userId: string; role: string },
@@ -106,7 +112,9 @@ export class ArticlesController {
   }
 
   @Post(':id/rollback/:version')
-  @ApiOperation({ summary: 'Roll an article back to a previous version (with access check)' })
+  @ApiOperation({
+    summary: 'Roll an article back to a previous version (with access check)',
+  })
   async rollback(
     @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
@@ -118,7 +126,9 @@ export class ArticlesController {
 
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
   @Patch(':id/assign-editor')
-  @ApiOperation({ summary: 'Assign an editor to an article (editor/admin only)' })
+  @ApiOperation({
+    summary: 'Assign an editor to an article (editor/admin only)',
+  })
   async assignEditor(
     @Param('id') id: string,
     @Body('editorId') editorId: string,
@@ -128,7 +138,9 @@ export class ArticlesController {
 
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
   @Patch(':id/review')
-  @ApiOperation({ summary: 'Submit an editorial review decision (approve/revision)' })
+  @ApiOperation({
+    summary: 'Submit an editorial review decision (approve/revision)',
+  })
   async submitReview(
     @Param('id') id: string,
     @CurrentUser('userId') editorId: string,
@@ -204,7 +216,9 @@ export class ArticlesController {
   }
 
   @Post(':id/ai-chat')
-  @ApiOperation({ summary: 'AI: open a chat with the AI assistant about this article' })
+  @ApiOperation({
+    summary: 'AI: open a chat with the AI assistant about this article',
+  })
   aiChat(
     @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,
@@ -254,7 +268,10 @@ export class ArticlesController {
   }
 
   @Post(':id/ai-geo')
-  @ApiOperation({ summary: 'AI: optimize the article for GEO (generative engine optimization)' })
+  @ApiOperation({
+    summary:
+      'AI: optimize the article for GEO (generative engine optimization)',
+  })
   aiOptimizeGEO(
     @CurrentUser() user: { userId: string; role: string },
     @Param('id') id: string,

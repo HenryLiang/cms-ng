@@ -100,11 +100,7 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
         reasoning_content: choice.message.reasoning_content || '',
       };
 
-      currentMessages = [
-        ...currentMessages,
-        assistantMessage,
-        ...toolResults,
-      ];
+      currentMessages = [...currentMessages, assistantMessage, ...toolResults];
     }
 
     // Max rounds reached, do one final call without tools

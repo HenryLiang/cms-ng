@@ -44,7 +44,9 @@ export class ChannelsController {
   }
 
   @Post(':articleId/adapt')
-  @ApiOperation({ summary: 'Generate a platform-adapted version of the article' })
+  @ApiOperation({
+    summary: 'Generate a platform-adapted version of the article',
+  })
   async generateAdaptation(
     @CurrentUser() user: { userId: string; role: string },
     @Param('articleId') articleId: string,

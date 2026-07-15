@@ -65,12 +65,22 @@ export class AuthService {
 
   /** 注册是否开放（委派 RegistrationService）。 */
   async getRegistrationStatus() {
-    return { registrationOpen: await this.registrationService.isRegistrationOpen() };
+    return {
+      registrationOpen: await this.registrationService.isRegistrationOpen(),
+    };
   }
 
   /** 开/关注册（委派 RegistrationService）。返回切换后的开放状态。 */
-  async setRegistrationStatus(enabled: boolean, operatorId: string, reason?: string) {
-    await this.registrationService.setRegistrationOpen(enabled, operatorId, reason);
+  async setRegistrationStatus(
+    enabled: boolean,
+    operatorId: string,
+    reason?: string,
+  ) {
+    await this.registrationService.setRegistrationOpen(
+      enabled,
+      operatorId,
+      reason,
+    );
     return { registrationOpen: enabled };
   }
 

@@ -17,7 +17,8 @@ export class CreateRefundDto {
   reason: string;
 
   @ApiProperty({
-    description: 'Amount to refund in credits. If omitted, refunds the full original amount',
+    description:
+      'Amount to refund in credits. If omitted, refunds the full original amount',
     example: 10,
     minimum: 0.0001,
     required: false,

@@ -247,9 +247,7 @@ export class ChatWithAIDto {
   @ApiProperty({
     description: 'Ordered list of chat messages forming the conversation',
     type: [ChatMessageDto],
-    example: [
-      { role: 'user', content: 'What is the tone of this article?' },
-    ],
+    example: [{ role: 'user', content: 'What is the tone of this article?' }],
   })
   @ValidateNested({ each: true })
   @Type(() => ChatMessageDto)
@@ -345,7 +343,8 @@ export class OptimizeSEODto {
 
 export class OptimizeGEODto {
   @ApiProperty({
-    description: 'Output language for the GEO (generative engine optimization) suggestions',
+    description:
+      'Output language for the GEO (generative engine optimization) suggestions',
     enum: ContentLanguage,
     example: ContentLanguage.ENGLISH,
     required: false,

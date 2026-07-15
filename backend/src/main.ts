@@ -32,7 +32,8 @@ async function bootstrap() {
           scheme: 'bearer',
           bearerFormat: 'JWT',
           name: 'Authorization',
-          description: 'Paste a JWT obtained from /auth/login (no "Bearer " prefix needed)',
+          description:
+            'Paste a JWT obtained from /auth/login (no "Bearer " prefix needed)',
           in: 'header',
         },
         'bearer',
@@ -43,7 +44,10 @@ async function bootstrap() {
       .addTag('articles', 'Article CRUD, workflow, and AI operations')
       .addTag('channels', 'Multi-platform publishing adapters')
       .addTag('auto-publish', 'Scheduled publishing tasks and runs')
-      .addTag('trending-topics', 'Trending topic aggregation (Google Trends, RSS)')
+      .addTag(
+        'trending-topics',
+        'Trending topic aggregation (Google Trends, RSS)',
+      )
       .addTag('ai', 'AI writing operations (draft, research kit, fact-check)')
       .addTag('billing', 'Top-ups, balance, transactions, billing config')
       .build();

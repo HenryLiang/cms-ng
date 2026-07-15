@@ -48,9 +48,9 @@ export function deserializeArticle<T extends Record<string, any>>(
  */
 export type SerializedArticleInput<T> = Omit<
   T,
-  typeof ARTICLE_JSON_FIELDS[number]
+  (typeof ARTICLE_JSON_FIELDS)[number]
 > & {
-  [K in typeof ARTICLE_JSON_FIELDS[number]]?: string;
+  [K in (typeof ARTICLE_JSON_FIELDS)[number]]?: string;
 };
 
 /**
@@ -82,5 +82,5 @@ export function serializeArticleInput<T extends Record<string, any>>(
       (input as any)[field] = JSON.stringify(value);
     }
   }
-  return input as SerializedArticleInput<T>;
+  return input;
 }

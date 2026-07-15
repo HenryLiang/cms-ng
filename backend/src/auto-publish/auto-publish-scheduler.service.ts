@@ -84,19 +84,25 @@ export class AutoPublishSchedulerService
       const cronExpression = this.timeToCron(time);
 
       const jobName = `auto-publish-${task.id}-${idx}`;
-      const job = new CronJob(cronExpression, async () => {
-        const killActive = await this.isKillSwitchActive();
-        if (killActive) {
-          this.logger.warn(`Kill switch active — skipping task ${task.name}`);
-          return;
-        }
-        this.logger.log(`Cron triggered: ${task.name} at ${time}`);
-        try {
-          await this.pipelineService.runTask(task.id, 'SCHEDULED');
-        } catch (error: any) {
-          this.logger.error(`Task ${task.name} failed: ${error.message}`);
-        }
-      }, undefined, false, config.timezone);
+      const job = new CronJob(
+        cronExpression,
+        async () => {
+          const killActive = await this.isKillSwitchActive();
+          if (killActive) {
+            this.logger.warn(`Kill switch active — skipping task ${task.name}`);
+            return;
+          }
+          this.logger.log(`Cron triggered: ${task.name} at ${time}`);
+          try {
+            await this.pipelineService.runTask(task.id, 'SCHEDULED');
+          } catch (error: any) {
+            this.logger.error(`Task ${task.name} failed: ${error.message}`);
+          }
+        },
+        undefined,
+        false,
+        config.timezone,
+      );
 
       this.schedulerRegistry.addCronJob(jobName, job);
       job.start();

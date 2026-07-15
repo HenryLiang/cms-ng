@@ -26,7 +26,6 @@ import { AuthorStyleModule } from './authors/author-style.module';
       validate: (rawEnv) => {
         const result = validateEnv(rawEnv);
         if (!result.success) {
-          // eslint-disable-next-line no-console
           console.error(formatValidationErrors(result.errors));
           // Throwing here causes NestFactory.create to reject; the message
           // is already printed above so users see a clean error.

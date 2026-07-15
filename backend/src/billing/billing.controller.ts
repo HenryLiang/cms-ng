@@ -125,7 +125,9 @@ export class BillingController {
   }
 
   @Put('alert')
-  @ApiOperation({ summary: 'Update the current user low-balance alert settings' })
+  @ApiOperation({
+    summary: 'Update the current user low-balance alert settings',
+  })
   updateAlert(
     @CurrentUser('userId') userId: string,
     @Body() dto: UpdateAlertDto,
@@ -138,10 +140,7 @@ export class BillingController {
   @Post('refund')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Issue a refund (admin only)' })
-  refund(
-    @CurrentUser('userId') adminId: string,
-    @Body() dto: CreateRefundDto,
-  ) {
+  refund(@CurrentUser('userId') adminId: string, @Body() dto: CreateRefundDto) {
     return this.billingService.refund(adminId, dto);
   }
 
@@ -149,7 +148,9 @@ export class BillingController {
 
   @Get('report')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get a billing report for a date range (admin only)' })
+  @ApiOperation({
+    summary: 'Get a billing report for a date range (admin only)',
+  })
   getReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -170,11 +171,21 @@ export class BillingController {
   ) {
     switch (dto.paymentMethod) {
       case 'ALIPAY':
-        return this.alipayService.createOrder(userId, dto.amount, `充值 ¥${dto.amount}`);
+        return this.alipayService.createOrder(
+          userId,
+          dto.amount,
+          `充值 ¥${dto.amount}`,
+        );
       case 'WECHAT_PAY':
-        return this.wechatPayService.createOrder(userId, dto.amount, `充值 ¥${dto.amount}`);
+        return this.wechatPayService.createOrder(
+          userId,
+          dto.amount,
+          `充值 ¥${dto.amount}`,
+        );
       default:
-        throw new BadRequestException(`Unsupported payment method: ${dto.paymentMethod}`);
+        throw new BadRequestException(
+          `Unsupported payment method: ${dto.paymentMethod}`,
+        );
     }
   }
 
@@ -183,7 +194,9 @@ export class BillingController {
    */
   @Public()
   @Post('payment/alipay/notify')
-  @ApiOperation({ summary: 'Alipay async payment notification (public callback)' })
+  @ApiOperation({
+    summary: 'Alipay async payment notification (public callback)',
+  })
   async alipayNotify(@Body() body: Record<string, string>) {
     return this.alipayService.handleNotification(body);
   }
@@ -193,7 +206,9 @@ export class BillingController {
    */
   @Public()
   @Post('payment/wechat/notify')
-  @ApiOperation({ summary: 'WeChat Pay async payment notification (public callback)' })
+  @ApiOperation({
+    summary: 'WeChat Pay async payment notification (public callback)',
+  })
   async wechatNotify(
     @Headers() headers: Record<string, string>,
     @Body() body: string,

@@ -8,7 +8,11 @@ import {
   TransactionType,
   BillingCategory,
 } from '@cms-ng/shared';
-import { PipelineStep, PipelineContext, StepTraceEntry } from './step.interface';
+import {
+  PipelineStep,
+  PipelineContext,
+  StepTraceEntry,
+} from './step.interface';
 import { RedisService } from '../../redis/redis.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { BillingService } from '../../billing/billing.service';
@@ -81,12 +85,17 @@ export class PipelineService {
    * Run the full pipeline for a single task execution.
    * Creates a Run record and processes `batchSize` articles.
    */
-  async runTask(taskId: string, triggerType: 'SCHEDULED' | 'MANUAL' = 'SCHEDULED'): Promise<void> {
+  async runTask(
+    taskId: string,
+    triggerType: 'SCHEDULED' | 'MANUAL' = 'SCHEDULED',
+  ): Promise<void> {
     // Check kill switch first — blocks both scheduled and manual triggers
     // MySQL is the source of truth (issue #48 P0), not Redis
     const killSwitchActive = await this.scheduler.isKillSwitchActive();
     if (killSwitchActive) {
-      this.logger.warn(`Kill switch active — skipping task ${taskId} (${triggerType})`);
+      this.logger.warn(
+        `Kill switch active — skipping task ${taskId} (${triggerType})`,
+      );
       return;
     }
 
@@ -98,7 +107,9 @@ export class PipelineService {
       return;
     }
     if (task.status !== 'ACTIVE') {
-      this.logger.warn(`Task ${taskId} is not ACTIVE (status=${task.status}), skipping`);
+      this.logger.warn(
+        `Task ${taskId} is not ACTIVE (status=${task.status}), skipping`,
+      );
       return;
     }
 
@@ -112,7 +123,9 @@ export class PipelineService {
           `Task ${taskId} BLOCKED: Redis unavailable, fail-closed lock denied (${triggerType})`,
         );
       } else {
-        this.logger.warn(`Task ${taskId} is already running — skipping duplicate trigger`);
+        this.logger.warn(
+          `Task ${taskId} is already running — skipping duplicate trigger`,
+        );
       }
       return;
     }
@@ -124,7 +137,10 @@ export class PipelineService {
     }
   }
 
-  private async executeRun(task: any, triggerType: 'SCHEDULED' | 'MANUAL'): Promise<void> {
+  private async executeRun(
+    task: any,
+    triggerType: 'SCHEDULED' | 'MANUAL',
+  ): Promise<void> {
     const taskId = task.id;
 
     // Create run record
@@ -137,10 +153,10 @@ export class PipelineService {
       },
     });
 
-    const retryConfig = safeJsonParse<{ maxRetries: number; retryDelayMs: number }>(
-      task.retryConfig,
-      { maxRetries: 2, retryDelayMs: 30000 },
-    );
+    const retryConfig = safeJsonParse<{
+      maxRetries: number;
+      retryDelayMs: number;
+    }>(task.retryConfig, { maxRetries: 2, retryDelayMs: 30000 });
     const contentConfig = safeJsonParse(task.contentConfig, {});
     const publishConfig = safeJsonParse(task.publishConfig, {});
 
@@ -218,7 +234,14 @@ export class PipelineService {
     });
 
     // Send notification email
-    await this.sendRunNotification(task, run.id, runStatus, successCount, failedCount, errors);
+    await this.sendRunNotification(
+      task,
+      run.id,
+      runStatus,
+      successCount,
+      failedCount,
+      errors,
+    );
 
     this.logger.log(
       `Run ${run.id} completed: ${runStatus} (${successCount} success, ${failedCount} failed)`,
@@ -231,9 +254,12 @@ export class PipelineService {
    */
   async retrySingleArticle(articleId: string): Promise<void> {
     // Check kill switch
-    const killSwitchActive = await this.redis.get('auto-publish:kill-switch') === 'true';
+    const killSwitchActive =
+      (await this.redis.get('auto-publish:kill-switch')) === 'true';
     if (killSwitchActive) {
-      this.logger.warn(`Kill switch active — skipping retry for article ${articleId}`);
+      this.logger.warn(
+        `Kill switch active — skipping retry for article ${articleId}`,
+      );
       return;
     }
 
@@ -254,15 +280,17 @@ export class PipelineService {
     }
 
     if (record.status !== ArticleRunStatus.FAILED) {
-      this.logger.warn(`Article ${articleId} is not FAILED (status=${record.status}), skipping retry`);
+      this.logger.warn(
+        `Article ${articleId} is not FAILED (status=${record.status}), skipping retry`,
+      );
       return;
     }
 
     const task = record.run.task;
-    const retryConfig = safeJsonParse<{ maxRetries: number; retryDelayMs: number }>(
-      task.retryConfig,
-      { maxRetries: 2, retryDelayMs: 30000 },
-    );
+    const retryConfig = safeJsonParse<{
+      maxRetries: number;
+      retryDelayMs: number;
+    }>(task.retryConfig, { maxRetries: 2, retryDelayMs: 30000 });
     const contentConfig = safeJsonParse(task.contentConfig, {});
     const publishConfig = safeJsonParse(task.publishConfig, {});
 
@@ -318,7 +346,9 @@ export class PipelineService {
 
       this.logger.log(`Single article retry succeeded: ${articleId}`);
     } catch (error: any) {
-      this.logger.error(`Single article retry failed for ${articleId}: ${error.message}`);
+      this.logger.error(
+        `Single article retry failed for ${articleId}: ${error.message}`,
+      );
 
       if (ctx.savedArticleId) {
         try {
@@ -431,7 +461,8 @@ export class PipelineService {
     }
 
     // All retries exhausted — update tracking record with trace
-    const totalDurationMs = ctx.trace?.reduce((sum, e) => sum + e.durationMs, 0) ?? 0;
+    const totalDurationMs =
+      ctx.trace?.reduce((sum, e) => sum + e.durationMs, 0) ?? 0;
     await this.prisma.autoPublishArticle.update({
       where: { id: ctx.articleId },
       data: {

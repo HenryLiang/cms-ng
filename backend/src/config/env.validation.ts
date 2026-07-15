@@ -32,7 +32,9 @@ export type ValidationResult =
   | { success: true; data: ValidatedEnv }
   | { success: false; errors: string[] };
 
-export function validateEnv(env: NodeJS.ProcessEnv = process.env): ValidationResult {
+export function validateEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): ValidationResult {
   const errors: string[] = [];
 
   for (const key of REQUIRED_VARS) {
@@ -42,7 +44,10 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): ValidationRes
     }
   }
 
-  if (env.JWT_SECRET !== undefined && env.JWT_SECRET.length < MIN_JWT_SECRET_LENGTH) {
+  if (
+    env.JWT_SECRET !== undefined &&
+    env.JWT_SECRET.length < MIN_JWT_SECRET_LENGTH
+  ) {
     errors.push(
       `  - JWT_SECRET: must be at least ${MIN_JWT_SECRET_LENGTH} characters (got ${env.JWT_SECRET.length})`,
     );
@@ -53,11 +58,16 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): ValidationRes
     env.DATABASE_URL.length > 0 &&
     !/^mysql:\/\//.test(env.DATABASE_URL)
   ) {
-    errors.push(`  - DATABASE_URL: must start with mysql:// (got "${env.DATABASE_URL.slice(0, 20)}...")`);
+    errors.push(
+      `  - DATABASE_URL: must start with mysql:// (got "${env.DATABASE_URL.slice(0, 20)}...")`,
+    );
   }
 
   const aiProvider = env.AI_PROVIDER;
-  if (aiProvider !== undefined && !(VALID_AI_PROVIDERS as readonly string[]).includes(aiProvider)) {
+  if (
+    aiProvider !== undefined &&
+    !(VALID_AI_PROVIDERS as readonly string[]).includes(aiProvider)
+  ) {
     errors.push(
       `  - AI_PROVIDER: must be one of [${VALID_AI_PROVIDERS.join(', ')}] (got "${aiProvider}")`,
     );
@@ -70,7 +80,9 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): ValidationRes
     };
     const requiredKey = keyMap[aiProvider as AiProvider];
     if (!env[requiredKey]) {
-      errors.push(`  - ${requiredKey}: required when AI_PROVIDER=${aiProvider}`);
+      errors.push(
+        `  - ${requiredKey}: required when AI_PROVIDER=${aiProvider}`,
+      );
     }
   }
 
@@ -89,7 +101,7 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): ValidationRes
       PORT: env.PORT ? Number(env.PORT) : 3001,
       NODE_ENV: (env.NODE_ENV as ValidatedEnv['NODE_ENV']) || 'development',
       AI_PROVIDER: (aiProvider as AiProvider) || 'deepseek',
-    } as ValidatedEnv,
+    },
   };
 }
 

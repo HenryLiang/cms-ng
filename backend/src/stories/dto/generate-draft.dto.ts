@@ -4,7 +4,8 @@ import { ContentLanguage } from '@cms-ng/shared';
 
 export class GenerateDraftFromResearchKitDto {
   @ApiProperty({
-    description: 'Research kit payload assembled from earlier research step (timeline, people, data, opinions, etc.)',
+    description:
+      'Research kit payload assembled from earlier research step (timeline, people, data, opinions, etc.)',
     example: {
       timeline: [{ date: '2026-01-01', event: 'Initial launch' }],
       people: [],

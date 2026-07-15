@@ -95,7 +95,9 @@ export class AutoPublishController {
   }
 
   @Get('articles/:id/trace')
-  @ApiOperation({ summary: 'Get the execution trace for a single auto-publish article' })
+  @ApiOperation({
+    summary: 'Get the execution trace for a single auto-publish article',
+  })
   async findArticleTrace(@Param('id') id: string) {
     return this.service.findArticleTrace(id);
   }
@@ -119,7 +121,9 @@ export class AutoPublishController {
   @Post('kill-switch')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Toggle the global auto-publish kill switch (admin only)' })
+  @ApiOperation({
+    summary: 'Toggle the global auto-publish kill switch (admin only)',
+  })
   async killSwitch(
     @Request() req: any,
     @Body('enable') enable: boolean,
