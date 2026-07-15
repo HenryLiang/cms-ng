@@ -87,7 +87,8 @@ const ALLOWED_TIMEZONES = [
 
 export class ScheduleConfigDto {
   @ApiProperty({
-    description: 'List of trigger times. Each entry is either HH:MM (00:00–23:59) or a valid 5-field cron expression',
+    description:
+      'List of trigger times. Each entry is either HH:MM (00:00–23:59) or a valid 5-field cron expression',
     example: ['09:00', '0 18 * * *'],
     type: [String],
   })
@@ -99,7 +100,7 @@ export class ScheduleConfigDto {
     enum: ALLOWED_TIMEZONES as unknown as string[],
     example: 'Asia/Hong_Kong',
   })
-  @IsIn(ALLOWED_TIMEZONES as unknown as string[])
+  @IsIn(ALLOWED_TIMEZONES)
   timezone: string;
 }
 
@@ -113,7 +114,8 @@ export class TopicStrategyDto {
   fixedKeywords: string[];
 
   @ApiProperty({
-    description: 'When true, mix in trending topics alongside the fixed keywords',
+    description:
+      'When true, mix in trending topics alongside the fixed keywords',
     example: true,
     required: false,
   })
@@ -159,7 +161,8 @@ export class ContentConfigDto {
   language: ContentLanguage;
 
   @ApiProperty({
-    description: 'Optional override of the system prompt used for content generation',
+    description:
+      'Optional override of the system prompt used for content generation',
     example: 'You are a newsroom assistant...',
     required: false,
   })
@@ -220,7 +223,8 @@ export class PublishConfigDto {
   platform: Platform;
 
   @ApiProperty({
-    description: 'UUID of the WordPress site to publish to (when platform is WordPress)',
+    description:
+      'UUID of the WordPress site to publish to (when platform is WordPress)',
     example: '8a3b1c52-7f1d-4d2e-9b1f-3a4b5c6d7e8f',
     required: false,
   })
@@ -238,7 +242,8 @@ export class PublishConfigDto {
   category?: string;
 
   @ApiProperty({
-    description: 'WordPress post status to apply (publish, draft, pending, etc.)',
+    description:
+      'WordPress post status to apply (publish, draft, pending, etc.)',
     example: 'publish',
     required: false,
   })

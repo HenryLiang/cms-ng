@@ -9,7 +9,8 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class RefreshTokenDto {
   @ApiProperty({
-    description: 'Existing JWT access token to refresh (looks too short if not a JWT)',
+    description:
+      'Existing JWT access token to refresh (looks too short if not a JWT)',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature',
     minLength: 10,
   })

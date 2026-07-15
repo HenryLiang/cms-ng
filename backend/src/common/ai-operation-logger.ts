@@ -90,7 +90,10 @@ export class AIOperationLogger {
       }
       return result;
     } catch (error: any) {
-      this.logger.error(`${opts.action} failed:`, error?.message ?? String(error));
+      this.logger.error(
+        `${opts.action} failed:`,
+        error?.message ?? String(error),
+      );
       await this.persistFailure(opts, error, Date.now() - startTime);
       return opts.fallback;
     }

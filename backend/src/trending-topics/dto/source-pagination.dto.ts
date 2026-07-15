@@ -25,7 +25,8 @@ export class SourcePaginationDto {
   page?: number = 1;
 
   @ApiProperty({
-    description: 'Maximum number of results to return (hard-capped at 50 by the service)',
+    description:
+      'Maximum number of results to return (hard-capped at 50 by the service)',
     example: 10,
     minimum: 1,
     maximum: 50,

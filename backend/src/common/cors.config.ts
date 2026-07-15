@@ -14,14 +14,18 @@ const DEV_DEFAULT_ORIGINS = ['http://localhost:3000'];
  * The CORS_ORIGINS value is a comma-separated list. Whitespace is trimmed
  * and empty entries are ignored.
  */
-export function buildCorsOptions(env: NodeJS.ProcessEnv = process.env): CorsOptions {
+export function buildCorsOptions(
+  env: NodeJS.ProcessEnv = process.env,
+): CorsOptions {
   const isProd = env.NODE_ENV === 'production';
   const configured = (env.CORS_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const allowlist = isProd ? configured : [...DEV_DEFAULT_ORIGINS, ...configured];
+  const allowlist = isProd
+    ? configured
+    : [...DEV_DEFAULT_ORIGINS, ...configured];
 
   return {
     origin: (origin, callback) => {

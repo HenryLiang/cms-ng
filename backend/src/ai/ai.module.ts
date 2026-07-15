@@ -17,7 +17,9 @@ import { AIOperationLogger } from '../common/ai-operation-logger';
 const chatProviderFactory = {
   provide: CHAT_PROVIDER,
   useFactory: (config: ConfigService): ChatCompletionProvider => {
-    const provider = (config.get<string>('AI_PROVIDER') || 'deepseek').toLowerCase();
+    const provider = (
+      config.get<string>('AI_PROVIDER') || 'deepseek'
+    ).toLowerCase();
     switch (provider) {
       case 'kimi':
         return new KimiProvider(config);

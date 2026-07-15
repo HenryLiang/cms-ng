@@ -47,7 +47,9 @@ export class UsersController {
 
   @Patch(':id')
   @Roles(UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update a user (self for non-admins; any user for admins)' })
+  @ApiOperation({
+    summary: 'Update a user (self for non-admins; any user for admins)',
+  })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -64,7 +66,8 @@ export class UsersController {
   @Post()
   @Roles(UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Create a new account (admin only). Returns a one-time random password.',
+    summary:
+      'Create a new account (admin only). Returns a one-time random password.',
   })
   async create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
@@ -84,7 +87,8 @@ export class UsersController {
   @Post(':id/reset-password')
   @Roles(UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Reset a user password (admin only). Returns a one-time random password.',
+    summary:
+      'Reset a user password (admin only). Returns a one-time random password.',
   })
   async resetPassword(@Param('id') id: string) {
     return this.usersService.resetPassword(id);

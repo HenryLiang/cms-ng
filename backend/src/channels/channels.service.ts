@@ -262,13 +262,15 @@ export class ChannelsService {
 
       // Look up unit price from billing config
       const configKey = `publish_${platform.toLowerCase()}`;
-      let unitPrice = 0.10; // default fallback
+      let unitPrice = 0.1; // default fallback
       try {
         const config = await this.billingService.getConfig(configKey);
         unitPrice = config.unitPrice;
       } catch {
         // Config not found — use default price
-        this.logger.debug(`Billing config "${configKey}" not found, using default ¥${unitPrice}`);
+        this.logger.debug(
+          `Billing config "${configKey}" not found, using default ¥${unitPrice}`,
+        );
       }
 
       if (unitPrice <= 0) return;

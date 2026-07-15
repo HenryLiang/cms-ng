@@ -55,9 +55,7 @@ export class WechatPayService {
   }
 
   private getNotifyUrl(): string {
-    return (
-      this.config.get<string>('APP_BASE_URL') || 'http://localhost:3001'
-    );
+    return this.config.get<string>('APP_BASE_URL') || 'http://localhost:3001';
   }
 
   /**
@@ -260,7 +258,10 @@ export class WechatPayService {
 
       return { code: 'SUCCESS', message: 'OK' };
     } catch (error) {
-      this.logger.error(`WeChat Pay notification error: ${error.message}`, error.stack);
+      this.logger.error(
+        `WeChat Pay notification error: ${error.message}`,
+        error.stack,
+      );
       return { code: 'FAIL', message: 'Processing error' };
     }
   }

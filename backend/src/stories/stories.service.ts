@@ -28,7 +28,9 @@ export class StoriesService {
       select: { preferredLanguage: true },
     });
     const contentLanguage =
-      dto.contentLanguage ?? user?.preferredLanguage ?? ContentLanguage.TRADITIONAL_CHINESE_HK;
+      dto.contentLanguage ??
+      user?.preferredLanguage ??
+      ContentLanguage.TRADITIONAL_CHINESE_HK;
 
     const story = await this.prisma.story.create({
       data: {
@@ -99,7 +101,7 @@ export class StoriesService {
         where,
         skip,
         take,
-        orderBy: { [sortBy]: order } as Prisma.StoryOrderByWithRelationInput,
+        orderBy: { [sortBy]: order },
         include: {
           reporter: { select: { id: true, name: true, email: true } },
           editor: { select: { id: true, name: true, email: true } },

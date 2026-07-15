@@ -57,9 +57,10 @@ export class AuthorStyleService {
     const configured = this.config.get<string>('AUTHORS_DATA_DIR') || '';
     // Default to <cwd>/data/authors so it works in both dev (repo root) and
     // prod (backend/ is the cwd — point AUTHORS_DATA_DIR at the real path).
-    this.authorsDir = configured && isAbsolute(configured)
-      ? configured
-      : join(process.cwd(), 'data', 'authors');
+    this.authorsDir =
+      configured && isAbsolute(configured)
+        ? configured
+        : join(process.cwd(), 'data', 'authors');
 
     // Eagerly detect on boot so the absence is logged once at startup.
     this.detectOnBoot();
@@ -179,7 +180,9 @@ export class AuthorStyleService {
     }
   }
 
-  private async readProfileSummary(slug: string): Promise<AuthorSummary | null> {
+  private async readProfileSummary(
+    slug: string,
+  ): Promise<AuthorSummary | null> {
     const profilePath = join(this.authorsDir, slug, 'profile.json');
     try {
       const raw = await readFile(profilePath, 'utf-8');
@@ -188,7 +191,7 @@ export class AuthorStyleService {
         name?: string;
         top_categories?: [string, number][];
         top_tags?: [string, number][];
-      }>(raw, {} as any);
+      }>(raw, {});
 
       const name = profile.author_name || profile.name || slug;
       // Derive a short fields list from top categories/tags (deduped, capped).

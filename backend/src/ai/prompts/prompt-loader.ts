@@ -69,7 +69,10 @@ const PLACEHOLDER = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
  * - Throws if a referenced var is missing.
  * - If vars has an extra key not referenced in the template, it's ignored.
  */
-export function substitute(template: string, vars: Record<string, string>): string {
+export function substitute(
+  template: string,
+  vars: Record<string, string>,
+): string {
   const missing = new Set<string>();
   const result = template.replace(PLACEHOLDER, (match, key: string) => {
     if (Object.prototype.hasOwnProperty.call(vars, key)) {

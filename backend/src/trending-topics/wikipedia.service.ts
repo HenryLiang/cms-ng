@@ -256,7 +256,6 @@ export class WikipediaService implements TopicSourceAdapter {
       // 原生 fetch 不读 HTTP_PROXY，须显式 dispatcher。
       // ProxyAgent 缓存为 singleton，避免每请求新建泄漏连接池。
       if (!this.proxyAgent) {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { ProxyAgent } = require('undici');
         this.proxyAgent = new ProxyAgent(this.proxyUrl);
       }

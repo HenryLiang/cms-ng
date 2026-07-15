@@ -54,9 +54,7 @@ export class AlipayService {
   }
 
   private getNotifyUrl(): string {
-    return (
-      this.config.get<string>('APP_BASE_URL') || 'http://localhost:3001'
-    );
+    return this.config.get<string>('APP_BASE_URL') || 'http://localhost:3001';
   }
 
   private getReturnUrl(): string {
@@ -105,7 +103,10 @@ export class AlipayService {
         },
       });
     } catch (error) {
-      this.logger.error(`Alipay createOrder failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Alipay createOrder failed: ${error.message}`,
+        error.stack,
+      );
       // Mark record as failed so it doesn't stay in PENDING forever
       await this.prisma.topUpRecord.update({
         where: { id: record.id },
@@ -158,13 +159,17 @@ export class AlipayService {
       });
 
       if (!record) {
-        this.logger.warn(`Alipay notification: record not found for ${outTradeNo}`);
+        this.logger.warn(
+          `Alipay notification: record not found for ${outTradeNo}`,
+        );
         return 'fail';
       }
 
       // Idempotent: already processed
       if (record.status === TransactionStatus.COMPLETED) {
-        this.logger.debug(`Alipay notification: already processed record=${record.id}`);
+        this.logger.debug(
+          `Alipay notification: already processed record=${record.id}`,
+        );
         return 'success';
       }
 

@@ -3,7 +3,8 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateAlertDto {
   @ApiProperty({
-    description: 'Spend threshold in credits that triggers the low-balance alert',
+    description:
+      'Spend threshold in credits that triggers the low-balance alert',
     example: 50,
     minimum: 0,
   })

@@ -13,7 +13,8 @@ export class QueryRunDto {
   taskId?: string;
 
   @ApiProperty({
-    description: 'Filter runs by their lifecycle status (e.g. RUNNING, COMPLETED, FAILED)',
+    description:
+      'Filter runs by their lifecycle status (e.g. RUNNING, COMPLETED, FAILED)',
     example: 'COMPLETED',
     required: false,
   })

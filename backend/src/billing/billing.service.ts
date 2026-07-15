@@ -17,7 +17,10 @@ import {
 import { ManualTopUpDto } from './dto/manual-top-up.dto';
 import { UpdateBillingConfigDto } from './dto/update-billing-config.dto';
 import { QueryTransactionsDto } from './dto/query-transactions.dto';
-import { EstimateCostDto, EstimateOperationType } from './dto/estimate-cost.dto';
+import {
+  EstimateCostDto,
+  EstimateOperationType,
+} from './dto/estimate-cost.dto';
 import { UpdateAlertDto } from './dto/update-alert.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { serializeBillingTransaction } from '../common/billing-transaction.utils';
@@ -63,7 +66,8 @@ export class BillingService {
     private prisma: PrismaService,
     private config: ConfigService,
   ) {
-    this.billingEnabled = this.config.get<string>('BILLING_ENABLED') !== 'false';
+    this.billingEnabled =
+      this.config.get<string>('BILLING_ENABLED') !== 'false';
     if (!this.billingEnabled) {
       this.logger.warn('Billing system is DISABLED (BILLING_ENABLED=false)');
     }
@@ -92,7 +96,9 @@ export class BillingService {
     return {
       balance: Number(user.balance),
       alertThreshold: alert ? Number(alert.thresholdAmount) : null,
-      recentTransactions: recentTransactions.map((t) => this.serializeTransaction(t)),
+      recentTransactions: recentTransactions.map((t) =>
+        this.serializeTransaction(t),
+      ),
     };
   }
 
@@ -168,7 +174,9 @@ export class BillingService {
             quantity: params.quantity,
             unitPrice: params.unitPrice,
             idempotencyKey: params.idempotencyKey,
-            metadata: params.metadata ? JSON.stringify(params.metadata) : undefined,
+            metadata: params.metadata
+              ? JSON.stringify(params.metadata)
+              : undefined,
             status: TransactionStatus.COMPLETED,
           },
         });
@@ -328,7 +336,8 @@ export class BillingService {
     const config = await this.prisma.billingConfig.findFirst({
       where: { itemKey },
     });
-    if (!config) throw new NotFoundException(`Billing config not found: ${itemKey}`);
+    if (!config)
+      throw new NotFoundException(`Billing config not found: ${itemKey}`);
     return {
       ...config,
       unitPrice: Number(config.unitPrice),
@@ -338,11 +347,16 @@ export class BillingService {
   /**
    * Update a billing config (admin only).
    */
-  async updateConfig(adminId: string, itemKey: string, dto: UpdateBillingConfigDto) {
+  async updateConfig(
+    adminId: string,
+    itemKey: string,
+    dto: UpdateBillingConfigDto,
+  ) {
     const config = await this.prisma.billingConfig.findFirst({
       where: { itemKey },
     });
-    if (!config) throw new NotFoundException(`Billing config not found: ${itemKey}`);
+    if (!config)
+      throw new NotFoundException(`Billing config not found: ${itemKey}`);
 
     const updated = await this.prisma.billingConfig.update({
       where: { id: config.id },
@@ -371,7 +385,12 @@ export class BillingService {
     if (!user) throw new NotFoundException('User not found');
 
     const currentBalance = Number(user.balance);
-    const breakdown: Array<{ item: string; quantity: number; unitPrice: number; subtotal: number }> = [];
+    const breakdown: Array<{
+      item: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+    }> = [];
     let estimatedCost = 0;
 
     switch (dto.operationType) {
@@ -381,14 +400,24 @@ export class BillingService {
         const units = Math.ceil(tokens / 1000);
         const price = config?.unitPrice || 0.02;
         const subtotal = units * price;
-        breakdown.push({ item: 'AI LLM 调用', quantity: units, unitPrice: price, subtotal });
+        breakdown.push({
+          item: 'AI LLM 调用',
+          quantity: units,
+          unitPrice: price,
+          subtotal,
+        });
         estimatedCost += subtotal;
         break;
       }
       case EstimateOperationType.AI_IMAGE: {
         const config = await this.getConfigSafe('ai_image_per_piece');
         const price = config?.unitPrice || 0.5;
-        breakdown.push({ item: 'AI 图片生成', quantity: 1, unitPrice: price, subtotal: price });
+        breakdown.push({
+          item: 'AI 图片生成',
+          quantity: 1,
+          unitPrice: price,
+          subtotal: price,
+        });
         estimatedCost += price;
         break;
       }
@@ -398,7 +427,12 @@ export class BillingService {
           const key = `publish_${platform.toLowerCase()}`;
           const config = await this.getConfigSafe(key);
           const price = config?.unitPrice || 0.1;
-          breakdown.push({ item: `${platform} 发布`, quantity: 1, unitPrice: price, subtotal: price });
+          breakdown.push({
+            item: `${platform} 发布`,
+            quantity: 1,
+            unitPrice: price,
+            subtotal: price,
+          });
           estimatedCost += price;
         }
         break;
@@ -414,7 +448,9 @@ export class BillingService {
         const publishConfig = await this.getConfigSafe('publish_website');
         const publishPrice = publishConfig?.unitPrice || 0;
 
-        const surchargeConfig = await this.getConfigSafe('auto_publish_surcharge');
+        const surchargeConfig = await this.getConfigSafe(
+          'auto_publish_surcharge',
+        );
         const surchargePrice = surchargeConfig?.unitPrice || 0.05;
 
         const perArticleCost = aiCost + publishPrice;
@@ -436,7 +472,8 @@ export class BillingService {
           unitPrice: surchargePrice,
           subtotal: surchargePrice,
         });
-        estimatedCost = aiCost * batchSize + publishPrice * batchSize + surchargePrice;
+        estimatedCost =
+          aiCost * batchSize + publishPrice * batchSize + surchargePrice;
         break;
       }
       case EstimateOperationType.X_TRENDING: {
@@ -444,7 +481,12 @@ export class BillingService {
         // 一次拉取（趋势榜单或聚合账号推文）按一次调用计费。
         const config = await this.getConfigSafe('x_trending_fetch');
         const price = config?.unitPrice || 0.05;
-        breakdown.push({ item: 'X 数据源拉取', quantity: 1, unitPrice: price, subtotal: price });
+        breakdown.push({
+          item: 'X 数据源拉取',
+          quantity: 1,
+          unitPrice: price,
+          subtotal: price,
+        });
         estimatedCost += price;
         break;
       }
@@ -468,8 +510,10 @@ export class BillingService {
     if (type) where.type = type;
     if (startDate || endDate) {
       where.createdAt = {};
-      if (startDate) (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
-      if (endDate) (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
+      if (startDate)
+        (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
+      if (endDate)
+        (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
     }
 
     const [transactions, total] = await Promise.all([
@@ -500,7 +544,8 @@ export class BillingService {
       if (amount < 0) {
         totalSpent += Math.abs(amount);
         byType[t.type] = (byType[t.type] || 0) + Math.abs(amount);
-        byCategory[t.category] = (byCategory[t.category] || 0) + Math.abs(amount);
+        byCategory[t.category] =
+          (byCategory[t.category] || 0) + Math.abs(amount);
       }
     }
 
@@ -521,8 +566,10 @@ export class BillingService {
     if (type) where.type = type;
     if (startDate || endDate) {
       where.createdAt = {};
-      if (startDate) (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
-      if (endDate) (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
+      if (startDate)
+        (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
+      if (endDate)
+        (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
     }
 
     const [transactions, total] = await Promise.all([
@@ -712,7 +759,9 @@ export class BillingService {
    * Get consumption report (admin).
    */
   async getReport(startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const end = endDate ? new Date(endDate) : new Date();
 
     const transactions = await this.prisma.billingTransaction.findMany({

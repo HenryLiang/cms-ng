@@ -155,11 +155,7 @@ export class UsersService {
    * 下次校验时回落 DB 读到最新状态——被禁用用户的后续请求立即被拒。
    * 禁止管理员禁用自己的账户，避免把自己锁死。
    */
-  async setStatus(
-    id: string,
-    dto: UpdateUserStatusDto,
-    operatorId: string,
-  ) {
+  async setStatus(id: string, dto: UpdateUserStatusDto, operatorId: string) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
@@ -234,11 +230,7 @@ export class UsersService {
    * 单账户消费汇总：余额、累计消费、累计充值、按类型/类目分布、最近流水（分页）。
    * 复用与 billing.service 一致的口径：完成态流水，负金额=消费。
    */
-  async getConsumption(
-    userId: string,
-    page = 1,
-    pageSize = 20,
-  ) {
+  async getConsumption(userId: string, page = 1, pageSize = 20) {
     // 防御性夹取：page/pageSize 来自 @Query 字符串解析，需抵御非正整数/NaN/负值，
     // 否则 Prisma skip/take 会抛 PrismaClientValidationError -> 500。
     const safePage = Math.max(1, Math.floor(page) || 1);
