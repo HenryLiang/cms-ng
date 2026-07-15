@@ -8,6 +8,10 @@ export interface User {
   role: UserRole;
   department?: string;
   preferredLanguage?: ContentLanguage;
+  isActive?: boolean;
+  balance?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AuthState {

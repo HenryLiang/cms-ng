@@ -6,7 +6,7 @@ import { useProtectedRoute } from '@/hooks/use-protected-route';
 import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
 import { UserRole } from '@cms-ng/shared';
-import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck, Zap, Wallet, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck, Zap, Wallet, Users, Settings } from 'lucide-react';
 import ToastHost from '@/components/toast-host';
 import ErrorBoundary from '@/components/error-boundary';
 
@@ -17,6 +17,7 @@ const allNavItems = [
   { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
   { href: '/dashboard/auto-publish', label: '自动发布', icon: Zap, roles: [UserRole.EDITOR, UserRole.ADMIN] },
   { href: '/dashboard/billing', label: '计费管理', icon: Wallet, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+  { href: '/dashboard/accounts', label: '账号管理', icon: Users, roles: [UserRole.ADMIN] },
   { href: '/dashboard/settings', label: '系统设置', icon: Settings, roles: [UserRole.ADMIN] },
 ];
 

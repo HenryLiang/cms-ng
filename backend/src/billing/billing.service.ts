@@ -20,6 +20,7 @@ import { QueryTransactionsDto } from './dto/query-transactions.dto';
 import { EstimateCostDto, EstimateOperationType } from './dto/estimate-cost.dto';
 import { UpdateAlertDto } from './dto/update-alert.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
+import { serializeBillingTransaction } from '../common/billing-transaction.utils';
 
 export class InsufficientBalanceException extends BadRequestException {
   constructor(required: number, available: number) {
@@ -821,21 +822,8 @@ export class BillingService {
     status: string;
     createdAt: Date;
   }) {
-    return {
-      id: t.id,
-      userId: t.userId,
-      type: t.type,
-      category: t.category,
-      amount: Number(t.amount),
-      balanceAfter: Number(t.balanceAfter),
-      description: t.description,
-      articleId: t.articleId,
-      aiOperationId: t.aiOperationId,
-      platformPublishId: t.platformPublishId,
-      quantity: t.quantity ? Number(t.quantity) : null,
-      unitPrice: t.unitPrice ? Number(t.unitPrice) : null,
-      status: t.status,
-      createdAt: t.createdAt,
-    };
+    // Delegate to the shared serializer so the transaction shape stays
+    // identical across 计费管理 and 账号管理 (see common/billing-transaction.utils).
+    return serializeBillingTransaction(t);
   }
 }

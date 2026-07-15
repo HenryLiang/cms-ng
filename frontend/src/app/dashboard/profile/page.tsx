@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/store/auth-store';
-import { updateUser } from '@/lib/users-api';
+import { updateUser, changePassword } from '@/lib/users-api';
 import { ContentLanguage } from '@cms-ng/shared';
 import { UserRole } from '@cms-ng/shared';
-import { Save, Check } from 'lucide-react';
+import { Save, Check, KeyRound } from 'lucide-react';
 
 const languageLabels: Record<ContentLanguage, string> = {
   [ContentLanguage.SIMPLIFIED_CHINESE]: '简体中文',
@@ -29,6 +29,11 @@ export default function ProfilePage() {
     department: user?.department || '',
     preferredLanguage: user?.preferredLanguage || ContentLanguage.TRADITIONAL_CHINESE_HK,
   });
+
+  // 修改密码
+  const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -57,6 +62,33 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   };
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwdMessage(null);
+    if (pwdForm.newPassword !== pwdForm.confirm) {
+      setPwdMessage({ type: 'error', text: '两次输入的新密码不一致' });
+      return;
+    }
+    if (pwdForm.newPassword.length < 6) {
+      setPwdMessage({ type: 'error', text: '新密码至少 6 位' });
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      await changePassword(pwdForm.currentPassword, pwdForm.newPassword);
+      setPwdForm({ currentPassword: '', newPassword: '', confirm: '' });
+      setPwdMessage({ type: 'success', text: '密码已修改' });
+    } catch (err: unknown) {
+      const apiMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setPwdMessage({ type: 'error', text: apiMsg || '修改失败，请检查当前密码是否正确' });
+    } finally {
+      setPwdSaving(false);
+    }
+  }
 
   if (!user) {
     return (
@@ -180,6 +212,82 @@ export default function ProfilePage() {
           )}
         </div>
       </form>
+
+      {/* 修改密码 */}
+      <div className="mt-10 border-t border-zinc-200 pt-8">
+        <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-zinc-900">
+          <KeyRound className="h-5 w-5" />
+          修改密码
+        </h2>
+        <form onSubmit={handleChangePassword} className="space-y-6">
+          <div>
+            <label htmlFor="currentPassword" className="mb-2 block text-sm font-medium text-zinc-700">
+              当前密码
+            </label>
+            <input
+              id="currentPassword"
+              type="password"
+              value={pwdForm.currentPassword}
+              onChange={(e) => setPwdForm({ ...pwdForm, currentPassword: e.target.value })}
+              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-zinc-700">
+              新密码
+            </label>
+            <input
+              id="newPassword"
+              type="password"
+              value={pwdForm.newPassword}
+              onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
+              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              minLength={6}
+              required
+            />
+            <p className="mt-1.5 text-xs text-zinc-500">至少 6 位</p>
+          </div>
+          <div>
+            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-zinc-700">
+              确认新密码
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={pwdForm.confirm}
+              onChange={(e) => setPwdForm({ ...pwdForm, confirm: e.target.value })}
+              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              minLength={6}
+              required
+            />
+          </div>
+          {pwdMessage && (
+            <p className={`text-sm ${pwdMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              {pwdMessage.text}
+            </p>
+          )}
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={pwdSaving}
+              className="flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pwdSaving ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-white" />
+                  修改中...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="h-4 w-4" />
+                  修改密码
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
