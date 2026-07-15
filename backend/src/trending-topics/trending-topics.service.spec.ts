@@ -500,6 +500,55 @@ describe('TrendingTopicsService', () => {
     });
   });
 
+  describe('NHK news source', () => {
+    const MockedParser = Parser as unknown as jest.Mock;
+
+    beforeEach(() => {
+      MockedParser.mockClear();
+    });
+
+    it('fetchNHKNews aggregates categories, dedupes by title, and paginates', async () => {
+      // 按分类 URL 返回不同条目；cat0 与 cat1 撞一条标题验证去重
+      const mockParseURL = jest.fn().mockImplementation((url: string) => {
+        if (url.includes('cat0.xml')) {
+          return Promise.resolve({ items: [{ title: '共通标题', contentSnippet: 'a', link: 'http://nhk/0' }] });
+        }
+        if (url.includes('cat1.xml')) {
+          return Promise.resolve({
+            items: [
+              { title: '共通标题', contentSnippet: 'b', link: 'http://nhk/1' },
+              { title: '社会新闻 1', contentSnippet: 'c', link: 'http://nhk/2' },
+            ],
+          });
+        }
+        return Promise.resolve({ items: [] });
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchNHKNews(1, 10);
+
+      // 8 个分类都被拉取
+      expect(mockParseURL).toHaveBeenCalledWith(expect.stringMatching(/\/rss\/news\/cat0\.xml$/));
+      expect(mockParseURL).toHaveBeenCalledWith(expect.stringMatching(/\/rss\/news\/cat7\.xml$/));
+      // 撞标题去重后剩 2 条（共通标题 + 社会新闻 1）
+      expect(result.total).toBe(2);
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].source).toBe('nhk');
+    });
+
+    it('fetchNHKNews serves page 2 from cache without re-fetching (within TTL)', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [{ title: '缓存测试', contentSnippet: 'x', link: 'http://nhk/c' }],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      await service.fetchNHKNews(1, 10);
+      const callsAfterFirst = mockParseURL.mock.calls.length;
+      await service.fetchNHKNews(2, 10); // 翻页 -> 走缓存，不重新拉 8 个源
+      expect(mockParseURL.mock.calls.length).toBe(callsAfterFirst);
+    });
+  });
+
   describe('parseTrafficToScore (private)', () => {
     it('should return 50 for empty traffic', () => {
       expect((service as any).parseTrafficToScore('')).toBe(50);

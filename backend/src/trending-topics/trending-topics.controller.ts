@@ -35,6 +35,7 @@ export class TrendingTopicsController {
     'nytimes',
     'economist',
     'ft',
+    'nhk',
     'zaobao',
     '36kr',
     'huxiu',
@@ -194,6 +195,17 @@ export class TrendingTopicsController {
       Math.max(1, parseInt(query.limit as any, 10) || 10),
     );
     return this.topicsService.fetchNewsBySource('ft', page, limit);
+  }
+
+  @Get('nhk')
+  @ApiOperation({ summary: 'Fetch trending news from NHK (aggregated categories)' })
+  fetchNHK(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
+    return this.topicsService.fetchNHKNews(page, limit);
   }
 
   @Get('zaobao')

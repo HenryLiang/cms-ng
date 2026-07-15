@@ -316,6 +316,57 @@ export class TrendingTopicsService {
     return this.paginate([], page, limit);
   }
 
+  // NHK 8 个分类 RSS（cat0 主要 / cat1 社会 / cat2 科学医療 / cat3 国際 / cat4 経済 / cat5 政治 / cat6 文化 / cat7 体育）
+  private get NHK_FEEDS() {
+    return [0, 1, 2, 3, 4, 5, 6, 7].map((cat) => ({
+      key: 'nhk',
+      url: `https://www3.nhk.or.jp/rss/news/cat${cat}.xml`,
+    }));
+  }
+
+  // NHK 聚合结果缓存（5 分钟），避免翻页时重复拉 8 个分类源
+  private nhkCache: { items: any[]; ts: number } | null = null;
+  private static readonly NHK_CACHE_TTL = 300;
+
+  /**
+   * 拉取 NHK 新闻：聚合 8 个分类 RSS（海外源走代理），按标题去重（cat0 主要与各分类有重叠），
+   * 5 分钟缓存，分页返回。单分类失败不阻断（Promise.allSettled）。
+   */
+  async fetchNHKNews(page = 1, limit = 10) {
+    const now = Date.now();
+    if (
+      this.nhkCache &&
+      now - this.nhkCache.ts < TrendingTopicsService.NHK_CACHE_TTL * 1000
+    ) {
+      return this.paginate(this.nhkCache.items, page, limit);
+    }
+
+    const requestOptions = this.getProxyRequestOptions();
+    const results = await Promise.allSettled(
+      this.NHK_FEEDS.map(async (feed) => {
+        try {
+          return await this.fetchSingleRSS(feed, requestOptions);
+        } catch {
+          return [] as any[];
+        }
+      }),
+    );
+    const all: any[] = [];
+    results.forEach((r) => {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) all.push(...r.value);
+    });
+    // 按标题去重（cat0 主要的条目会与各分类重复）
+    const seen = new Set<string>();
+    const deduped = all.filter((item) => {
+      const key = item.title?.trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    this.nhkCache = { items: deduped, ts: now };
+    return this.paginate(deduped, page, limit);
+  }
+
   async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
     const baseRequestOptions = this.getProxyRequestOptions();
 

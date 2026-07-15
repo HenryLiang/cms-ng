@@ -21,6 +21,7 @@ describe('TrendingTopicsController', () => {
     fetchGoogleTrends: jest.Mock;
     fetchNewsBySource: jest.Mock;
     fetchBilibiliPartitionRanking: jest.Mock;
+    fetchNHKNews: jest.Mock;
     importFromGoogleTrends: jest.Mock;
     importTopic: jest.Mock;
     adoptTopic: jest.Mock;
@@ -49,6 +50,7 @@ describe('TrendingTopicsController', () => {
       fetchGoogleTrends: jest.fn(),
       fetchNewsBySource: jest.fn(),
       fetchBilibiliPartitionRanking: jest.fn(),
+      fetchNHKNews: jest.fn(),
       importFromGoogleTrends: jest.fn(),
       importTopic: jest.fn(),
       adoptTopic: jest.fn(),
@@ -126,6 +128,7 @@ describe('TrendingTopicsController', () => {
       expect(() => controller.findOne('bilibili-hot-search')).toThrow("Invalid topic ID: 'bilibili-hot-search' is a data source name");
       expect(() => controller.findOne('weibo-hot')).toThrow("Invalid topic ID: 'weibo-hot' is a data source name");
       expect(() => controller.findOne('zhihu-hot')).toThrow("Invalid topic ID: 'zhihu-hot' is a data source name");
+      expect(() => controller.findOne('nhk')).toThrow("Invalid topic ID: 'nhk' is a data source name");
     });
   });
 
@@ -239,6 +242,14 @@ describe('TrendingTopicsController', () => {
       topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
       await controller.fetchZhihuHot({ page: '2', limit: '5' } as any);
       expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('zhihu-hot', 2, 5);
+    });
+  });
+
+  describe('NHK endpoint', () => {
+    it('fetchNHK delegates to topicsService.fetchNHKNews', async () => {
+      topicsService.fetchNHKNews.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchNHK({ page: '1', limit: '10' } as any);
+      expect(topicsService.fetchNHKNews).toHaveBeenCalledWith(1, 10);
     });
   });
 
