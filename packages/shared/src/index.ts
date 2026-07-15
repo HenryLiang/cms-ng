@@ -12,17 +12,17 @@ export enum UserRole {
 
 // ===== 稿件状态 =====
 export enum ArticleStatus {
-  DRAFT = 'DRAFT',           // 选题中/草稿
-  WRITING = 'WRITING',       // 采写中
+  DRAFT = 'DRAFT', // 选题中/草稿
+  WRITING = 'WRITING', // 采写中
   AI_OPTIMIZING = 'AI_OPTIMIZING', // AI优化中
   PENDING_REVIEW = 'PENDING_REVIEW', // 待审核
-  IN_REVIEW = 'IN_REVIEW',   // 审核中
-  REVISION = 'REVISION',     // 退回修改
-  APPROVED = 'APPROVED',     // 审核通过
-  PUBLISHED = 'PUBLISHED',   // 已发布
-  ARCHIVED = 'ARCHIVED',     // 已归档
+  IN_REVIEW = 'IN_REVIEW', // 审核中
+  REVISION = 'REVISION', // 退回修改
+  APPROVED = 'APPROVED', // 审核通过
+  PUBLISHED = 'PUBLISHED', // 已发布
+  ARCHIVED = 'ARCHIVED', // 已归档
   PIPELINE_FAILED = 'PIPELINE_FAILED', // 管道失败（自动发布半成品）
-  AUTO_PUBLISHED = 'AUTO_PUBLISHED',   // 自动发布
+  AUTO_PUBLISHED = 'AUTO_PUBLISHED', // 自动发布
 }
 
 // ===== 平台类型 =====
@@ -465,4 +465,70 @@ export interface ApiResponse<T> {
     pageSize?: number;
     total?: number;
   };
+}
+
+// ===== 选题数据源 =====
+export type TopicSourceCategory =
+  | 'news'
+  | 'trending'
+  | 'social'
+  | 'culture'
+  | 'history';
+
+export type TopicSourceParameter =
+  | {
+      key: string;
+      label: string;
+      kind: 'select';
+      defaultValue?: string | number;
+      options: Array<{ value: string | number; label: string }>;
+    }
+  | {
+      key: string;
+      label: string;
+      kind: 'date' | 'text' | 'combobox';
+      defaultValue?: string;
+      placeholder?: string;
+      options?: Array<{ value: string; label: string }>;
+    };
+
+export interface TopicSourceDefinition {
+  id: string;
+  label: string;
+  category: TopicSourceCategory;
+  icon: 'newspaper' | 'trending' | 'flame' | 'video' | 'social' | 'calendar';
+  parameters?: TopicSourceParameter[];
+  aggregate?: boolean;
+  autoFetch?: boolean;
+  visible?: boolean;
+}
+
+export interface TopicCandidateLink {
+  title: string;
+  source: string;
+  snippet: string;
+  url: string;
+}
+
+export interface TopicCandidate {
+  title: string;
+  description: string;
+  source: string;
+  heatScore: number;
+  tags: string[];
+  articles: TopicCandidateLink[];
+  coverImage?: string;
+  year?: number;
+  type?: string;
+}
+
+export interface TopicSourcePage {
+  items: TopicCandidate[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  status?: 'available' | 'degraded' | 'unavailable';
+  warnings?: string[];
+  fetchedAt?: string;
 }

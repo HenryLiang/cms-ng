@@ -1,7 +1,7 @@
 declare module 'rss-parser' {
   export default class Parser {
-    constructor(options?: any);
-    parseURL(url: string): Promise<any>;
-    parseString(xml: string): Promise<any>;
+    constructor(options?: unknown);
+    parseURL<T = unknown>(url: string): Promise<T>;
+    parseString<T = unknown>(xml: string): Promise<T>;
   }
 }

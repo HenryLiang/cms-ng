@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import {
+  ServiceUnavailableException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TwitterService } from './twitter.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -87,6 +90,41 @@ describe('TwitterService', () => {
     });
   });
 
+  it('describes X sources and dispatches a generic source query', async () => {
+    redis.get.mockResolvedValue(JSON.stringify([]));
+    prisma.twitterWatchAccount.findMany.mockResolvedValue([
+      { userName: 'openai', displayName: 'OpenAI' },
+    ]);
+
+    const definitions = await service.listDefinitions({
+      userId: 'u1',
+      includeParameterOptions: true,
+    });
+    const page = await service.fetch(
+      'x-trends',
+      { userId: 'u1' },
+      { page: 2, limit: 5, params: { woeid: 23424977 } },
+    );
+
+    expect(definitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'x-trends' }),
+        expect.objectContaining({ id: 'x-accounts' }),
+      ]),
+    );
+    expect(
+      definitions.find((definition) => definition.id === 'x-accounts')
+        ?.parameters?.[0],
+    ).toEqual(
+      expect.objectContaining({
+        kind: 'combobox',
+        options: [{ value: 'openai', label: '@openai · OpenAI' }],
+      }),
+    );
+    expect(redis.get).toHaveBeenCalledWith('x:trends:23424977');
+    expect(page).toEqual(expect.objectContaining({ page: 2, limit: 5 }));
+  });
+
   describe('fetchTrends', () => {
     it('throws ServiceUnavailableException when API key missing', async () => {
       // Re-instantiate with no key
@@ -100,7 +138,9 @@ describe('TwitterService', () => {
         ],
       }).compile();
       const noKeyService = module.get<TwitterService>(TwitterService);
-      await expect(noKeyService.fetchTrends('u1', 1)).rejects.toThrow(ServiceUnavailableException);
+      await expect(noKeyService.fetchTrends('u1', 1)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
     });
 
     it('returns cached trends without calling API or charging', async () => {
@@ -122,7 +162,13 @@ describe('TwitterService', () => {
         ok: true,
         json: async () => ({
           trends: [
-            { trend: { name: '#AI', rank: 1, url: 'https://x.com/search?q=%23AI' } },
+            {
+              trend: {
+                name: '#AI',
+                rank: 1,
+                url: 'https://x.com/search?q=%23AI',
+              },
+            },
             { trend: { name: 'BreakingNews', rank: 5 } },
           ],
         }),
@@ -133,7 +179,10 @@ describe('TwitterService', () => {
       // Charged once
       expect(billing.checkBalance).toHaveBeenCalledWith('u1', 0.05);
       expect(billing.deduct).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'u1', idempotencyKey: expect.stringMatching(/^x_fetch:u1:trends:1:\d+$/) }),
+        expect.objectContaining({
+          userId: 'u1',
+          idempotencyKey: expect.stringMatching(/^x_fetch:u1:trends:1:\d+$/),
+        }),
       );
       // Fetched the API
       expect(fetchMock).toHaveBeenCalledWith(
@@ -141,19 +190,32 @@ describe('TwitterService', () => {
         expect.objectContaining({ headers: { 'x-api-key': 'test-key' } }),
       );
       // Cached
-      expect(redis.set).toHaveBeenCalledWith('x:trends:1', expect.any(String), 600);
+      expect(redis.set).toHaveBeenCalledWith(
+        'x:trends:1',
+        expect.any(String),
+        600,
+      );
       // Normalized — rank-based heatScore: rank 1 → 99, rank 5 → 95
       expect(result.items).toHaveLength(2);
-      expect(result.items[0]).toMatchObject({ title: '#AI', source: 'x-trends', heatScore: 99 });
+      expect(result.items[0]).toMatchObject({
+        title: '#AI',
+        source: 'x-trends',
+        heatScore: 99,
+      });
       expect(result.items[0].tags).toEqual(['#AI']); // hashtag → tag
-      expect(result.items[0].articles[0].url).toBe('https://x.com/search?q=%23AI');
+      expect(result.items[0].articles[0].url).toBe(
+        'https://x.com/search?q=%23AI',
+      );
       expect(result.items[1].heatScore).toBe(95); // rank 5 → 95
       expect(result.items[1].tags).toEqual([]); // non-hashtag → no tags
     });
 
     it('does not charge when BILLING_ENABLED is false', async () => {
       billing.isEnabled.mockReturnValue(false);
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ trends: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ trends: [] }),
+      });
 
       await service.fetchTrends('u1', 1);
 
@@ -172,10 +234,25 @@ describe('TwitterService', () => {
           msg: 'success',
           data: {
             tweets: [
-              { id: '1', text: 'Original post', likeCount: 10, retweetCount: 5, replyCount: 2, isReply: false, type: 'tweet' },
+              {
+                id: '1',
+                text: 'Original post',
+                likeCount: 10,
+                retweetCount: 5,
+                replyCount: 2,
+                isReply: false,
+                type: 'tweet',
+              },
               { id: '2', text: 'A reply', isReply: true },
               { id: '3', text: 'RT @someone: shared', type: 'retweet' },
-              { id: '4', text: 'Second original', likeCount: 0, retweetCount: 0, replyCount: 0, isReply: false },
+              {
+                id: '4',
+                text: 'Second original',
+                likeCount: 0,
+                retweetCount: 0,
+                replyCount: 0,
+                isReply: false,
+              },
             ],
           },
         }),
@@ -197,9 +274,18 @@ describe('TwitterService', () => {
       // 防御性：万一某端点把 tweets 放顶层（无 data 外壳），解包逻辑应回退到 raw
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ status: 'success', msg: 'success', tweets: [{ id: '9', text: 'x', isReply: false }] }),
+        json: async () => ({
+          status: 'success',
+          msg: 'success',
+          tweets: [{ id: '9', text: 'x', isReply: false }],
+        }),
       });
-      const items = await service.fetchAccountTweets('someacct', undefined, 'u1', true);
+      const items = await service.fetchAccountTweets(
+        'someacct',
+        undefined,
+        'u1',
+        true,
+      );
       expect(items).toHaveLength(1);
       expect(items[0].title).toBe('x');
     });
@@ -210,7 +296,11 @@ describe('TwitterService', () => {
         json: async () => ({
           status: 'success',
           msg: 'success',
-          data: { unavailable: true, message: 'User is suspended', unavailableReason: 'Suspended' },
+          data: {
+            unavailable: true,
+            message: 'User is suspended',
+            unavailableReason: 'Suspended',
+          },
         }),
       });
       const items = await service.fetchAccountTweets('someacct', 5, 'u1', true);
@@ -218,13 +308,26 @@ describe('TwitterService', () => {
     });
 
     it('strips leading @ from userName and lowercases cache key', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'success', msg: 'success', data: { tweets: [] } }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          status: 'success',
+          msg: 'success',
+          data: { tweets: [] },
+        }),
+      });
       await service.fetchAccountTweets('@ElonMusk', 5, 'u1', true);
-      expect(redis.set).toHaveBeenCalledWith('x:acct:elonmusk', expect.any(String), 300);
+      expect(redis.set).toHaveBeenCalledWith(
+        'x:acct:elonmusk',
+        expect.any(String),
+        300,
+      );
     });
 
     it('throws BadRequestException for empty userName', async () => {
-      await expect(service.fetchAccountTweets('   ', 5, 'u1')).rejects.toThrow(BadRequestException);
+      await expect(service.fetchAccountTweets('   ', 5, 'u1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -236,7 +339,14 @@ describe('TwitterService', () => {
       ]);
       // First account returns a tweet (data wrapper); second account's fetch rejects (suspended)
       fetchMock
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'success', msg: 'success', data: { tweets: [{ id: '1', text: 'hi', isReply: false }] } }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            status: 'success',
+            msg: 'success',
+            data: { tweets: [{ id: '1', text: 'hi', isReply: false }] },
+          }),
+        })
         .mockRejectedValueOnce(new Error('account suspended'));
 
       const result = await service.fetchAggregatedAccounts('u1', 1, 20);
@@ -266,8 +376,18 @@ describe('TwitterService', () => {
   describe('addAccount', () => {
     it('validates handle via user/info then upserts', async () => {
       // user/info 真实结构：{status, msg, data:{userName,...}}
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'success', msg: 'success', data: { userName: 'elonmusk', id: '1' } }) });
-      prisma.twitterWatchAccount.upsert.mockResolvedValue({ id: '1', userName: 'elonmusk' });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          status: 'success',
+          msg: 'success',
+          data: { userName: 'elonmusk', id: '1' },
+        }),
+      });
+      prisma.twitterWatchAccount.upsert.mockResolvedValue({
+        id: '1',
+        userName: 'elonmusk',
+      });
 
       const result = await service.addAccount('@elonmusk', 'Elon');
       expect(fetchMock).toHaveBeenCalledWith(
@@ -275,19 +395,33 @@ describe('TwitterService', () => {
         expect.anything(),
       );
       expect(prisma.twitterWatchAccount.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userName: 'elonmusk' }, create: { userName: 'elonmusk', displayName: 'Elon' } }),
+        expect.objectContaining({
+          where: { userName: 'elonmusk' },
+          create: { userName: 'elonmusk', displayName: 'Elon' },
+        }),
       );
       expect(result.userName).toBe('elonmusk');
     });
 
     it('throws BadRequestException when handle is unavailable/not found', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'success', msg: 'success', data: { unavailable: true, message: 'User not found' } }) });
-      await expect(service.addAccount('nonexistent')).rejects.toThrow(BadRequestException);
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          status: 'success',
+          msg: 'success',
+          data: { unavailable: true, message: 'User not found' },
+        }),
+      });
+      await expect(service.addAccount('nonexistent')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when fetch itself fails', async () => {
       fetchMock.mockRejectedValue(new Error('404'));
-      await expect(service.addAccount('nonexistent')).rejects.toThrow(BadRequestException);
+      await expect(service.addAccount('nonexistent')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

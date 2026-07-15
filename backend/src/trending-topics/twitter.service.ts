@@ -13,6 +13,13 @@ import {
   InsufficientBalanceException,
 } from '../billing/billing.service';
 import { TransactionType, BillingCategory } from '@cms-ng/shared';
+import { TopicSourceAdapter } from './sources/topic-source.adapter';
+import {
+  TopicSourceContext,
+  TopicSourceDefinition,
+  TopicSourcePage,
+  TopicSourceQuery,
+} from './sources/topic-source.types';
 
 /**
  * X (Twitter) 数据源服务 — 基于 twitterapi.io REST API。
@@ -31,7 +38,7 @@ import { TransactionType, BillingCategory } from '@cms-ng/shared';
  *   - 鲁棒：聚合拉取用 Promise.allSettled 隔离单账号失败。
  */
 @Injectable()
-export class TwitterService {
+export class TwitterService implements TopicSourceAdapter {
   private readonly logger = new Logger(TwitterService.name);
 
   private readonly apiKey: string | undefined;
@@ -72,12 +79,106 @@ export class TwitterService {
       .filter((n) => Number.isFinite(n) && n > 0);
     if (this.woeids.length === 0) this.woeids = [1];
     this.proxyEnabled =
-      (this.config.get<string>('TWITTERAPI_IO_PROXY_ENABLED') || '').toLowerCase() === 'true';
+      (
+        this.config.get<string>('TWITTERAPI_IO_PROXY_ENABLED') || ''
+      ).toLowerCase() === 'true';
     this.proxyUrl =
-      this.config.get<string>('HTTP_PROXY') || this.config.get<string>('http_proxy') || undefined;
+      this.config.get<string>('HTTP_PROXY') ||
+      this.config.get<string>('http_proxy') ||
+      undefined;
   }
 
   // ─── 公共 API ───
+
+  async listDefinitions(
+    context: TopicSourceContext,
+  ): Promise<TopicSourceDefinition[]> {
+    void context;
+    const watchedAccounts = context.includeParameterOptions
+      ? ((await this.prisma.twitterWatchAccount.findMany({
+          orderBy: { createdAt: 'asc' },
+        })) ?? [])
+      : [];
+    return [
+      {
+        id: 'x-trends',
+        label: 'X 趋势',
+        category: 'social',
+        icon: 'social',
+        aggregate: false,
+        parameters: [
+          {
+            key: 'woeid',
+            label: '地域',
+            kind: 'select',
+            defaultValue: this.woeids[0] || 1,
+            options: this.getWoeids().map((item) => ({
+              value: item.woeid,
+              label: item.label,
+            })),
+          },
+        ],
+      },
+      {
+        id: 'x-accounts',
+        label: 'X 热门账号',
+        category: 'social',
+        icon: 'social',
+        aggregate: false,
+        autoFetch: false,
+        parameters: [
+          {
+            key: 'account',
+            label: '账号',
+            kind: 'combobox',
+            placeholder: '@username',
+            options: watchedAccounts.map((account) => ({
+              value: account.userName,
+              label: `@${account.userName}${account.displayName ? ` · ${account.displayName}` : ''}`,
+            })),
+          },
+        ],
+      },
+    ];
+  }
+
+  async fetch(
+    sourceId: string,
+    context: TopicSourceContext,
+    query: TopicSourceQuery,
+  ): Promise<TopicSourcePage> {
+    if (!context.userId) {
+      throw new BadRequestException('拉取 X 数据源需要登录用户');
+    }
+    const page = query.page ?? 1;
+    const limit = query.limit ?? (sourceId === 'x-accounts' ? 20 : 10);
+    let result: TopicSourcePage;
+    if (sourceId === 'x-trends') {
+      const woeid = Number(query.params?.woeid || this.woeids[0] || 1);
+      result = await this.fetchTrends(context.userId, woeid, page, limit);
+    } else if (sourceId === 'x-accounts') {
+      const account = String(query.params?.account || '').trim();
+      result = account
+        ? this.paginate(
+            await this.fetchAccountTweets(
+              account,
+              undefined,
+              context.userId,
+              true,
+            ),
+            page,
+            limit,
+          )
+        : await this.fetchAggregatedAccounts(context.userId, page, limit);
+    } else {
+      throw new BadRequestException(`未知的 X 数据源: ${sourceId}`);
+    }
+    return {
+      ...result,
+      status: 'available',
+      fetchedAt: new Date().toISOString(),
+    };
+  }
 
   /** 可切换的地域列表（供前端 WOEID 切换器） */
   getWoeids(): Array<{ woeid: number; label: string }> {
@@ -208,7 +309,9 @@ export class TwitterService {
       await this.redis.set(cacheKey, JSON.stringify(items), 300);
     }
     // 不传 limit 则返回 API 一次返回的全部推文；传了才切片（聚合调用用）
-    return typeof limit === 'number' && limit > 0 ? items.slice(0, limit) : items;
+    return typeof limit === 'number' && limit > 0
+      ? items.slice(0, limit)
+      : items;
   }
 
   // ─── watch 清单 CRUD（管理员态） ───
@@ -235,7 +338,9 @@ export class TwitterService {
       }
     } catch (err: any) {
       if (err instanceof BadRequestException) throw err;
-      throw new BadRequestException(`X 账号 @${handle} 校验失败: ${err.message}`);
+      throw new BadRequestException(
+        `X 账号 @${handle} 校验失败: ${err.message}`,
+      );
     }
 
     return this.prisma.twitterWatchAccount.upsert({
@@ -327,8 +432,15 @@ export class TwitterService {
     const json = await res.json();
     // twitterapi.io 多数端点返回 {status, msg, data:{...}}；trends 端点直接在顶层放 trends。
     // 这里返回整个 json，由各 normalize 方法自行解包；同时把 HTTP 层错误信息抛出。
-    if (json && json.status && json.status !== 'success' && json.status !== 'ok') {
-      throw new Error(`twitterapi.io: ${json.msg || json.message || json.status}`);
+    if (
+      json &&
+      json.status &&
+      json.status !== 'success' &&
+      json.status !== 'ok'
+    ) {
+      throw new Error(
+        `twitterapi.io: ${json.msg || json.message || json.status}`,
+      );
     }
     return json;
   }
@@ -348,8 +460,7 @@ export class TwitterService {
     }
     return trends.map((t) => {
       // twitterapi.io: t.trend 是 {name, rank, ...}；也兼容平铺形态
-      const inner =
-        t.trend && typeof t.trend === 'object' ? t.trend : t;
+      const inner = t.trend && typeof t.trend === 'object' ? t.trend : t;
       const name = String(inner.name ?? inner.trend ?? '');
       const rank = typeof inner.rank === 'number' ? inner.rank : undefined;
       const volume =
@@ -362,7 +473,9 @@ export class TwitterService {
         heatScore = Math.max(10, Math.min(99, 100 - rank));
       }
       const url =
-        inner.url || t.url || `https://x.com/search?q=${encodeURIComponent(name)}`;
+        inner.url ||
+        t.url ||
+        `https://x.com/search?q=${encodeURIComponent(name)}`;
       return {
         title: name,
         description: name,
@@ -382,7 +495,11 @@ export class TwitterService {
   private normalizeTweets(raw: any, handle: string): any[] {
     // 解包 data 外壳（user/tweets 用 {status,msg,data:{...}}；兼容顶层平铺）
     const payload =
-      raw && typeof raw === 'object' && 'data' in raw && raw.data && typeof raw.data === 'object'
+      raw &&
+      typeof raw === 'object' &&
+      'data' in raw &&
+      raw.data &&
+      typeof raw.data === 'object'
         ? raw.data
         : raw;
     // 账号不可用（suspended/protected）→ 优雅返回空
@@ -399,13 +516,16 @@ export class TwitterService {
         if (tw.isReply === true) return false;
         // 剔除转推
         if (tw.type === 'retweet') return false;
-        if (typeof tw.text === 'string' && tw.text.startsWith('RT @')) return false;
+        if (typeof tw.text === 'string' && tw.text.startsWith('RT @'))
+          return false;
         return true;
       })
       .map((tw) => {
         const text = typeof tw.text === 'string' ? tw.text : '';
         const engagement =
-          (Number(tw.likeCount) || 0) + (Number(tw.retweetCount) || 0) + (Number(tw.replyCount) || 0);
+          (Number(tw.likeCount) || 0) +
+          (Number(tw.retweetCount) || 0) +
+          (Number(tw.replyCount) || 0);
         const tweetId = String(tw.id ?? '');
         return {
           title: text.slice(0, 80),
@@ -416,7 +536,7 @@ export class TwitterService {
           articles: [
             {
               title: text.slice(0, 80),
-              source: handle,
+              source: `@${handle}`,
               snippet: text,
               url: tw.url || `https://x.com/${handle}/status/${tweetId}`,
             },

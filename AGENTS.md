@@ -204,9 +204,11 @@ SMTP-based email notifications are configured via `SMTP_*` env vars and sent **i
 
 ### Trending Topics
 
-`trending-topics.service.ts` aggregates from **12 hard-coded feeds via `rss-parser`** (with `https-proxy-agent` for proxy support): 1 Google Trends (parsed from its public RSS URL — the `google-trends-api` package is declared but unused, a dead-dependency candidate) + 8 native RSS (sina, people, chinanews, bbc, guardian, nytimes, economist, ft) + 4 RSSHub-proxied (zaobao, 36kr, huxiu, douban-movie). RSSHub (in `docker-compose.yml` at `:1200`) provides a local RSS aggregator the service can consume from. Gotcha: zaobao's native feed is dead since the 2026 redesign (code comment: 早报官方 .com.sg/rss/news.xml 已下线) — it MUST stay on RSSHub.
+External topic candidates use the adapter/catalog seam in `backend/src/trending-topics/sources/`. `TopicSourceCatalog` is the single dispatch point, and every adapter implements `TopicSourceAdapter` to publish source definitions plus normalized `TopicSourcePage` results. `RssTopicSourceAdapter` owns the declarative RSS/RSSHub catalog and the genuinely different RSS mechanisms (Google Trends fields, aggregate feeds, NHK multi-feed aggregation, Bilibili partition parameters); `TwitterService` and `WikipediaService` implement the same adapter for their REST mechanisms. `TrendingTopicsService` now only owns curated-topic persistence, adoption, AI suggestions, and compatibility shims for legacy source routes.
 
-**代理开关**: 海外源（Google Trends + 5 个海外 native feeds：bbc/guardian/nytimes/economist/ft）的代理由 `RSS_PROXY_ENABLED` 环境变量控制。设为 `true` 时才会读取 `HTTP_PROXY`（或小写 `http_proxy`）走代理（开发环境大陆需要），设为 `false` 则直连（生产环境新加坡不需要）。3 个国内 native feeds（sina/people/chinanews）与全部 4 个 RSSHub feeds 始终直连（`isRSSHub:true` 强制直连）。
+The frontend discovers sources and their `select`/`date`/`text`/`combobox` parameters through `GET /trending-topics/sources`, then fetches normalized candidates through `GET /trending-topics/sources/:sourceId/items`. Both new endpoints use `ApiResponse<T>`; legacy per-source routes remain available during migration. To add a normal RSS/RSSHub feed, add one `RssSourceConfig`; to add a genuinely different mechanism, implement `TopicSourceAdapter` and register it in `TrendingTopicsModule`. Source-specific frontend branching is not required. RSSHub (in `docker-compose.yml` at `:1200`) remains optional; zaobao MUST stay on RSSHub because its native feed is gone.
+
+**代理开关**: 海外 RSS（Google Trends、BBC/Guardian/NYTimes/Economist/FT/Reuters、NHK）由 `RSS_PROXY_ENABLED` 控制；设为 `true` 时读取 `HTTP_PROXY`（或小写 `http_proxy`）。国内原生源（sina/people/chinanews）与全部 RSSHub 源始终直连。
 
 ### Key Backend Conventions
 
@@ -241,7 +243,7 @@ Backend base URL (dev): `http://localhost:3001`. All endpoints require a JWT Bea
 - **articles**: `POST|GET /articles`, `GET /articles/review-queue`, `GET|PATCH|DELETE /articles/:id`, `GET /articles/:id/versions`, `POST /articles/:id/rollback/:version`, `PATCH /articles/:id/{assign-editor,review}`, `POST /articles/:id/ai-{rewrite,expand,condense,polish,headlines,excerpt,chat,draft,fact-check,review,seo,generate-image}`
 - **channels**: `GET /channels/platforms`, `GET /channels/:articleId/publishes`, `POST /channels/:articleId/{adapt,publish-wordpress}`, `PATCH|DELETE /channels/:articleId/publishes/:publishId`
 - **auto-publish**: `POST|GET|PATCH|DELETE /auto-publish/tasks` + `POST /tasks/:id/{toggle,run}`, `GET /auto-publish/{runs,stats}` + `GET /runs/:id` + `GET /runs/:runId/articles`, `POST /auto-publish/articles/:id/{withdraw,retry}`, `POST /auto-publish/kill-switch`
-- **trending-topics**: `GET /trending-topics/{google-trends,all-news,sina,people,bbc,chinanews,guardian,nytimes,economist,ft,zaobao,weibo-hot,zhihu-hot,36kr,huxiu,douban-movie}` (per-source feeds), `POST /trending-topics/suggestions` (AI story suggestions), `POST /trending-topics/import-google-trend`, `GET|PATCH|DELETE /trending-topics/:id`, `POST /trending-topics/:id/adopt`
+- **trending-topics**: `GET /trending-topics/sources`, `GET /trending-topics/sources/:sourceId/items` (generic source catalog/fetch), legacy `GET /trending-topics/{google-trends,all-news,...}` routes, `POST /trending-topics/{suggestions,import,import-google-trend}`, `GET|PATCH|DELETE /trending-topics/:id`, `POST /trending-topics/:id/adopt`
 - **billing**: see "Billing & Payments" above
 
 ## Environment Setup

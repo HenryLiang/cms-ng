@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WikipediaService } from './wikipedia.service';
 import { RedisService } from '../redis/redis.service';
@@ -33,7 +36,9 @@ describe('WikipediaService', () => {
           provide: ConfigService,
           useValue: {
             get: (key: string) => {
-              const map: Record<string, string> = { WIKIPEDIA_PROXY_ENABLED: 'false' };
+              const map: Record<string, string> = {
+                WIKIPEDIA_PROXY_ENABLED: 'false',
+              };
               return map[key];
             },
           },
@@ -55,13 +60,18 @@ describe('WikipediaService', () => {
         text: '埃及軍方宣佈終止憲法，推翻首位民選總統穆爾西。',
         year: 2013,
         pages: [
-          { normalizedtitle: '2013年', extract: '2013年是一個平年，第一天是星期二。' },
+          {
+            normalizedtitle: '2013年',
+            extract: '2013年是一個平年，第一天是星期二。',
+          },
           {
             normalizedtitle: '穆爾西',
             extract: '穆爾西是埃及首位民選總統。',
             description: 'President of Egypt from 2012 to 2013',
             thumbnail: { source: 'https://upload.example/morsi.jpg' },
-            content_urls: { desktop: { page: 'https://zh.wikipedia.org/wiki/穆爾西' } },
+            content_urls: {
+              desktop: { page: 'https://zh.wikipedia.org/wiki/穆爾西' },
+            },
           },
         ],
       },
@@ -73,17 +83,34 @@ describe('WikipediaService', () => {
     ],
   };
 
+  it('describes and fetches the historical source through the generic interface', async () => {
+    redis.get.mockResolvedValue(JSON.stringify([]));
+
+    const definitions = await service.listDefinitions({});
+    const result = await service.fetch(
+      'this-day',
+      {},
+      { params: { region: 'HK', date: '2026-07-03' } },
+    );
+
+    expect(definitions).toEqual([
+      expect.objectContaining({ id: 'this-day', category: 'history' }),
+    ]);
+    expect(redis.get).toHaveBeenCalledWith('wiki:otd:zh:zh-hk:7-3');
+    expect(result).toEqual(expect.objectContaining({ status: 'available' }));
+  });
+
   describe('fetchOnThisDay', () => {
     it('throws BadRequestException for unsupported region', async () => {
-      await expect(service.fetchOnThisDay('JP', undefined, 1, 10)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.fetchOnThisDay('JP', undefined, 1, 10),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException for invalid date format', async () => {
-      await expect(service.fetchOnThisDay('CN', '2026/07/03', 1, 10)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.fetchOnThisDay('CN', '2026/07/03', 1, 10),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('returns cached items without calling API', async () => {
@@ -102,7 +129,11 @@ describe('WikipediaService', () => {
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
       // 缓存键按 lang+variant 区分
-      expect(redis.set).toHaveBeenCalledWith('wiki:otd:zh:zh-cn:7-3', expect.any(String), 86400);
+      expect(redis.set).toHaveBeenCalledWith(
+        'wiki:otd:zh:zh-cn:7-3',
+        expect.any(String),
+        86400,
+      );
       // 调用了 zh.wikipedia.org，并带 zh-cn Accept-Language（简体）
       expect(fetchMock).toHaveBeenCalledWith(
         'https://zh.wikipedia.org/api/rest_v1/feed/onthisday/events/7/3',
@@ -114,7 +145,9 @@ describe('WikipediaService', () => {
       expect(result.items).toHaveLength(2);
       // 2013 事件：跳过年份页"2013年"，bestPage 取有缩略图的"穆爾西"
       const modern = result.items.find((i: any) => i.year === 2013);
-      expect(modern.title).toBe('【2013年】埃及軍方宣佈終止憲法，推翻首位民選總統穆爾西。');
+      expect(modern.title).toBe(
+        '【2013年】埃及軍方宣佈終止憲法，推翻首位民選總統穆爾西。',
+      );
       expect(modern.description).toBe('穆爾西是埃及首位民選總統。'); // 跳过年份页 extract
       expect(modern.source).toBe('this-day');
       expect(modern.tags).toEqual(['穆爾西']); // 年份页"2013年"被剔除
@@ -136,12 +169,17 @@ describe('WikipediaService', () => {
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
       // 2013 事件 heatScore 应高于 500 年事件（recency 更高）
-      expect(result.items[0].heatScore).toBeGreaterThanOrEqual(result.items[1].heatScore);
+      expect(result.items[0].heatScore).toBeGreaterThanOrEqual(
+        result.items[1].heatScore,
+      );
       expect(result.items[0].year).toBe(2013);
     });
 
     it('HK uses zh-hk variant (traditional Chinese)', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: [] }),
+      });
 
       await service.fetchOnThisDay('HK', '2026-07-03', 1, 10);
 
@@ -151,11 +189,18 @@ describe('WikipediaService', () => {
           headers: expect.objectContaining({ 'Accept-Language': 'zh-hk' }),
         }),
       );
-      expect(redis.set).toHaveBeenCalledWith('wiki:otd:zh:zh-hk:7-3', expect.any(String), 86400);
+      expect(redis.set).toHaveBeenCalledWith(
+        'wiki:otd:zh:zh-hk:7-3',
+        expect.any(String),
+        86400,
+      );
     });
 
     it('US and EU use en without Accept-Language, sharing the same cache key', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: [] }),
+      });
 
       await service.fetchOnThisDay('US', '2026-07-03', 1, 10);
       const usInit = fetchMock.mock.calls[0][1];
@@ -167,7 +212,11 @@ describe('WikipediaService', () => {
 
       await service.fetchOnThisDay('EU', '2026-07-03', 1, 10);
       // US 与 EU 共用 en 源 → 同一缓存键
-      expect(redis.set).toHaveBeenCalledWith('wiki:otd:en:default:7-3', expect.any(String), 86400);
+      expect(redis.set).toHaveBeenCalledWith(
+        'wiki:otd:en:default:7-3',
+        expect.any(String),
+        86400,
+      );
     });
 
     it('paginates results', async () => {
@@ -176,7 +225,10 @@ describe('WikipediaService', () => {
         year: 2000,
         pages: [],
       }));
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: many }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: many }),
+      });
 
       const page1 = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
       const page2 = await service.fetchOnThisDay('CN', '2026-07-03', 2, 10);
@@ -189,7 +241,10 @@ describe('WikipediaService', () => {
     });
 
     it('defaults to today when date omitted', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: [] }),
+      });
 
       await service.fetchOnThisDay('CN', undefined, 1, 10);
 
@@ -200,25 +255,29 @@ describe('WikipediaService', () => {
     });
 
     it('throws ServiceUnavailableException when API returns non-ok', async () => {
-      fetchMock.mockResolvedValue({ ok: false, status: 503, text: async () => 'upstream error' });
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => 'upstream error',
+      });
 
-      await expect(service.fetchOnThisDay('CN', '2026-07-03', 1, 10)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        service.fetchOnThisDay('CN', '2026-07-03', 1, 10),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
 
     it('throws ServiceUnavailableException on network error', async () => {
       fetchMock.mockRejectedValue(new Error('ETIMEDOUT'));
 
-      await expect(service.fetchOnThisDay('CN', '2026-07-03', 1, 10)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        service.fetchOnThisDay('CN', '2026-07-03', 1, 10),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
 
     it('rejects impossible calendar dates (e.g. 2026-02-31) with BadRequestException', async () => {
-      await expect(service.fetchOnThisDay('CN', '2026-02-31', 1, 10)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.fetchOnThisDay('CN', '2026-02-31', 1, 10),
+      ).rejects.toThrow(BadRequestException);
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -230,7 +289,12 @@ describe('WikipediaService', () => {
             {
               text: '某冷门事件描述。',
               year: 2013,
-              pages: [{ normalizedtitle: '2013年', extract: '2013年是一個平年，第一天是星期二。' }],
+              pages: [
+                {
+                  normalizedtitle: '2013年',
+                  extract: '2013年是一個平年，第一天是星期二。',
+                },
+              ],
             },
           ],
         }),
@@ -262,13 +326,20 @@ describe('WikipediaService', () => {
 
     it('treats corrupt cache value as miss: deletes key, refetches, re-caches', async () => {
       redis.get.mockResolvedValue('{not valid json');
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: [] }),
+      });
 
       await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
       expect(redis.del).toHaveBeenCalledWith('wiki:otd:zh:zh-cn:7-3');
       expect(fetchMock).toHaveBeenCalled();
-      expect(redis.set).toHaveBeenCalledWith('wiki:otd:zh:zh-cn:7-3', expect.any(String), 86400);
+      expect(redis.set).toHaveBeenCalledWith(
+        'wiki:otd:zh:zh-cn:7-3',
+        expect.any(String),
+        86400,
+      );
     });
 
     it('merges all 5 types with type labels (events/selected/births/deaths/holidays)', async () => {
@@ -282,14 +353,19 @@ describe('WikipediaService', () => {
           deaths: [{ text: '某人逝世', year: 1970, pages: [] }],
           holidays: [{ text: '某节日', pages: [] }], // 无 year
         };
-        return Promise.resolve({ ok: true, json: async () => ({ [type]: data[type] || [] }) });
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ [type]: data[type] || [] }),
+        });
       });
 
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
       expect(fetchMock).toHaveBeenCalledTimes(5); // 5 类型并发
       const types = result.items.map((i: any) => i.type);
-      expect(types).toEqual(expect.arrayContaining(['事件', '精选', '出生', '逝世', '节日']));
+      expect(types).toEqual(
+        expect.arrayContaining(['事件', '精选', '出生', '逝世', '节日']),
+      );
       // holidays 无 year → title 无年份前缀、year undefined
       const holiday = result.items.find((i: any) => i.type === '节日');
       expect(holiday.title).toBe('某节日');
@@ -300,13 +376,19 @@ describe('WikipediaService', () => {
       // events 失败，其他 4 类型成功
       fetchMock.mockImplementation((url: string) => {
         if (url.includes('/events/')) {
-          return Promise.resolve({ ok: false, status: 500, text: async () => 'err' });
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            text: async () => 'err',
+          });
         }
         const m = /\/onthisday\/(\w+)\//.exec(url);
         const type = m ? m[1] : 'events';
         return Promise.resolve({
           ok: true,
-          json: async () => ({ [type]: [{ text: `${type}条目`, year: 2000, pages: [] }] }),
+          json: async () => ({
+            [type]: [{ text: `${type}条目`, year: 2000, pages: [] }],
+          }),
         });
       });
 
@@ -314,7 +396,9 @@ describe('WikipediaService', () => {
 
       const types = result.items.map((i: any) => i.type);
       expect(types).not.toContain('事件'); // events 失败跳过
-      expect(types).toEqual(expect.arrayContaining(['精选', '出生', '逝世', '节日']));
+      expect(types).toEqual(
+        expect.arrayContaining(['精选', '出生', '逝世', '节日']),
+      );
     });
   });
 
@@ -339,7 +423,10 @@ describe('WikipediaService', () => {
         ],
       }).compile();
       const proxyService = module.get<WikipediaService>(WikipediaService);
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: [] }),
+      });
 
       await proxyService.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
@@ -349,7 +436,10 @@ describe('WikipediaService', () => {
     });
 
     it('does not attach ProxyAgent when WIKIPEDIA_PROXY_ENABLED=false', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ events: [] }) });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events: [] }),
+      });
 
       await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
