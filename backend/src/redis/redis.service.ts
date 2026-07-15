@@ -4,6 +4,8 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
+  private static readonly DEFAULT_COMMAND_TIMEOUT_MS = 5000;
+
   private readonly logger = new Logger(RedisService.name);
   private client: Redis | null = null;
 
@@ -11,9 +13,20 @@ export class RedisService implements OnModuleDestroy {
     const url = this.config.get<string>('REDIS_URL');
     if (url) {
       try {
+        const configuredCommandTimeout = Number(
+          this.config.get<string>('REDIS_COMMAND_TIMEOUT_MS'),
+        );
+        const commandTimeout =
+          Number.isFinite(configuredCommandTimeout) &&
+          configuredCommandTimeout > 0
+            ? configuredCommandTimeout
+            : RedisService.DEFAULT_COMMAND_TIMEOUT_MS;
         this.client = new Redis(url, {
           lazyConnect: true,
           maxRetriesPerRequest: 3,
+          // Cache operations are fail-open throughout the service. Bound slow
+          // commands as well as hard failures so callers can actually degrade.
+          commandTimeout,
           retryStrategy: (times) => Math.min(times * 200, 2000),
         });
         this.client.on('error', (err) => {
