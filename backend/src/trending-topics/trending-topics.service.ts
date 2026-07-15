@@ -1,51 +1,35 @@
 import {
+  BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@cms-ng/shared';
+import type { TrendingTopic as TrendingTopicRecord } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
+import { safeJsonParse } from '../common/json.utils';
+import { PrismaService } from '../prisma/prisma.service';
+import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
-import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
-import { UserRole } from '@cms-ng/shared';
-import { safeJsonParse } from '../common/json.utils';
-import Parser from 'rss-parser';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+import { TopicSourceCatalog } from './sources/topic-source.catalog';
 
+interface ImportTopicInput {
+  title: string;
+  description?: string;
+  source?: string;
+  heatScore?: number;
+  tags?: string[];
+}
+
+/** Curated-topic persistence and adoption. External source I/O lives in TopicSourceCatalog. */
 @Injectable()
 export class TrendingTopicsService {
-  private readonly proxyEnabled: boolean;
-  private readonly proxyUrl: string | undefined;
-  private readonly rssHubUrl: string;
-
   constructor(
-    private prisma: PrismaService,
-    private aiService: AIService,
-    private config: ConfigService,
-  ) {
-    this.proxyEnabled =
-      (this.config.get<string>('RSS_PROXY_ENABLED') || '').toLowerCase() ===
-      'true';
-    this.proxyUrl =
-      this.config.get<string>('HTTP_PROXY') ||
-      this.config.get<string>('http_proxy');
-    this.rssHubUrl =
-      this.config.get<string>('RSS_HUB_URL') || 'http://localhost:1200';
-  }
-
-  /**
-   * 根据代理开关返回请求选项。
-   * 开关关闭时返回空对象，即使设置了 HTTP_PROXY 也不使用代理。
-   */
-  private getProxyRequestOptions(): any {
-    if (this.proxyEnabled && this.proxyUrl) {
-      return { agent: new HttpsProxyAgent(this.proxyUrl) };
-    }
-    return {};
-  }
+    private readonly prisma: PrismaService,
+    private readonly aiService: AIService,
+    private readonly sourceCatalog: TopicSourceCatalog,
+  ) {}
 
   async create(userId: string, dto: CreateTopicDto) {
     const topic = await this.prisma.trendingTopic.create({
@@ -66,13 +50,11 @@ export class TrendingTopicsService {
     const topics = await this.prisma.trendingTopic.findMany({
       orderBy: [{ heatScore: 'desc' }, { createdAt: 'desc' }],
     });
-    return topics.map((t) => this.serializeTopic(t));
+    return topics.map((topic) => this.serializeTopic(topic));
   }
 
   async findOne(id: string) {
-    const topic = await this.prisma.trendingTopic.findUnique({
-      where: { id },
-    });
+    const topic = await this.prisma.trendingTopic.findUnique({ where: { id } });
     if (!topic) throw new NotFoundException('Topic not found');
     return this.serializeTopic(topic);
   }
@@ -81,7 +63,7 @@ export class TrendingTopicsService {
     id: string,
     dto: UpdateTopicDto,
     userId: string,
-    userRole: string,
+    userRole: UserRole,
   ) {
     const existing = await this.prisma.trendingTopic.findUnique({
       where: { id },
@@ -92,7 +74,6 @@ export class TrendingTopicsService {
         'You do not have permission to update this topic',
       );
     }
-
     const topic = await this.prisma.trendingTopic.update({
       where: { id },
       data: {
@@ -107,7 +88,7 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
-  async remove(id: string, userId: string, userRole: string) {
+  async remove(id: string, userId: string, userRole: UserRole) {
     const existing = await this.prisma.trendingTopic.findUnique({
       where: { id },
     });
@@ -127,15 +108,12 @@ export class TrendingTopicsService {
       select: { name: true, expertise: true, department: true },
     });
     if (!user) throw new NotFoundException('User not found');
-
     const recentTopics = await this.prisma.trendingTopic.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
       select: { title: true },
     });
-
     const expertise = safeJsonParse<string[]>(user.expertise, []);
-
     return this.aiService.generateStorySuggestions(
       userId,
       {
@@ -143,7 +121,7 @@ export class TrendingTopicsService {
         expertise: Array.isArray(expertise) ? expertise : [],
         department: user.department || undefined,
       },
-      recentTopics.map((t) => t.title),
+      recentTopics.map((topic) => topic.title),
     );
   }
 
@@ -155,8 +133,6 @@ export class TrendingTopicsService {
     if (topic.status === 'ADOPTED') {
       throw new BadRequestException('Topic has already been adopted');
     }
-
-    // Create a Story from the topic
     const story = await this.prisma.story.create({
       data: {
         title: topic.title,
@@ -170,402 +146,51 @@ export class TrendingTopicsService {
         reporterId: userId,
       },
     });
-
-    // Mark topic as adopted
     await this.prisma.trendingTopic.update({
       where: { id: topicId },
       data: { status: 'ADOPTED', adoptedStoryId: story.id },
     });
-
     return { storyId: story.id, topicId };
   }
 
-  /**
-   * Lazy getter — the URLs are computed from `this.rssHubUrl`, which is
-   * initialized in the constructor body. A class field initializer runs
-   * before the constructor body, so referencing `this.rssHubUrl` there
-   * trips TS2729. Computing on access defers the read until after
-   * construction.
-   */
-  private get RSS_FEEDS() {
-    return [
-      {
-        key: 'google-trends',
-        url: 'https://trends.google.com/trending/rss?geo=HK',
-        isGoogle: true,
-      },
-      // 原生 RSS 源（优先）
-      {
-        key: 'sina',
-        url: 'https://rss.sina.com.cn/news/china/focus15.xml',
-        isGoogle: false,
-      },
-      {
-        key: 'people',
-        url: 'http://www.people.com.cn/rss/politics.xml',
-        isGoogle: false,
-      },
-      {
-        key: 'bbc',
-        url: 'http://feeds.bbci.co.uk/news/rss.xml',
-        isGoogle: false,
-      },
-      {
-        key: 'chinanews',
-        url: 'http://www.chinanews.com/rss/scroll-news.xml',
-        isGoogle: false,
-      },
-      {
-        key: 'guardian',
-        url: 'https://www.theguardian.com/world/rss',
-        isGoogle: false,
-      },
-      {
-        key: 'nytimes',
-        url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
-        isGoogle: false,
-      },
-      {
-        key: 'economist',
-        url: 'https://www.economist.com/latest/rss.xml',
-        isGoogle: false,
-      },
-      { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
-      // Reuters 原生 RSS 已关停、RSSHub 路由失效（Reuters API 返 401/404），
-      // 改走 Google News 聚合 site:reuters.com（返回真实 Reuters 文章，约 100 条，海外源走代理）
-      {
-        key: 'reuters',
-        url: 'https://news.google.com/rss/search?q=site:reuters.com&hl=en&gl=US&ceid=US:en',
-        isGoogle: false,
-      },
-      // RSSHub 源（网站无原生 RSS 时）
-      {
-        key: 'zaobao',
-        // 早报官方 .com.sg/rss/news.xml 已下线（2026 改版后全 404），改走 RSSHub
-        url: `${this.rssHubUrl}/zaobao/realtime/china`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      {
-        key: '36kr',
-        url: `${this.rssHubUrl}/36kr/news/latest`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      {
-        key: 'huxiu',
-        url: `${this.rssHubUrl}/huxiu/article`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      {
-        key: 'douban-movie',
-        url: `${this.rssHubUrl}/douban/movie/playing`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      // 微博 / 知乎 热搜（RSSHub）。加 ?limit=50 拉更多条（微博可到 50、知乎 30）
-      {
-        key: 'weibo-hot',
-        url: `${this.rssHubUrl}/weibo/search/hot?limit=50`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      {
-        key: 'zhihu-hot',
-        url: `${this.rssHubUrl}/zhihu/hot?limit=50`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      // B 站数据源（RSSHub）
-      {
-        key: 'bilibili-hot-search',
-        url: `${this.rssHubUrl}/bilibili/hot-search`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-      {
-        key: 'bilibili-ranking',
-        // /bilibili/popular/all 综合热门。/bilibili/ranking/:rid 走 B站 API 会被 -352 风控拦截
-        // （RSSHub 返空 503），改用 popular/all（不同接口，稳定 200）。
-        url: `${this.rssHubUrl}/bilibili/popular/all`,
-        isGoogle: false,
-        isRSSHub: true,
-      },
-    ];
-  }
-
-  /**
-   * 拉取 B 站分区排行榜。
-   * 用 RSSHub /bilibili/ranking/:rid（rid 为分区 ID，如 36=知识 / 3=音乐 / 181=影视）。
-   * 注：/bilibili/partion/ranking/:tid 路由当前返回空，改用 ranking 路由带分区 rid。
-   * 该路由走 B站 API，易被 -352 风控拦截（概率性，单次约 50% 成功）。RSSHub 不缓存失败响应，
-   * 故重试 3 次（含退避）可把成功率提到 ~87%；仍失败则返回空，前端显示「暂无数据」。
-   */
-  async fetchBilibiliPartitionRanking(tid: number, page = 1, limit = 10) {
-    const feed = {
-      key: 'bilibili-partion',
-      url: `${this.rssHubUrl}/bilibili/ranking/${tid}`,
-    };
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const items = await this.fetchSingleRSS(feed, {});
-        return this.paginate(items, page, limit);
-      } catch (error: any) {
-        if (attempt === 3) {
-          // 3 次仍失败 -> 返回空，前端显示「暂无数据」（不抛 500）
-          return this.paginate([], page, limit);
-        }
-        // 短退避后重试（B站 -352 是概率性的，重试通常能过）
-        await new Promise((r) => setTimeout(r, 300 * attempt));
-      }
-    }
-    return this.paginate([], page, limit);
-  }
-
-  // NHK 8 个分类 RSS（cat0 主要 / cat1 社会 / cat2 科学医療 / cat3 国際 / cat4 経済 / cat5 政治 / cat6 文化 / cat7 体育）
-  private get NHK_FEEDS() {
-    return [0, 1, 2, 3, 4, 5, 6, 7].map((cat) => ({
-      key: 'nhk',
-      url: `https://www3.nhk.or.jp/rss/news/cat${cat}.xml`,
-    }));
-  }
-
-  // NHK 聚合结果缓存（5 分钟），避免翻页时重复拉 8 个分类源
-  private nhkCache: { items: any[]; ts: number } | null = null;
-  private static readonly NHK_CACHE_TTL = 300;
-
-  /**
-   * 拉取 NHK 新闻：聚合 8 个分类 RSS（海外源走代理），按标题去重（cat0 主要与各分类有重叠），
-   * 5 分钟缓存，分页返回。单分类失败不阻断（Promise.allSettled）。
-   */
-  async fetchNHKNews(page = 1, limit = 10) {
-    const now = Date.now();
-    if (
-      this.nhkCache &&
-      now - this.nhkCache.ts < TrendingTopicsService.NHK_CACHE_TTL * 1000
-    ) {
-      return this.paginate(this.nhkCache.items, page, limit);
-    }
-
-    const requestOptions = this.getProxyRequestOptions();
-    const results = await Promise.allSettled(
-      this.NHK_FEEDS.map(async (feed) => {
-        try {
-          return await this.fetchSingleRSS(feed, requestOptions);
-        } catch {
-          return [] as any[];
-        }
-      }),
+  /** Compatibility methods for existing source-specific routes. */
+  fetchGoogleTrends(geo: string, timeRange: string, page = 1, limit = 10) {
+    return this.sourceCatalog.fetch(
+      'google-trends',
+      {},
+      { page, limit, params: { geo, timeRange } },
     );
-    const all: any[] = [];
-    results.forEach((r) => {
-      if (r.status === 'fulfilled' && Array.isArray(r.value)) all.push(...r.value);
-    });
-    // 按标题去重（cat0 主要的条目会与各分类重复）
-    const seen = new Set<string>();
-    const deduped = all.filter((item) => {
-      const key = item.title?.trim();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    this.nhkCache = { items: deduped, ts: now };
-    return this.paginate(deduped, page, limit);
   }
 
-  async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
-    const baseRequestOptions = this.getProxyRequestOptions();
-
-    const results = await Promise.allSettled(
-      this.RSS_FEEDS.map(async (feed) => {
-        try {
-          // RSSHub 本地实例不走代理
-          const requestOptions =
-            !feed.isGoogle && (feed as any).isRSSHub ? {} : baseRequestOptions;
-          if (feed.isGoogle) {
-            return await this.fetchSingleGoogleTrends(
-              feed.url.replace('HK', geo || 'HK'),
-              requestOptions,
-            );
-          }
-          return await this.fetchSingleRSS(feed, requestOptions);
-        } catch (err: any) {
-          return [] as any[];
-        }
-      }),
+  fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
+    return this.sourceCatalog.fetch(
+      'all-news',
+      {},
+      { page, limit, params: { geo: geo || 'HK' } },
     );
-
-    const allItems: any[] = [];
-    results.forEach((r) => {
-      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-        allItems.push(...r.value);
-      }
-    });
-
-    // Deduplicate by title similarity (exact match)
-    const seen = new Set<string>();
-    const deduped = allItems.filter((item) => {
-      const key = item.title?.trim();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    return this.paginate(deduped, page, limit);
   }
 
-  private async fetchSingleGoogleTrends(
-    feedUrl: string,
-    requestOptions: any,
-  ): Promise<any[]> {
-    try {
-      const parser = new Parser({
-        customFields: {
-          item: [
-            'ht:approx_traffic',
-            'ht:picture',
-            'ht:picture_source',
-            'ht:news_item',
-          ],
-        },
-        requestOptions,
-      });
-      const feed = await parser.parseURL(feedUrl);
-      return (feed.items || []).map((item: any) => {
-        const traffic = item['ht:approx_traffic'] || '';
-        const articles = this.normalizeNewsItems(item['ht:news_item']);
-        const firstNews = articles[0];
-        const snippet = firstNews?.snippet;
-        const description =
-          snippet ||
-          firstNews?.title ||
-          item.contentSnippet ||
-          item.title ||
-          '';
-        return {
-          title: item.title || '',
-          description,
-          source: 'google-trends',
-          heatScore: this.parseTrafficToScore(traffic),
-          tags: [],
-          articles: articles.slice(0, 3),
-        };
-      });
-    } catch (err: any) {
-      if (requestOptions?.agent) {
-        return this.fetchSingleGoogleTrends(feedUrl, {});
-      }
-      throw err;
-    }
+  fetchNewsBySource(sourceId: string, page = 1, limit = 10) {
+    return this.sourceCatalog.fetch(sourceId, {}, { page, limit });
   }
 
-  private paginate(items: any[], page: number, limit: number) {
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    return {
-      items: items.slice(start, end),
-      total: items.length,
-      page,
-      limit,
-      totalPages: Math.ceil(items.length / limit) || 1,
-    };
+  fetchBilibiliPartitionRanking(tid: number, page = 1, limit = 10) {
+    return this.sourceCatalog.fetch(
+      'bilibili-partition',
+      {},
+      { page, limit, params: { tid } },
+    );
   }
 
-  private async fetchSingleRSS(
-    feed: { key: string; url: string },
-    requestOptions: any,
-  ): Promise<any[]> {
-    try {
-      const parser = new Parser({ requestOptions });
-      const rssFeed = await parser.parseURL(feed.url);
-      return (rssFeed.items || []).map((item: any) => ({
-        title: item.title || '',
-        description: item.contentSnippet || item.summary || item.title || '',
-        source: feed.key,
-        heatScore: 50,
-        tags: [],
-        articles: item.link
-          ? [
-              {
-                title: item.title || '',
-                source: feed.key,
-                snippet: item.contentSnippet || '',
-                url: item.link,
-              },
-            ]
-          : [],
-      }));
-    } catch (err: any) {
-      if (requestOptions?.agent) {
-        return this.fetchSingleRSS(feed, {});
-      }
-      throw err;
-    }
+  fetchNHKNews(page = 1, limit = 10) {
+    return this.sourceCatalog.fetch('nhk', {}, { page, limit });
   }
 
-  async fetchGoogleTrends(
-    geo: string,
-    _timeRange: string,
-    page = 1,
-    limit = 10,
-  ) {
-    try {
-      const requestOptions = this.getProxyRequestOptions();
-      const items = await this.fetchSingleGoogleTrends(
-        `https://trends.google.com/trending/rss?geo=${geo || 'HK'}`,
-        requestOptions,
-      );
-      return this.paginate(items, page, limit);
-    } catch (error: any) {
-      throw new Error(`Google Trends 获取失败: ${error.message}`);
-    }
+  importFromGoogleTrends(userId: string, data: ImportTopicInput) {
+    return this.importTopic(userId, { ...data, source: 'google-trends' });
   }
 
-  async fetchNewsBySource(sourceKey: string, page = 1, limit = 10) {
-    const feed = this.RSS_FEEDS.find((f) => f.key === sourceKey);
-    if (!feed) {
-      throw new BadRequestException(`未知的数据源: ${sourceKey}`);
-    }
-
-    // RSSHub 本地实例不走代理
-    const requestOptions =
-      feed.url.includes('localhost') || feed.url.includes('127.0.0.1')
-        ? {}
-        : this.getProxyRequestOptions();
-
-    try {
-      let items;
-      if (feed.isGoogle) {
-        items = await this.fetchSingleGoogleTrends(feed.url, requestOptions);
-      } else {
-        items = await this.fetchSingleRSS(feed, requestOptions);
-      }
-      return this.paginate(items, page, limit);
-    } catch (error: any) {
-      // 上游 RSS/RSSHub 失败（如 B站 -352 风控、源站宕机）-> 返回空结果，前端显示「暂无数据」，
-      // 不抛 500（与 fetchAllTrendingNews 的 per-feed 容错一致）。
-      return this.paginate([], page, limit);
-    }
-  }
-
-  async importFromGoogleTrends(userId: string, data: any) {
-    const topic = await this.prisma.trendingTopic.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        source: 'google-trends',
-        heatScore: data.heatScore ?? 50,
-        tags: JSON.stringify(data.tags ?? []),
-        status: 'OPEN',
-        createdBy: userId,
-      },
-    });
-    return this.serializeTopic(topic);
-  }
-
-  /** 通用导入：source 由调用方传入（x-trends / x-accounts / 任意）。与 importFromGoogleTrends 同构。 */
-  async importTopic(userId: string, data: any) {
+  async importTopic(userId: string, data: ImportTopicInput) {
     const topic = await this.prisma.trendingTopic.create({
       data: {
         title: data.title,
@@ -580,73 +205,7 @@ export class TrendingTopicsService {
     return this.serializeTopic(topic);
   }
 
-  private normalizeNewsItems(
-    newsItemField: any,
-  ): { title: string; source: string; snippet: string; url: string }[] {
-    if (!newsItemField) return [];
-    // rss-parser merges multiple <ht:news_item> siblings into a single object with array properties
-    const isMergedFormat =
-      typeof newsItemField === 'object' &&
-      !Array.isArray(newsItemField) &&
-      Array.isArray(newsItemField['ht:news_item_title']);
-
-    if (isMergedFormat) {
-      const titles = newsItemField['ht:news_item_title'] || [];
-      const snippets = newsItemField['ht:news_item_snippet'] || [];
-      const urls = newsItemField['ht:news_item_url'] || [];
-      const sources = newsItemField['ht:news_item_source'] || [];
-      const count = Math.max(
-        titles.length,
-        snippets.length,
-        urls.length,
-        sources.length,
-      );
-      const articles = [];
-      for (let i = 0; i < count; i++) {
-        const title = titles[i] || '';
-        const snippet = snippets[i] || '';
-        articles.push({
-          title,
-          source: sources[i] || '',
-          snippet: snippet || title,
-          url: urls[i] || '',
-        });
-      }
-      return articles;
-    }
-
-    // Single news item as object
-    if (typeof newsItemField === 'object' && !Array.isArray(newsItemField)) {
-      const title = newsItemField['ht:news_item_title'] || '';
-      return [
-        {
-          title,
-          source: newsItemField['ht:news_item_source'] || '',
-          snippet: newsItemField['ht:news_item_snippet'] || title,
-          url: newsItemField['ht:news_item_url'] || '',
-        },
-      ];
-    }
-
-    return [];
-  }
-
-  private parseTrafficToScore(traffic: string): number {
-    if (!traffic) return 50;
-    const num = parseInt(traffic.replace(/[^0-9]/g, ''), 10);
-    if (num >= 50000) return 98;
-    if (num >= 20000) return 95;
-    if (num >= 10000) return 90;
-    if (num >= 5000) return 85;
-    if (num >= 2000) return 80;
-    if (num >= 1000) return 75;
-    if (num >= 500) return 70;
-    if (num >= 200) return 65;
-    if (num >= 100) return 60;
-    return 50;
-  }
-
-  private serializeTopic(topic: any) {
+  private serializeTopic(topic: TrendingTopicRecord) {
     return {
       ...topic,
       tags: safeJsonParse(topic.tags, []),

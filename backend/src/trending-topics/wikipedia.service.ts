@@ -6,6 +6,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
+import { TopicSourceAdapter } from './sources/topic-source.adapter';
+import {
+  TopicSourceContext,
+  TopicSourceDefinition,
+  TopicSourcePage,
+  TopicSourceQuery,
+} from './sources/topic-source.types';
 
 /**
  * 当年今日 / 历史上的今天 数据源服务 — 基于 Wikipedia On This Day REST API。
@@ -28,7 +35,7 @@ import { RedisService } from '../redis/redis.service';
  *   - heatScore：Wikipedia 无原生热度，按「距今年份越近 × 相关词条越多」复合计算。
  */
 @Injectable()
-export class WikipediaService {
+export class WikipediaService implements TopicSourceAdapter {
   private readonly logger = new Logger(WikipediaService.name);
 
   private readonly proxyEnabled: boolean;
@@ -64,9 +71,13 @@ export class WikipediaService {
     private readonly redis: RedisService,
   ) {
     this.proxyEnabled =
-      (this.config.get<string>('WIKIPEDIA_PROXY_ENABLED') || '').toLowerCase() === 'true';
+      (
+        this.config.get<string>('WIKIPEDIA_PROXY_ENABLED') || ''
+      ).toLowerCase() === 'true';
     this.proxyUrl =
-      this.config.get<string>('HTTP_PROXY') || this.config.get<string>('http_proxy') || undefined;
+      this.config.get<string>('HTTP_PROXY') ||
+      this.config.get<string>('http_proxy') ||
+      undefined;
     // Wikipedia User-Agent 政策 (https://meta.wikimedia.org/wiki/User-Agent_policy) 要求
     // UA 括号内必须包含 URL 或联系邮箱，否则会被 Varnish 直接 403（错误页 <title>Wikimedia Error</title>）。
     // 不合规 UA 例：'CMS-NG/1.0 (content creation platform)' → 403；
@@ -78,6 +89,55 @@ export class WikipediaService {
   }
 
   private readonly userAgent: string;
+
+  listDefinitions(context: TopicSourceContext): TopicSourceDefinition[] {
+    void context;
+    return [
+      {
+        id: 'this-day',
+        label: '当年今日',
+        category: 'history',
+        icon: 'calendar',
+        aggregate: false,
+        parameters: [
+          {
+            key: 'region',
+            label: '地区',
+            kind: 'select',
+            defaultValue: 'CN',
+            options: [
+              { value: 'CN', label: '中国' },
+              { value: 'HK', label: '香港' },
+              { value: 'US', label: '美国' },
+              { value: 'EU', label: '欧洲' },
+            ],
+          },
+          { key: 'date', label: '日期', kind: 'date' },
+        ],
+      },
+    ];
+  }
+
+  async fetch(
+    sourceId: string,
+    _context: TopicSourceContext,
+    query: TopicSourceQuery,
+  ): Promise<TopicSourcePage> {
+    if (sourceId !== 'this-day') {
+      throw new BadRequestException(`未知的 Wikipedia 数据源: ${sourceId}`);
+    }
+    const result = await this.fetchOnThisDay(
+      String(query.params?.region || 'CN'),
+      query.params?.date ? String(query.params.date) : undefined,
+      query.page ?? 1,
+      query.limit ?? 10,
+    );
+    return {
+      ...result,
+      status: 'available',
+      fetchedAt: new Date().toISOString(),
+    };
+  }
 
   /**
    * 拉取「历史上的今天」事件列表。
@@ -91,10 +151,18 @@ export class WikipediaService {
     date: string | undefined,
     page = 1,
     limit = 10,
-  ): Promise<{ items: any[]; total: number; page: number; limit: number; totalPages: number }> {
+  ): Promise<{
+    items: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     const cfg = WikipediaService.REGION_MAP[region];
     if (!cfg) {
-      throw new BadRequestException(`不支持的地区: ${region}（可选：CN/HK/US/EU）`);
+      throw new BadRequestException(
+        `不支持的地区: ${region}（可选：CN/HK/US/EU）`,
+      );
     }
 
     const { month, day } = this.parseDate(date);
@@ -118,11 +186,20 @@ export class WikipediaService {
     }
     if (!cacheHit) {
       // Wikipedia 无 all 端点，并发拉 5 个单类型合并（单类型失败不阻断整体）
-      const typeResults = await this.fetchAllTypes(cfg.lang, cfg.variant, month, day);
+      const typeResults = await this.fetchAllTypes(
+        cfg.lang,
+        cfg.variant,
+        month,
+        day,
+      );
       items = this.normalizeAll(typeResults);
       // 按 heatScore 倒序 —— 最新且相关词条最多的事件排前面
       items.sort((a, b) => b.heatScore - a.heatScore);
-      await this.redis.set(cacheKey, JSON.stringify(items), WikipediaService.CACHE_TTL);
+      await this.redis.set(
+        cacheKey,
+        JSON.stringify(items),
+        WikipediaService.CACHE_TTL,
+      );
     }
     return this.paginate(items, page, limit);
   }
@@ -134,7 +211,9 @@ export class WikipediaService {
     if (date) {
       const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(date);
       if (!m) {
-        throw new BadRequestException(`日期格式无效: ${date}（应为 YYYY-MM-DD）`);
+        throw new BadRequestException(
+          `日期格式无效: ${date}（应为 YYYY-MM-DD）`,
+        );
       }
       const year = parseInt(m[1], 10);
       const month = parseInt(m[2], 10);
@@ -145,7 +224,9 @@ export class WikipediaService {
       // 校验真实日历日期：拒绝 2/31、4/31、非闰年 2/30 等
       const daysInMonth = new Date(year, month, 0).getDate();
       if (day > daysInMonth) {
-        throw new BadRequestException(`日期无效: ${date}（${year}年${month}月只有${daysInMonth}天）`);
+        throw new BadRequestException(
+          `日期无效: ${date}（${year}年${month}月只有${daysInMonth}天）`,
+        );
       }
       return { month, day };
     }
@@ -214,9 +295,16 @@ export class WikipediaService {
       types.map(async (t) => {
         try {
           const raw = await this.callWikipediaApi(lang, variant, month, day, t);
-          return { type: t, items: Array.isArray(raw?.[t]) ? raw[t] : [], ok: true, err: undefined as Error | undefined };
+          return {
+            type: t,
+            items: Array.isArray(raw?.[t]) ? raw[t] : [],
+            ok: true,
+            err: undefined as Error | undefined,
+          };
         } catch (err) {
-          this.logger.warn(`Wikipedia ${t} 拉取失败，跳过: ${(err as Error).message}`);
+          this.logger.warn(
+            `Wikipedia ${t} 拉取失败，跳过: ${(err as Error).message}`,
+          );
           return { type: t, items: [], ok: false, err: err as Error };
         }
       }),
@@ -237,7 +325,9 @@ export class WikipediaService {
    * 关键：跳过 ^\d{4}年?$ 年份页（zh: "2013年"、en: "2013"，其 extract 是「20XX年是一个平年」，零信息量），
    *       优先取有缩略图的 page 做 bestPage（其 extract 做 description、thumbnail 做 coverImage）。
    */
-  private normalizeAll(typeResults: Array<{ type: string; items: any[] }>): any[] {
+  private normalizeAll(
+    typeResults: Array<{ type: string; items: any[] }>,
+  ): any[] {
     const currentYear = new Date().getFullYear();
     const all: any[] = [];
     for (const { type, items } of typeResults) {
@@ -250,7 +340,9 @@ export class WikipediaService {
         // 跳过年份页（zh: "2013年"；en: "2013"）
         const nonYearPages = pages.filter(
           (p) =>
-            p && typeof p.normalizedtitle === 'string' && !/^\d{4}年?$/.test(p.normalizedtitle),
+            p &&
+            typeof p.normalizedtitle === 'string' &&
+            !/^\d{4}年?$/.test(p.normalizedtitle),
         );
         // bestPage：优先有缩略图的（封面图），否则首个非年份页
         const bestPage =
@@ -261,15 +353,24 @@ export class WikipediaService {
           title: p.normalizedtitle || '',
           source: 'this-day',
           snippet: p.extract || p.description || '',
-          url: p.content_urls?.desktop?.page || p.content_urls?.mobile?.page || '',
+          url:
+            p.content_urls?.desktop?.page || p.content_urls?.mobile?.page || '',
         }));
 
         all.push({
-          title: year > 0 ? `【${year}年】${text}` : year < 0 ? `【公元前${Math.abs(year)}年】${text}` : text,
+          title:
+            year > 0
+              ? `【${year}年】${text}`
+              : year < 0
+                ? `【公元前${Math.abs(year)}年】${text}`
+                : text,
           description: bestPage?.extract || text,
           source: 'this-day',
           heatScore: this.computeHeatScore(year, pages.length, currentYear),
-          tags: nonYearPages.slice(0, 10).map((p) => p.normalizedtitle).filter(Boolean),
+          tags: nonYearPages
+            .slice(0, 10)
+            .map((p) => p.normalizedtitle)
+            .filter(Boolean),
           articles,
           coverImage: bestPage?.thumbnail?.source || undefined,
           year: year || undefined,
@@ -286,7 +387,11 @@ export class WikipediaService {
    *   richness = min(100, pagesCount * 20)    —— 相关词条越多分越高，5 个即满分
    *   heatScore = clamp(round(recency*0.6 + richness*0.4), 10, 99)
    */
-  private computeHeatScore(year: number, pagesCount: number, currentYear: number): number {
+  private computeHeatScore(
+    year: number,
+    pagesCount: number,
+    currentYear: number,
+  ): number {
     if (!year || year < 1) return 10;
     const recency = Math.min(100, (year / currentYear) * 100);
     const richness = Math.min(100, pagesCount * 20);

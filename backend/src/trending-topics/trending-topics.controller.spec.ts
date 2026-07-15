@@ -4,6 +4,7 @@ import { TrendingTopicsController } from './trending-topics.controller';
 import { TrendingTopicsService } from './trending-topics.service';
 import { TwitterService } from './twitter.service';
 import { WikipediaService } from './wikipedia.service';
+import { TopicSourceCatalog } from './sources/topic-source.catalog';
 
 jest.mock('https-proxy-agent', () => ({
   HttpsProxyAgent: jest.fn(),
@@ -38,6 +39,10 @@ describe('TrendingTopicsController', () => {
   let wikipediaService: {
     fetchOnThisDay: jest.Mock;
   };
+  let sourceCatalog: {
+    listSources: jest.Mock;
+    fetch: jest.Mock;
+  };
 
   beforeEach(async () => {
     topicsService = {
@@ -67,6 +72,10 @@ describe('TrendingTopicsController', () => {
     wikipediaService = {
       fetchOnThisDay: jest.fn(),
     };
+    sourceCatalog = {
+      listSources: jest.fn(),
+      fetch: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TrendingTopicsController],
@@ -74,6 +83,7 @@ describe('TrendingTopicsController', () => {
         { provide: TrendingTopicsService, useValue: topicsService },
         { provide: TwitterService, useValue: twitterService },
         { provide: WikipediaService, useValue: wikipediaService },
+        { provide: TopicSourceCatalog, useValue: sourceCatalog },
       ],
     }).compile();
 
@@ -84,13 +94,52 @@ describe('TrendingTopicsController', () => {
     jest.clearAllMocks();
   });
 
+  describe('generic source interface', () => {
+    it('lists sources and fetches any source through the catalog', async () => {
+      sourceCatalog.listSources.mockResolvedValue([
+        { id: 'bbc', label: 'BBC' },
+      ]);
+      sourceCatalog.fetch.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 2,
+        limit: 5,
+        totalPages: 1,
+      });
+
+      await expect(controller.listSources('user-id')).resolves.toEqual({
+        success: true,
+        data: [expect.objectContaining({ id: 'bbc' })],
+      });
+      await expect(
+        controller.fetchSource('user-id', 'bbc', {
+          page: 2,
+          limit: 5,
+          geo: 'US',
+        }),
+      ).resolves.toEqual({
+        success: true,
+        data: expect.objectContaining({ page: 2 }),
+      });
+      expect(sourceCatalog.fetch).toHaveBeenCalledWith(
+        'bbc',
+        { userId: 'user-id' },
+        { page: 2, limit: 5, params: { geo: 'US' } },
+      );
+    });
+  });
+
   describe('create', () => {
     it('should call topicsService.create', async () => {
       topicsService.create.mockResolvedValue({ id: 't1', title: 'Topic' });
 
-      const result = await controller.create('user-id', { title: 'Topic' } as any);
+      const result = await controller.create('user-id', {
+        title: 'Topic',
+      } as any);
 
-      expect(topicsService.create).toHaveBeenCalledWith('user-id', { title: 'Topic' });
+      expect(topicsService.create).toHaveBeenCalledWith('user-id', {
+        title: 'Topic',
+      });
       expect(result.id).toBe('t1');
     });
   });
@@ -108,28 +157,27 @@ describe('TrendingTopicsController', () => {
 
   describe('findOne', () => {
     it('should return topic by id', async () => {
-      topicsService.findOne.mockResolvedValue({ id: '550e8400-e29b-41d4-a716-446655440000' });
+      topicsService.findOne.mockResolvedValue({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+      });
 
-      const result = await controller.findOne('550e8400-e29b-41d4-a716-446655440000');
+      const result = await controller.findOne(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
 
-      expect(topicsService.findOne).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000');
+      expect(topicsService.findOne).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
       expect(result.id).toBe('550e8400-e29b-41d4-a716-446655440000');
     });
 
     it('should throw BadRequestException for unknown source names', () => {
-      expect(() => controller.findOne('nonexistent')).toThrow(BadRequestException);
-      expect(() => controller.findOne('nonexistent')).toThrow('Unknown data source: nonexistent');
-    });
-
-    it('should throw BadRequestException for known source keys', () => {
-      expect(() => controller.findOne('bbc')).toThrow(BadRequestException);
-      expect(() => controller.findOne('bbc')).toThrow("Invalid topic ID: 'bbc' is a data source name");
-      expect(() => controller.findOne('this-day')).toThrow("Invalid topic ID: 'this-day' is a data source name");
-      expect(() => controller.findOne('bilibili-hot-search')).toThrow("Invalid topic ID: 'bilibili-hot-search' is a data source name");
-      expect(() => controller.findOne('weibo-hot')).toThrow("Invalid topic ID: 'weibo-hot' is a data source name");
-      expect(() => controller.findOne('zhihu-hot')).toThrow("Invalid topic ID: 'zhihu-hot' is a data source name");
-      expect(() => controller.findOne('nhk')).toThrow("Invalid topic ID: 'nhk' is a data source name");
-      expect(() => controller.findOne('reuters')).toThrow("Invalid topic ID: 'reuters' is a data source name");
+      expect(() => controller.findOne('nonexistent')).toThrow(
+        BadRequestException,
+      );
+      expect(() => controller.findOne('nonexistent')).toThrow(
+        'Unknown data source: nonexistent',
+      );
     });
   });
 
@@ -137,9 +185,16 @@ describe('TrendingTopicsController', () => {
     it('should call topicsService.update with user info', async () => {
       topicsService.update.mockResolvedValue({ id: 't1', title: 'Updated' });
 
-      const result = await controller.update('user-id', 'REPORTER', 't1', { title: 'Updated' } as any);
+      const result = await controller.update('user-id', 'REPORTER', 't1', {
+        title: 'Updated',
+      } as any);
 
-      expect(topicsService.update).toHaveBeenCalledWith('t1', { title: 'Updated' }, 'user-id', 'REPORTER');
+      expect(topicsService.update).toHaveBeenCalledWith(
+        't1',
+        { title: 'Updated' },
+        'user-id',
+        'REPORTER',
+      );
       expect(result.title).toBe('Updated');
     });
   });
@@ -150,38 +205,71 @@ describe('TrendingTopicsController', () => {
 
       const result = await controller.remove('user-id', 'REPORTER', 't1');
 
-      expect(topicsService.remove).toHaveBeenCalledWith('t1', 'user-id', 'REPORTER');
+      expect(topicsService.remove).toHaveBeenCalledWith(
+        't1',
+        'user-id',
+        'REPORTER',
+      );
       expect(result.success).toBe(true);
     });
   });
 
   describe('generateSuggestions', () => {
     it('should call generateAISuggestions', async () => {
-      topicsService.generateAISuggestions.mockResolvedValue([{ title: 'Suggestion' }]);
+      topicsService.generateAISuggestions.mockResolvedValue([
+        { title: 'Suggestion' },
+      ]);
 
       const result = await controller.generateSuggestions('user-id');
 
-      expect(topicsService.generateAISuggestions).toHaveBeenCalledWith('user-id');
+      expect(topicsService.generateAISuggestions).toHaveBeenCalledWith(
+        'user-id',
+      );
       expect(result).toHaveLength(1);
     });
   });
 
   describe('fetchGoogleTrends', () => {
     it('should call fetchGoogleTrends with defaults', async () => {
-      topicsService.fetchGoogleTrends.mockResolvedValue({ items: [{ title: 'Trend' }], total: 1, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchGoogleTrends.mockResolvedValue({
+        items: [{ title: 'Trend' }],
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
 
-      const result = await controller.fetchGoogleTrends({ geo: '', timeRange: '' } as any);
+      const result = await controller.fetchGoogleTrends({
+        geo: '',
+        timeRange: '',
+      } as any);
 
-      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith('HK', '24h', 1, 10);
+      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith(
+        'HK',
+        '24h',
+        1,
+        10,
+      );
       expect(result.items).toHaveLength(1);
     });
 
     it('should pass query params', async () => {
-      topicsService.fetchGoogleTrends.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchGoogleTrends.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
 
       await controller.fetchGoogleTrends({ geo: 'US', timeRange: '7d' } as any);
 
-      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith('US', '7d', 1, 10);
+      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith(
+        'US',
+        '7d',
+        1,
+        10,
+      );
     });
   });
 
@@ -189,9 +277,14 @@ describe('TrendingTopicsController', () => {
     it('should call importFromGoogleTrends', async () => {
       topicsService.importFromGoogleTrends.mockResolvedValue({ id: 't1' });
 
-      const result = await controller.importGoogleTrend('user-id', { title: 'Trend' });
+      const result = await controller.importGoogleTrend('user-id', {
+        title: 'Trend',
+      });
 
-      expect(topicsService.importFromGoogleTrends).toHaveBeenCalledWith('user-id', { title: 'Trend' });
+      expect(topicsService.importFromGoogleTrends).toHaveBeenCalledWith(
+        'user-id',
+        { title: 'Trend' },
+      );
       expect(result.id).toBe('t1');
     });
   });
@@ -200,55 +293,133 @@ describe('TrendingTopicsController', () => {
     it('should call topicsService.importTopic with source', async () => {
       topicsService.importTopic.mockResolvedValue({ id: 't2' });
 
-      const result = await controller.importTopic('user-id', { title: 'X', source: 'x-trends' });
+      const result = await controller.importTopic('user-id', {
+        title: 'X',
+        source: 'x-trends',
+      });
 
-      expect(topicsService.importTopic).toHaveBeenCalledWith('user-id', { title: 'X', source: 'x-trends' });
+      expect(topicsService.importTopic).toHaveBeenCalledWith('user-id', {
+        title: 'X',
+        source: 'x-trends',
+      });
       expect(result.id).toBe('t2');
     });
   });
 
   describe('Bilibili endpoints', () => {
     it('fetchBilibiliHotSearch delegates to topicsService.fetchNewsBySource', async () => {
-      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
-      await controller.fetchBilibiliHotSearch({ page: '1', limit: '10' } as any);
-      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('bilibili-hot-search', 1, 10);
+      topicsService.fetchNewsBySource.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      await controller.fetchBilibiliHotSearch({
+        page: '1',
+        limit: '10',
+      } as any);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
+        'bilibili-hot-search',
+        1,
+        10,
+      );
     });
 
     it('fetchBilibiliRanking delegates to topicsService.fetchNewsBySource', async () => {
-      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchNewsBySource.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
       await controller.fetchBilibiliRanking({ page: '2', limit: '5' } as any);
-      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('bilibili-ranking', 2, 5);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
+        'bilibili-ranking',
+        2,
+        5,
+      );
     });
 
     it('fetchBilibiliPartitionRanking delegates to topicsService.fetchBilibiliPartitionRanking', async () => {
-      topicsService.fetchBilibiliPartitionRanking.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
-      await controller.fetchBilibiliPartitionRanking('36', { page: '1', limit: '10' } as any);
-      expect(topicsService.fetchBilibiliPartitionRanking).toHaveBeenCalledWith(36, 1, 10);
+      topicsService.fetchBilibiliPartitionRanking.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      await controller.fetchBilibiliPartitionRanking('36', {
+        page: '1',
+        limit: '10',
+      } as any);
+      expect(topicsService.fetchBilibiliPartitionRanking).toHaveBeenCalledWith(
+        36,
+        1,
+        10,
+      );
     });
 
     it('fetchBilibiliPartitionRanking throws for invalid tid', () => {
-      expect(() => controller.fetchBilibiliPartitionRanking('abc', { page: '1', limit: '10' } as any)).toThrow(BadRequestException);
-      expect(() => controller.fetchBilibiliPartitionRanking('0', { page: '1', limit: '10' } as any)).toThrow('分区 ID tid 必须是正整数');
+      expect(() =>
+        controller.fetchBilibiliPartitionRanking('abc', {
+          page: '1',
+          limit: '10',
+        } as any),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        controller.fetchBilibiliPartitionRanking('0', {
+          page: '1',
+          limit: '10',
+        } as any),
+      ).toThrow('分区 ID tid 必须是正整数');
     });
   });
 
   describe('Weibo / Zhihu endpoints', () => {
     it('fetchWeiboHot delegates to topicsService.fetchNewsBySource', async () => {
-      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchNewsBySource.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
       await controller.fetchWeiboHot({ page: '1', limit: '10' } as any);
-      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('weibo-hot', 1, 10);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
+        'weibo-hot',
+        1,
+        10,
+      );
     });
 
     it('fetchZhihuHot delegates to topicsService.fetchNewsBySource', async () => {
-      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchNewsBySource.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
       await controller.fetchZhihuHot({ page: '2', limit: '5' } as any);
-      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('zhihu-hot', 2, 5);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
+        'zhihu-hot',
+        2,
+        5,
+      );
     });
   });
 
   describe('NHK endpoint', () => {
     it('fetchNHK delegates to topicsService.fetchNHKNews', async () => {
-      topicsService.fetchNHKNews.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchNHKNews.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
       await controller.fetchNHK({ page: '1', limit: '10' } as any);
       expect(topicsService.fetchNHKNews).toHaveBeenCalledWith(1, 10);
     });
@@ -256,23 +427,58 @@ describe('TrendingTopicsController', () => {
 
   describe('Reuters endpoint', () => {
     it('fetchReuters delegates to topicsService.fetchNewsBySource', async () => {
-      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      topicsService.fetchNewsBySource.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
       await controller.fetchReuters({ page: '1', limit: '10' } as any);
-      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('reuters', 1, 10);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
+        'reuters',
+        1,
+        10,
+      );
     });
   });
 
   describe('X (Twitter) endpoints', () => {
     it('fetchXTrends delegates to twitterService with parsed woeid', async () => {
-      twitterService.fetchTrends.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
-      await controller.fetchXTrends('user-id', '23424977', { page: '2', limit: '5' } as any);
-      expect(twitterService.fetchTrends).toHaveBeenCalledWith('user-id', 23424977, 2, 5);
+      twitterService.fetchTrends.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      await controller.fetchXTrends('user-id', '23424977', {
+        page: '2',
+        limit: '5',
+      } as any);
+      expect(twitterService.fetchTrends).toHaveBeenCalledWith(
+        'user-id',
+        23424977,
+        2,
+        5,
+      );
     });
 
     it('fetchXTrends defaults woeid to 1 when unparseable', async () => {
-      twitterService.fetchTrends.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      twitterService.fetchTrends.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
       await controller.fetchXTrends('user-id', 'abc', {} as any);
-      expect(twitterService.fetchTrends).toHaveBeenCalledWith('user-id', 1, 1, 10);
+      expect(twitterService.fetchTrends).toHaveBeenCalledWith(
+        'user-id',
+        1,
+        1,
+        10,
+      );
     });
 
     it('xTrendWoeids delegates to twitterService.getWoeids', () => {
@@ -283,35 +489,84 @@ describe('TrendingTopicsController', () => {
     });
 
     it('fetchXAccounts delegates to twitterService.fetchAggregatedAccounts', async () => {
-      twitterService.fetchAggregatedAccounts.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20, totalPages: 1 });
-      await controller.fetchXAccounts('user-id', { page: '1', limit: '20' } as any);
-      expect(twitterService.fetchAggregatedAccounts).toHaveBeenCalledWith('user-id', 1, 20);
+      twitterService.fetchAggregatedAccounts.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      });
+      await controller.fetchXAccounts('user-id', {
+        page: '1',
+        limit: '20',
+      } as any);
+      expect(twitterService.fetchAggregatedAccounts).toHaveBeenCalledWith(
+        'user-id',
+        1,
+        20,
+      );
     });
 
     it('fetchXAccountTweets delegates to twitterService.fetchAccountTweets', async () => {
       twitterService.fetchAccountTweets.mockResolvedValue([]);
       await controller.fetchXAccountTweets('user-id', 'elonmusk', '5');
-      expect(twitterService.fetchAccountTweets).toHaveBeenCalledWith('elonmusk', 5, 'user-id', true);
+      expect(twitterService.fetchAccountTweets).toHaveBeenCalledWith(
+        'elonmusk',
+        5,
+        'user-id',
+        true,
+      );
     });
   });
 
   describe('this-day (Wikipedia On This Day)', () => {
     it('fetchThisDay delegates to wikipediaService with defaults (region→CN)', async () => {
-      wikipediaService.fetchOnThisDay.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
-      await controller.fetchThisDay(undefined as any, undefined, { page: '1', limit: '10' } as any);
-      expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith('CN', undefined, 1, 10);
+      wikipediaService.fetchOnThisDay.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      await controller.fetchThisDay(undefined as any, undefined, {
+        page: '1',
+        limit: '10',
+      } as any);
+      expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith(
+        'CN',
+        undefined,
+        1,
+        10,
+      );
     });
 
     it('fetchThisDay passes region/date/page/limit', async () => {
-      wikipediaService.fetchOnThisDay.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
-      await controller.fetchThisDay('HK', '2026-07-03', { page: '2', limit: '5' } as any);
-      expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith('HK', '2026-07-03', 2, 5);
+      wikipediaService.fetchOnThisDay.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      await controller.fetchThisDay('HK', '2026-07-03', {
+        page: '2',
+        limit: '5',
+      } as any);
+      expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith(
+        'HK',
+        '2026-07-03',
+        2,
+        5,
+      );
     });
   });
 
   describe('adoptTopic', () => {
     it('should call adoptTopic', async () => {
-      topicsService.adoptTopic.mockResolvedValue({ storyId: 's1', topicId: 't1' });
+      topicsService.adoptTopic.mockResolvedValue({
+        storyId: 's1',
+        topicId: 't1',
+      });
 
       const result = await controller.adoptTopic('user-id', 't1');
 

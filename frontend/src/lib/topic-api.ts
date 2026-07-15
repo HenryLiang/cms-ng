@@ -1,4 +1,15 @@
 import { api } from './api';
+import type {
+  TopicCandidate,
+  TopicSourceDefinition,
+  TopicSourcePage,
+} from '@cms-ng/shared';
+
+export type {
+  TopicCandidate,
+  TopicSourceDefinition,
+  TopicSourceParameter,
+} from '@cms-ng/shared';
 
 type TopicStatus = 'OPEN' | 'ADOPTED' | 'ARCHIVED';
 
@@ -24,29 +35,23 @@ export interface StorySuggestion {
   reason: string;
 }
 
-export interface GoogleTrendItem {
-  title: string;
-  description: string;
-  source: string;
-  heatScore: number;
-  tags: string[];
-  articles?: {
-    title: string;
-    source: string;
-    snippet: string;
-    url: string;
-  }[];
-  coverImage?: string;
-  year?: number;
-  type?: string;
+/** @deprecated Use TopicCandidate. Kept while source-specific UI code migrates. */
+export type GoogleTrendItem = TopicCandidate;
+export type PaginatedNewsResponse = TopicSourcePage;
+
+export async function getTopicSources(): Promise<TopicSourceDefinition[]> {
+  const res = await api.get('/trending-topics/sources');
+  return res.data.data;
 }
 
-export interface PaginatedNewsResponse {
-  items: GoogleTrendItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+export async function getTopicSourceItems(
+  sourceId: string,
+  params: Record<string, string | number | boolean | undefined> = {},
+): Promise<PaginatedNewsResponse> {
+  const res = await api.get(`/trending-topics/sources/${sourceId}/items`, {
+    params,
+  });
+  return res.data.data;
 }
 
 export interface CreateTopicInput {
@@ -70,12 +75,17 @@ export async function getTopic(id: string): Promise<TrendingTopic> {
   return res.data;
 }
 
-export async function createTopic(data: CreateTopicInput): Promise<TrendingTopic> {
+export async function createTopic(
+  data: CreateTopicInput,
+): Promise<TrendingTopic> {
   const res = await api.post('/trending-topics', data);
   return res.data;
 }
 
-export async function updateTopic(id: string, data: UpdateTopicInput): Promise<TrendingTopic> {
+export async function updateTopic(
+  id: string,
+  data: UpdateTopicInput,
+): Promise<TrendingTopic> {
   const res = await api.patch(`/trending-topics/${id}`, data);
   return res.data;
 }
@@ -89,7 +99,9 @@ export async function getAISuggestions(): Promise<StorySuggestion[]> {
   return res.data;
 }
 
-export async function adoptTopic(topicId: string): Promise<{ storyId: string; topicId: string }> {
+export async function adoptTopic(
+  topicId: string,
+): Promise<{ storyId: string; topicId: string }> {
   const res = await api.post(`/trending-topics/${topicId}/adopt`);
   return res.data;
 }
@@ -144,7 +156,9 @@ export async function getThisDay(
   return res.data;
 }
 
-export async function importGoogleTrend(data: GoogleTrendItem): Promise<TrendingTopic> {
+export async function importGoogleTrend(
+  data: GoogleTrendItem,
+): Promise<TrendingTopic> {
   const res = await api.post('/trending-topics/import-google-trend', data);
   return res.data;
 }

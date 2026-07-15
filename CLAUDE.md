@@ -86,6 +86,8 @@ The repo is a Turbo monorepo with `frontend/`, `backend/`, `packages/shared/`, `
 
 Backend architecture and subsystem details (AI Layer, Channels, Auto-Publishing, Billing, Storage, Email, Trending Topics, plus backend conventions and env validation rules) are lazy-loaded from `backend/CLAUDE.md` when working under `backend/`.
 
+The topic-source extension point is `backend/src/trending-topics/sources/`: ordinary RSS/RSSHub feeds are declarative entries, while new mechanisms implement `TopicSourceAdapter` and register with `TopicSourceCatalog`. See `backend/CLAUDE.md` for the full contract and generic endpoints.
+
 Backend conventions live in `backend/CLAUDE.md` (lazy-loaded when working under `backend/`). Frontend conventions live in `frontend/CLAUDE.md`.
 
 ### API Endpoints

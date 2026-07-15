@@ -9,7 +9,14 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TrendingTopicsService } from './trending-topics.service';
 import { TwitterService } from './twitter.service';
 import { WikipediaService } from './wikipedia.service';
@@ -19,37 +26,17 @@ import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
 import { SourcePaginationDto } from './dto/source-pagination.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@cms-ng/shared';
+import { type ApiResponse, UserRole } from '@cms-ng/shared';
+import { TopicSourceCatalog } from './sources/topic-source.catalog';
+import type {
+  TopicSourceDefinition,
+  TopicSourcePage,
+} from './sources/topic-source.types';
 
 @ApiTags('trending-topics')
 @ApiBearerAuth('bearer')
 @Controller('trending-topics')
 export class TrendingTopicsController {
-  private readonly SOURCE_KEYS = [
-    'google-trends',
-    'sina',
-    'people',
-    'bbc',
-    'chinanews',
-    'guardian',
-    'nytimes',
-    'economist',
-    'ft',
-    'reuters',
-    'nhk',
-    'zaobao',
-    '36kr',
-    'huxiu',
-    'douban-movie',
-    'weibo-hot',
-    'zhihu-hot',
-    'bilibili-hot-search',
-    'bilibili-ranking',
-    'bilibili-partion',
-    'x-trends',
-    'x-accounts',
-    'this-day',
-  ];
   private readonly UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -57,6 +44,7 @@ export class TrendingTopicsController {
     private topicsService: TrendingTopicsService,
     private twitterService: TwitterService,
     private wikipediaService: WikipediaService,
+    private sourceCatalog: TopicSourceCatalog,
   ) {}
 
   @Post()
@@ -75,6 +63,64 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Generate AI topic suggestions' })
   generateSuggestions(@CurrentUser('userId') userId: string) {
     return this.topicsService.generateAISuggestions(userId);
+  }
+
+  @Get('sources')
+  @ApiOperation({
+    summary: 'List available topic sources and their parameters',
+  })
+  @ApiOkResponse({ description: 'Source definitions wrapped in ApiResponse' })
+  async listSources(
+    @CurrentUser('userId') userId: string,
+  ): Promise<ApiResponse<TopicSourceDefinition[]>> {
+    return {
+      success: true,
+      data: await this.sourceCatalog.listSources({ userId }),
+    };
+  }
+
+  @Get('sources/:sourceId/items')
+  @ApiOperation({
+    summary: 'Fetch normalized topic candidates from any source',
+  })
+  @ApiParam({ name: 'sourceId', description: 'ID returned by GET /sources' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiOkResponse({
+    description:
+      'Normalized candidates wrapped in ApiResponse; additional query parameters come from the source definition',
+  })
+  async fetchSource(
+    @CurrentUser('userId') userId: string,
+    @Param('sourceId') sourceId: string,
+    @Query() query: Record<string, unknown>,
+  ): Promise<ApiResponse<TopicSourcePage>> {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(query.limit) || 10));
+    const params: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(query)) {
+      if (
+        key !== 'page' &&
+        key !== 'limit' &&
+        (typeof value === 'string' ||
+          typeof value === 'number' ||
+          typeof value === 'boolean')
+      ) {
+        params[key] = value;
+      }
+    }
+    return {
+      success: true,
+      data: await this.sourceCatalog.fetch(
+        sourceId,
+        { userId },
+        {
+          page,
+          limit,
+          params,
+        },
+      ),
+    };
   }
 
   @Get('google-trends')
@@ -199,7 +245,9 @@ export class TrendingTopicsController {
   }
 
   @Get('reuters')
-  @ApiOperation({ summary: 'Fetch trending news from Reuters (via Google News)' })
+  @ApiOperation({
+    summary: 'Fetch trending news from Reuters (via Google News)',
+  })
   fetchReuters(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
     const limit = Math.min(
@@ -210,7 +258,9 @@ export class TrendingTopicsController {
   }
 
   @Get('nhk')
-  @ApiOperation({ summary: 'Fetch trending news from NHK (aggregated categories)' })
+  @ApiOperation({
+    summary: 'Fetch trending news from NHK (aggregated categories)',
+  })
   fetchNHK(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
     const limit = Math.min(
@@ -463,11 +513,6 @@ export class TrendingTopicsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a curated trending topic by id' })
   findOne(@Param('id') id: string) {
-    if (this.SOURCE_KEYS.includes(id)) {
-      throw new BadRequestException(
-        `Invalid topic ID: '${id}' is a data source name`,
-      );
-    }
     if (!this.UUID_REGEX.test(id)) {
       throw new BadRequestException(`Unknown data source: ${id}`);
     }
@@ -478,7 +523,7 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Update a curated trending topic' })
   update(
     @CurrentUser('userId') userId: string,
-    @CurrentUser('role') role: string,
+    @CurrentUser('role') role: UserRole,
     @Param('id') id: string,
     @Body() dto: UpdateTopicDto,
   ) {
@@ -489,7 +534,7 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Delete a curated trending topic' })
   remove(
     @CurrentUser('userId') userId: string,
-    @CurrentUser('role') role: string,
+    @CurrentUser('role') role: UserRole,
     @Param('id') id: string,
   ) {
     return this.topicsService.remove(id, userId, role);
