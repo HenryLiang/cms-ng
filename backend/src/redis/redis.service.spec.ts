@@ -1,6 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 import { RedisService } from './redis.service';
+
+jest.mock('ioredis', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    status: 'ready',
+    on: jest.fn(),
+    connect: jest.fn().mockResolvedValue(undefined),
+    quit: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
 
 describe('RedisService', () => {
   let service: RedisService;
@@ -10,6 +21,7 @@ describe('RedisService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     // Mock Redis as unavailable for unit tests
     mockConfig.get.mockReturnValue(undefined);
 
@@ -21,6 +33,37 @@ describe('RedisService', () => {
     }).compile();
 
     service = module.get<RedisService>(RedisService);
+  });
+
+  describe('command timeout', () => {
+    it.each([
+      [undefined, 5000],
+      ['2500', 2500],
+      ['invalid', 5000],
+    ])(
+      'uses %p configuration as a %i ms command timeout',
+      async (configuredTimeout, expectedTimeout) => {
+        jest.clearAllMocks();
+        mockConfig.get.mockImplementation((key: string) => {
+          if (key === 'REDIS_URL') return 'redis://localhost:6379';
+          if (key === 'REDIS_COMMAND_TIMEOUT_MS') return configuredTimeout;
+          return undefined;
+        });
+
+        const module = await Test.createTestingModule({
+          providers: [
+            RedisService,
+            { provide: ConfigService, useValue: mockConfig },
+          ],
+        }).compile();
+
+        expect(Redis).toHaveBeenCalledWith(
+          'redis://localhost:6379',
+          expect.objectContaining({ commandTimeout: expectedTimeout }),
+        );
+        await module.close();
+      },
+    );
   });
 
   describe('isAvailable', () => {
