@@ -129,6 +129,7 @@ describe('TrendingTopicsController', () => {
       expect(() => controller.findOne('weibo-hot')).toThrow("Invalid topic ID: 'weibo-hot' is a data source name");
       expect(() => controller.findOne('zhihu-hot')).toThrow("Invalid topic ID: 'zhihu-hot' is a data source name");
       expect(() => controller.findOne('nhk')).toThrow("Invalid topic ID: 'nhk' is a data source name");
+      expect(() => controller.findOne('reuters')).toThrow("Invalid topic ID: 'reuters' is a data source name");
     });
   });
 
@@ -250,6 +251,14 @@ describe('TrendingTopicsController', () => {
       topicsService.fetchNHKNews.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
       await controller.fetchNHK({ page: '1', limit: '10' } as any);
       expect(topicsService.fetchNHKNews).toHaveBeenCalledWith(1, 10);
+    });
+  });
+
+  describe('Reuters endpoint', () => {
+    it('fetchReuters delegates to topicsService.fetchNewsBySource', async () => {
+      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchReuters({ page: '1', limit: '10' } as any);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('reuters', 1, 10);
     });
   });
 

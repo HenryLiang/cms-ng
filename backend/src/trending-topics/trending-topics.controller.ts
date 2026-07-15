@@ -35,6 +35,7 @@ export class TrendingTopicsController {
     'nytimes',
     'economist',
     'ft',
+    'reuters',
     'nhk',
     'zaobao',
     '36kr',
@@ -195,6 +196,17 @@ export class TrendingTopicsController {
       Math.max(1, parseInt(query.limit as any, 10) || 10),
     );
     return this.topicsService.fetchNewsBySource('ft', page, limit);
+  }
+
+  @Get('reuters')
+  @ApiOperation({ summary: 'Fetch trending news from Reuters (via Google News)' })
+  fetchReuters(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
+    return this.topicsService.fetchNewsBySource('reuters', page, limit);
   }
 
   @Get('nhk')

@@ -231,6 +231,13 @@ export class TrendingTopicsService {
         isGoogle: false,
       },
       { key: 'ft', url: 'https://www.ft.com/rss/home/uk', isGoogle: false },
+      // Reuters 原生 RSS 已关停、RSSHub 路由失效（Reuters API 返 401/404），
+      // 改走 Google News 聚合 site:reuters.com（返回真实 Reuters 文章，约 100 条，海外源走代理）
+      {
+        key: 'reuters',
+        url: 'https://news.google.com/rss/search?q=site:reuters.com&hl=en&gl=US&ceid=US:en',
+        isGoogle: false,
+      },
       // RSSHub 源（网站无原生 RSS 时）
       {
         key: 'zaobao',

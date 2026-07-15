@@ -549,6 +549,29 @@ describe('TrendingTopicsService', () => {
     });
   });
 
+  describe('Reuters news source', () => {
+    const MockedParser = Parser as unknown as jest.Mock;
+
+    beforeEach(() => {
+      MockedParser.mockClear();
+    });
+
+    it('fetchNewsBySource should parse reuters RSS (via Google News)', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [{ title: 'Stripe offers to buy PayPal - Reuters', contentSnippet: 'desc', link: 'https://news.google.com/r/1' }],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchNewsBySource('reuters', 1, 10);
+
+      expect(mockParseURL).toHaveBeenCalledWith(
+        expect.stringMatching(/news\.google\.com\/rss\/search\?q=site:reuters\.com/),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].source).toBe('reuters');
+    });
+  });
+
   describe('parseTrafficToScore (private)', () => {
     it('should return 50 for empty traffic', () => {
       expect((service as any).parseTrafficToScore('')).toBe(50);
