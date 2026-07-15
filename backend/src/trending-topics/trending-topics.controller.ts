@@ -39,6 +39,11 @@ export class TrendingTopicsController {
     '36kr',
     'huxiu',
     'douban-movie',
+    'weibo-hot',
+    'zhihu-hot',
+    'bilibili-hot-search',
+    'bilibili-ranking',
+    'bilibili-partion',
     'x-trends',
     'x-accounts',
     'this-day',
@@ -87,7 +92,9 @@ export class TrendingTopicsController {
   }
 
   @Get('all-news')
-  @ApiOperation({ summary: 'Fetch trending news aggregated across all sources' })
+  @ApiOperation({
+    summary: 'Fetch trending news aggregated across all sources',
+  })
   fetchAllTrendingNews(@Query() query: GoogleTrendsQueryDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
     const limit = Math.min(
@@ -105,7 +112,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from Sina' })
   fetchSinaNews(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('sina', page, limit);
   }
 
@@ -113,7 +123,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from People' })
   fetchPeopleNews(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('people', page, limit);
   }
 
@@ -121,7 +134,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from BBC' })
   fetchBBCNews(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('bbc', page, limit);
   }
 
@@ -129,7 +145,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from China News' })
   fetchChinanews(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('chinanews', page, limit);
   }
 
@@ -137,7 +156,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from The Guardian' })
   fetchGuardian(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('guardian', page, limit);
   }
 
@@ -145,7 +167,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from The New York Times' })
   fetchNYTimes(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('nytimes', page, limit);
   }
 
@@ -153,7 +178,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from The Economist' })
   fetchEconomist(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('economist', page, limit);
   }
 
@@ -161,7 +189,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from Financial Times' })
   fetchFT(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('ft', page, limit);
   }
 
@@ -169,7 +200,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from Lianhe Zaobao' })
   fetchZaobao(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('zaobao', page, limit);
   }
 
@@ -177,7 +211,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending topics from Weibo' })
   fetchWeiboHot(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('weibo-hot', page, limit);
   }
 
@@ -185,7 +222,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending topics from Zhihu' })
   fetchZhihuHot(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('zhihu-hot', page, limit);
   }
 
@@ -193,7 +233,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from 36Kr' })
   fetch36kr(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('36kr', page, limit);
   }
 
@@ -201,7 +244,10 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending news from Huxiu' })
   fetchHuxiu(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('huxiu', page, limit);
   }
 
@@ -209,8 +255,63 @@ export class TrendingTopicsController {
   @ApiOperation({ summary: 'Fetch trending movies from Douban' })
   fetchDoubanMovie(@Query() query: SourcePaginationDto) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.topicsService.fetchNewsBySource('douban-movie', page, limit);
+  }
+
+  // ─── B 站数据源 ───
+
+  @Get('bilibili-hot-search')
+  @ApiOperation({ summary: 'Fetch hot search from Bilibili' })
+  fetchBilibiliHotSearch(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
+    return this.topicsService.fetchNewsBySource(
+      'bilibili-hot-search',
+      page,
+      limit,
+    );
+  }
+
+  @Get('bilibili-ranking')
+  @ApiOperation({ summary: 'Fetch trending ranking from Bilibili' })
+  fetchBilibiliRanking(@Query() query: SourcePaginationDto) {
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
+    return this.topicsService.fetchNewsBySource(
+      'bilibili-ranking',
+      page,
+      limit,
+    );
+  }
+
+  @Get('bilibili-partion/:tid')
+  @ApiOperation({
+    summary: 'Fetch partition ranking from Bilibili by partition ID',
+  })
+  fetchBilibiliPartitionRanking(
+    @Param('tid') tid: string,
+    @Query() query: SourcePaginationDto,
+  ) {
+    const t = parseInt(tid, 10) || 0;
+    if (t <= 0) {
+      throw new BadRequestException('分区 ID tid 必须是正整数');
+    }
+    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
+    return this.topicsService.fetchBilibiliPartitionRanking(t, page, limit);
   }
 
   // ─── X (Twitter) 数据源 ───
@@ -228,9 +329,12 @@ export class TrendingTopicsController {
     @Query('woeid') woeid: string,
     @Query() query: SourcePaginationDto,
   ) {
-    const w = parseInt(woeid as any, 10) || 1;
+    const w = parseInt(woeid, 10) || 1;
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
     return this.twitterService.fetchTrends(userId, w, page, limit);
   }
 
@@ -241,19 +345,24 @@ export class TrendingTopicsController {
     @Query() query: SourcePaginationDto,
   ) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 20));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 20),
+    );
     return this.twitterService.fetchAggregatedAccounts(userId, page, limit);
   }
 
   @Get('x-accounts/:userName')
-  @ApiOperation({ summary: 'Fetch latest tweets from a specific X account by userName' })
+  @ApiOperation({
+    summary: 'Fetch latest tweets from a specific X account by userName',
+  })
   fetchXAccountTweets(
     @CurrentUser('userId') userId: string,
     @Param('userName') userName: string,
     @Query('limit') limit: string,
   ) {
     // 不传 limit → 返回 API 一次给出的全部推文；传了则按该值切片
-    const lim = limit ? Math.max(1, parseInt(limit as any, 10)) : undefined;
+    const lim = limit ? Math.max(1, parseInt(limit, 10)) : undefined;
     return this.twitterService.fetchAccountTweets(
       userName,
       Number.isFinite(lim) ? lim : undefined,
@@ -272,8 +381,14 @@ export class TrendingTopicsController {
   @Post('x-watch')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: '[Admin] Add an X account to the watch list' })
-  addXWatchAccount(@Body() body: { userName: string; displayName?: string; category?: string }) {
-    return this.twitterService.addAccount(body.userName, body.displayName, body.category);
+  addXWatchAccount(
+    @Body() body: { userName: string; displayName?: string; category?: string },
+  ) {
+    return this.twitterService.addAccount(
+      body.userName,
+      body.displayName,
+      body.category,
+    );
   }
 
   @Delete('x-watch/:id')
@@ -290,7 +405,9 @@ export class TrendingTopicsController {
   }
 
   @Post('import')
-  @ApiOperation({ summary: 'Import any trending item (e.g. X trend/tweet) as a curated topic' })
+  @ApiOperation({
+    summary: 'Import any trending item (e.g. X trend/tweet) as a curated topic',
+  })
   importTopic(@CurrentUser('userId') userId: string, @Body() data: any) {
     return this.topicsService.importTopic(userId, data);
   }
@@ -298,15 +415,25 @@ export class TrendingTopicsController {
   // ─── 当年今日 / 历史上的今天（Wikipedia On This Day）───
 
   @Get('this-day')
-  @ApiOperation({ summary: 'Fetch "On this day" historical events by region (Wikipedia)' })
+  @ApiOperation({
+    summary: 'Fetch "On this day" historical events by region (Wikipedia)',
+  })
   fetchThisDay(
     @Query('region') region: string,
     @Query('date') date: string | undefined,
     @Query() query: SourcePaginationDto,
   ) {
     const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit as any, 10) || 10));
-    return this.wikipediaService.fetchOnThisDay(region || 'CN', date, page, limit);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(query.limit as any, 10) || 10),
+    );
+    return this.wikipediaService.fetchOnThisDay(
+      region || 'CN',
+      date,
+      page,
+      limit,
+    );
   }
 
   @Get(':id')

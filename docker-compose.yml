@@ -4,7 +4,10 @@
 
 services:
   rsshub:
-    image: diygod/rsshub:latest
+    # chromium-bundled 预装 Chromium，供需要 Playwright 的路由使用
+    # （B站热搜 /weibo/search/hot / 小红书 等反爬源需浏览器渲染）。
+    # 普通 latest 镜像不含浏览器，这些路由会 503。
+    image: diygod/rsshub:chromium-bundled
     container_name: cms-ng-rsshub
     restart: unless-stopped
     ports:
@@ -12,3 +15,6 @@ services:
     environment:
       NODE_ENV: production
       CACHE_TYPE: memory
+      # 路由缓存 30 分钟（默认 5 分钟）。B站 ranking 走 API 易被 -352 风控，
+      # 拉长缓存让成功拉取的分区数据保留更久，减少回源被拦概率。
+      CACHE_EXPIRE: 1800

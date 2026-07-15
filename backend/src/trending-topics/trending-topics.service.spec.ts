@@ -330,6 +330,176 @@ describe('TrendingTopicsService', () => {
     });
   });
 
+  describe('Bilibili data sources', () => {
+    const MockedParser = Parser as unknown as jest.Mock;
+
+    beforeEach(() => {
+      MockedParser.mockClear();
+    });
+
+    it('fetchNewsBySource should parse bilibili-hot-search RSS', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [
+          { title: 'B站热搜 1', contentSnippet: '描述 1', link: 'https://www.bilibili.com/video/BV1' },
+          { title: 'B站热搜 2', contentSnippet: '描述 2', link: 'https://www.bilibili.com/video/BV2' },
+        ],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchNewsBySource('bilibili-hot-search', 1, 10);
+
+      expect(mockParseURL).toHaveBeenCalledWith(
+        expect.stringMatching(/\/bilibili\/hot-search$/),
+      );
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].source).toBe('bilibili-hot-search');
+      expect(result.items[0].articles[0].url).toBe('https://www.bilibili.com/video/BV1');
+    });
+
+    it('fetchNewsBySource should parse bilibili-ranking RSS', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({ items: [] });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      await service.fetchNewsBySource('bilibili-ranking', 1, 10);
+
+      // /bilibili/popular/all 综合热门（ranking API 被 B站 -352 风控，改用 popular/all）
+      expect(mockParseURL).toHaveBeenCalledWith(
+        expect.stringMatching(/\/bilibili\/popular\/all$/),
+      );
+    });
+
+    it('fetchNewsBySource returns empty (not 500) when upstream RSSHub fails', async () => {
+      // B站 -352 风控等上游失败 -> 容错返回空分页，不抛错（前端显示「暂无数据」）
+      const mockParseURL = jest.fn().mockRejectedValue(new Error('-352 risk control'));
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchNewsBySource('bilibili-ranking', 1, 10);
+
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('fetchBilibiliPartitionRanking retries on -352 then returns empty if all fail', async () => {
+      // B站 -352 是概率性的，重试 3 次；全失败才返空（不抛 500）
+      const mockParseURL = jest.fn().mockRejectedValue(new Error('-352 risk control'));
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchBilibiliPartitionRanking(36, 1, 10);
+
+      expect(mockParseURL).toHaveBeenCalledTimes(3); // 重试 3 次
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('fetchBilibiliPartitionRanking succeeds on retry after initial -352', async () => {
+      // 第 1 次 -352 失败，第 2 次成功 -> 返回数据（验证重试有效）
+      const mockParseURL = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('-352 risk control'))
+        .mockResolvedValueOnce({
+          items: [{ title: '知识区热门', contentSnippet: '描述', link: 'https://www.bilibili.com/video/BV9' }],
+        });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchBilibiliPartitionRanking(36, 1, 10);
+
+      expect(mockParseURL).toHaveBeenCalledTimes(2);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].source).toBe('bilibili-partion');
+    });
+
+    it('fetchBilibiliPartitionRanking should interpolate tid into the URL', async () => {
+      // 用两个不同 tid 验证 tid 确实被插值（而非硬编码），单个 tid 无法区分二者。
+      // 走 /bilibili/ranking/:rid（partion/ranking 路由当前失效）。
+      for (const tid of [36, 122]) {
+        const mockParseURL = jest.fn().mockResolvedValue({
+          items: [{ title: `分区${tid}热门`, contentSnippet: '描述', link: `https://www.bilibili.com/video/BV${tid}` }],
+        });
+        MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+        const result = await service.fetchBilibiliPartitionRanking(tid, 1, 10);
+
+        expect(mockParseURL).toHaveBeenCalledWith(
+          expect.stringMatching(new RegExp(`/bilibili/ranking/${tid}$`)),
+        );
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].source).toBe('bilibili-partion');
+      }
+    });
+
+    it('fetchAllTrendingNews aggregates sources, dedupes by title, and isolates feed failures', async () => {
+      // 按 URL 区分返回内容：bilibili-hot-search 返回 2 条（其中 1 条与 bilibili-ranking 撞标题），
+      // bilibili-ranking 返回 1 条，其余源 reject（验证 Promise.allSettled 不被单源失败拖垮）。
+      const mockParseURL = jest.fn().mockImplementation((url: string) => {
+        if (url.includes('/bilibili/hot-search')) {
+          return Promise.resolve({
+            items: [
+              { title: '撞标题的话题', contentSnippet: 'a', link: 'http://x/1' },
+              { title: 'B站热搜独有', contentSnippet: 'b', link: 'http://x/2' },
+            ],
+          });
+        }
+        if (url.includes('/bilibili/popular/all')) {
+          return Promise.resolve({
+            items: [{ title: '撞标题的话题', contentSnippet: 'c', link: 'http://x/3' }],
+          });
+        }
+        return Promise.reject(new Error('simulated feed failure'));
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchAllTrendingNews('HK', 1, 50);
+
+      // 两个 B 站源都被实际拉取
+      expect(mockParseURL).toHaveBeenCalledWith(expect.stringMatching(/\/bilibili\/hot-search$/));
+      expect(mockParseURL).toHaveBeenCalledWith(expect.stringMatching(/\/bilibili\/popular\/all$/));
+      // 撞标题的去重后只剩 1 条 -> 共 2 条
+      const titles = result.items.map((i: any) => i.title);
+      expect(titles).toContain('B站热搜独有');
+      expect(titles.filter((t: string) => t === '撞标题的话题')).toHaveLength(1);
+      // 单源失败不阻断聚合（其余源全 reject，但 B 站两条仍返回）
+      expect(result.total).toBe(2);
+    });
+  });
+
+  describe('Weibo / Zhihu hot search sources', () => {
+    const MockedParser = Parser as unknown as jest.Mock;
+
+    beforeEach(() => {
+      MockedParser.mockClear();
+    });
+
+    it('fetchNewsBySource should parse weibo-hot RSS', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [{ title: '微博热搜 1', contentSnippet: '描述', link: 'https://s.weibo.com/weibo?q=1' }],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchNewsBySource('weibo-hot', 1, 10);
+
+      expect(mockParseURL).toHaveBeenCalledWith(
+        expect.stringMatching(/\/weibo\/search\/hot\?limit=50$/),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].source).toBe('weibo-hot');
+    });
+
+    it('fetchNewsBySource should parse zhihu-hot RSS', async () => {
+      const mockParseURL = jest.fn().mockResolvedValue({
+        items: [{ title: '知乎热榜 1', contentSnippet: '描述', link: 'https://www.zhihu.com/question/1' }],
+      });
+      MockedParser.mockImplementation(() => ({ parseURL: mockParseURL }));
+
+      const result = await service.fetchNewsBySource('zhihu-hot', 1, 10);
+
+      expect(mockParseURL).toHaveBeenCalledWith(
+        expect.stringMatching(/\/zhihu\/hot\?limit=50$/),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].source).toBe('zhihu-hot');
+    });
+  });
+
   describe('parseTrafficToScore (private)', () => {
     it('should return 50 for empty traffic', () => {
       expect((service as any).parseTrafficToScore('')).toBe(50);

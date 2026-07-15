@@ -117,6 +117,19 @@ export async function getNewsBySource(
   return res.data;
 }
 
+// ─── B 站数据源 ───
+
+export async function getBilibiliPartitionRanking(
+  tid: number,
+  page = 1,
+  limit = 10,
+): Promise<PaginatedNewsResponse> {
+  const res = await api.get(`/trending-topics/bilibili-partion/${tid}`, {
+    params: { page, limit },
+  });
+  return res.data;
+}
+
 // ─── 当年今日 / 历史上的今天（Wikipedia On This Day）───
 
 export async function getThisDay(

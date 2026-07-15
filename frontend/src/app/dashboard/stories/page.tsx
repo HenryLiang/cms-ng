@@ -18,6 +18,7 @@ import {
   getXAccountTweets,
   getXWatchAccounts,
   getThisDay,
+  getBilibiliPartitionRanking,
   type TrendingTopic,
   type StorySuggestion,
   type GoogleTrendItem,
@@ -41,7 +42,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Play,
 } from 'lucide-react';
+
+// 选题数据源每页条数（B站热榜源上限 20、热搜上限 10；微博/知乎加 ?limit=50 后可拿更多）
+const PAGE_SIZE = 20;
 
 export default function StoryHubPage() {
   const router = useRouter();
@@ -77,6 +82,18 @@ export default function StoryHubPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
 
+  // B 站分区热榜 state。仅保留 RSSHub /bilibili/ranking/:rid 实测有排行数据的分区
+  // （动画/游戏/娱乐 等分区当前 B站 无综合排行 -> RSSHub 返空，故未列入）。
+  const BILIBILI_PARTITIONS = [
+    { tid: 36, label: '知识' },
+    { tid: 3, label: '音乐' },
+    { tid: 181, label: '影视' },
+    { tid: 211, label: '美食' },
+    { tid: 160, label: '生活' },
+    { tid: 155, label: '时尚' },
+  ];
+  const [selectedBilibiliTid, setSelectedBilibiliTid] = useState(36);
+
   const NEWS_SOURCES = [
     { key: 'google-trends', label: 'Google Trends', icon: TrendingUp },
     { key: 'sina', label: '新浪新闻', icon: Newspaper },
@@ -91,6 +108,11 @@ export default function StoryHubPage() {
     { key: '36kr', label: '36氪', icon: Newspaper },
     { key: 'huxiu', label: '虎嗅', icon: Newspaper },
     { key: 'douban-movie', label: '豆瓣热映', icon: Newspaper },
+    { key: 'weibo-hot', label: '微博热搜', icon: Flame },
+    { key: 'zhihu-hot', label: '知乎热榜', icon: Flame },
+    { key: 'bilibili-hot-search', label: 'B站热搜', icon: Play },
+    { key: 'bilibili-ranking', label: 'B站热榜', icon: Play },
+    { key: 'bilibili-partion', label: 'B站分区热榜', icon: Play },
     { key: 'x-trends', label: 'X 趋势', icon: Bird },
     { key: 'x-accounts', label: 'X 热门账号', icon: Bird },
     { key: 'this-day', label: '当年今日', icon: Calendar },
@@ -190,11 +212,11 @@ export default function StoryHubPage() {
     setNewsPage(page);
     try {
       if (sourceKey === 'google-trends') {
-        const res = await getGoogleTrends(selectedGeo, selectedTimeRange, page, 10);
+        const res = await getGoogleTrends(selectedGeo, selectedTimeRange, page, PAGE_SIZE);
         setNewsSourceItems(res.items);
         setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
       } else if (sourceKey === 'x-trends') {
-        const res = await getXTrends(selectedWoeid, page, 10);
+        const res = await getXTrends(selectedWoeid, page, PAGE_SIZE);
         setNewsSourceItems(res.items);
         setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
       } else if (sourceKey === 'x-accounts') {
@@ -202,11 +224,15 @@ export default function StoryHubPage() {
         setNewsSourceItems([]);
         setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
       } else if (sourceKey === 'this-day') {
-        const res = await getThisDay(selectedThisDayRegion, selectedThisDayDate, page, 10);
+        const res = await getThisDay(selectedThisDayRegion, selectedThisDayDate, page, PAGE_SIZE);
+        setNewsSourceItems(res.items);
+        setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+      } else if (sourceKey === 'bilibili-partion') {
+        const res = await getBilibiliPartitionRanking(selectedBilibiliTid, page, PAGE_SIZE);
         setNewsSourceItems(res.items);
         setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
       } else {
-        const res = await getNewsBySource(sourceKey, page, 10);
+        const res = await getNewsBySource(sourceKey, page, PAGE_SIZE);
         setNewsSourceItems(res.items);
         setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
       }
@@ -282,7 +308,24 @@ export default function StoryHubPage() {
     setNewsSourceLoading(true);
     setNewsPage(1);
     try {
-      const res = await getThisDay(region, selectedThisDayDate, 1, 10);
+      const res = await getThisDay(region, selectedThisDayDate, 1, PAGE_SIZE);
+      setNewsSourceItems(res.items);
+      setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
+    } catch {
+      setNewsSourceItems([]);
+      setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
+    } finally {
+      setNewsSourceLoading(false);
+    }
+  }
+
+  // B 站分区热榜：切换分区后重新拉取（直接用新 tid 拉取，避免 setState 闭包旧值）
+  async function handleBilibiliTidChange(tid: number) {
+    setSelectedBilibiliTid(tid);
+    setNewsSourceLoading(true);
+    setNewsPage(1);
+    try {
+      const res = await getBilibiliPartitionRanking(tid, 1, PAGE_SIZE);
       setNewsSourceItems(res.items);
       setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
     } catch {
@@ -299,7 +342,7 @@ export default function StoryHubPage() {
     setNewsSourceLoading(true);
     setNewsPage(1);
     try {
-      const res = await getThisDay(selectedThisDayRegion, date, 1, 10);
+      const res = await getThisDay(selectedThisDayRegion, date, 1, PAGE_SIZE);
       setNewsSourceItems(res.items);
       setNewsPagination({ total: res.total, totalPages: res.totalPages, limit: res.limit });
     } catch {
@@ -546,6 +589,9 @@ export default function StoryHubPage() {
             onThisDayRegionChange={handleThisDayRegionChange}
             selectedThisDayDate={selectedThisDayDate}
             onThisDayDateChange={handleThisDayDateChange}
+            bilibiliPartitions={BILIBILI_PARTITIONS}
+            selectedBilibiliTid={selectedBilibiliTid}
+            onBilibiliTidChange={handleBilibiliTidChange}
           />
         ) : showAISuggestions ? (
           <AIRecommendationsPanel
@@ -743,6 +789,9 @@ function NewsSourcePanel({
   onThisDayRegionChange,
   selectedThisDayDate,
   onThisDayDateChange,
+  bilibiliPartitions,
+  selectedBilibiliTid,
+  onBilibiliTidChange,
 }: {
   sourceKey: string;
   items: GoogleTrendItem[];
@@ -768,6 +817,9 @@ function NewsSourcePanel({
   onThisDayRegionChange: (region: string) => void;
   selectedThisDayDate: string;
   onThisDayDateChange: (date: string) => void;
+  bilibiliPartitions: { tid: number; label: string }[];
+  selectedBilibiliTid: number;
+  onBilibiliTidChange: (tid: number) => void;
 }) {
   const sourceConfig = {
     'google-trends': { label: 'Google Trends', color: 'text-orange-600', icon: TrendingUp },
@@ -783,6 +835,11 @@ function NewsSourcePanel({
     '36kr': { label: '36氪', color: 'text-sky-600', icon: Newspaper },
     'huxiu': { label: '虎嗅', color: 'text-amber-600', icon: Newspaper },
     'douban-movie': { label: '豆瓣热映', color: 'text-green-600', icon: Newspaper },
+    'weibo-hot': { label: '微博热搜', color: 'text-red-600', icon: Flame },
+    'zhihu-hot': { label: '知乎热榜', color: 'text-blue-600', icon: Flame },
+    'bilibili-hot-search': { label: 'B站热搜', color: 'text-pink-500', icon: Play },
+    'bilibili-ranking': { label: 'B站热榜', color: 'text-pink-500', icon: Play },
+    'bilibili-partion': { label: 'B站分区热榜', color: 'text-pink-500', icon: Play },
     'x-trends': { label: 'X 趋势', color: 'text-black', icon: Bird },
     'x-accounts': { label: 'X 热门账号', color: 'text-sky-600', icon: Bird },
     'this-day': { label: '当年今日', color: 'text-amber-600', icon: Calendar },
@@ -813,6 +870,7 @@ function NewsSourcePanel({
   const isXTrends = sourceKey === 'x-trends';
   const isXAccounts = sourceKey === 'x-accounts';
   const isThisDay = sourceKey === 'this-day';
+  const isBilibiliPartition = sourceKey === 'bilibili-partion';
 
   return (
     <div className="max-w-2xl">
@@ -906,6 +964,25 @@ function NewsSourcePanel({
             onChange={(e) => onThisDayDateChange(e.target.value)}
             className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-700"
           />
+        </div>
+      )}
+
+      {/* B 站分区热榜：分区切换器 */}
+      {isBilibiliPartition && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-xs text-zinc-500">分区</span>
+          <select
+            value={selectedBilibiliTid}
+            onChange={(e) => onBilibiliTidChange(Number(e.target.value))}
+            disabled={loading}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-700 disabled:opacity-50"
+          >
+            {bilibiliPartitions.map((p) => (
+              <option key={p.tid} value={p.tid}>
+                {p.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

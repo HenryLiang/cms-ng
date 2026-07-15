@@ -26,9 +26,14 @@ export class TrendingTopicsService {
     private aiService: AIService,
     private config: ConfigService,
   ) {
-    this.proxyEnabled = (this.config.get<string>('RSS_PROXY_ENABLED') || '').toLowerCase() === 'true';
-    this.proxyUrl = this.config.get<string>('HTTP_PROXY') || this.config.get<string>('http_proxy');
-    this.rssHubUrl = this.config.get<string>('RSS_HUB_URL') || 'http://localhost:1200';
+    this.proxyEnabled =
+      (this.config.get<string>('RSS_PROXY_ENABLED') || '').toLowerCase() ===
+      'true';
+    this.proxyUrl =
+      this.config.get<string>('HTTP_PROXY') ||
+      this.config.get<string>('http_proxy');
+    this.rssHubUrl =
+      this.config.get<string>('RSS_HUB_URL') || 'http://localhost:1200';
   }
 
   /**
@@ -252,7 +257,63 @@ export class TrendingTopicsService {
         isGoogle: false,
         isRSSHub: true,
       },
+      // 微博 / 知乎 热搜（RSSHub）。加 ?limit=50 拉更多条（微博可到 50、知乎 30）
+      {
+        key: 'weibo-hot',
+        url: `${this.rssHubUrl}/weibo/search/hot?limit=50`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+      {
+        key: 'zhihu-hot',
+        url: `${this.rssHubUrl}/zhihu/hot?limit=50`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+      // B 站数据源（RSSHub）
+      {
+        key: 'bilibili-hot-search',
+        url: `${this.rssHubUrl}/bilibili/hot-search`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
+      {
+        key: 'bilibili-ranking',
+        // /bilibili/popular/all 综合热门。/bilibili/ranking/:rid 走 B站 API 会被 -352 风控拦截
+        // （RSSHub 返空 503），改用 popular/all（不同接口，稳定 200）。
+        url: `${this.rssHubUrl}/bilibili/popular/all`,
+        isGoogle: false,
+        isRSSHub: true,
+      },
     ];
+  }
+
+  /**
+   * 拉取 B 站分区排行榜。
+   * 用 RSSHub /bilibili/ranking/:rid（rid 为分区 ID，如 36=知识 / 3=音乐 / 181=影视）。
+   * 注：/bilibili/partion/ranking/:tid 路由当前返回空，改用 ranking 路由带分区 rid。
+   * 该路由走 B站 API，易被 -352 风控拦截（概率性，单次约 50% 成功）。RSSHub 不缓存失败响应，
+   * 故重试 3 次（含退避）可把成功率提到 ~87%；仍失败则返回空，前端显示「暂无数据」。
+   */
+  async fetchBilibiliPartitionRanking(tid: number, page = 1, limit = 10) {
+    const feed = {
+      key: 'bilibili-partion',
+      url: `${this.rssHubUrl}/bilibili/ranking/${tid}`,
+    };
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const items = await this.fetchSingleRSS(feed, {});
+        return this.paginate(items, page, limit);
+      } catch (error: any) {
+        if (attempt === 3) {
+          // 3 次仍失败 -> 返回空，前端显示「暂无数据」（不抛 500）
+          return this.paginate([], page, limit);
+        }
+        // 短退避后重试（B站 -352 是概率性的，重试通常能过）
+        await new Promise((r) => setTimeout(r, 300 * attempt));
+      }
+    }
+    return this.paginate([], page, limit);
   }
 
   async fetchAllTrendingNews(geo?: string, page = 1, limit = 20) {
@@ -319,7 +380,11 @@ export class TrendingTopicsService {
         const firstNews = articles[0];
         const snippet = firstNews?.snippet;
         const description =
-          snippet || firstNews?.title || item.contentSnippet || item.title || '';
+          snippet ||
+          firstNews?.title ||
+          item.contentSnippet ||
+          item.title ||
+          '';
         return {
           title: item.title || '',
           description,
@@ -420,7 +485,9 @@ export class TrendingTopicsService {
       }
       return this.paginate(items, page, limit);
     } catch (error: any) {
-      throw new Error(`${sourceKey} 获取失败: ${error.message}`);
+      // 上游 RSS/RSSHub 失败（如 B站 -352 风控、源站宕机）-> 返回空结果，前端显示「暂无数据」，
+      // 不抛 500（与 fetchAllTrendingNews 的 per-feed 容错一致）。
+      return this.paginate([], page, limit);
     }
   }
 

@@ -19,6 +19,8 @@ describe('TrendingTopicsController', () => {
     remove: jest.Mock;
     generateAISuggestions: jest.Mock;
     fetchGoogleTrends: jest.Mock;
+    fetchNewsBySource: jest.Mock;
+    fetchBilibiliPartitionRanking: jest.Mock;
     importFromGoogleTrends: jest.Mock;
     importTopic: jest.Mock;
     adoptTopic: jest.Mock;
@@ -45,6 +47,8 @@ describe('TrendingTopicsController', () => {
       remove: jest.fn(),
       generateAISuggestions: jest.fn(),
       fetchGoogleTrends: jest.fn(),
+      fetchNewsBySource: jest.fn(),
+      fetchBilibiliPartitionRanking: jest.fn(),
       importFromGoogleTrends: jest.fn(),
       importTopic: jest.fn(),
       adoptTopic: jest.fn(),
@@ -119,6 +123,9 @@ describe('TrendingTopicsController', () => {
       expect(() => controller.findOne('bbc')).toThrow(BadRequestException);
       expect(() => controller.findOne('bbc')).toThrow("Invalid topic ID: 'bbc' is a data source name");
       expect(() => controller.findOne('this-day')).toThrow("Invalid topic ID: 'this-day' is a data source name");
+      expect(() => controller.findOne('bilibili-hot-search')).toThrow("Invalid topic ID: 'bilibili-hot-search' is a data source name");
+      expect(() => controller.findOne('weibo-hot')).toThrow("Invalid topic ID: 'weibo-hot' is a data source name");
+      expect(() => controller.findOne('zhihu-hot')).toThrow("Invalid topic ID: 'zhihu-hot' is a data source name");
     });
   });
 
@@ -193,6 +200,45 @@ describe('TrendingTopicsController', () => {
 
       expect(topicsService.importTopic).toHaveBeenCalledWith('user-id', { title: 'X', source: 'x-trends' });
       expect(result.id).toBe('t2');
+    });
+  });
+
+  describe('Bilibili endpoints', () => {
+    it('fetchBilibiliHotSearch delegates to topicsService.fetchNewsBySource', async () => {
+      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchBilibiliHotSearch({ page: '1', limit: '10' } as any);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('bilibili-hot-search', 1, 10);
+    });
+
+    it('fetchBilibiliRanking delegates to topicsService.fetchNewsBySource', async () => {
+      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchBilibiliRanking({ page: '2', limit: '5' } as any);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('bilibili-ranking', 2, 5);
+    });
+
+    it('fetchBilibiliPartitionRanking delegates to topicsService.fetchBilibiliPartitionRanking', async () => {
+      topicsService.fetchBilibiliPartitionRanking.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchBilibiliPartitionRanking('36', { page: '1', limit: '10' } as any);
+      expect(topicsService.fetchBilibiliPartitionRanking).toHaveBeenCalledWith(36, 1, 10);
+    });
+
+    it('fetchBilibiliPartitionRanking throws for invalid tid', () => {
+      expect(() => controller.fetchBilibiliPartitionRanking('abc', { page: '1', limit: '10' } as any)).toThrow(BadRequestException);
+      expect(() => controller.fetchBilibiliPartitionRanking('0', { page: '1', limit: '10' } as any)).toThrow('分区 ID tid 必须是正整数');
+    });
+  });
+
+  describe('Weibo / Zhihu endpoints', () => {
+    it('fetchWeiboHot delegates to topicsService.fetchNewsBySource', async () => {
+      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchWeiboHot({ page: '1', limit: '10' } as any);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('weibo-hot', 1, 10);
+    });
+
+    it('fetchZhihuHot delegates to topicsService.fetchNewsBySource', async () => {
+      topicsService.fetchNewsBySource.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+      await controller.fetchZhihuHot({ page: '2', limit: '5' } as any);
+      expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith('zhihu-hot', 2, 5);
     });
   });
 
