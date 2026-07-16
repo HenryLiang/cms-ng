@@ -4,10 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  Loader2,
   Wallet,
   TrendingDown,
-  TrendingUp,
   ArrowRight,
   CreditCard,
   Receipt,
@@ -21,6 +19,7 @@ import {
   type BalanceInfo,
   type BillingTransaction,
 } from '@/lib/billing-api';
+import { Badge, Card, PageHeader } from '@/components/ui';
 
 const typeLabels: Record<string, string> = {
   TOP_UP: '充值',
@@ -96,7 +95,7 @@ export default function BillingPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
@@ -119,10 +118,10 @@ export default function BillingPage() {
 
   return (
     <div className="h-full p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">计费中心</h1>
-        <p className="mt-1 text-sm text-zinc-500">管理账户余额、查看消费记录和充值历史</p>
-      </div>
+      <PageHeader
+        title="计费中心"
+        subtitle="管理账户余额、查看消费记录和充值历史"
+      />
 
       {/* 支付宝支付返回横幅 */}
       {showPaymentBanner && paymentStatus === 'success' && (
@@ -162,45 +161,45 @@ export default function BillingPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
+        <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="h-4 w-4 text-red-500" />
-            <span className="text-xs text-zinc-500">本月消费</span>
+            <span className="text-xs text-muted">本月消费</span>
           </div>
-          <div className="text-2xl font-semibold text-zinc-900">
+          <div className="tnum text-2xl font-semibold text-foreground">
             ¥{monthSpent.toFixed(2)}
           </div>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
+        </Card>
+        <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <CreditCard className="h-4 w-4 text-emerald-500" />
-            <span className="text-xs text-zinc-500">充值总额</span>
+            <span className="text-xs text-muted">充值总额</span>
           </div>
-          <div className="text-2xl font-semibold text-zinc-900">
+          <div className="tnum text-2xl font-semibold text-foreground">
             ¥{totalTopUps.toFixed(2)}
           </div>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
+        </Card>
+        <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="h-4 w-4 text-blue-500" />
-            <span className="text-xs text-zinc-500">当前余额</span>
+            <span className="text-xs text-muted">当前余额</span>
           </div>
-          <div className="text-2xl font-semibold text-zinc-900">
+          <div className="tnum text-2xl font-semibold text-foreground">
             ¥{(balance?.balance ?? 0).toFixed(2)}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Recent Transactions */}
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+      <Card>
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-zinc-500" />
-            <h2 className="text-sm font-semibold text-zinc-900">最近交易</h2>
+            <Receipt className="h-4 w-4 text-muted" />
+            <h2 className="text-sm font-semibold text-foreground">最近交易</h2>
           </div>
           <Link
             href="/dashboard/billing/transactions"
-            className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900"
+            className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground"
           >
             查看全部
             <ArrowRight className="h-3 w-3" />
@@ -209,12 +208,12 @@ export default function BillingPage() {
 
         {transactions.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-zinc-500">暂无数据</p>
+            <p className="text-muted">暂无数据</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-100 text-left text-xs text-zinc-500">
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
                 <th className="px-6 py-3 font-medium">时间</th>
                 <th className="px-6 py-3 font-medium">类型</th>
                 <th className="px-6 py-3 font-medium">描述</th>
@@ -222,17 +221,17 @@ export default function BillingPage() {
                 <th className="px-6 py-3 font-medium text-right">余额</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line">
               {transactions.map((tx) => (
-                <tr key={tx.id} className="border-b border-zinc-50 last:border-0">
-                  <td className="px-6 py-3 text-zinc-500">{formatDate(tx.createdAt)}</td>
+                <tr key={tx.id} className="transition hover:bg-surface-muted/50">
+                  <td className="tnum px-6 py-3 text-muted">{formatDate(tx.createdAt)}</td>
                   <td className="px-6 py-3">
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                    <Badge tone="neutral">
                       {typeLabels[tx.type] || tx.type}
-                    </span>
+                    </Badge>
                   </td>
-                  <td className="px-6 py-3 text-zinc-700">{tx.description}</td>
-                  <td className="px-6 py-3 text-right">
+                  <td className="px-6 py-3 text-foreground">{tx.description}</td>
+                  <td className="tnum px-6 py-3 text-right">
                     <span
                       className={`font-medium ${
                         tx.amount >= 0 ? 'text-emerald-600' : 'text-red-600'
@@ -241,7 +240,7 @@ export default function BillingPage() {
                       {tx.amount >= 0 ? '+' : '-'}¥{Math.abs(tx.amount).toFixed(2)}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-right text-zinc-500">
+                  <td className="tnum px-6 py-3 text-right text-muted">
                     ¥{tx.balanceAfter.toFixed(2)}
                   </td>
                 </tr>
@@ -249,7 +248,7 @@ export default function BillingPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

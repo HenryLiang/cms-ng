@@ -49,13 +49,13 @@ function formatDuration(ms: number): string {
 function StatusIcon({ status }: { status: string }) {
   if (status === 'success') return <CheckCircle className="h-4 w-4 text-emerald-500" />;
   if (status === 'failed') return <XCircle className="h-4 w-4 text-red-500" />;
-  return <Clock className="h-4 w-4 text-zinc-400" />;
+  return <Clock className="h-4 w-4 text-subtle" />;
 }
 
 function statusColor(status: string): string {
   if (status === 'success') return 'bg-emerald-400';
   if (status === 'failed') return 'bg-red-400';
-  return 'bg-zinc-300';
+  return 'bg-line-strong';
 }
 
 // ── Special Renderers ──
@@ -74,7 +74,7 @@ function TopicDecisionPanel({ metadata }: { metadata: Record<string, unknown> })
       {/* Source breakdown */}
       {sources && (
         <div>
-          <h4 className="text-xs font-medium text-zinc-500 mb-1">数据来源</h4>
+          <h4 className="text-xs font-medium text-muted mb-1">数据来源</h4>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded bg-blue-50 p-2">
               <span className="font-medium text-blue-700">固定关键词</span>
@@ -100,20 +100,20 @@ function TopicDecisionPanel({ metadata }: { metadata: Record<string, unknown> })
 
       {/* Filter funnel */}
       <div>
-        <h4 className="text-xs font-medium text-zinc-500 mb-1">过滤漏斗</h4>
+        <h4 className="text-xs font-medium text-muted mb-1">过滤漏斗</h4>
         <div className="flex items-center gap-1 text-xs">
-          <span className="rounded bg-zinc-100 px-2 py-0.5">
+          <span className="rounded bg-surface-muted px-2 py-0.5">
             原始 {String(metadata.rawCandidateCount || 0)}
           </span>
-          <span className="text-zinc-400">→</span>
+          <span className="text-subtle">→</span>
           <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-700">
             过滤后 {String(metadata.afterFilterCount || 0)}
           </span>
-          <span className="text-zinc-400">→</span>
+          <span className="text-subtle">→</span>
           <span className="rounded bg-blue-50 px-2 py-0.5 text-blue-700">
             去重后 {String(metadata.afterDedupCount || 0)}
           </span>
-          <span className="text-zinc-400">→</span>
+          <span className="text-subtle">→</span>
           <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700 font-medium">
             选中 1
           </span>
@@ -162,7 +162,7 @@ function ResearchDataPanel({ metadata }: { metadata: Record<string, unknown> }) 
       )}
 
       {showFull && fullKit && (
-        <pre className="text-xs bg-zinc-50 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap">
+        <pre className="text-xs bg-canvas rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap">
           {JSON.stringify(fullKit, null, 2)}
         </pre>
       )}
@@ -172,17 +172,17 @@ function ResearchDataPanel({ metadata }: { metadata: Record<string, unknown> }) 
 
 function BillingPanel({ metadata }: { metadata: Record<string, unknown> }) {
   if (!metadata.balanceCheckEnabled) {
-    return <div className="text-xs text-zinc-500">计费功能已禁用，跳过检查</div>;
+    return <div className="text-xs text-muted">计费功能已禁用，跳过检查</div>;
   }
 
   return (
     <div className="space-y-2 text-xs">
       <div className="flex justify-between">
-        <span className="text-zinc-500">当前余额</span>
+        <span className="text-muted">当前余额</span>
         <span className="font-medium">¥{Number(metadata.currentBalance || 0).toFixed(4)}</span>
       </div>
       <div className="flex justify-between">
-        <span className="text-zinc-500">预估费用</span>
+        <span className="text-muted">预估费用</span>
         <span className="font-medium text-amber-600">¥{Number(metadata.estimatedCost || 0).toFixed(4)}</span>
       </div>
     </div>
@@ -198,7 +198,7 @@ function MetadataRenderer({ step, metadata }: { step: string; metadata: Record<s
 
   // Generic JSON display for other steps
   return (
-    <pre className="text-xs bg-zinc-50 rounded p-3 overflow-auto max-h-48 whitespace-pre-wrap">
+    <pre className="text-xs bg-canvas rounded p-3 overflow-auto max-h-48 whitespace-pre-wrap">
       {JSON.stringify(metadata, null, 2)}
     </pre>
   );
@@ -220,33 +220,33 @@ function StepCard({
   const hasDetails = (entry.decisions?.length ?? 0) > 0 || (entry.metadata ? Object.keys(entry.metadata).length > 0 : false);
 
   return (
-    <div className={`rounded-lg border ${entry.status === 'failed' ? 'border-red-200 bg-red-50/50' : 'border-zinc-200 bg-white'}`}>
+    <div className={`rounded-lg border ${entry.status === 'failed' ? 'border-red-200 bg-red-50/50' : 'border-line bg-surface'}`}>
       <button
         onClick={onToggle}
         disabled={!hasDetails && !entry.error}
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left disabled:cursor-default"
       >
         <StatusIcon status={entry.status} />
-        <Icon className="h-3.5 w-3.5 text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-800 flex-1">{label}</span>
-        <span className="text-xs text-zinc-400 tabular-nums">{formatDuration(entry.durationMs)}</span>
+        <Icon className="h-3.5 w-3.5 text-subtle" />
+        <span className="text-sm font-medium text-foreground flex-1">{label}</span>
+        <span className="text-xs text-subtle tabular-nums">{formatDuration(entry.durationMs)}</span>
         {hasDetails && (
           expanded
-            ? <ChevronDown className="h-4 w-4 text-zinc-400" />
-            : <ChevronRight className="h-4 w-4 text-zinc-400" />
+            ? <ChevronDown className="h-4 w-4 text-subtle" />
+            : <ChevronRight className="h-4 w-4 text-subtle" />
         )}
       </button>
 
       {expanded && (hasDetails || entry.error) && (
-        <div className="border-t border-zinc-100 px-4 py-3 space-y-3">
+        <div className="border-t border-line px-4 py-3 space-y-3">
           {/* Decisions */}
           {entry.decisions && entry.decisions.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-zinc-500 mb-1">决策日志</h4>
+              <h4 className="text-xs font-medium text-muted mb-1">决策日志</h4>
               <ul className="space-y-1">
                 {entry.decisions.map((d, i) => (
-                  <li key={i} className="text-xs text-zinc-700 flex gap-2">
-                    <span className="text-zinc-400 shrink-0">•</span>
+                  <li key={i} className="text-xs text-foreground flex gap-2">
+                    <span className="text-subtle shrink-0">•</span>
                     <span>{d}</span>
                   </li>
                 ))}
@@ -257,7 +257,7 @@ function StepCard({
           {/* Metadata */}
           {entry.metadata && Object.keys(entry.metadata).length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-zinc-500 mb-1">元数据</h4>
+              <h4 className="text-xs font-medium text-muted mb-1">元数据</h4>
               <MetadataRenderer step={entry.step} metadata={entry.metadata} />
             </div>
           )}
@@ -295,7 +295,7 @@ export default function ExecutionTraceViewer({
 
   if (!trace || trace.length === 0) {
     return (
-      <div className="text-sm text-zinc-500 text-center py-4">
+      <div className="text-sm text-muted text-center py-4">
         暂无执行追踪数据
       </div>
     );
@@ -321,7 +321,7 @@ export default function ExecutionTraceViewer({
       </div>
 
       {/* Total duration */}
-      <div className="text-xs text-zinc-500 text-right">
+      <div className="text-xs text-muted text-right">
         总耗时: {formatDuration(total)}
       </div>
 

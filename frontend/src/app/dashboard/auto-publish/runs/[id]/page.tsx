@@ -11,9 +11,9 @@ import {
   type AutoPublishArticle,
 } from '@/lib/auto-publish-api';
 import ExecutionTraceViewer from '@/components/execution-trace-viewer';
+import { Card, Badge } from '@/components/ui';
 import {
   ArrowLeft,
-  Loader2,
   CheckCircle,
   XCircle,
   Clock,
@@ -95,14 +95,14 @@ export default function RunDetailPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   if (!run) {
     return (
-      <div className="p-8 text-center text-zinc-500">运行记录不存在</div>
+      <div className="p-8 text-center text-muted">运行记录不存在</div>
     );
   }
 
@@ -110,7 +110,7 @@ export default function RunDetailPage() {
     <div className="p-8 max-w-4xl mx-auto">
       <Link
         href={`/dashboard/auto-publish/${run.taskId}`}
-        className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         返回任务详情
@@ -118,17 +118,17 @@ export default function RunDetailPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-zinc-900">
-          运行详情 — {run.taskName}
+        <h1 className="text-2xl font-semibold text-foreground">
+          运行详情 - {run.taskName}
         </h1>
-        <div className="mt-2 flex items-center gap-4 text-sm text-zinc-500">
+        <div className="mt-2 flex items-center gap-4 text-sm text-muted">
           <RunStatusBadge status={run.status} />
           <span>
             {run.triggerType === 'MANUAL' ? '手动触发' : '定时触发'}
           </span>
-          <span>{new Date(run.startedAt).toLocaleString('zh-HK')}</span>
+          <span className="tnum">{new Date(run.startedAt).toLocaleString('zh-HK')}</span>
           {run.completedAt && (
-            <span>
+            <span className="tnum">
               耗时:{' '}
               {Math.round(
                 (new Date(run.completedAt).getTime() -
@@ -143,20 +143,20 @@ export default function RunDetailPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 text-center">
-          <div className="text-2xl font-semibold text-zinc-900">
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-semibold text-foreground tnum">
             {run.totalArticles}
           </div>
-          <div className="text-xs text-zinc-500">计划</div>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center">
-          <div className="text-2xl font-semibold text-emerald-600">
+          <div className="text-xs text-muted">计划</div>
+        </Card>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+          <div className="text-2xl font-semibold text-emerald-600 tnum">
             {run.successCount}
           </div>
           <div className="text-xs text-emerald-600">成功</div>
         </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
-          <div className="text-2xl font-semibold text-red-600">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+          <div className="text-2xl font-semibold text-red-600 tnum">
             {run.failedCount}
           </div>
           <div className="text-xs text-red-600">失败</div>
@@ -179,20 +179,17 @@ export default function RunDetailPage() {
 
       {/* Articles */}
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-4">
-          文章追踪 ({articles.length})
+        <h2 className="text-lg font-semibold text-foreground mb-4">
+          文章追踪 (<span className="tnum">{articles.length}</span>)
         </h2>
         <div className="space-y-3">
           {articles.map((article) => (
-            <div
-              key={article.id}
-              className="rounded-lg border border-zinc-200 bg-white p-5"
-            >
+            <Card key={article.id} className="p-5">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <ArticleStatusIcon status={article.status} />
-                    <span className="text-sm font-medium text-zinc-900">
+                    <span className="text-sm font-medium text-foreground">
                       {article.topic || '未选题'}
                     </span>
                   </div>
@@ -211,7 +208,7 @@ export default function RunDetailPage() {
                       className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
                       {actionId === article.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
                       ) : (
                         <Undo2 className="h-3 w-3" />
                       )}
@@ -225,7 +222,7 @@ export default function RunDetailPage() {
                       className="flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
                     >
                       {actionId === article.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
                       ) : (
                         <RefreshCw className="h-3 w-3" />
                       )}
@@ -269,7 +266,7 @@ export default function RunDetailPage() {
                               ? 'bg-emerald-400'
                               : isCurrent
                                 ? 'bg-blue-400 animate-pulse'
-                                : 'bg-zinc-200'
+                                : 'bg-surface-muted'
                         }`}
                       />
                       <span
@@ -280,7 +277,7 @@ export default function RunDetailPage() {
                               ? 'text-emerald-600'
                               : isCurrent
                                 ? 'text-blue-600'
-                                : 'text-zinc-400'
+                                : 'text-subtle'
                         }`}
                       >
                         {PIPELINE_STEP_LABELS[step]}
@@ -292,7 +289,7 @@ export default function RunDetailPage() {
 
               {/* Trace viewer toggle */}
               {article.executionTrace && article.executionTrace.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-zinc-100">
+                <div className="mt-2 pt-2 border-t border-line">
                   <button
                     onClick={() => setExpandedArticle(expandedArticle === article.id ? null : article.id)}
                     className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
@@ -304,7 +301,7 @@ export default function RunDetailPage() {
                     )}
                     {expandedArticle === article.id ? '收起执行详情' : '查看执行详情'}
                     {article.totalDurationMs != null && (
-                      <span className="ml-1 text-zinc-400">
+                      <span className="ml-1 text-subtle tnum">
                         ({(article.totalDurationMs / 1000).toFixed(1)}s)
                       </span>
                     )}
@@ -320,11 +317,11 @@ export default function RunDetailPage() {
                   )}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
 
           {articles.length === 0 && (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-zinc-500 text-sm">
+            <div className="rounded-lg border border-dashed border-line-strong p-8 text-center text-muted text-sm">
               暂无文章记录
             </div>
           )}
@@ -341,23 +338,19 @@ function ArticleStatusIcon({ status }: { status: string }) {
     case 'FAILED':
       return <XCircle className="h-4 w-4 text-red-500" />;
     case 'WITHDRAWN':
-      return <Undo2 className="h-4 w-4 text-zinc-400" />;
+      return <Undo2 className="h-4 w-4 text-subtle" />;
     default:
       return <Clock className="h-4 w-4 text-blue-400" />;
   }
 }
 
 function RunStatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    COMPLETED: { label: '完成', className: 'bg-emerald-50 text-emerald-600' },
-    PARTIAL: { label: '部分成功', className: 'bg-amber-50 text-amber-600' },
-    FAILED: { label: '失败', className: 'bg-red-50 text-red-600' },
-    RUNNING: { label: '运行中', className: 'bg-blue-50 text-blue-600' },
+  const map: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+    COMPLETED: { label: '完成', tone: 'success' },
+    PARTIAL: { label: '部分成功', tone: 'warning' },
+    FAILED: { label: '失败', tone: 'danger' },
+    RUNNING: { label: '运行中', tone: 'info' },
   };
-  const config = map[status] || { label: status, className: 'bg-zinc-100 text-zinc-500' };
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${config.className}`}>
-      {config.label}
-    </span>
-  );
+  const config = map[status] || { label: status, tone: 'neutral' as const };
+  return <Badge tone={config.tone}>{config.label}</Badge>;
 }

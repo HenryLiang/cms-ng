@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Loader2,
   Plus,
   Ban,
   CheckCircle2,
@@ -28,6 +27,7 @@ import {
   transactionTypeLabels,
   transactionCategoryLabels,
 } from '@/lib/transaction-labels';
+import { Button, Card, PageHeader, Badge, Input } from '@/components/ui';
 
 const roleLabels: Record<UserRole, string> = {
   [UserRole.REPORTER]: '记者',
@@ -111,19 +111,16 @@ export default function AccountsPage() {
 
   return (
     <div className="h-full p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">账号管理</h1>
-          <p className="mt-1 text-sm text-zinc-500">创建账户、启用/禁用账户、查看账户消费情况</p>
-        </div>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
-        >
-          <Plus className="h-4 w-4" />
-          新建账户
-        </button>
-      </div>
+      <PageHeader
+        title="账号管理"
+        subtitle="创建账户、启用/禁用账户、查看账户消费情况"
+        actions={
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            新建账户
+          </Button>
+        }
+      />
 
       {message && (
         <div
@@ -137,19 +134,19 @@ export default function AccountsPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-zinc-200 bg-white">
+      <Card>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
           </div>
         ) : users.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center">
-            <p className="text-zinc-500">暂无账户</p>
+          <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">
+            <p className="text-muted">暂无账户</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-100 text-left text-xs text-zinc-500">
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
                 <th className="px-6 py-3 font-medium">姓名</th>
                 <th className="px-6 py-3 font-medium">邮箱</th>
                 <th className="px-6 py-3 font-medium">角色</th>
@@ -161,69 +158,65 @@ export default function AccountsPage() {
                 <th className="px-6 py-3 font-medium text-right">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line">
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-zinc-50 last:border-0">
-                  <td className="px-6 py-3 font-medium text-zinc-900">{u.name}</td>
-                  <td className="px-6 py-3 text-zinc-600">{u.email}</td>
-                  <td className="px-6 py-3 text-zinc-600">{roleLabels[u.role] || u.role}</td>
-                  <td className="px-6 py-3 text-zinc-600">{u.department || '-'}</td>
+                <tr key={u.id} className="transition hover:bg-surface-muted/50">
+                  <td className="px-6 py-3 font-medium text-foreground">{u.name}</td>
+                  <td className="px-6 py-3 text-muted">{u.email}</td>
+                  <td className="px-6 py-3 text-muted">{roleLabels[u.role] || u.role}</td>
+                  <td className="px-6 py-3 text-muted">{u.department || '-'}</td>
                   <td className="px-6 py-3">
                     {u.isActive ? (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        启用
-                      </span>
+                      <Badge tone="success">启用</Badge>
                     ) : (
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
-                        禁用
-                      </span>
+                      <Badge tone="neutral">禁用</Badge>
                     )}
                   </td>
-                  <td className="px-6 py-3 text-right text-zinc-600">
+                  <td className="px-6 py-3 text-right text-muted tnum">
                     ¥{Number(u.balance ?? 0).toFixed(2)}
                   </td>
-                  <td className="px-6 py-3 text-zinc-500">
+                  <td className="px-6 py-3 text-subtle tnum">
                     {u.createdAt ? formatDate(u.createdAt) : '-'}
                   </td>
-                  <td className="px-6 py-3 text-zinc-500">
+                  <td className="px-6 py-3 text-subtle tnum">
                     {u.lastLoginAt ? formatDate(u.lastLoginAt) : '从未登录'}
                   </td>
                   <td className="px-6 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleToggleStatus(u)}
-                        className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                          u.isActive
-                            ? 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-                            : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-                        }`}
-                      >
-                        {u.isActive ? (
-                          <>
-                            <Ban className="h-3 w-3" />
-                            禁用
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="h-3 w-3" />
-                            启用
-                          </>
-                        )}
-                      </button>
-                      <button
+                      {u.isActive ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleToggleStatus(u)}
+                        >
+                          <Ban className="h-3 w-3" />
+                          禁用
+                        </Button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleStatus(u)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                        >
+                          <CheckCircle2 className="h-3 w-3" />
+                          启用
+                        </button>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setConfirmReset(u)}
-                        className="flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                       >
                         <KeyRound className="h-3 w-3" />
                         重置密码
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setDrawerUser(u)}
-                        className="flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                       >
                         <Eye className="h-3 w-3" />
                         消费
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -231,7 +224,7 @@ export default function AccountsPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
 
       {createOpen && (
         <CreateAccountModal
@@ -317,25 +310,23 @@ function CreateAccountModal({
     <ModalShell title="新建账户" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="邮箱" htmlFor="create-email">
-          <input
+          <Input
             id="create-email"
             type="email"
             required
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className={inputClass}
             placeholder="user@example.com"
           />
         </Field>
         <Field label="姓名" htmlFor="create-name">
-          <input
+          <Input
             id="create-name"
             type="text"
             required
             minLength={2}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className={inputClass}
           />
         </Field>
         <Field label="角色" htmlFor="create-role">
@@ -343,7 +334,7 @@ function CreateAccountModal({
             id="create-role"
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
-            className={inputClass}
+            className={selectClass}
           >
             <option value={UserRole.REPORTER}>记者</option>
             <option value={UserRole.EDITOR}>编辑</option>
@@ -351,12 +342,11 @@ function CreateAccountModal({
           </select>
         </Field>
         <Field label="部门（可选）" htmlFor="create-department">
-          <input
+          <Input
             id="create-department"
             type="text"
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
-            className={inputClass}
           />
         </Field>
         <Field label="语言偏好" htmlFor="create-lang">
@@ -364,7 +354,7 @@ function CreateAccountModal({
             id="create-lang"
             value={form.preferredLanguage}
             onChange={(e) => setForm({ ...form, preferredLanguage: e.target.value as ContentLanguage })}
-            className={inputClass}
+            className={selectClass}
           >
             {Object.entries(languageLabels).map(([value, label]) => (
               <option key={value} value={value}>
@@ -373,26 +363,17 @@ function CreateAccountModal({
             ))}
           </select>
         </Field>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted">
           创建后将生成一个随机初始密码，仅显示一次，请立即保存并交给用户。
         </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          >
+          <Button type="button" variant="secondary" onClick={onClose}>
             取消
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          </Button>
+          <Button type="submit" variant="primary" loading={saving}>
             创建
-          </button>
+          </Button>
         </div>
       </form>
     </ModalShell>
@@ -428,12 +409,9 @@ function PasswordResultModal({
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           该密码仅显示一次，请立即复制保存。关闭后无法再次查看。
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-          <code className="flex-1 font-mono text-lg tracking-wider text-zinc-900">{password}</code>
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-          >
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-muted p-3">
+          <code className="flex-1 font-mono text-lg tracking-wider text-foreground">{password}</code>
+          <Button variant="secondary" size="sm" onClick={handleCopy}>
             {copied ? (
               <>
                 <Check className="h-3 w-3" />
@@ -445,15 +423,12 @@ function PasswordResultModal({
                 复制
               </>
             )}
-          </button>
+          </Button>
         </div>
         <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-          >
+          <Button variant="primary" onClick={onClose}>
             我已保存
-          </button>
+          </Button>
         </div>
       </div>
     </ModalShell>
@@ -480,22 +455,14 @@ function ConfirmDialog({
   return (
     <ModalShell title={title} onClose={onCancel}>
       <div className="space-y-4">
-        <p className="text-sm text-zinc-600">{message}</p>
+        <p className="text-sm text-muted">{message}</p>
         <div className="flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          >
+          <Button variant="secondary" onClick={onCancel}>
             取消
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          </Button>
+          <Button variant="primary" loading={loading} onClick={onConfirm}>
             {confirmText}
-          </button>
+          </Button>
         </div>
       </div>
     </ModalShell>
@@ -537,21 +504,21 @@ function ConsumptionDrawer({ user, onClose }: { user: User; onClose: () => void 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-[480px] flex-col bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
+      <div className="relative flex h-full w-full max-w-[480px] flex-col border-l border-line bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold">账户消费</h2>
-            <p className="text-xs text-zinc-500">{user.name}（{user.email}）</p>
+            <p className="text-xs text-muted">{user.name}（{user.email}）</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
             </div>
           ) : error ? (
             <p className="py-12 text-center text-sm text-red-600">{error}</p>
@@ -564,18 +531,18 @@ function ConsumptionDrawer({ user, onClose }: { user: User; onClose: () => void 
               </div>
 
               <div>
-                <h3 className="mb-2 text-sm font-medium text-zinc-700">按类目分布</h3>
+                <h3 className="mb-2 text-sm font-medium text-foreground">按类目分布</h3>
                 <div className="space-y-2">
                   {Object.entries(data.summary.byCategory).length === 0 ? (
-                    <p className="text-xs text-zinc-400">暂无消费</p>
+                    <p className="text-xs text-subtle">暂无消费</p>
                   ) : (
                     Object.entries(data.summary.byCategory).map(([cat, amount]) => (
                       <div
                         key={cat}
-                        className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                        className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm"
                       >
-                        <span className="text-zinc-600">{transactionCategoryLabels[cat] || cat}</span>
-                        <span className="font-medium text-zinc-900">¥{amount.toFixed(2)}</span>
+                        <span className="text-muted">{transactionCategoryLabels[cat] || cat}</span>
+                        <span className="font-medium text-foreground tnum">¥{amount.toFixed(2)}</span>
                       </div>
                     ))
                   )}
@@ -583,24 +550,24 @@ function ConsumptionDrawer({ user, onClose }: { user: User; onClose: () => void 
               </div>
 
               <div>
-                <h3 className="mb-2 text-sm font-medium text-zinc-700">最近流水</h3>
+                <h3 className="mb-2 text-sm font-medium text-foreground">最近流水</h3>
                 {data.recentTransactions.length === 0 ? (
-                  <p className="text-xs text-zinc-400">暂无交易记录</p>
+                  <p className="text-xs text-subtle">暂无交易记录</p>
                 ) : (
                   <div className="space-y-2">
                     {data.recentTransactions.map((tx) => (
                       <div
                         key={tx.id}
-                        className="flex items-center justify-between rounded-lg border border-zinc-100 px-3 py-2 text-sm"
+                        className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-zinc-700">{tx.description}</p>
-                          <p className="text-xs text-zinc-400">
+                          <p className="truncate text-foreground">{tx.description}</p>
+                          <p className="text-xs text-subtle">
                             {transactionTypeLabels[tx.type] || tx.type} · {formatDate(tx.createdAt)}
                           </p>
                         </div>
                         <span
-                          className={`ml-2 shrink-0 font-medium ${
+                          className={`ml-2 shrink-0 font-medium tnum ${
                             tx.amount >= 0 ? 'text-emerald-600' : 'text-red-600'
                           }`}
                         >
@@ -616,27 +583,29 @@ function ConsumptionDrawer({ user, onClose }: { user: User; onClose: () => void 
         </div>
 
         {data && data.meta.total > pageSize && (
-          <div className="flex items-center justify-between border-t border-zinc-200 px-6 py-3">
-            <p className="text-xs text-zinc-500">
+          <div className="flex items-center justify-between border-t border-line px-6 py-3">
+            <p className="text-xs text-muted tnum">
               共 {data.meta.total} 条，第 {page}/{totalPages} 页
             </p>
             <div className="flex items-center gap-2">
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
               >
                 <ChevronLeft className="h-3 w-3" />
                 上一页
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
               >
                 下一页
                 <ChevronRight className="h-3 w-3" />
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -657,11 +626,11 @@ function Stat({
   tone?: 'red' | 'green';
 }) {
   const color =
-    tone === 'red' ? 'text-red-600' : tone === 'green' ? 'text-emerald-600' : 'text-zinc-900';
+    tone === 'red' ? 'text-red-600' : tone === 'green' ? 'text-emerald-600' : 'text-foreground';
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className={`mt-1 text-base font-semibold ${color}`}>{value}</p>
+    <div className="rounded-lg border border-line bg-surface p-3">
+      <p className="text-xs text-muted">{label}</p>
+      <p className={`mt-1 text-base font-semibold tnum ${color}`}>{value}</p>
     </div>
   );
 }
@@ -678,12 +647,12 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <div className="relative w-full max-w-md rounded-lg border border-line bg-surface p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
         {children}
       </div>
@@ -702,7 +671,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-zinc-700">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-foreground">
         {label}
       </label>
       {children}
@@ -710,5 +679,5 @@ function Field({
   );
 }
 
-const inputClass =
-  'w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900';
+const selectClass =
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20';

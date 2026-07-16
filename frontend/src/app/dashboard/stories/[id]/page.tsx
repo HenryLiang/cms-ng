@@ -20,7 +20,6 @@ import {
   Plus,
   Trash2,
   FileText,
-  Loader2,
   Save,
   BookOpen,
   Sparkles,
@@ -28,6 +27,7 @@ import {
 import { ContentLanguage } from '@cms-ng/shared';
 import LanguageBadge from '@/components/language-badge';
 import ResearchKitPanel from '@/components/research-kit-panel';
+import { Button, Badge, Card } from '@/components/ui';
 
 export default function StoryDetailPage() {
   const router = useRouter();
@@ -194,7 +194,7 @@ export default function StoryDetailPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
@@ -202,7 +202,7 @@ export default function StoryDetailPage() {
   if (!story) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-zinc-500">{loadError ?? '选题不存在'}</p>
+        <p className="text-muted">{loadError ?? '选题不存在'}</p>
       </div>
     );
   }
@@ -224,7 +224,7 @@ export default function StoryDetailPage() {
       <div className="mx-auto max-w-3xl">
         <Link
           href="/dashboard"
-          className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900"
+          className="mb-6 inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           返回工作台
@@ -238,13 +238,13 @@ export default function StoryDetailPage() {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full text-2xl font-semibold bg-transparent border-b border-zinc-300 outline-none focus:border-zinc-900"
+                  className="w-full text-2xl font-semibold bg-transparent border-b border-line-strong outline-none focus:border-brand"
                 />
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="w-full text-sm text-zinc-600 bg-transparent border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-zinc-400"
+                  className="w-full text-sm text-muted bg-transparent border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   placeholder="选题描述..."
                 />
                 <div className="flex gap-3">
@@ -252,13 +252,13 @@ export default function StoryDetailPage() {
                     type="text"
                     value={angle}
                     onChange={(e) => setAngle(e.target.value)}
-                    className="flex-1 text-sm bg-transparent border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-zinc-400"
+                    className="flex-1 text-sm bg-transparent border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                     placeholder="报道角度..."
                   />
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as Story['status'])}
-                    className="text-sm border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-zinc-400"
+                    className="text-sm border border-line rounded-lg px-3 py-2 bg-surface text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
                     {Object.entries(statusLabels).map(([key, label]) => (
                       <option key={key} value={key}>{label}</option>
@@ -269,14 +269,14 @@ export default function StoryDetailPage() {
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-semibold">{story.title}</h1>
-                  <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+                  <h1 className="text-2xl font-semibold text-foreground">{story.title}</h1>
+                  <Badge tone="neutral" className="px-3 py-1">
                     {statusLabels[story.status] || story.status}
-                  </span>
+                  </Badge>
                   <select
                     value={contentLanguage}
                     onChange={(e) => setContentLanguage(e.target.value as ContentLanguage)}
-                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400"
+                    className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                     title="内容语言"
                   >
                     <option value={ContentLanguage.SIMPLIFIED_CHINESE}>简体中文</option>
@@ -288,7 +288,7 @@ export default function StoryDetailPage() {
                     value={authorSlug}
                     onChange={(e) => setAuthorSlug(e.target.value)}
                     disabled={!authorsAvailable}
-                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400 disabled:opacity-50"
+                    className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
                     title={
                       authorsAvailable
                         ? '作者风格：选中的作者文风将应用到生成的初稿'
@@ -304,10 +304,10 @@ export default function StoryDetailPage() {
                   </select>
                 </div>
                 {story.description && (
-                  <p className="mt-2 text-sm text-zinc-600">{story.description}</p>
+                  <p className="mt-2 text-sm text-muted">{story.description}</p>
                 )}
                 {story.angle && (
-                  <p className="mt-1 text-sm text-zinc-500">角度：{story.angle}</p>
+                  <p className="mt-1 text-sm text-muted">角度：{story.angle}</p>
                 )}
               </>
             )}
@@ -315,32 +315,36 @@ export default function StoryDetailPage() {
           <div className="flex gap-2 ml-4">
             {isEditing ? (
               <>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={saving}
                   onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {!saving && <Save className="h-4 w-4" />}
                   保存
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setIsEditing(false)}
-                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >
                   取消
-                </button>
+                </Button>
               </>
             ) : (
               <>
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setIsEditing(true)}
-                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >
                   编辑
-                </button>
+                </Button>
                 <button
                   onClick={handleDelete}
-                  className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                  title="删除选题"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -366,43 +370,41 @@ export default function StoryDetailPage() {
               value={draftInstruction}
               onChange={(e) => setDraftInstruction(e.target.value)}
               rows={2}
-              className="w-full text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-zinc-400"
+              className="w-full text-sm text-muted bg-surface border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               placeholder="对初稿的特殊要求，如：侧重民生角度、增加专家观点、控制字数在2000字以内..."
             />
           </div>
         )}
         {!showResearchPanel && (
-          <div className="mb-6 rounded-lg border border-zinc-200 bg-white">
+          <Card className="mb-6">
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-zinc-500" />
-                <h2 className="text-sm font-medium text-zinc-900">AI 资料搜集</h2>
-                <span className="text-xs text-zinc-400">基于选题信息生成结构化背景资料</span>
+                <BookOpen className="h-4 w-4 text-muted" />
+                <h2 className="text-sm font-medium text-foreground">AI 资料搜集</h2>
+                <span className="text-xs text-subtle">基于选题信息生成结构化背景资料</span>
               </div>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
+                loading={researchLoading}
                 onClick={() => {
                   setShowResearchPanel(true);
                   handleGenerateResearchKit();
                 }}
-                disabled={researchLoading}
-                className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
               >
-                <BookOpen className="h-4 w-4" />
+                {!researchLoading && <BookOpen className="h-4 w-4" />}
                 生成资料包
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium">相关稿件</h2>
-          <button
-            onClick={handleCreateArticle}
-            className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-          >
+          <h2 className="text-lg font-medium text-foreground">相关稿件</h2>
+          <Button variant="primary" size="sm" onClick={handleCreateArticle}>
             <Plus className="h-4 w-4" />
             新建稿件
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-2">
@@ -410,37 +412,39 @@ export default function StoryDetailPage() {
             <Link
               key={article.id}
               href={`/dashboard/articles/${article.id}`}
-              className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4 hover:shadow-sm transition-shadow"
+              className="flex items-center gap-3 rounded-lg border border-line bg-surface p-4 hover:shadow-sm transition-shadow"
             >
-              <FileText className="h-5 w-5 text-zinc-400" />
+              <FileText className="h-5 w-5 text-subtle" />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium text-zinc-900 truncate">{article.title}</h3>
-                <p className="text-xs text-zinc-500">
+                <h3 className="text-sm font-medium text-foreground truncate">{article.title}</h3>
+                <p className="text-xs text-muted">
                   {article.subtitle || '暂无副标题'} · 版本 {article.version}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  article.status === 'PUBLISHED'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : article.status === 'PENDING_REVIEW'
-                    ? 'bg-amber-50 text-amber-700'
-                    : 'bg-zinc-100 text-zinc-700'
-                }`}>
+                <Badge
+                  tone={
+                    article.status === 'PUBLISHED'
+                      ? 'success'
+                      : article.status === 'PENDING_REVIEW'
+                        ? 'warning'
+                        : 'neutral'
+                  }
+                >
                   {statusLabels[article.status] || article.status}
-                </span>
+                </Badge>
                 <LanguageBadge language={article.contentLanguage} />
               </div>
             </Link>
           ))}
           {articles.length === 0 && (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
-              <p className="text-sm text-zinc-500">暂无稿件</p>
+            <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
+              <p className="text-sm text-muted">暂无稿件</p>
               <button
                 onClick={handleCreateArticle}
-                className="mt-2 text-sm font-medium text-zinc-900 hover:underline"
+                className="mt-2 text-sm font-medium text-foreground hover:underline"
               >
-                创建第一篇稿件 →
+                创建第一篇稿件 -&gt;
               </button>
             </div>
           )}

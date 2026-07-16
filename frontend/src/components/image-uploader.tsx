@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { UploadCloud, Loader2 } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
 import { uploadMedia, type MediaAsset } from '@/lib/media-api';
 
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -105,19 +105,19 @@ export function ImageUploader({
         onPaste={onPaste}
         className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors ${
           dragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100'
+            ? 'border-brand bg-brand-soft'
+            : 'border-line-strong bg-canvas hover:border-brand hover:bg-surface-muted'
         } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
       >
         {uploading ? (
-          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
         ) : (
-          <UploadCloud className="h-8 w-8 text-zinc-400" />
+          <UploadCloud className="h-8 w-8 text-subtle" />
         )}
-        <div className="text-sm font-medium text-zinc-700">
+        <div className="text-sm font-medium text-foreground">
           {uploading ? '上传中…' : '点击、拖拽或粘贴图片到此处'}
         </div>
-        <div className="text-xs text-zinc-400">
+        <div className="text-xs text-subtle">
           支持 jpg/png/webp/gif，单文件 ≤ 10MB
         </div>
         <input
