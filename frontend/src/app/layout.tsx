@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "01创作大脑",
+  title: "01创作大脑 · AI创作作业系统",
   description: "AI驱动的内容创作作业系统",
 };
 
@@ -25,10 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="zh-HK"
+      lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-canvas text-foreground">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
