@@ -30,6 +30,7 @@ const activeUser = {
   isActive: true,
   balance: 80,
   createdAt: '2026-01-01T00:00:00.000Z',
+  lastLoginAt: null,
 };
 
 describe('AccountsPage', () => {
@@ -42,6 +43,8 @@ describe('AccountsPage', () => {
     expect(screen.getByText('reporter@example.com')).toBeInTheDocument();
     expect(screen.getByText('启用')).toBeInTheDocument();
     expect(screen.getByText(/¥80\.00/)).toBeInTheDocument();
+    // 从未登录的账户显示占位文案
+    expect(screen.getByText('从未登录')).toBeInTheDocument();
   });
 
   it('shows empty state when there are no users', async () => {

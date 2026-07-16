@@ -157,6 +157,7 @@ export default function AccountsPage() {
                 <th className="px-6 py-3 font-medium">状态</th>
                 <th className="px-6 py-3 font-medium text-right">余额</th>
                 <th className="px-6 py-3 font-medium">创建时间</th>
+                <th className="px-6 py-3 font-medium">最后登录</th>
                 <th className="px-6 py-3 font-medium text-right">操作</th>
               </tr>
             </thead>
@@ -183,6 +184,9 @@ export default function AccountsPage() {
                   </td>
                   <td className="px-6 py-3 text-zinc-500">
                     {u.createdAt ? formatDate(u.createdAt) : '-'}
+                  </td>
+                  <td className="px-6 py-3 text-zinc-500">
+                    {u.lastLoginAt ? formatDate(u.lastLoginAt) : '从未登录'}
                   </td>
                   <td className="px-6 py-3">
                     <div className="flex items-center justify-end gap-2">

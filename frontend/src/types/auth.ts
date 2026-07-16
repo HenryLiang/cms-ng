@@ -10,6 +10,7 @@ export interface User {
   preferredLanguage?: ContentLanguage;
   isActive?: boolean;
   balance?: number;
+  lastLoginAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

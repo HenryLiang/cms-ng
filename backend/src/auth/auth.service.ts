@@ -97,6 +97,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // 记录最后登录时间（仅凭证登录刷新；token refresh 不计为登录）。
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
     const token = this.jwtService.sign({
       sub: user.id,
       email: user.email,

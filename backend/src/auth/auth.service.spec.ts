@@ -145,6 +145,10 @@ describe('AuthService', () => {
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: dto.email } });
       expect(bcrypt.compare).toHaveBeenCalledWith(dto.password, user.passwordHash);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-id' },
+        data: { lastLoginAt: expect.any(Date) },
+      });
       expect(jwtService.sign).toHaveBeenCalledWith({ sub: 'user-id', email: dto.email, role: 'REPORTER' });
       expect(result.user.id).toBe('user-id');
       expect(result.accessToken).toBe('test_jwt_token');

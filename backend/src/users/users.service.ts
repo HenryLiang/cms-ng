@@ -44,6 +44,7 @@ const USER_SELECT = {
   preferredLanguage: true,
   isActive: true,
   balance: true,
+  lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -59,6 +60,7 @@ type SelectedUser = {
   preferredLanguage: string | null;
   isActive: boolean;
   balance: unknown;
+  lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -325,6 +327,7 @@ export class UsersService {
       preferredLanguage: u.preferredLanguage,
       isActive: u.isActive,
       balance: Number(u.balance),
+      lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
     };

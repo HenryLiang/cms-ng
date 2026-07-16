@@ -57,6 +57,7 @@ describe('UsersService', () => {
     preferredLanguage: 'TRADITIONAL_CHINESE_HK',
     isActive: true,
     balance: '0.0000',
+    lastLoginAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
     ...override,
