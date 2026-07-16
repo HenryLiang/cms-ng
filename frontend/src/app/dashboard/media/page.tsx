@@ -10,8 +10,8 @@ import {
 } from '@/lib/media-api';
 import { MediaSource } from '@cms-ng/shared';
 import { ImageUploader } from '@/components/image-uploader';
+import { Button, PageHeader, Input } from '@/components/ui';
 import {
-  Loader2,
   Search,
   Trash2,
   X,
@@ -94,29 +94,28 @@ export default function MediaLibraryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900">媒体库</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            管理上传与 AI 生成的图片，共 {total} 项
-          </p>
-        </div>
-        <button
-          onClick={() => setShowUpload((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-        >
-          <Upload className="h-4 w-4" />
-          上传图片
-        </button>
-      </div>
+      <PageHeader
+        title="媒体库"
+        subtitle={
+          <>
+            管理上传与 AI 生成的图片，共 <span className="tnum">{total}</span> 项
+          </>
+        }
+        actions={
+          <Button onClick={() => setShowUpload((v) => !v)}>
+            <Upload className="h-4 w-4" />
+            上传图片
+          </Button>
+        }
+      />
 
       {showUpload && (
-        <ImageUploader onUploaded={onUploaded} className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200" />
+        <ImageUploader onUploaded={onUploaded} className="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-line" />
       )}
 
       {/* 筛选 + 搜索 */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1 rounded-lg bg-white p-1 ring-1 ring-zinc-200">
+        <div className="flex items-center gap-1 rounded-lg bg-surface p-1 ring-1 ring-line">
           {SOURCE_FILTERS.map((f) => (
             <button
               key={f.value}
@@ -126,8 +125,8 @@ export default function MediaLibraryPage() {
               }}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 source === f.value
-                  ? 'bg-zinc-900 text-white'
-                  : 'text-zinc-600 hover:bg-zinc-100'
+                  ? 'bg-foreground text-white'
+                  : 'text-muted hover:bg-surface-muted'
               }`}
             >
               {f.label}
@@ -135,32 +134,28 @@ export default function MediaLibraryPage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-            <input
+          <div className="w-64">
+            <Input
+              leftIcon={<Search className="h-4 w-4" />}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               placeholder="搜索文件名/alt/prompt"
-              className="w-64 rounded-lg border border-zinc-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          <button
-            onClick={onSearch}
-            className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200"
-          >
+          <Button variant="secondary" onClick={onSearch}>
             搜索
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* 网格 */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-20 text-zinc-400">
+        <div className="flex flex-col items-center justify-center gap-3 py-20 text-subtle">
           <Sparkles className="h-10 w-10" />
           <p className="text-sm">暂无图片，点击右上角上传</p>
         </div>
@@ -170,9 +165,9 @@ export default function MediaLibraryPage() {
             <button
               key={asset.id}
               onClick={() => setSelected(asset)}
-              className="group overflow-hidden rounded-lg bg-white ring-1 ring-zinc-200 transition-shadow hover:ring-2 hover:ring-blue-400"
+              className="group overflow-hidden rounded-lg bg-surface ring-1 ring-line transition-shadow hover:ring-2 hover:ring-brand"
             >
-              <div className="relative aspect-square overflow-hidden bg-zinc-100">
+              <div className="relative aspect-square overflow-hidden bg-surface-muted">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={asset.thumbnailUrl ?? asset.url}
@@ -184,7 +179,7 @@ export default function MediaLibraryPage() {
                   {SOURCE_LABEL[asset.source] ?? asset.source}
                 </span>
               </div>
-              <div className="truncate px-2 py-1.5 text-xs text-zinc-600">
+              <div className="truncate px-2 py-1.5 text-xs text-muted">
                 {asset.fileName}
               </div>
             </button>
@@ -195,23 +190,25 @@ export default function MediaLibraryPage() {
       {/* 分页 */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
           >
             <ChevronLeft className="h-5 w-5" />
-          </button>
-          <span className="text-sm text-zinc-600">
+          </Button>
+          <span className="text-sm text-muted tnum">
             {page} / {totalPages}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
           >
             <ChevronRight className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -276,12 +273,12 @@ function MediaDetailDrawer({
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-zinc-900">图片详情</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+      <div className="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">图片详情</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-4 p-4">
@@ -289,18 +286,15 @@ function MediaDetailDrawer({
           <img
             src={asset.url}
             alt={asset.altText ?? asset.fileName}
-            className="w-full rounded-lg bg-zinc-100 object-contain"
+            className="w-full rounded-lg bg-surface-muted object-contain"
           />
 
-          <button
-            onClick={copyUrl}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-          >
+          <Button variant="secondary" className="w-full" onClick={copyUrl}>
             {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
             {copied ? '已复制' : '复制 URL'}
-          </button>
+          </Button>
 
-          <dl className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
+          <dl className="grid grid-cols-2 gap-2 text-xs text-muted tnum">
             <div>来源：{SOURCE_LABEL[asset.source] ?? asset.source}</div>
             <div>类型：{asset.mimeType}</div>
             <div>尺寸：{asset.width && asset.height ? `${asset.width}×${asset.height}` : '-'}</div>
@@ -311,43 +305,40 @@ function MediaDetailDrawer({
             </div>
             {asset.prompt && (
               <div className="col-span-2">
-                <dt className="mb-0.5 font-medium text-zinc-600">Prompt</dt>
-                <dd className="text-zinc-500">{asset.prompt}</dd>
+                <dt className="mb-0.5 font-medium text-foreground">Prompt</dt>
+                <dd className="text-muted">{asset.prompt}</dd>
               </div>
             )}
           </dl>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-600">标题</label>
-            <input
+            <label className="text-xs font-medium text-foreground">标题</label>
+            <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-600">
+            <label className="text-xs font-medium text-foreground">
               Alt 替换文本（无障碍 + SEO）
             </label>
-            <input
+            <Input
               value={altText}
               onChange={(e) => setAltText(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-600">
+            <label className="text-xs font-medium text-foreground">
               标签（逗号分隔）
             </label>
-            <input
+            <Input
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>
 
-        <div className="sticky bottom-0 flex items-center gap-2 border-t border-zinc-200 bg-white px-4 py-3">
+        <div className="sticky bottom-0 flex items-center gap-2 border-t border-line bg-surface px-4 py-3">
           <button
             onClick={onDelete}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -355,14 +346,9 @@ function MediaDetailDrawer({
             <Trash2 className="h-4 w-4" />
             删除
           </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          <Button variant="primary" loading={saving} onClick={onSave} className="ml-auto">
             保存
-          </button>
+          </Button>
         </div>
       </div>
     </div>

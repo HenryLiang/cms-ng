@@ -8,8 +8,8 @@ import {
 } from '@/lib/media-api';
 import { MediaSource } from '@cms-ng/shared';
 import { ImageUploader } from './image-uploader';
+import { Button } from '@/components/ui';
 import {
-  Loader2,
   Search,
   X,
   Upload,
@@ -104,18 +104,18 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative flex h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+      <div className="relative flex h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-surface shadow-pop">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-zinc-900">选择图片</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">选择图片</h2>
+          <button onClick={onClose} className="text-subtle hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-2">
-          <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-0.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2">
+          <div className="flex items-center gap-1 rounded-lg bg-surface-muted p-0.5">
             {SOURCE_FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -125,8 +125,8 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
                 }}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   source === f.value
-                    ? 'bg-white text-zinc-900 shadow-sm'
-                    : 'text-zinc-500 hover:text-zinc-700'
+                    ? 'bg-surface text-foreground shadow-sm'
+                    : 'text-muted hover:text-foreground'
                 }`}
               >
                 {f.label}
@@ -134,28 +134,26 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
             ))}
           </div>
           <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
             <input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               placeholder="搜索文件名/alt/prompt（回车）"
-              className="w-full rounded-lg border border-zinc-300 py-1.5 pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-line-strong bg-surface py-1.5 pl-8 pr-3 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </div>
-          <button
-            onClick={onSearch}
-            className="rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200"
-          >
+          <Button variant="secondary" size="sm" onClick={onSearch}>
             搜索
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setShowUpload((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
           >
             <Upload className="h-3.5 w-3.5" />
             上传
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -172,10 +170,10 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
           )}
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-sm text-zinc-400">
+            <div className="flex flex-col items-center justify-center py-16 text-sm text-subtle">
               暂无图片，点击「上传」添加
             </div>
           ) : (
@@ -184,10 +182,10 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
                 <button
                   key={asset.id}
                   onClick={() => setSelectedId(asset.id)}
-                  className={`group relative overflow-hidden rounded-lg bg-zinc-100 ring-2 transition-all ${
+                  className={`group relative overflow-hidden rounded-lg bg-surface-muted ring-2 transition-all ${
                     selectedId === asset.id
-                      ? 'ring-blue-500'
-                      : 'ring-transparent hover:ring-zinc-300'
+                      ? 'ring-brand'
+                      : 'ring-transparent hover:ring-line-strong'
                   }`}
                 >
                   <div className="aspect-square">
@@ -200,11 +198,11 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
                     />
                   </div>
                   {selectedId === asset.id && (
-                    <div className="absolute right-1 top-1 rounded-full bg-blue-500 p-0.5">
+                    <div className="absolute right-1 top-1 rounded-full bg-brand p-0.5">
                       <Check className="h-3 w-3 text-white" />
                     </div>
                   )}
-                  <div className="truncate bg-white px-1.5 py-1 text-[10px] text-zinc-500">
+                  <div className="truncate bg-surface px-1.5 py-1 text-[10px] text-muted">
                     {asset.fileName}
                   </div>
                 </button>
@@ -214,14 +212,14 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-3">
-          <div className="flex items-center gap-1 text-xs text-zinc-500">
+        <div className="flex items-center justify-between border-t border-line px-4 py-3">
+          <div className="flex items-center gap-1 text-xs text-muted">
             {totalPages > 1 && (
               <>
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded p-1 hover:bg-zinc-100 disabled:opacity-30"
+                  className="rounded p-1 hover:bg-surface-muted disabled:opacity-30"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -231,7 +229,7 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
                 <button
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded p-1 hover:bg-zinc-100 disabled:opacity-30"
+                  className="rounded p-1 hover:bg-surface-muted disabled:opacity-30"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -239,19 +237,12 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"
-            >
+            <Button variant="ghost" onClick={onClose}>
               取消
-            </button>
-            <button
-              onClick={confirm}
-              disabled={!selectedId}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40"
-            >
+            </Button>
+            <Button variant="primary" onClick={confirm} disabled={!selectedId}>
               确认选择
-            </button>
+            </Button>
           </div>
         </div>
       </div>

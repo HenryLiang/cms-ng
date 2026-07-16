@@ -3,6 +3,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { Button, Card, buttonClasses } from '@/components/ui';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -43,29 +44,25 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
           role="alert"
           className="flex h-full min-h-[60vh] items-center justify-center p-8"
         >
-          <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+          <Card className="max-w-md p-6 text-center">
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-amber-600" />
-            <h2 className="text-lg font-semibold text-amber-900">页面出现了一些问题</h2>
-            <p className="mt-2 text-sm text-amber-800">
+            <h2 className="text-lg font-semibold text-foreground">页面出现了一些问题</h2>
+            <p className="mt-2 text-sm text-muted">
               请尝试刷新页面，或返回工作台继续操作。
             </p>
             <div className="mt-4 flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={this.handleReload}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-              >
+              <Button type="button" variant="primary" onClick={this.handleReload}>
                 <RotateCcw className="h-3.5 w-3.5" />
                 重新加载
-              </button>
+              </Button>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                className={buttonClasses({ variant: 'secondary' })}
               >
                 返回工作台
               </Link>
             </div>
-          </div>
+          </Card>
         </div>
       );
     }

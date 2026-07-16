@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, Save, Pencil, X, Check } from 'lucide-react';
+import { Save, Pencil, X } from 'lucide-react';
 import {
   getBillingConfigs,
   updateBillingConfig,
   type BillingConfig,
 } from '@/lib/billing-api';
+import { Badge, Button, Card, Input, PageHeader } from '@/components/ui';
 
 const categoryLabels: Record<string, string> = {
   AI: 'AI 服务',
@@ -72,27 +73,27 @@ export default function BillingConfigPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   return (
     <div className="h-full p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">计费配置</h1>
-        <p className="mt-1 text-sm text-zinc-500">管理各服务项目的计费单价和启用状态</p>
-      </div>
+      <PageHeader
+        title="计费配置"
+        subtitle="管理各服务项目的计费单价和启用状态"
+      />
 
-      <div className="rounded-lg border border-zinc-200 bg-white">
+      <Card>
         {configs.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center">
-            <p className="text-zinc-500">暂无数据</p>
+          <div className="m-4 rounded-lg border border-dashed border-line-strong p-12 text-center">
+            <p className="text-muted">暂无数据</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-100 text-left text-xs text-zinc-500">
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
                 <th className="px-6 py-3 font-medium">名称</th>
                 <th className="px-6 py-3 font-medium">类别</th>
                 <th className="px-6 py-3 font-medium">计费单位</th>
@@ -101,33 +102,33 @@ export default function BillingConfigPage() {
                 <th className="px-6 py-3 font-medium text-right">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line">
               {configs.map((config) => {
                 const isEditing = editingKey === config.itemKey;
                 return (
-                  <tr key={config.id} className="border-b border-zinc-50 last:border-0">
-                    <td className="px-6 py-3 font-medium text-zinc-900">
+                  <tr key={config.id} className="transition hover:bg-surface-muted/50">
+                    <td className="px-6 py-3 font-medium text-foreground">
                       {config.itemName}
                     </td>
                     <td className="px-6 py-3">
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                      <Badge tone="neutral">
                         {categoryLabels[config.category] || config.category}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-6 py-3 text-zinc-500">{config.unit}</td>
-                    <td className="px-6 py-3 text-right">
+                    <td className="px-6 py-3 text-muted">{config.unit}</td>
+                    <td className="tnum px-6 py-3 text-right">
                       {isEditing ? (
-                        <input
+                        <Input
                           type="number"
                           step="0.0001"
                           min="0"
                           value={editPrice}
                           onChange={(e) => setEditPrice(e.target.value)}
-                          className="w-24 rounded border border-zinc-300 px-2 py-1 text-right text-sm outline-none focus:border-zinc-500"
+                          className="w-24 text-right"
                           autoFocus
                         />
                       ) : (
-                        <span className="font-mono text-zinc-900">
+                        <span className="tnum font-mono text-foreground">
                           ¥{config.unitPrice.toFixed(4)}
                         </span>
                       )}
@@ -139,54 +140,48 @@ export default function BillingConfigPage() {
                           className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                             editActive
                               ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                              : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
+                              : 'bg-surface-muted text-muted hover:bg-surface-muted'
                           }`}
                         >
                           {editActive ? '启用' : '禁用'}
                         </button>
                       ) : (
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            config.isActive
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-zinc-100 text-zinc-500'
-                          }`}
-                        >
+                        <Badge tone={config.isActive ? 'success' : 'neutral'}>
                           {config.isActive ? '启用' : '禁用'}
-                        </span>
+                        </Badge>
                       )}
                     </td>
                     <td className="px-6 py-3 text-right">
                       {isEditing ? (
                         <div className="flex items-center justify-end gap-2">
-                          <button
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            loading={saving}
                             onClick={() => handleSave(config.itemKey)}
-                            disabled={saving}
-                            className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                           >
-                            {saving ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Save className="h-3 w-3" />
-                            )}
+                            <Save className="h-3 w-3" />
                             保存
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={cancelEdit}
-                            className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                           >
                             <X className="h-3 w-3" />
                             取消
-                          </button>
+                          </Button>
                         </div>
                       ) : (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => startEdit(config)}
-                          className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 ml-auto"
+                          className="ml-auto"
                         >
                           <Pencil className="h-3 w-3" />
                           编辑
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -195,7 +190,7 @@ export default function BillingConfigPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

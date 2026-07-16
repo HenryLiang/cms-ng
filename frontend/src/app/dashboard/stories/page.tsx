@@ -35,6 +35,7 @@ import {
   Calendar,
   Play,
 } from 'lucide-react';
+import { Button, Badge } from '@/components/ui';
 
 // 选题数据源每页条数（B站热榜源上限 20、热搜上限 10；微博/知乎加 ?limit=50 后可拿更多）
 const PAGE_SIZE = 20;
@@ -274,7 +275,7 @@ export default function StoryHubPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
@@ -282,17 +283,18 @@ export default function StoryHubPage() {
   return (
     <div className="flex h-full">
       {/* Left sidebar - Topic list */}
-      <div className="w-80 border-r border-zinc-200 bg-white flex flex-col">
-        <div className="p-4 border-b border-zinc-200">
+      <div className="w-80 border-r border-line bg-surface flex flex-col">
+        <div className="p-4 border-b border-line">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold">选题中心</h1>
-            <button
+            <h1 className="text-lg font-semibold text-foreground">选题中心</h1>
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
             >
               <Plus className="h-3 w-3" />
               录入热点
-            </button>
+            </Button>
           </div>
           <button
             onClick={handleGetAISuggestions}
@@ -309,7 +311,7 @@ export default function StoryHubPage() {
 
           {/* 数据源标签切换 */}
           <div className="mt-3">
-            <p className="text-xs text-zinc-400 mb-2">外部数据源</p>
+            <p className="text-xs text-subtle mb-2">外部数据源</p>
             <div className="flex flex-wrap gap-1.5">
               {sourceDefinitions.map((source) => {
                 const Icon = SOURCE_ICONS[source.icon] ?? Newspaper;
@@ -322,7 +324,7 @@ export default function StoryHubPage() {
                     className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
                       isActive
                         ? 'bg-orange-100 text-orange-700 border border-orange-200'
-                        : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                        : 'bg-surface border border-line text-muted hover:bg-surface-muted'
                     }`}
                   >
                     {newsSourceLoading && isActive ? (
@@ -341,7 +343,7 @@ export default function StoryHubPage() {
         {showCreateForm && (
           <form
             onSubmit={handleCreateTopic}
-            className="p-4 border-b border-zinc-200 space-y-3"
+            className="p-4 border-b border-line space-y-3"
           >
             <input
               type="text"
@@ -349,24 +351,24 @@ export default function StoryHubPage() {
               placeholder="热点标题"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <textarea
               placeholder="描述（可选）"
               rows={2}
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <input
               type="text"
               placeholder="来源（可选）"
               value={newSource}
               onChange={(e) => setNewSource(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">热度</span>
+              <span className="text-xs text-muted">热度</span>
               <input
                 type="range"
                 min={0}
@@ -375,24 +377,27 @@ export default function StoryHubPage() {
                 onChange={(e) => setNewHeatScore(Number(e.target.value))}
                 className="flex-1"
               />
-              <span className="text-xs font-medium w-8 text-right">
+              <span className="text-xs font-medium w-8 text-right tnum">
                 {newHeatScore}
               </span>
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 type="submit"
-                className="flex-1 rounded-lg bg-zinc-900 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+                className="flex-1"
               >
                 创建
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
               >
                 取消
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -407,29 +412,27 @@ export default function StoryHubPage() {
                 setActiveNewsSource(null);
                 setNewsPage(1);
               }}
-              className={`w-full text-left p-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors cursor-pointer ${
-                selectedTopic?.id === topic.id ? 'bg-zinc-50' : ''
+              className={`w-full text-left p-4 border-b border-line hover:bg-surface-muted transition-colors cursor-pointer ${
+                selectedTopic?.id === topic.id ? 'bg-canvas' : ''
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-zinc-900 truncate">
+                  <h3 className="text-sm font-medium text-foreground truncate">
                     {topic.title}
                   </h3>
                   {topic.description && (
-                    <p className="mt-1 text-xs text-zinc-500 line-clamp-2">
+                    <p className="mt-1 text-xs text-muted line-clamp-2">
                       {topic.description}
                     </p>
                   )}
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-xs text-orange-500">
+                    <span className="flex items-center gap-1 text-xs text-orange-500 tnum">
                       <Flame className="h-3 w-3" />
                       {topic.heatScore}
                     </span>
                     {topic.status === 'ADOPTED' && (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
-                        已采纳
-                      </span>
+                      <Badge tone="success">已采纳</Badge>
                     )}
                   </div>
                 </div>
@@ -438,7 +441,7 @@ export default function StoryHubPage() {
                     e.stopPropagation();
                     handleDeleteTopic(topic.id);
                   }}
-                  className="text-zinc-400 hover:text-red-500"
+                  className="text-subtle hover:text-red-500"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -447,8 +450,8 @@ export default function StoryHubPage() {
           ))}
           {topics.length === 0 && (
             <div className="p-8 text-center">
-              <p className="text-sm text-zinc-400">暂无热点</p>
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="text-sm text-subtle">暂无热点</p>
+              <p className="mt-1 text-xs text-subtle">
                 点击上方按钮录入或获取 AI 推荐
               </p>
             </div>
@@ -457,7 +460,7 @@ export default function StoryHubPage() {
       </div>
 
       {/* Right panel - Detail or AI Suggestions or News Source */}
-      <div className="flex-1 bg-zinc-50 p-8 overflow-auto">
+      <div className="flex-1 bg-canvas p-8 overflow-auto">
         {activeNewsSource && activeSourceDefinition ? (
           <NewsSourcePanel
             source={activeSourceDefinition}
@@ -511,30 +514,24 @@ function TopicDetailPanel({
     <div className="max-w-2xl">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h2 className="text-xl font-semibold">{topic.title}</h2>
-          <div className="mt-1 flex items-center gap-3 text-sm text-zinc-500">
-            <span className="flex items-center gap-1">
+          <h2 className="text-xl font-semibold text-foreground">{topic.title}</h2>
+          <div className="mt-1 flex items-center gap-3 text-sm text-muted">
+            <span className="flex items-center gap-1 tnum">
               <Flame className="h-4 w-4 text-orange-500" />
               热度 {topic.heatScore}
             </span>
             {topic.source && <span>来源：{topic.source}</span>}
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                topic.status === 'ADOPTED'
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'bg-blue-50 text-blue-600'
-              }`}
-            >
+            <Badge tone={topic.status === 'ADOPTED' ? 'success' : 'info'}>
               {topic.status === 'ADOPTED' ? '已采纳' : '开放中'}
-            </span>
+            </Badge>
           </div>
         </div>
       </div>
 
       {topic.description && (
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-zinc-700 mb-2">描述</h3>
-          <p className="text-sm text-zinc-600 leading-relaxed">
+          <h3 className="text-sm font-medium text-foreground mb-2">描述</h3>
+          <p className="text-sm text-muted leading-relaxed">
             {topic.description}
           </p>
         </div>
@@ -542,15 +539,15 @@ function TopicDetailPanel({
 
       {topic.suggestedAngles && topic.suggestedAngles.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-zinc-700 mb-2">建议角度</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">建议角度</h3>
           <div className="space-y-2">
             {topic.suggestedAngles.map((angle, i) => (
               <div
                 key={i}
-                className="flex items-center gap-2 rounded-lg bg-white border border-zinc-200 p-3"
+                className="flex items-center gap-2 rounded-lg bg-surface border border-line p-3"
               >
                 <Lightbulb className="h-4 w-4 text-amber-500" />
-                <span className="text-sm text-zinc-700">{angle}</span>
+                <span className="text-sm text-foreground">{angle}</span>
               </div>
             ))}
           </div>
@@ -558,24 +555,20 @@ function TopicDetailPanel({
       )}
 
       {topic.status !== 'ADOPTED' && (
-        <button
+        <Button
+          variant="primary"
+          loading={adopting}
           onClick={onAdopt}
-          disabled={adopting}
-          className="flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >
-          {adopting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CheckCircle className="h-4 w-4" />
-          )}
+          {!adopting && <CheckCircle className="h-4 w-4" />}
           一键创建选题
-        </button>
+        </Button>
       )}
 
       {topic.adoptedStoryId && (
         <Link
           href={`/dashboard/stories/${topic.adoptedStoryId}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-6 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-6 py-3 text-sm font-medium text-foreground hover:bg-surface-muted"
         >
           查看已创建的选题
           <ArrowRight className="h-4 w-4" />
@@ -603,58 +596,55 @@ function AIRecommendationsPanel({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-purple-600" />
-          <h2 className="text-xl font-semibold">AI 选题推荐</h2>
+          <h2 className="text-xl font-semibold text-foreground">AI 选题推荐</h2>
         </div>
-        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+        <button onClick={onClose} className="text-subtle hover:text-foreground">
           <X className="h-5 w-5" />
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
         </div>
       ) : suggestions.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
-          <p className="text-zinc-500">暂无推荐，请稍后重试</p>
+        <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
+          <p className="text-muted">暂无推荐，请稍后重试</p>
         </div>
       ) : (
         <div className="space-y-4">
           {suggestions.map((suggestion, i) => (
             <div
               key={i}
-              className="rounded-lg border border-zinc-200 bg-white p-5 hover:shadow-sm transition-shadow"
+              className="rounded-lg border border-line bg-surface p-5 hover:shadow-sm transition-shadow"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <h3 className="text-base font-medium text-zinc-900">
+                  <h3 className="text-base font-medium text-foreground">
                     {suggestion.title}
                   </h3>
-                  <p className="mt-2 text-sm text-zinc-600">
+                  <p className="mt-2 text-sm text-muted">
                     {suggestion.description}
                   </p>
                   <div className="mt-3 flex items-center gap-2">
                     <Lightbulb className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm text-zinc-700">
+                    <span className="text-sm text-foreground">
                       {suggestion.suggestedAngle}
                     </span>
                   </div>
-                  <p className="mt-2 text-xs text-zinc-400">
+                  <p className="mt-2 text-xs text-subtle">
                     {suggestion.reason}
                   </p>
                 </div>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={adoptingId === 'suggestion'}
                   onClick={() => onAdopt(suggestion)}
-                  disabled={adoptingId === 'suggestion'}
-                  className="shrink-0 flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
-                  {adoptingId === 'suggestion' ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Plus className="h-3 w-3" />
-                  )}
+                  {!(adoptingId === 'suggestion') && <Plus className="h-3 w-3" />}
                   采纳
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -701,17 +691,17 @@ function NewsSourcePanel({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Icon className="h-5 w-5 text-orange-600" />
-          <h2 className="text-xl font-semibold">{source.label}</h2>
+          <h2 className="text-xl font-semibold text-foreground">{source.label}</h2>
         </div>
-        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+        <button onClick={onClose} className="text-subtle hover:text-foreground">
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-zinc-200 bg-white p-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-3">
         {(source.parameters ?? []).map((parameter) => (
           <label key={parameter.key} className="flex min-w-32 flex-col gap-1">
-            <span className="text-xs text-zinc-500">{parameter.label}</span>
+            <span className="text-xs text-muted">{parameter.label}</span>
             {parameter.kind === 'select' ? (
               <select
                 value={params[parameter.key] ?? parameter.defaultValue ?? ''}
@@ -725,7 +715,7 @@ function NewsSourcePanel({
                     option?.value ?? event.target.value,
                   );
                 }}
-                className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-700"
+                className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               >
                 {parameter.options.map((option) => (
                   <option key={String(option.value)} value={option.value}>
@@ -743,7 +733,7 @@ function NewsSourcePanel({
                   onChange={(event) =>
                     onParamChange(parameter.key, event.target.value)
                   }
-                  className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700"
+                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
                 <datalist id={`${source.id}-${parameter.key}-options`}>
                   {(parameter.options ?? []).map((option) => (
@@ -761,19 +751,19 @@ function NewsSourcePanel({
                 onChange={(event) =>
                   onParamChange(parameter.key, event.target.value)
                 }
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700"
+                className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
             )}
           </label>
         ))}
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="sm"
+          loading={loading}
           onClick={onRefresh}
-          disabled={loading}
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           {source.autoFetch === false ? '加载' : '刷新'}
-        </button>
+        </Button>
       </div>
 
       {warnings.length > 0 && (
@@ -784,11 +774,11 @@ function NewsSourcePanel({
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
-          <p className="text-zinc-500">
+        <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
+          <p className="text-muted">
             {source.manualRefresh
               ? '点击「刷新」获取最新数据'
               : source.autoFetch === false
@@ -801,15 +791,15 @@ function NewsSourcePanel({
           {items.map((item, i) => (
             <div
               key={i}
-              className="rounded-lg border border-zinc-200 bg-white p-5 hover:shadow-sm transition-shadow"
+              className="rounded-lg border border-line bg-surface p-5 hover:shadow-sm transition-shadow"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-medium text-zinc-900">
+                    <h3 className="text-base font-medium text-foreground">
                       {item.title}
                     </h3>
-                    <span className="rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-600">
+                    <span className="rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-600 tnum">
                       热度 {item.heatScore}
                     </span>
                     {isThisDay && item.year && (
@@ -825,7 +815,7 @@ function NewsSourcePanel({
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-sm text-zinc-600">
+                  <p className="mt-2 text-sm text-muted">
                     {item.description}
                   </p>
                   {isThisDay && item.coverImage && (
@@ -835,7 +825,7 @@ function NewsSourcePanel({
                       src={item.coverImage}
                       alt=""
                       loading="lazy"
-                      className="mt-3 h-32 w-auto rounded-lg border border-zinc-200 object-cover"
+                      className="mt-3 h-32 w-auto rounded-lg border border-line object-cover"
                     />
                   )}
                   {item.tags && item.tags.length > 0 && (
@@ -843,7 +833,7 @@ function NewsSourcePanel({
                       {item.tags.slice(0, 5).map((tag, j) => (
                         <span
                           key={j}
-                          className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500"
+                          className="rounded bg-surface-muted px-2 py-0.5 text-xs text-muted"
                         >
                           {tag}
                         </span>
@@ -852,7 +842,7 @@ function NewsSourcePanel({
                   )}
                   {isThisDay && item.articles && item.articles.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-xs text-zinc-400 mb-1">相关词条</p>
+                      <p className="text-xs text-subtle mb-1">相关词条</p>
                       <div className="flex flex-wrap gap-2">
                         {item.articles
                           .filter((a) => a.url)
@@ -872,13 +862,14 @@ function NewsSourcePanel({
                     </div>
                   )}
                 </div>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => onImport(item)}
-                  className="shrink-0 flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800"
                 >
                   <Plus className="h-3 w-3" />
                   导入系统
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -887,27 +878,29 @@ function NewsSourcePanel({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-zinc-200">
-          <div className="text-sm text-zinc-500">
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
+          <div className="text-sm text-muted tnum">
             共 {total} 条，第 {page}/{totalPages} 页
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => onPageChange(page - 1)}
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={page <= 1}
-              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => onPageChange(page - 1)}
             >
               <ChevronLeft className="h-4 w-4" />
               上一页
-            </button>
-            <button
-              onClick={() => onPageChange(page + 1)}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={page >= totalPages}
-              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => onPageChange(page + 1)}
             >
               下一页
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -918,11 +911,11 @@ function NewsSourcePanel({
 function EmptyState({ onGetSuggestions }: { onGetSuggestions: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
-      <div className="rounded-full bg-zinc-100 p-4 mb-4">
-        <Lightbulb className="h-8 w-8 text-zinc-400" />
+      <div className="rounded-full bg-surface-muted p-4 mb-4">
+        <Lightbulb className="h-8 w-8 text-subtle" />
       </div>
-      <h3 className="text-lg font-medium text-zinc-900">选题中心</h3>
-      <p className="mt-2 text-sm text-zinc-500 max-w-sm">
+      <h3 className="text-lg font-medium text-foreground">选题中心</h3>
+      <p className="mt-2 text-sm text-muted max-w-sm">
         从左侧选择一个热点查看详情，或使用 AI 获取个性化选题推荐
       </p>
       <button

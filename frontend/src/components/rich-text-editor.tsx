@@ -161,7 +161,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
         onClick={onClick}
         title={title}
         className={`rounded-md p-1.5 transition-colors ${
-          active ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+          active ? 'bg-surface-muted text-foreground' : 'text-muted hover:bg-surface-muted hover:text-foreground'
         }`}
       >
         {icon}
@@ -171,7 +171,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
     return (
       <div className="flex flex-col h-full">
         {/* Toolbar */}
-        <div className="flex items-center gap-1 border-b border-zinc-200 bg-zinc-50 px-3 py-1.5 flex-wrap">
+        <div className="flex items-center gap-1 border-b border-line bg-canvas px-3 py-1.5 flex-wrap">
           {/* Format */}
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
@@ -203,7 +203,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             icon={<Palette className="h-4 w-4" />}
             title="文字颜色"
           />
-          <div className="mx-1 h-4 w-px bg-zinc-200" />
+          <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Headings */}
           <ToolbarButton
@@ -218,7 +218,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             icon={<Heading2 className="h-4 w-4" />}
             title="二级标题"
           />
-          <div className="mx-1 h-4 w-px bg-zinc-200" />
+          <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Lists */}
           <ToolbarButton
@@ -239,7 +239,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             icon={<Quote className="h-4 w-4" />}
             title="引用"
           />
-          <div className="mx-1 h-4 w-px bg-zinc-200" />
+          <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Alignment */}
           <ToolbarButton
@@ -266,7 +266,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             icon={<AlignJustify className="h-4 w-4" />}
             title="两端对齐"
           />
-          <div className="mx-1 h-4 w-px bg-zinc-200" />
+          <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Media */}
           <ToolbarButton
@@ -285,7 +285,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             icon={<Video className="h-4 w-4" />}
             title="插入 YouTube 视频"
           />
-          <div className="mx-1 h-4 w-px bg-zinc-200" />
+          <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Table */}
           <div className="relative">
@@ -296,13 +296,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
               title="表格"
             />
             {showTableMenu && (
-              <div className="absolute top-full left-0 mt-1 z-50 rounded-lg border border-zinc-200 bg-white shadow-lg p-2 w-40">
+              <div className="absolute top-full left-0 mt-1 z-50 rounded-lg border border-line bg-surface shadow-pop p-2 w-40">
                 <button
                   onClick={() => {
                     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   <TableIcon className="h-3.5 w-3.5" />
                   插入 3x3 表格
@@ -312,7 +312,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                     editor.chain().focus().addColumnBefore().run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   在当前列前插入
                 </button>
@@ -321,7 +321,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                     editor.chain().focus().addColumnAfter().run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   在当前列后插入
                 </button>
@@ -330,7 +330,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                     editor.chain().focus().deleteColumn().run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   删除当前列
                 </button>
@@ -339,7 +339,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                     editor.chain().focus().addRowBefore().run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   在当前行前插入
                 </button>
@@ -348,7 +348,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                     editor.chain().focus().addRowAfter().run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   在当前行后插入
                 </button>
@@ -357,11 +357,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                     editor.chain().focus().deleteRow().run();
                     setShowTableMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   删除当前行
                 </button>
-                <div className="my-1 h-px bg-zinc-100" />
+                <div className="my-1 h-px bg-line" />
                 <button
                   onClick={() => {
                     editor.chain().focus().deleteTable().run();
@@ -388,10 +388,10 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             icon={<Redo className="h-4 w-4" />}
             title="重做"
           />
-          <div className="mx-1 h-4 w-px bg-zinc-200" />
+          <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Character count */}
-          <span className="text-xs text-zinc-400 whitespace-nowrap">
+          <span className="text-xs text-subtle whitespace-nowrap">
             {charCount} 字 / {wordCount} 词
           </span>
         </div>

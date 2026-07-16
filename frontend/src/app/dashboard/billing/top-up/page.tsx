@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Loader2,
   CreditCard,
   Check,
   Smartphone,
   Building2,
-  Plus,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import {
@@ -18,6 +16,7 @@ import {
 } from '@/lib/billing-api';
 import { getUsers } from '@/lib/users-api';
 import type { User } from '@/types/auth';
+import { Badge, Button, Card, Input, PageHeader } from '@/components/ui';
 
 const packages = [
   { name: '试用包', amount: 100, bonus: 0 },
@@ -174,17 +173,17 @@ export default function TopUpPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   return (
     <div className="h-full p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">充值</h1>
-        <p className="mt-1 text-sm text-zinc-500">为账户充值以使用 AI 和发布功能</p>
-      </div>
+      <PageHeader
+        title="充值"
+        subtitle="为账户充值以使用 AI 和发布功能"
+      />
 
       {/* Package Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -197,17 +196,17 @@ export default function TopUpPage() {
             }}
             className={`relative rounded-lg border p-4 text-left transition-all ${
               selectedPackage === idx
-                ? 'border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900'
-                : 'border-zinc-200 bg-white hover:border-zinc-300'
+                ? 'border-brand bg-brand-soft ring-1 ring-brand'
+                : 'border-line bg-surface hover:border-line-strong'
             }`}
           >
             {selectedPackage === idx && (
               <div className="absolute right-2 top-2">
-                <Check className="h-4 w-4 text-zinc-900" />
+                <Check className="h-4 w-4 text-brand" />
               </div>
             )}
-            <p className="text-xs text-zinc-500">{pkg.name}</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-900">¥{pkg.amount.toLocaleString()}</p>
+            <p className="text-xs text-muted">{pkg.name}</p>
+            <p className="tnum mt-1 text-xl font-semibold text-foreground">¥{pkg.amount.toLocaleString()}</p>
             {pkg.bonus > 0 && paymentMethod !== 'manual' && (
               <p className="mt-1 text-xs font-medium text-emerald-600">
                 赠送 ¥{pkg.bonus}
@@ -219,10 +218,10 @@ export default function TopUpPage() {
 
       {/* Custom Amount */}
       <div className="mb-6 max-w-md">
-        <label className="block text-xs font-medium text-zinc-700 mb-1">自定义金额</label>
+        <label className="block text-xs font-medium text-foreground mb-1">自定义金额</label>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-zinc-500">¥</span>
-          <input
+          <span className="text-sm text-muted">¥</span>
+          <Input
             type="number"
             min={paymentMethod === 'manual' ? 0.01 : 10}
             value={customAmount}
@@ -231,14 +230,13 @@ export default function TopUpPage() {
               setSelectedPackage(null);
             }}
             placeholder={paymentMethod === 'manual' ? '最低 ¥0.01' : '最低 ¥10'}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
           />
         </div>
       </div>
 
       {/* Payment Method */}
       <div className="mb-6">
-        <label className="block text-xs font-medium text-zinc-700 mb-2">支付方式</label>
+        <label className="block text-xs font-medium text-foreground mb-2">支付方式</label>
         <div className="flex gap-3">
           {paymentMethods
             .filter((m) => m.id !== 'manual' || isAdmin)
@@ -250,8 +248,8 @@ export default function TopUpPage() {
                   onClick={() => setPaymentMethod(method.id)}
                   className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
                     paymentMethod === method.id
-                      ? 'border-zinc-900 bg-zinc-900 text-white'
-                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
+                      ? 'brand-gradient-strong border-brand text-white'
+                      : 'border-line bg-surface text-foreground hover:border-line-strong'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -265,7 +263,7 @@ export default function TopUpPage() {
       {/* Target User (admin manual top-up only) */}
       {paymentMethod === 'manual' && (
         <div className="mb-6 max-w-md">
-          <label htmlFor="target-user" className="block text-xs font-medium text-zinc-700 mb-1">
+          <label htmlFor="target-user" className="block text-xs font-medium text-foreground mb-1">
             充值目标用户
           </label>
           <select
@@ -273,7 +271,7 @@ export default function TopUpPage() {
             value={targetUserId}
             onChange={(e) => setTargetUserId(e.target.value)}
             disabled={usersLoading}
-            className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+            className="w-full rounded-lg border border-line bg-surface p-2.5 text-sm text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
           >
             <option value="">{usersLoading ? '加载中…' : '请选择用户'}</option>
             {users.map((u) => (
@@ -290,35 +288,32 @@ export default function TopUpPage() {
 
       {/* Submit Button */}
       <div className="mb-10">
-        <button
+        <Button
           onClick={handleTopUp}
           disabled={submitting || getSelectedAmount() <= 0}
-          className="flex items-center gap-2 rounded-lg bg-zinc-900 px-8 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          loading={submitting}
+          className="px-8 py-3"
         >
-          {submitting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CreditCard className="h-4 w-4" />
-          )}
+          <CreditCard className="h-4 w-4" />
           确认充值 {getSelectedAmount() > 0 && `¥${getSelectedAmount().toFixed(2)}`}
-        </button>
+        </Button>
       </div>
 
-      {/* Top-up History (admin only — getTopUpRecords is @Roles ADMIN) */}
+      {/* Top-up History (admin only - getTopUpRecords is @Roles ADMIN) */}
       {isAdmin && (
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-100 px-6 py-4">
-          <h2 className="text-sm font-semibold text-zinc-900">充值记录</h2>
+      <Card>
+        <div className="border-b border-line px-6 py-4">
+          <h2 className="text-sm font-semibold text-foreground">充值记录</h2>
         </div>
 
         {records.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center">
-            <p className="text-zinc-500">暂无数据</p>
+          <div className="m-4 rounded-lg border border-dashed border-line-strong p-12 text-center">
+            <p className="text-muted">暂无数据</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-100 text-left text-xs text-zinc-500">
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
                 <th className="px-6 py-3 font-medium">时间</th>
                 <th className="px-6 py-3 font-medium">用户</th>
                 <th className="px-6 py-3 font-medium">金额</th>
@@ -327,41 +322,41 @@ export default function TopUpPage() {
                 <th className="px-6 py-3 font-medium">状态</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line">
               {records.map((record) => (
-                <tr key={record.id} className="border-b border-zinc-50 last:border-0">
-                  <td className="px-6 py-3 text-zinc-500">
+                <tr key={record.id} className="transition hover:bg-surface-muted/50">
+                  <td className="tnum px-6 py-3 text-muted">
                     {new Date(record.createdAt).toLocaleString('zh-CN')}
                   </td>
-                  <td className="px-6 py-3 text-zinc-700">{record.user.name}</td>
-                  <td className="px-6 py-3 font-medium text-zinc-900">
+                  <td className="px-6 py-3 text-foreground">{record.user.name}</td>
+                  <td className="tnum px-6 py-3 font-medium text-foreground">
                     ¥{record.amount.toFixed(2)}
                   </td>
-                  <td className="px-6 py-3 text-emerald-600">
+                  <td className="tnum px-6 py-3 text-emerald-600">
                     +¥{(record.creditsAdded + record.bonusCredits).toFixed(2)}
                   </td>
-                  <td className="px-6 py-3 text-zinc-500">
+                  <td className="px-6 py-3 text-muted">
                     {record.paymentMethod === 'MANUAL' ? '手动' : record.paymentMethod}
                   </td>
                   <td className="px-6 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    <Badge
+                      tone={
                         record.status === 'COMPLETED'
-                          ? 'bg-emerald-50 text-emerald-700'
+                          ? 'success'
                           : record.status === 'PENDING'
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-red-50 text-red-700'
-                      }`}
+                          ? 'warning'
+                          : 'danger'
+                      }
                     >
                       {statusLabels[record.status] || record.status}
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
       )}
     </div>
   );

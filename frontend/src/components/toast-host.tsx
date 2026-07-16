@@ -13,7 +13,7 @@ const ICON_MAP: Record<ToastType, React.ComponentType<{ className?: string }>> =
 const STYLE_MAP: Record<ToastType, string> = {
   success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
   error: 'border-red-200 bg-red-50 text-red-900',
-  info: 'border-zinc-200 bg-white text-zinc-900',
+  info: 'border-line bg-surface text-foreground',
   warning: 'border-amber-200 bg-amber-50 text-amber-900',
 };
 
@@ -36,7 +36,7 @@ export default function ToastHost() {
             key={t.id}
             role="status"
             data-testid={`toast-${t.type}`}
-            className={`pointer-events-auto flex items-start gap-3 rounded-lg border px-3 py-2.5 shadow-sm ${STYLE_MAP[t.type]}`}
+            className={`pointer-events-auto flex items-start gap-3 rounded-lg border px-3 py-2.5 shadow-pop ${STYLE_MAP[t.type]}`}
           >
             <Icon className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="flex-1 text-sm leading-relaxed">{t.message}</p>

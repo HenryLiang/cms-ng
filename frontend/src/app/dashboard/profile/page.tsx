@@ -6,6 +6,7 @@ import { updateUser, changePassword } from '@/lib/users-api';
 import { ContentLanguage } from '@cms-ng/shared';
 import { UserRole } from '@cms-ng/shared';
 import { Save, Check, KeyRound } from 'lucide-react';
+import { Button, Card, PageHeader, Input } from '@/components/ui';
 
 const languageLabels: Record<ContentLanguage, string> = {
   [ContentLanguage.SIMPLIFIED_CHINESE]: '简体中文',
@@ -93,201 +94,184 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-8 text-2xl font-bold text-zinc-900">个人资料</h1>
+      <PageHeader title="个人资料" className="mb-8" />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Name */}
-        <div>
-          <label htmlFor="name" className="mb-2 block text-sm font-medium text-zinc-700">
-            姓名
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-            required
-          />
-        </div>
-
-        {/* Email (read-only) */}
-        <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
-            邮箱
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={user.email}
-            disabled
-            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-500"
-          />
-        </div>
-
-        {/* Role (read-only) */}
-        <div>
-          <label htmlFor="role" className="mb-2 block text-sm font-medium text-zinc-700">
-            角色
-          </label>
-          <input
-            id="role"
-            type="text"
-            value={roleLabels[user.role] || user.role}
-            disabled
-            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-500"
-          />
-        </div>
-
-        {/* Department */}
-        <div>
-          <label htmlFor="department" className="mb-2 block text-sm font-medium text-zinc-700">
-            部门
-          </label>
-          <input
-            id="department"
-            type="text"
-            value={formData.department}
-            onChange={(e) => handleChange('department', e.target.value)}
-            placeholder="请输入部门名称"
-            className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-          />
-        </div>
-
-        {/* Preferred Language */}
-        <div>
-          <label htmlFor="preferredLanguage" className="mb-2 block text-sm font-medium text-zinc-700">
-            语言偏好
-          </label>
-          <select
-            id="preferredLanguage"
-            value={formData.preferredLanguage}
-            onChange={(e) => handleChange('preferredLanguage', e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-          >
-            {Object.entries(languageLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1.5 text-xs text-zinc-500">
-            该设置将用于 AI 内容生成和稿件创作的默认语言
-          </p>
-        </div>
-
-        {/* Submit */}
-        <div className="flex items-center gap-4 pt-4">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-white" />
-                保存中...
-              </>
-            ) : saveSuccess ? (
-              <>
-                <Check className="h-4 w-4" />
-                已保存
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                保存设置
-              </>
-            )}
-          </button>
-          {saveSuccess && (
-            <span className="text-sm text-green-600">设置已保存</span>
-          )}
-        </div>
-      </form>
-
-      {/* 修改密码 */}
-      <div className="mt-10 border-t border-zinc-200 pt-8">
-        <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-zinc-900">
-          <KeyRound className="h-5 w-5" />
-          修改密码
-        </h2>
-        <form onSubmit={handleChangePassword} className="space-y-6">
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Name */}
           <div>
-            <label htmlFor="currentPassword" className="mb-2 block text-sm font-medium text-zinc-700">
-              当前密码
+            <label htmlFor="name" className="mb-2 block text-sm font-medium text-foreground">
+              姓名
             </label>
-            <input
-              id="currentPassword"
-              type="password"
-              value={pwdForm.currentPassword}
-              onChange={(e) => setPwdForm({ ...pwdForm, currentPassword: e.target.value })}
-              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+            <Input
+              id="name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleChange('name', e.target.value)}
               required
             />
           </div>
+
+          {/* Email (read-only) */}
           <div>
-            <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-zinc-700">
-              新密码
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-foreground">
+              邮箱
             </label>
             <input
-              id="newPassword"
-              type="password"
-              value={pwdForm.newPassword}
-              onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
-              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-              minLength={6}
-              required
+              id="email"
+              type="email"
+              value={user.email}
+              disabled
+              className="w-full rounded-lg border border-line bg-surface-muted px-4 py-2.5 text-sm text-muted"
             />
-            <p className="mt-1.5 text-xs text-zinc-500">至少 6 位</p>
           </div>
+
+          {/* Role (read-only) */}
           <div>
-            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-zinc-700">
-              确认新密码
+            <label htmlFor="role" className="mb-2 block text-sm font-medium text-foreground">
+              角色
             </label>
             <input
-              id="confirmPassword"
-              type="password"
-              value={pwdForm.confirm}
-              onChange={(e) => setPwdForm({ ...pwdForm, confirm: e.target.value })}
-              className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-              minLength={6}
-              required
+              id="role"
+              type="text"
+              value={roleLabels[user.role] || user.role}
+              disabled
+              className="w-full rounded-lg border border-line bg-surface-muted px-4 py-2.5 text-sm text-muted"
             />
           </div>
-          {pwdMessage && (
-            <p className={`text-sm ${pwdMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-              {pwdMessage.text}
-            </p>
-          )}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={pwdSaving}
-              className="flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+
+          {/* Department */}
+          <div>
+            <label htmlFor="department" className="mb-2 block text-sm font-medium text-foreground">
+              部门
+            </label>
+            <Input
+              id="department"
+              type="text"
+              value={formData.department}
+              onChange={(e) => handleChange('department', e.target.value)}
+              placeholder="请输入部门名称"
+            />
+          </div>
+
+          {/* Preferred Language */}
+          <div>
+            <label htmlFor="preferredLanguage" className="mb-2 block text-sm font-medium text-foreground">
+              语言偏好
+            </label>
+            <select
+              id="preferredLanguage"
+              value={formData.preferredLanguage}
+              onChange={(e) => handleChange('preferredLanguage', e.target.value)}
+              className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
-              {pwdSaving ? (
+              {Object.entries(languageLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-muted">
+              该设置将用于 AI 内容生成和稿件创作的默认语言
+            </p>
+          </div>
+
+          {/* Submit */}
+          <div className="flex items-center gap-4 pt-4">
+            <Button type="submit" variant="primary" loading={isSaving}>
+              {isSaving ? (
+                '保存中...'
+              ) : saveSuccess ? (
                 <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-white" />
-                  修改中...
+                  <Check className="h-4 w-4" />
+                  已保存
                 </>
               ) : (
                 <>
-                  <KeyRound className="h-4 w-4" />
-                  修改密码
+                  <Save className="h-4 w-4" />
+                  保存设置
                 </>
               )}
-            </button>
+            </Button>
+            {saveSuccess && (
+              <span className="text-sm text-green-600">设置已保存</span>
+            )}
           </div>
         </form>
-      </div>
+
+        {/* 修改密码 */}
+        <div className="mt-10 border-t border-line pt-8">
+          <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-foreground">
+            <KeyRound className="h-5 w-5" />
+            修改密码
+          </h2>
+          <form onSubmit={handleChangePassword} className="space-y-6">
+            <div>
+              <label htmlFor="currentPassword" className="mb-2 block text-sm font-medium text-foreground">
+                当前密码
+              </label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={pwdForm.currentPassword}
+                onChange={(e) => setPwdForm({ ...pwdForm, currentPassword: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-foreground">
+                新密码
+              </label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={pwdForm.newPassword}
+                onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
+                minLength={6}
+                required
+              />
+              <p className="mt-1.5 text-xs text-muted">至少 6 位</p>
+            </div>
+            <div>
+              <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-foreground">
+                确认新密码
+              </label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={pwdForm.confirm}
+                onChange={(e) => setPwdForm({ ...pwdForm, confirm: e.target.value })}
+                minLength={6}
+                required
+              />
+            </div>
+            {pwdMessage && (
+              <p className={`text-sm ${pwdMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                {pwdMessage.text}
+              </p>
+            )}
+            <div className="pt-2">
+              <Button type="submit" variant="primary" loading={pwdSaving}>
+                {pwdSaving ? (
+                  '修改中...'
+                ) : (
+                  <>
+                    <KeyRound className="h-4 w-4" />
+                    修改密码
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Card>
     </div>
   );
 }

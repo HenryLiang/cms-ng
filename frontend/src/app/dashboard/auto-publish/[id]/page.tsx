@@ -12,9 +12,9 @@ import {
   type AutoPublishRun,
 } from '@/lib/auto-publish-api';
 import { AutoTaskStatus } from '@cms-ng/shared';
+import { Button, Card, Badge } from '@/components/ui';
 import {
   ArrowLeft,
-  Loader2,
   Play,
   Pause,
   Zap,
@@ -22,7 +22,6 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  ExternalLink,
 } from 'lucide-react';
 
 export default function TaskDetailPage() {
@@ -75,14 +74,14 @@ export default function TaskDetailPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   if (!task) {
     return (
-      <div className="p-8 text-center text-zinc-500">任务不存在</div>
+      <div className="p-8 text-center text-muted">任务不存在</div>
     );
   }
 
@@ -90,7 +89,7 @@ export default function TaskDetailPage() {
     <div className="p-8 max-w-4xl mx-auto">
       <Link
         href="/dashboard/auto-publish"
-        className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         返回任务列表
@@ -99,31 +98,27 @@ export default function TaskDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">{task.name}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{task.name}</h1>
           {task.description && (
-            <p className="mt-1 text-sm text-zinc-500">{task.description}</p>
+            <p className="mt-1 text-sm text-muted">{task.description}</p>
           )}
           <div className="mt-2 flex items-center gap-3 text-sm">
-            <StatusBadge status={task.status} />
-            <span className="text-zinc-400">|</span>
-            <span className="text-zinc-500">
+            <TaskStatusBadge status={task.status} />
+            <span className="text-subtle">|</span>
+            <span className="text-muted">
               创建者: {task.createdByUser?.name || '未知'}
             </span>
           </div>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="primary"
+            loading={running}
             onClick={handleRun}
-            disabled={running}
-            className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >
-            {running ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Zap className="h-4 w-4" />
-            )}
+            <Zap className="h-4 w-4" />
             手动运行
-          </button>
+          </Button>
           <button
             onClick={handleToggle}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${
@@ -148,12 +143,12 @@ export default function TaskDetailPage() {
       {/* Config Cards */}
       <div className="grid grid-cols-2 gap-4 mb-8">
         <ConfigCard title="调度配置">
-          <div className="space-y-1 text-sm text-zinc-600">
+          <div className="space-y-1 text-sm text-muted">
             <div>时间: {task.scheduleConfig.times?.join(', ') || '未设置'}</div>
             <div>时区: {task.scheduleConfig.timezone || 'Asia/Hong_Kong'}</div>
             <div>每次生成: {task.batchSize} 篇</div>
             {task.nextRunAt && task.status === AutoTaskStatus.ACTIVE && (
-              <div className="text-blue-600">
+              <div className="text-blue-600 tnum">
                 下次运行: {new Date(task.nextRunAt).toLocaleString('zh-HK')}
               </div>
             )}
@@ -161,14 +156,14 @@ export default function TaskDetailPage() {
         </ConfigCard>
 
         <ConfigCard title="选题策略">
-          <div className="space-y-1 text-sm text-zinc-600">
+          <div className="space-y-1 text-sm text-muted">
             {task.topicStrategy.fixedKeywords?.length > 0 && (
               <div>
                 关键词:{' '}
                 {task.topicStrategy.fixedKeywords.map((k) => (
                   <span
                     key={k}
-                    className="inline-block rounded bg-zinc-100 px-1.5 py-0.5 text-xs mr-1"
+                    className="inline-block rounded bg-surface-muted px-1.5 py-0.5 text-xs mr-1"
                   >
                     {k}
                   </span>
@@ -180,7 +175,7 @@ export default function TaskDetailPage() {
         </ConfigCard>
 
         <ConfigCard title="内容配置">
-          <div className="space-y-1 text-sm text-zinc-600">
+          <div className="space-y-1 text-sm text-muted">
             <div>
               风格:{' '}
               {
@@ -205,7 +200,7 @@ export default function TaskDetailPage() {
         </ConfigCard>
 
         <ConfigCard title="发布配置">
-          <div className="space-y-1 text-sm text-zinc-600">
+          <div className="space-y-1 text-sm text-muted">
             <div>平台: {task.publishConfig.platform}</div>
             <div>
               发布状态: {task.publishConfig.postStatus || 'publish'}
@@ -219,21 +214,21 @@ export default function TaskDetailPage() {
 
       {/* Run History */}
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-4">运行历史</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">运行历史</h2>
         <div className="space-y-2">
           {runs.map((run) => (
             <Link
               key={run.id}
               href={`/dashboard/auto-publish/runs/${run.id}`}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 hover:shadow-sm transition-shadow"
+              className="flex items-center justify-between rounded-lg border border-line bg-surface p-4 transition-shadow hover:shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <RunStatusIcon status={run.status} />
                 <div>
-                  <div className="text-sm font-medium text-zinc-900">
+                  <div className="text-sm font-medium text-foreground tnum">
                     {new Date(run.startedAt).toLocaleString('zh-HK')}
                   </div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="text-xs text-muted tnum">
                     {run.triggerType === 'MANUAL' ? '手动触发' : '定时触发'}
                     {' · '}
                     成功 {run.successCount} / 失败 {run.failedCount} / 计划 {run.totalArticles}
@@ -244,7 +239,7 @@ export default function TaskDetailPage() {
             </Link>
           ))}
           {runs.length === 0 && (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-zinc-500 text-sm">
+            <div className="rounded-lg border border-dashed border-line-strong p-8 text-center text-muted text-sm">
               暂无运行记录
             </div>
           )}
@@ -256,25 +251,21 @@ export default function TaskDetailPage() {
 
 function ConfigCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4">
-      <h3 className="text-sm font-medium text-zinc-900 mb-3">{title}</h3>
+    <Card className="p-4">
+      <h3 className="text-sm font-medium text-foreground mb-3">{title}</h3>
       {children}
-    </div>
+    </Card>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    ACTIVE: { label: '运行中', className: 'bg-emerald-50 text-emerald-600' },
-    PAUSED: { label: '已暂停', className: 'bg-amber-50 text-amber-600' },
-    DISABLED: { label: '已禁用', className: 'bg-zinc-100 text-zinc-500' },
+function TaskStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; tone: 'success' | 'warning' | 'neutral' }> = {
+    ACTIVE: { label: '运行中', tone: 'success' },
+    PAUSED: { label: '已暂停', tone: 'warning' },
+    DISABLED: { label: '已禁用', tone: 'neutral' },
   };
   const config = map[status] || map.PAUSED;
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${config.className}`}>
-      {config.label}
-    </span>
-  );
+  return <Badge tone={config.tone}>{config.label}</Badge>;
 }
 
 function RunStatusIcon({ status }: { status: string }) {
@@ -286,23 +277,19 @@ function RunStatusIcon({ status }: { status: string }) {
     case 'FAILED':
       return <XCircle className="h-5 w-5 text-red-500" />;
     case 'RUNNING':
-      return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
+      return <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />;
     default:
-      return <Clock className="h-5 w-5 text-zinc-400" />;
+      return <Clock className="h-5 w-5 text-subtle" />;
   }
 }
 
 function RunStatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    COMPLETED: { label: '完成', className: 'bg-emerald-50 text-emerald-600' },
-    PARTIAL: { label: '部分成功', className: 'bg-amber-50 text-amber-600' },
-    FAILED: { label: '失败', className: 'bg-red-50 text-red-600' },
-    RUNNING: { label: '运行中', className: 'bg-blue-50 text-blue-600' },
+  const map: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+    COMPLETED: { label: '完成', tone: 'success' },
+    PARTIAL: { label: '部分成功', tone: 'warning' },
+    FAILED: { label: '失败', tone: 'danger' },
+    RUNNING: { label: '运行中', tone: 'info' },
   };
-  const config = map[status] || { label: status, className: 'bg-zinc-100 text-zinc-500' };
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${config.className}`}>
-      {config.label}
-    </span>
-  );
+  const config = map[status] || { label: status, tone: 'neutral' as const };
+  return <Badge tone={config.tone}>{config.label}</Badge>;
 }
