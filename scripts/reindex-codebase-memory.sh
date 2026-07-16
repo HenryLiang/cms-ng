@@ -24,7 +24,8 @@ print_rebuild_hint() {
       index_repository(repo_path="$ROOT", mode="full", persistence=true)
     或直接对 agent 说："重建 codebase-memory 索引"。
 
-  重建后 .codebase-memory/graph.db.zst 会更新，请一并提交以共享给团队。
+  .codebase-memory/ 为本地状态（已 gitignore，不进版本库），无需提交。
+  团队成员各自通过本脚本指引重建本地索引即可。
 EOF
 }
 
