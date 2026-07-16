@@ -179,12 +179,9 @@ export default function StoryHubPage() {
     }
   }
 
-  async function handleLoadNewsSource(sourceId: string, page = 1) {
+  async function fetchNewsSourceItems(sourceId: string, page = 1) {
     setNewsSourceLoading(true);
     setNewsSourceWarnings([]);
-    setActiveNewsSource(sourceId);
-    setShowAISuggestions(false);
-    setSelectedTopic(null);
     setNewsPage(page);
     try {
       const definition = sourceDefinitions.find(
@@ -226,10 +223,28 @@ export default function StoryHubPage() {
     }
   }
 
+  function handleLoadNewsSource(sourceId: string, page = 1) {
+    setActiveNewsSource(sourceId);
+    setShowAISuggestions(false);
+    setSelectedTopic(null);
+    const definition = sourceDefinitions.find(
+      (source) => source.id === sourceId,
+    );
+    // manualRefresh 源（如 Google Trends）：选中标签不自动检索，等用户点「刷新」
+    if (definition?.manualRefresh) {
+      setNewsSourceItems([]);
+      setNewsSourceWarnings([]);
+      setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
+      setNewsPage(1);
+      return;
+    }
+    void fetchNewsSourceItems(sourceId, page);
+  }
+
   async function handlePageChange(page: number) {
     if (!activeNewsSource || page < 1 || page > newsPagination.totalPages)
       return;
-    await handleLoadNewsSource(activeNewsSource, page);
+    await fetchNewsSourceItems(activeNewsSource, page);
   }
 
   async function handleImportNewsItem(item: TopicCandidate) {
@@ -459,7 +474,7 @@ export default function StoryHubPage() {
             onParamChange={(key, value) =>
               handleSourceParamChange(activeNewsSource, key, value)
             }
-            onRefresh={() => handleLoadNewsSource(activeNewsSource, 1)}
+            onRefresh={() => fetchNewsSourceItems(activeNewsSource, 1)}
           />
         ) : showAISuggestions ? (
           <AIRecommendationsPanel
@@ -774,9 +789,11 @@ function NewsSourcePanel({
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
           <p className="text-zinc-500">
-            {source.autoFetch === false
-              ? '请填写上方参数后加载'
-              : '暂无数据，请稍后重试'}
+            {source.manualRefresh
+              ? '点击「刷新」获取最新数据'
+              : source.autoFetch === false
+                ? '请填写上方参数后加载'
+                : '暂无数据，请稍后重试'}
           </p>
         </div>
       ) : (

@@ -133,7 +133,6 @@ export class TrendingTopicsController {
     );
     return this.topicsService.fetchGoogleTrends(
       query.geo || 'HK',
-      query.timeRange || '24h',
       page,
       limit,
     );

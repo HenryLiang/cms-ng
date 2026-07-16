@@ -84,6 +84,7 @@ export class RssTopicSourceAdapter implements TopicSourceAdapter {
           category: 'trending',
           icon: 'trending',
           aggregate: true,
+          manualRefresh: true,
           parameters: [
             {
               key: 'geo',

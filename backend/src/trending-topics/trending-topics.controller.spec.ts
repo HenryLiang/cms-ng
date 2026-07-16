@@ -241,12 +241,10 @@ describe('TrendingTopicsController', () => {
 
       const result = await controller.fetchGoogleTrends({
         geo: '',
-        timeRange: '',
       } as any);
 
       expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith(
         'HK',
-        '24h',
         1,
         10,
       );
@@ -262,11 +260,10 @@ describe('TrendingTopicsController', () => {
         totalPages: 1,
       });
 
-      await controller.fetchGoogleTrends({ geo: 'US', timeRange: '7d' } as any);
+      await controller.fetchGoogleTrends({ geo: 'US' } as any);
 
       expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith(
         'US',
-        '7d',
         1,
         10,
       );

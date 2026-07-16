@@ -157,11 +157,11 @@ describe('TrendingTopicsService', () => {
 
   it('keeps legacy source methods as catalog-backed compatibility shims', async () => {
     sourceCatalog.fetch.mockResolvedValue({ items: [] });
-    await service.fetchGoogleTrends('US', '24h', 2, 5);
+    await service.fetchGoogleTrends('US', 2, 5);
     expect(sourceCatalog.fetch).toHaveBeenCalledWith(
       'google-trends',
       {},
-      { page: 2, limit: 5, params: { geo: 'US', timeRange: '24h' } },
+      { page: 2, limit: 5, params: { geo: 'US' } },
     );
   });
 

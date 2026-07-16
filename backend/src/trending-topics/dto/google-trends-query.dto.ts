@@ -13,15 +13,6 @@ export class GoogleTrendsQueryDto {
   geo?: string = 'HK';
 
   @ApiProperty({
-    description: 'Time range to look back over (e.g. 24h, 7d, 30d)',
-    example: '24h',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  timeRange?: string = '24h';
-
-  @ApiProperty({
     description: '1-based page number for pagination',
     example: 1,
     minimum: 1,

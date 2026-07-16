@@ -108,12 +108,11 @@ export async function adoptTopic(
 
 export async function getGoogleTrends(
   geo: string,
-  timeRange: string,
   page = 1,
   limit = 10,
 ): Promise<PaginatedNewsResponse> {
   const res = await api.get('/trending-topics/google-trends', {
-    params: { geo, timeRange, page, limit },
+    params: { geo, page, limit },
   });
   return res.data;
 }

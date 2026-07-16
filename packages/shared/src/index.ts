@@ -500,6 +500,7 @@ export interface TopicSourceDefinition {
   parameters?: TopicSourceParameter[];
   aggregate?: boolean;
   autoFetch?: boolean;
+  manualRefresh?: boolean;
   visible?: boolean;
 }
 

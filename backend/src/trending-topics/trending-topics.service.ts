@@ -154,11 +154,11 @@ export class TrendingTopicsService {
   }
 
   /** Compatibility methods for existing source-specific routes. */
-  fetchGoogleTrends(geo: string, timeRange: string, page = 1, limit = 10) {
+  fetchGoogleTrends(geo: string, page = 1, limit = 10) {
     return this.sourceCatalog.fetch(
       'google-trends',
       {},
-      { page, limit, params: { geo, timeRange } },
+      { page, limit, params: { geo } },
     );
   }
 
