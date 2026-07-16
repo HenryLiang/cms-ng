@@ -241,6 +241,9 @@ export class GoogleTrendsRealtimeAdapter
         });
         await page.waitForSelector('a[href*="/trends/explore"]', {
           timeout: GoogleTrendsRealtimeAdapter.SELECTOR_TIMEOUT_MS,
+          // explore 链接是图标按钮，常在折叠区/视口外不可见；只要 attached 即可
+          // （evaluate 直接读 DOM，不依赖可见性）。
+          state: 'attached',
         });
         // 锚定稳定的 explore 链接 + URL q= 参数取标题，不依赖 Angular 自动生成的 class
         const titles = await page.evaluate(() => {
