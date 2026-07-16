@@ -1,47 +1,28 @@
 import { ContentLanguage } from '@cms-ng/shared';
 
-const languageConfig: Record<
-  ContentLanguage,
-  { label: string; className: string }
-> = {
-  [ContentLanguage.SIMPLIFIED_CHINESE]: {
-    label: '简',
-    className: 'bg-blue-50 text-blue-700',
-  },
-  [ContentLanguage.TRADITIONAL_CHINESE_HK]: {
-    label: '繁',
-    className: 'bg-purple-50 text-purple-700',
-  },
-  [ContentLanguage.TRADITIONAL_CHINESE_CANTONESE]: {
-    label: '粤',
-    className: 'bg-orange-50 text-orange-700',
-  },
-  [ContentLanguage.ENGLISH]: {
-    label: 'EN',
-    className: 'bg-emerald-50 text-emerald-700',
-  },
+const LABELS: Record<ContentLanguage, string> = {
+  [ContentLanguage.SIMPLIFIED_CHINESE]: '简',
+  [ContentLanguage.TRADITIONAL_CHINESE_HK]: '繁',
+  [ContentLanguage.TRADITIONAL_CHINESE_CANTONESE]: '粤',
+  [ContentLanguage.ENGLISH]: 'EN',
 };
 
 interface LanguageBadgeProps {
   language?: ContentLanguage;
 }
 
+/** 语言徽章：统一中性底，靠文字区分（保持全站冷调一致）。 */
 export default function LanguageBadge({ language }: LanguageBadgeProps) {
   if (!language) {
     return (
-      <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
-        —
+      <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-subtle">
+        -
       </span>
     );
   }
-
-  const config = languageConfig[language];
-
   return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-xs font-medium ${config.className}`}
-    >
-      {config.label}
+    <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted">
+      {LABELS[language]}
     </span>
   );
 }

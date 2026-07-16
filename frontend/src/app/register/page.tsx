@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
-import { Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, BrainCircuit, Lightbulb, Wand2, Zap, UserPlus } from 'lucide-react';
 import { getRegistrationStatus } from '@/lib/auth-api';
+import { Button, Input } from '@/components/ui';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function RegisterPage() {
           ? (err as { response?: { data?: { message?: string } } }).response?.data
               ?.message
           : undefined;
-      setError(apiMsg || 'Registration failed');
+      setError(apiMsg || '注册失败，请稍后重试');
     } finally {
       setIsSubmitting(false);
     }
@@ -60,26 +61,29 @@ export default function RegisterPage() {
 
   if (!statusChecked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   if (!registrationOpen) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-        <div className="w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+        <div className="w-full max-w-md space-y-6 rounded-2xl border border-line bg-surface p-8 shadow-card">
           <div className="text-center">
+            <div className="brand-gradient-strong mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl">
+              <BrainCircuit className="h-5 w-5 text-white" />
+            </div>
             <h1 className="text-2xl font-semibold tracking-tight">01创作大脑</h1>
-            <p className="mt-2 text-sm text-zinc-500">注册已关闭</p>
+            <p className="mt-2 text-sm text-muted">注册已关闭</p>
           </div>
-          <div className="rounded-lg bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+          <div className="rounded-lg border border-line bg-surface-muted px-4 py-3 text-sm text-muted">
             管理员已暂时关闭注册功能，请稍后再试。
           </div>
-          <p className="text-center text-sm text-zinc-500">
+          <p className="text-center text-sm text-muted">
             已有账户？{' '}
-            <Link href="/login" className="font-medium text-zinc-900 hover:underline">
+            <Link href="/login" className="font-medium text-brand hover:underline">
               登录
             </Link>
           </p>
@@ -89,82 +93,117 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-sm">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">01创作大脑</h1>
-          <p className="mt-2 text-sm text-zinc-500">创建新账户</p>
+    <div className="flex min-h-screen">
+      {/* 左：品牌面板 */}
+      <div className="glow-panel relative hidden w-1/2 flex-col justify-between overflow-hidden p-12 lg:flex">
+        <div className="grid-overlay absolute inset-0 opacity-60" />
+        <div className="relative flex items-center gap-3">
+          <div className="brand-gradient-strong flex h-10 w-10 items-center justify-center rounded-xl shadow-lg shadow-blue-500/30">
+            <BrainCircuit className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-lg font-semibold text-white">01创作大脑</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
+        <div className="relative">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+            加入 AI 驱动的内容创作作业系统
+          </div>
+          <h2 className="text-3xl font-semibold leading-tight text-white">
+            开启你的
+            <br />
+            <span className="bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
+              智能创作之旅
+            </span>
+          </h2>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-sidebar-muted">
+            注册后即可使用选题发现、AI 协同写作、编辑审核与多平台自动分发全流程能力。
+          </p>
+          <div className="mt-8 space-y-3">
+            <div className="flex items-center gap-3 text-sm text-sidebar-text">
+              <Lightbulb className="h-4 w-4 text-cyan-400" /> 实时趋势选题与事实核查
             </div>
-          )}
+            <div className="flex items-center gap-3 text-sm text-sidebar-text">
+              <Wand2 className="h-4 w-4 text-cyan-400" /> AI 改写 / 扩写 / 润色 / 标题生成
+            </div>
+            <div className="flex items-center gap-3 text-sm text-sidebar-text">
+              <Zap className="h-4 w-4 text-cyan-400" /> 一键多平台自动发布
+            </div>
+          </div>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-700">姓名</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <input
+        <div className="relative text-[11px] text-sidebar-muted">© 2026 01创作大脑 · CMS-NG</div>
+      </div>
+
+      {/* 右：表单 */}
+      <div className="flex w-full flex-col justify-center bg-canvas p-8 lg:w-1/2">
+        <div className="mx-auto w-full max-w-sm">
+          <div className="mb-8 lg:hidden">
+            <div className="brand-gradient-strong mb-4 flex h-10 w-10 items-center justify-center rounded-xl">
+              <BrainCircuit className="h-5 w-5 text-white" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">创建新账户</h1>
+          <p className="mt-2 text-sm text-muted">填写信息，立即开始创作</p>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">姓名</label>
+              <Input
                 type="text"
                 required
                 minLength={2}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400"
                 placeholder="你的名字"
+                leftIcon={<User className="h-4 w-4" />}
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-700">邮箱</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <input
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">邮箱</label>
+              <Input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400"
                 placeholder="you@example.com"
+                leftIcon={<Mail className="h-4 w-4" />}
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-700">密码</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <input
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">密码</label>
+              <Input
                 type="password"
                 required
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400"
-                placeholder="••••••"
+                placeholder="至少 6 位"
+                leftIcon={<Lock className="h-4 w-4" />}
               />
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex w-full items-center justify-center rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '注册'}
-          </button>
-        </form>
+            <Button type="submit" loading={isSubmitting} className="w-full">
+              <UserPlus className="h-4 w-4" />
+              注册
+            </Button>
+          </form>
 
-        <p className="text-center text-sm text-zinc-500">
-          已有账户？{' '}
-          <Link href="/login" className="font-medium text-zinc-900 hover:underline">
-            登录
-          </Link>
-        </p>
+          <p className="mt-6 text-center text-sm text-muted">
+            已有账户？{' '}
+            <Link href="/login" className="font-medium text-brand hover:underline">
+              登录
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

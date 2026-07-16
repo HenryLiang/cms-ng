@@ -44,11 +44,11 @@ import ReviewReportPanel from '@/components/review-report-panel';
 import SEOPanel from '@/components/seo-panel';
 import GEOPanel from '@/components/geo-panel';
 import ChannelPanel from '@/components/channels/channel-panel';
+import { Button, StatusBadge } from '@/components/ui';
 import {
   ArrowLeft,
   Trash2,
   Loader2,
-  Save,
   Send,
   RotateCcw,
   Wand2,
@@ -592,22 +592,10 @@ export default function ArticleEditorPage() {
     '检查逻辑一致性',
   ];
 
-  const statusLabels: Record<string, string> = {
-    DRAFT: '草稿',
-    WRITING: '采写中',
-    AI_OPTIMIZING: 'AI优化中',
-    PENDING_REVIEW: '待审核',
-    IN_REVIEW: '审核中',
-    REVISION: '退回修改',
-    APPROVED: '已通过',
-    PUBLISHED: '已发布',
-    ARCHIVED: '已归档',
-  };
-
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
@@ -615,7 +603,7 @@ export default function ArticleEditorPage() {
   if (!article) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-zinc-500">{loadError ?? '稿件不存在'}</p>
+        <p className="text-sm text-muted">{loadError ?? '稿件不存在'}</p>
       </div>
     );
   }
@@ -635,9 +623,9 @@ export default function ArticleEditorPage() {
       )}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-3">
+      <div className="flex items-center justify-between border-b border-line bg-surface px-6 py-3">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/articles" className="text-zinc-500 hover:text-zinc-900">
+          <Link href="/dashboard/articles" className="text-muted transition-colors hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
@@ -646,13 +634,13 @@ export default function ArticleEditorPage() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="bg-transparent text-lg font-semibold outline-none"
+                className="bg-transparent text-lg font-semibold text-foreground outline-none"
                 placeholder="稿件标题"
               />
               <button
                 onClick={handleGenerateHeadlines}
                 disabled={headlinesLoading}
-                className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft px-2 py-1 text-xs font-medium text-brand-soft-text transition hover:brightness-95 disabled:opacity-50"
                 title="标题实验室"
               >
                 {headlinesLoading ? (
@@ -662,13 +650,11 @@ export default function ArticleEditorPage() {
                 )}
                 标题实验室
               </button>
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                {statusLabels[article.status] || article.status}
-              </span>
+              <StatusBadge status={article.status} />
               <select
                 value={contentLanguage}
                 onChange={(e) => setContentLanguage(e.target.value as ContentLanguage)}
-                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400"
+                className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                 title="内容语言"
               >
                 <option value={ContentLanguage.SIMPLIFIED_CHINESE}>简体中文</option>
@@ -680,7 +666,7 @@ export default function ArticleEditorPage() {
                 value={authorSlug}
                 onChange={(e) => setAuthorSlug(e.target.value)}
                 disabled={!authorsAvailable}
-                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400 disabled:opacity-50"
+                className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
                 title={
                   authorsAvailable
                     ? '作者风格：选中的作者文风将应用到所有生成/编辑类 AI 操作'
@@ -695,37 +681,29 @@ export default function ArticleEditorPage() {
                 ))}
               </select>
             </div>
-            <p className="text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-muted tnum">
               版本 {article.version} · {wordCount} 字 · 最后保存{' '}
               {new Date(article.updatedAt).toLocaleString('zh-CN')}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenVersions}
-            className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          >
+          <Button variant="secondary" size="sm" onClick={handleOpenVersions}>
             <History className="h-4 w-4" />
             版本历史
-          </button>
-          <button
-            onClick={() => handleSave()}
-            disabled={saving}
-            className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          </Button>
+          <Button variant="secondary" size="sm" loading={saving} onClick={() => handleSave()}>
             保存
-          </button>
-          <button
-            onClick={handleOpenSubmitModal}
-            disabled={saving}
-            className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="primary" size="sm" disabled={saving} onClick={handleOpenSubmitModal}>
             <Send className="h-4 w-4" />
             提交审核
-          </button>
-          <button onClick={handleDelete} className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50">
+          </Button>
+          <button
+            onClick={handleDelete}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50"
+            title="删除稿件"
+          >
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
