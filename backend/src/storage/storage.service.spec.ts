@@ -5,14 +5,18 @@ describe('StorageService interface contract', () => {
     expect(typeof STORAGE_SERVICE).toBe('symbol');
   });
 
-  it('StorageService interface has put and delete methods', () => {
+  it('StorageService interface has put, delete, copy, thumbnailUrl methods', () => {
     // 编译期断言:类型层面强制约束,运行时仅做 sanity check
     const fake: StorageService = {
       put: jest.fn(),
       delete: jest.fn(),
+      copy: jest.fn(),
+      thumbnailUrl: jest.fn(),
     };
     expect(typeof fake.put).toBe('function');
     expect(typeof fake.delete).toBe('function');
+    expect(typeof fake.copy).toBe('function');
+    expect(typeof fake.thumbnailUrl).toBe('function');
   });
 
   it('PutResult exposes url and key', () => {

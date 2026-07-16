@@ -79,5 +79,5 @@ export class CreateArticleDto {
   })
   @IsString()
   @IsOptional()
-  coverImage?: string;
+  coverImage?: string | null;
 }

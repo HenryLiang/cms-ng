@@ -10,6 +10,7 @@ describe('CosStorageService', () => {
   let service: CosStorageService;
   let mockPutObject: jest.Mock;
   let mockDeleteObject: jest.Mock;
+  let mockPutObjectCopy: jest.Mock;
   let config: { get: jest.Mock };
 
   const setupConfig = (env: Record<string, string>) => {
@@ -21,11 +22,13 @@ describe('CosStorageService', () => {
   beforeEach(() => {
     mockPutObject = jest.fn().mockResolvedValue({});
     mockDeleteObject = jest.fn().mockResolvedValue({});
+    mockPutObjectCopy = jest.fn().mockResolvedValue({});
     (COS as jest.MockedClass<typeof COS>).mockImplementation(
       () =>
         ({
           putObject: mockPutObject,
           deleteObject: mockDeleteObject,
+          putObjectCopy: mockPutObjectCopy,
         } as any),
     );
   });
@@ -126,6 +129,36 @@ describe('CosStorageService', () => {
         Bucket: 'bkt-1300000000',
         Region: 'ap-shanghai',
         Key: 'cms-ng/x.png',
+      });
+    });
+  });
+
+  describe('copy', () => {
+    it('calls cos.putObjectCopy with correct args and returns dest URL', async () => {
+      setupConfig({
+        COS_SECRET_ID: 'sid',
+        COS_SECRET_KEY: 'skey',
+        COS_BUCKET: 'bkt-1300000000',
+        COS_REGION: 'ap-shanghai',
+      });
+      const mod = await Test.createTestingModule({
+        providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+      }).compile();
+      const s = mod.get(CosStorageService);
+      const r = await s.copy(
+        'cms-ng/media/u1/202607/a.png',
+        'cms-ng/media/u1/202607/b.png',
+      );
+      expect(mockPutObjectCopy).toHaveBeenCalledWith({
+        Bucket: 'bkt-1300000000',
+        Region: 'ap-shanghai',
+        Key: 'cms-ng/media/u1/202607/b.png',
+        CopySource:
+          'bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/media/u1/202607/a.png',
+      });
+      expect(r).toEqual({
+        url: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/media/u1/202607/b.png',
+        key: 'cms-ng/media/u1/202607/b.png',
       });
     });
   });

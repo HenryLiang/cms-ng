@@ -33,6 +33,7 @@ model User {
   topUpRecords        TopUpRecord[]
   billingTransactions BillingTransaction[]
   balanceAlert        BalanceAlert?
+  mediaAssets         MediaAsset[]
 
   @@map("users")
 }
@@ -486,4 +487,61 @@ model RegistrationSwitch {
   updatedAt DateTime  @updatedAt
 
   @@map("registration_switches")
+}
+
+// ===== 媒体资源管理 =====
+// 用户上传 + AI 生成图片统一管理。个人库先行：libraryType 本期仅 PERSONAL；
+// TEAM 预留待 Team 实体建立后启用（teamId 字段已预留，零迁移）。
+enum MediaSource {
+  UPLOAD
+  AI_GENERATED
+}
+
+enum MediaStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum MediaLibraryType {
+  PERSONAL
+  TEAM
+}
+
+model MediaAsset {
+  id            String           @id @default(uuid())
+  // 存储
+  storageKey    String           // COS key（相对 bucket 根，不含前导 /）
+  url           String           // 公网访问 URL（含 CDN）
+  thumbnailUrl  String?          // 缩略图 URL（COS imageMogr2 拼参生成，零额外存储）
+  // 文件元数据
+  fileName      String           // 展示用文件名（上传原文件名 / AI 生成命名）
+  mimeType      String           // image/jpeg | image/png | image/webp | image/gif
+  size          Int              // 字节数
+  width         Int?             // 像素
+  height        Int?             // 像素
+  // 来源
+  source        MediaSource      @default(UPLOAD)
+  sourceRef     String?          // AI: 关联 aiOperationId；UPLOAD: null
+  prompt        String?          @db.Text // AI 生成时的 prompt
+  // 元信息
+  altText       String?
+  title         String?
+  description   String?          @db.Text
+  tags          String           @default("[]") // JSON string 数组（项目惯例，用 safeJsonParse 解析）
+  // 归属
+  ownerId       String           // 上传者 / 生成者 userId
+  owner         User             @relation(fields: [ownerId], references: [id])
+  libraryType   MediaLibraryType @default(PERSONAL)
+  teamId        String?          // 团队库归属（libraryType=TEAM 时必填，本期不启用）
+  // 状态
+  status        MediaStatus      @default(ACTIVE)
+  // 时间
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([source])
+  @@index([status])
+  @@map("media_assets")
 }

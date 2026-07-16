@@ -6,13 +6,14 @@ import { useProtectedRoute } from '@/hooks/use-protected-route';
 import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
 import { UserRole } from '@cms-ng/shared';
-import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck, Zap, Wallet, Users, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, Lightbulb, ClipboardCheck, Zap, Wallet, Users, Settings, Images } from 'lucide-react';
 import ToastHost from '@/components/toast-host';
 import ErrorBoundary from '@/components/error-boundary';
 
 const allNavItems = [
   { href: '/dashboard', label: '工作台', icon: LayoutDashboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
   { href: '/dashboard/articles', label: '我的稿件', icon: FileText, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+  { href: '/dashboard/media', label: '媒体库', icon: Images, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
   { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, roles: [UserRole.EDITOR, UserRole.ADMIN] },
   { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
   { href: '/dashboard/auto-publish', label: '自动发布', icon: Zap, roles: [UserRole.EDITOR, UserRole.ADMIN] },

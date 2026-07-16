@@ -49,4 +49,20 @@ export class CosStorageService implements StorageService {
       Key: key,
     });
   }
+
+  async copy(srcKey: string, destKey: string): Promise<PutResult> {
+    await this.client.putObjectCopy({
+      Bucket: this.bucket,
+      Region: this.region,
+      Key: destKey,
+      CopySource: `${this.bucket}.cos.${this.region}.myqcloud.com/${srcKey}`,
+    });
+    return { url: `${this.baseUrl}/${destKey}`, key: destKey };
+  }
+
+  thumbnailUrl(url: string): string {
+    // COS 数据万象 imageMogr2：按长边缩略到 300px + 去元数据（strip 含 EXIF）
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}imageMogr2/thumbnail/300x300/strip`;
+  }
 }

@@ -100,6 +100,23 @@ export enum BillingCategory {
   OTHER = 'OTHER',
 }
 
+// ===== 媒体资源 =====
+export enum MediaSource {
+  UPLOAD = 'UPLOAD',
+  AI_GENERATED = 'AI_GENERATED',
+}
+
+export enum MediaStatus {
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED',
+  DELETED = 'DELETED',
+}
+
+export enum MediaLibraryType {
+  PERSONAL = 'PERSONAL',
+  TEAM = 'TEAM',
+}
+
 // ===== 用户 =====
 export interface User {
   id: string;

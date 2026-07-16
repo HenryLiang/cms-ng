@@ -38,6 +38,7 @@ export interface CreateArticleInput {
 
 export interface UpdateArticleInput extends Partial<CreateArticleInput> {
   editorId?: string;
+  coverImage?: string | null;
 }
 
 export interface PaginatedMeta {

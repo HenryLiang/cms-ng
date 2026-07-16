@@ -16,6 +16,7 @@ import { AutoPublishModule } from './auto-publish/auto-publish.module';
 import { StorageModule } from './storage/storage.module';
 import { BillingModule } from './billing/billing.module';
 import { AuthorStyleModule } from './authors/author-style.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { AuthorStyleModule } from './authors/author-style.module';
     AutoPublishModule,
     BillingModule,
     AuthorStyleModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

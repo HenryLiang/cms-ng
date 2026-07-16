@@ -36,7 +36,9 @@ import {
 import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
 import { ContentLanguage } from '@cms-ng/shared';
 import { getEditors } from '@/lib/users-api';
+import { uploadMedia } from '@/lib/media-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
+import { MediaPicker } from '@/components/media-picker';
 import FactCheckPanel from '@/components/fact-check-panel';
 import ReviewReportPanel from '@/components/review-report-panel';
 import SEOPanel from '@/components/seo-panel';
@@ -70,6 +72,7 @@ import {
   TrendingUp,
   Image,
   Bot,
+  Upload,
 } from 'lucide-react';
 
 export default function ArticleEditorPage() {
@@ -168,6 +171,9 @@ export default function ArticleEditorPage() {
 
   // Image preview
   const [showImagePreview, setShowImagePreview] = useState(false);
+  // Cover image: pick from media library / upload
+  const [showCoverPicker, setShowCoverPicker] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
 
   useEffect(() => {
     loadArticle();
@@ -242,10 +248,13 @@ export default function ArticleEditorPage() {
         excerpt: excerpt || undefined,
         status: status as any,
         contentLanguage,
+        coverImage: article?.coverImage ?? null,
       });
       await loadArticle();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+    } catch {
+      // 错误已由 api 拦截器 toast；避免 unhandled rejection
     } finally {
       setSaving(false);
     }
@@ -538,6 +547,24 @@ export default function ArticleEditorPage() {
       alert(`图片生成失败：${msg}`);
     } finally {
       setImageGenLoading(false);
+    }
+  }
+
+  // ===== Cover image: upload to media library and set as cover =====
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverUploading(true);
+    try {
+      const [asset] = await uploadMedia([file]);
+      if (asset) {
+        setArticle((prev) => (prev ? { ...prev, coverImage: asset.url } : prev));
+      }
+    } catch {
+      // 错误已由 api 拦截器 toast，不重复弹窗
+    } finally {
+      setCoverUploading(false);
+      e.target.value = '';
     }
   }
 
@@ -942,15 +969,55 @@ export default function ArticleEditorPage() {
                   className="w-full h-full object-cover"
                 />
               </div>
-            ) : (
+            ) : null}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setShowImageGen(true)}
-                className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 py-6 text-sm text-zinc-500 hover:bg-zinc-100 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
               >
-                <Image className="h-4 w-4" />
-                暂无封面图，点击 AI 生成配图
+                <Sparkles className="h-3.5 w-3.5" />
+                AI 生成
               </button>
-            )}
+              <button
+                onClick={() => setShowCoverPicker(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                <Image className="h-3.5 w-3.5" />
+                从媒体库选择
+              </button>
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+                <Upload className="h-3.5 w-3.5" />
+                {coverUploading ? '上传中…' : '上传图片'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={coverUploading}
+                  onChange={(e) => void handleCoverUpload(e)}
+                />
+              </label>
+              {article?.coverImage && (
+                <button
+                  onClick={() =>
+                    setArticle((prev) =>
+                      prev ? { ...prev, coverImage: undefined } : prev,
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                >
+                  移除封面
+                </button>
+              )}
+            </div>
+            <MediaPicker
+              open={showCoverPicker}
+              onClose={() => setShowCoverPicker(false)}
+              onPick={(asset) => {
+                setArticle((prev) =>
+                  prev ? { ...prev, coverImage: asset.url } : prev,
+                );
+              }}
+            />
           </div>
           <div className="flex-1 min-h-0 mx-auto max-w-3xl w-full px-8 pb-8">
             <RichTextEditor

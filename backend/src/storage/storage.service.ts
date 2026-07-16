@@ -26,4 +26,19 @@ export interface StorageService {
    * 删除一个对象(找不到不抛错)
    */
   delete(key: string): Promise<void>;
+
+  /**
+   * 复制一个对象(同 bucket 内,用于资产复制/正文图片另存)
+   * @param srcKey 源对象 key
+   * @param destKey 目标对象 key
+   * @returns 目标对象的 url + key
+   */
+  copy(srcKey: string, destKey: string): Promise<PutResult>;
+
+  /**
+   * 由公网 url 生成缩略图 url。实现侧决定如何处理
+   * (如 COS imageMogr2 / S3 image processing)。
+   * 让缩略图策略与具体存储后端绑定,避免业务层硬编码。
+   */
+  thumbnailUrl(url: string): string;
 }

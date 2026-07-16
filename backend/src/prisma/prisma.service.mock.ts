@@ -84,8 +84,20 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
+    mediaAsset: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+    },
     $connect: jest.fn(),
     $disconnect: jest.fn(),
+    // $transaction([promise, promise]) -> Promise.all；findAll 依赖此行为
+    $transaction: jest.fn((args: unknown) =>
+      Array.isArray(args) ? Promise.all(args as Promise<unknown>[]) : args,
+    ),
   } as unknown as jest.Mocked<PrismaService>;
 
   return mock;

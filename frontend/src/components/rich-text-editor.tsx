@@ -38,6 +38,7 @@ import {
   Redo,
 } from 'lucide-react';
 import { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
+import { MediaPicker } from './media-picker';
 
 export interface RichTextEditorRef {
   editor: Editor | null;
@@ -52,6 +53,7 @@ interface RichTextEditorProps {
 const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   function RichTextEditor({ content, onChange, placeholder }, ref) {
     const [showTableMenu, setShowTableMenu] = useState(false);
+    const [showMediaPicker, setShowMediaPicker] = useState(false);
 
     const editor = useEditor({
       extensions: [
@@ -122,9 +124,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
     };
 
     const insertImage = () => {
-      const url = window.prompt('输入图片 URL');
-      if (!url) return;
-      editor.chain().focus().setImage({ src: url }).run();
+      setShowMediaPicker(true);
     };
 
     const insertYoutube = () => {
@@ -403,6 +403,21 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             className="prose prose-zinc max-w-none p-8 focus:outline-none [&_.ProseMirror]:min-h-[50vh] [&_.ProseMirror]:outline-none [&_.ProseMirror-focused]:outline-none [&_.ProseMirror_p]:my-2 [&_.ProseMirror_h1]:my-3 [&_.ProseMirror_h2]:my-3 [&_.ProseMirror_h3]:my-2 [&_.ProseMirror_blockquote]:border-l-4 [&_.ProseMirror_blockquote]:border-zinc-200 [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:italic [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ol]:my-2 [&_.ProseMirror_img]:rounded-lg [&_.ProseMirror_img]:my-4 [&_.ProseMirror_table]:w-full [&_.ProseMirror_table]:border-collapse [&_.ProseMirror_th]:border [&_.ProseMirror_th]:border-zinc-300 [&_.ProseMirror_th]:bg-zinc-100 [&_.ProseMirror_th]:px-3 [&_.ProseMirror_th]:py-2 [&_.ProseMirror_td]:border [&_.ProseMirror_td]:border-zinc-300 [&_.ProseMirror_td]:px-3 [&_.ProseMirror_td]:py-2 [&_.ProseMirror_youtubeWrapper]:my-4"
           />
         </div>
+        <MediaPicker
+          open={showMediaPicker}
+          onClose={() => setShowMediaPicker(false)}
+          onPick={(asset) => {
+            editor
+              .chain()
+              .focus()
+              .setImage({
+                src: asset.url,
+                alt: asset.altText || asset.fileName,
+                title: asset.title ?? undefined,
+              })
+              .run();
+          }}
+        />
       </div>
     );
   }

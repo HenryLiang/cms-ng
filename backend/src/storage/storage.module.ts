@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { CosStorageService } from './cos-storage.service';
-import { STORAGE_SERVICE, StorageService } from './storage.service';
+import { STORAGE_SERVICE } from './storage.service';
 
 @Global()
 @Module({
