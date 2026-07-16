@@ -155,16 +155,6 @@ describe('TrendingTopicsService', () => {
     );
   });
 
-  it('keeps legacy source methods as catalog-backed compatibility shims', async () => {
-    sourceCatalog.fetch.mockResolvedValue({ items: [] });
-    await service.fetchGoogleTrends('US', 2, 5);
-    expect(sourceCatalog.fetch).toHaveBeenCalledWith(
-      'google-trends',
-      {},
-      { page: 2, limit: 5, params: { geo: 'US' } },
-    );
-  });
-
   it('imports every candidate through one persistence path', async () => {
     prisma.trendingTopic.create.mockResolvedValue(
       mockTopic({ source: 'google-trends' }),

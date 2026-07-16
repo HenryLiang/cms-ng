@@ -123,21 +123,6 @@ export class TrendingTopicsController {
     };
   }
 
-  @Get('google-trends')
-  @ApiOperation({ summary: 'Fetch Google Trends results' })
-  fetchGoogleTrends(@Query() query: GoogleTrendsQueryDto) {
-    const page = Math.max(1, parseInt(query.page as any, 10) || 1);
-    const limit = Math.min(
-      50,
-      Math.max(1, parseInt(query.limit as any, 10) || 10),
-    );
-    return this.topicsService.fetchGoogleTrends(
-      query.geo || 'HK',
-      page,
-      limit,
-    );
-  }
-
   @Get('all-news')
   @ApiOperation({
     summary: 'Fetch trending news aggregated across all sources',

@@ -86,7 +86,7 @@ The repo is a Turbo monorepo with `frontend/`, `backend/`, `packages/shared/`, `
 
 Backend architecture and subsystem details (AI Layer, Channels, Auto-Publishing, Billing, Storage, Email, Trending Topics, plus backend conventions and env validation rules) are lazy-loaded from `backend/CLAUDE.md` when working under `backend/`.
 
-The topic-source extension point is `backend/src/trending-topics/sources/`: ordinary RSS/RSSHub feeds are declarative entries, while new mechanisms implement `TopicSourceAdapter` and register with `TopicSourceCatalog`. See `backend/CLAUDE.md` for the full contract and generic endpoints.
+The topic-source extension point is `backend/src/trending-topics/sources/`: ordinary RSS/RSSHub feeds are declarative entries, while new mechanisms implement `TopicSourceAdapter` and register with `TopicSourceCatalog`. Example: `google-trends-realtime` renders Google Trends Trending Now (`/trending?geo=&hours=`) via Playwright headless browser — requires `PLAYWRIGHT_ENABLED=true` + a one-time `npx playwright install --with-deps chromium` on the host (production runs as a host process, not a container); fail-opens to the RSS daily `google-trends` source (`status:'degraded'`) when disabled or Chromium is missing. See `backend/CLAUDE.md` for the full contract and generic endpoints.
 
 Backend conventions live in `backend/CLAUDE.md` (lazy-loaded when working under `backend/`). Frontend conventions live in `frontend/CLAUDE.md`.
 

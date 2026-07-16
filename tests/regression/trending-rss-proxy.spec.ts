@@ -6,14 +6,14 @@
  *  - §16  TC-RSS-PRX-* / TC-RSS-LCL-*  RSS_PROXY_ENABLED 代理开关
  *
  * 测试矩阵:
- *   TC-TRD-AGT-001  GET /trending-topics/google-trends 外部真实抓取(软失败)
+ *   TC-TRD-AGT-001  GET /trending-topics/sources/google-trends/items 外部真实抓取(软失败)
  *   TC-TRD-RSS-001  GET /trending-topics/guardian     原生 RSS 源(API 必应)
  *   TC-RSS-PRX-001  读 /tmp/qa-backend.log 验证代理状态行(启动日志)
  *   TC-RSS-PRX-002  RSS_PROXY_ENABLED=false 场景下直连 RSS 源可成功
  *   TC-RSS-LCL-001  本地 RSSHub 源(zaobao)在 :1200 可达时返回 200
  *
  * 响应格式(无全局包装):
- *  - GET /trending-topics/google-trends?geo=HK&timeRange=24h → { items, total, page, limit, totalPages }
+ *  - GET /trending-topics/sources/google-trends/items?geo=HK -> { success, data: { items, total, page, limit, totalPages }
  *  - GET /trending-topics/{source}                            → { items, total, page, limit, totalPages }
  *  - 当外部源 4xx/5xx 时,fetchNewsBySource 抛 Error(由 controller 默认 ExceptionFilter 转 500)
  *    → 软测试容忍: 期望 200 OR 期望 API 响应(不挂起)
@@ -73,13 +73,13 @@ function isRSSHubReachable(host = 'http://localhost:1200', timeoutMs = 2000): bo
 // =====================================================================
 
 test.describe('TRD-AGT: Google Trends 真实抓取 (软失败)', () => {
-  test('TC-TRD-AGT-001: GET /trending-topics/google-trends?geo=HK&timeRange=24h 返回列表', async ({ api }) => {
+  test('TC-TRD-AGT-001: GET /trending-topics/sources/google-trends/items?geo=HK 返回列表', async ({ api }) => {
     test.setTimeout(120_000); // Google Trends 海外抓取最坏可达 60-90s
     const { token } = await loginByApi('admin');
     const t0 = Date.now();
     let r;
     try {
-      r = await api.get('/trending-topics/google-trends?geo=HK&timeRange=24h&limit=5', {
+      r = await api.get('/trending-topics/sources/google-trends/items?geo=HK&limit=5', {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 110_000,
       });

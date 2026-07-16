@@ -6,6 +6,7 @@ import { BillingModule } from '../billing/billing.module';
 import { TwitterService } from './twitter.service';
 import { WikipediaService } from './wikipedia.service';
 import { RssTopicSourceAdapter } from './sources/rss-topic-source.adapter';
+import { GoogleTrendsRealtimeAdapter } from './sources/google-trends-realtime.topic-source.adapter';
 import {
   TOPIC_SOURCE_ADAPTERS,
   TopicSourceCatalog,
@@ -19,14 +20,21 @@ import {
     TwitterService,
     WikipediaService,
     RssTopicSourceAdapter,
+    GoogleTrendsRealtimeAdapter,
     {
       provide: TOPIC_SOURCE_ADAPTERS,
       useFactory: (
         rss: RssTopicSourceAdapter,
         twitter: TwitterService,
         wikipedia: WikipediaService,
-      ) => [rss, twitter, wikipedia],
-      inject: [RssTopicSourceAdapter, TwitterService, WikipediaService],
+        googleTrendsRealtime: GoogleTrendsRealtimeAdapter,
+      ) => [rss, twitter, wikipedia, googleTrendsRealtime],
+      inject: [
+        RssTopicSourceAdapter,
+        TwitterService,
+        WikipediaService,
+        GoogleTrendsRealtimeAdapter,
+      ],
     },
     TopicSourceCatalog,
   ],

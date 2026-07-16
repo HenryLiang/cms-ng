@@ -192,7 +192,7 @@ test('§18 TC-XMD-002 — Trending topic → story → article → approval', as
   test.setTimeout(120_000);
 
   // ---- Step 1: fetch Google Trends (geo=HK) ----
-  const trendsRes = await callApi('/trending-topics/google-trends?geo=HK&limit=10', {
+  const trendsRes = await callApi('/trending-topics/sources/google-trends/items?geo=HK&limit=10', {
     timeoutMs: 60_000,
   });
   // Google Trends may fail if RSS_PROXY_ENABLED=false and direct network is
@@ -202,9 +202,10 @@ test('§18 TC-XMD-002 — Trending topic → story → article → approval', as
     test.skip(true, `google-trends fetch failed (status ${trendsRes.status}) — skipping TC-XMD-002`);
     return;
   }
-  const trendsArr: any[] = Array.isArray(trendsRes.body)
-    ? trendsRes.body
-    : (trendsRes.body?.topics || trendsRes.body?.items || []);
+  const trendsBody = trendsRes.body?.data ?? trendsRes.body;
+  const trendsArr: any[] = Array.isArray(trendsBody)
+    ? trendsBody
+    : (trendsBody?.topics || trendsBody?.items || []);
   expect(Array.isArray(trendsArr), 'trends response should be an array or have a topics/items field').toBe(true);
   if (trendsArr.length === 0) {
     test.skip(true, 'google-trends returned 0 topics for geo=HK — nothing to adopt');

@@ -13,6 +13,10 @@ async function bootstrap() {
   // is always allowed. In production, no whitelist = deny all cross-origin.
   app.enableCors(buildCorsOptions());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  // 启用 shutdown hooks：让 OnModuleDestroy 在 SIGTERM/SIGINT 时真正触发。
+  // 此前是 dead code -- RedisService.onModuleDestroy 与 Playwright 浏览器清理
+  // 都依赖它；cms-ng-service.sh 用 SIGTERM 停服，不启用会孤儿子进程。
+  app.enableShutdownHooks();
 
   // OpenAPI / Swagger UI — only in non-production. The dev/QA E2E
   // fixtures use it to discover endpoint contracts; production hides it

@@ -465,10 +465,10 @@ test.describe('TRD: Trending Topics 热点聚合', () => {
     }
   });
 
-  test('TC-TRD-003: /trending-topics/google-trends（外部 API 软失败）', async ({ api }) => {
+  test('TC-TRD-003: /trending-topics/sources/google-trends/items（外部 RSS 软失败）', async ({ api }) => {
     const { token } = await loginByApi('admin');
     const t0 = Date.now();
-    const r = await api.get('/trending-topics/google-trends?geo=HK&limit=5', {
+    const r = await api.get('/trending-topics/sources/google-trends/items?geo=HK&limit=5', {
       headers: { Authorization: `Bearer ${token}` },
       timeout: 45000,
     });
@@ -670,7 +670,7 @@ test.describe('RSS-PROXY: 代理开关行为', () => {
   test('TC-PROXY-002: Google Trends 走代理（行为可见性）', async ({ api }) => {
     const { token } = await loginByApi('admin');
     const t0 = Date.now();
-    const r = await api.get('/trending-topics/google-trends?geo=HK&limit=3', {
+    const r = await api.get('/trending-topics/sources/google-trends/items?geo=HK&limit=3', {
       headers: { Authorization: `Bearer ${token}` },
       timeout: 40000,
     });

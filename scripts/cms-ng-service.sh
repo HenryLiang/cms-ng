@@ -278,6 +278,19 @@ prod_preflight() {
 
     echo "        node $(node --version)"
     echo "        backend/.env OK (含 ${#REQUIRED_ENV_VARS[@]} 个必要变量)"
+
+    # 非致命：PLAYWRIGHT_ENABLED=true 时检查 Chromium 是否已安装
+    # （Google Trends 实时源依赖）。缺失仅告警，服务 fail-open 回退 RSS 每日源。
+    if grep -qE '^PLAYWRIGHT_ENABLED="true"' "$BACKEND_ENV" 2>/dev/null; then
+        local browsers_path="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+        if [ ! -d "$browsers_path" ] || [ -z "$(ls -A "$browsers_path" 2>/dev/null)" ]; then
+            echo "        Warn: PLAYWRIGHT_ENABLED=true 但 Chromium 未安装于 $browsers_path"
+            echo "               Google Trends 实时源将 fail-open 回退到 RSS 每日源"
+            echo "               一次性安装: cd backend && npx playwright install --with-deps chromium"
+        else
+            echo "        Playwright Chromium OK ($browsers_path)"
+        fi
+    fi
 }
 
 prod_build() {

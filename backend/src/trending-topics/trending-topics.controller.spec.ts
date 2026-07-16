@@ -19,7 +19,6 @@ describe('TrendingTopicsController', () => {
     update: jest.Mock;
     remove: jest.Mock;
     generateAISuggestions: jest.Mock;
-    fetchGoogleTrends: jest.Mock;
     fetchNewsBySource: jest.Mock;
     fetchBilibiliPartitionRanking: jest.Mock;
     fetchNHKNews: jest.Mock;
@@ -52,7 +51,6 @@ describe('TrendingTopicsController', () => {
       update: jest.fn(),
       remove: jest.fn(),
       generateAISuggestions: jest.fn(),
-      fetchGoogleTrends: jest.fn(),
       fetchNewsBySource: jest.fn(),
       fetchBilibiliPartitionRanking: jest.fn(),
       fetchNHKNews: jest.fn(),
@@ -226,47 +224,6 @@ describe('TrendingTopicsController', () => {
         'user-id',
       );
       expect(result).toHaveLength(1);
-    });
-  });
-
-  describe('fetchGoogleTrends', () => {
-    it('should call fetchGoogleTrends with defaults', async () => {
-      topicsService.fetchGoogleTrends.mockResolvedValue({
-        items: [{ title: 'Trend' }],
-        total: 1,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      });
-
-      const result = await controller.fetchGoogleTrends({
-        geo: '',
-      } as any);
-
-      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith(
-        'HK',
-        1,
-        10,
-      );
-      expect(result.items).toHaveLength(1);
-    });
-
-    it('should pass query params', async () => {
-      topicsService.fetchGoogleTrends.mockResolvedValue({
-        items: [],
-        total: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      });
-
-      await controller.fetchGoogleTrends({ geo: 'US' } as any);
-
-      expect(topicsService.fetchGoogleTrends).toHaveBeenCalledWith(
-        'US',
-        1,
-        10,
-      );
     });
   });
 
