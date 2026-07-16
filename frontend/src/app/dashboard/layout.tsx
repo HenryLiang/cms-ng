@@ -203,7 +203,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface/80 px-6 backdrop-blur">
           <div className="flex items-center gap-2 text-sm">
             <LayoutDashboard className="h-4 w-4 text-subtle" />
-            <span className="text-muted">{activeItem?.label ?? '工作台'}</span>
+            <span className="text-muted">{activeItem?.label ?? (profileActive ? '个人资料' : '工作台')}</span>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {/* 全局搜索（视觉占位，后续接入全局检索） */}

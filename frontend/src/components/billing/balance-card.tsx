@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Loader2 } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { getBalance, type BalanceInfo, type BillingTransaction } from '@/lib/billing-api';
+import { Card, buttonClasses } from '@/components/ui';
 
 function formatCurrency(amount: number): string {
   return `¥${amount.toFixed(2)}`;
@@ -53,35 +54,35 @@ export default function BalanceCard() {
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <Card className="p-4">
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
         </div>
-      </div>
+      </Card>
     );
   }
 
   if (error || !info) {
     return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <Card className="p-4">
         <p className="text-sm text-red-500">{error ?? '无法加载余额信息'}</p>
-      </div>
+      </Card>
     );
   }
 
   const isLowBalance = info.alertThreshold !== null && info.balance < info.alertThreshold;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+    <Card className="p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Wallet className="h-5 w-5 text-zinc-600" />
-          <span className="text-sm font-medium text-zinc-900">账户余额</span>
+          <Wallet className="h-5 w-5 text-muted" />
+          <span className="text-sm font-medium text-foreground">账户余额</span>
         </div>
         <Link
           href="/dashboard/billing/top-up"
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 transition-colors"
+          className={buttonClasses({ variant: 'primary', size: 'sm' })}
         >
           充值
         </Link>
@@ -89,7 +90,7 @@ export default function BalanceCard() {
 
       {/* Balance */}
       <div className="mb-4">
-        <div className="text-3xl font-bold text-zinc-900">{formatCurrency(info.balance)}</div>
+        <div className="text-3xl font-bold text-foreground">{formatCurrency(info.balance)}</div>
         {isLowBalance && (
           <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
             <AlertTriangle className="h-3.5 w-3.5" />
@@ -100,24 +101,24 @@ export default function BalanceCard() {
 
       {/* Recent Transactions */}
       {info.recentTransactions.length > 0 && (
-        <div className="border-t border-zinc-100 pt-3">
-          <p className="mb-2 text-xs font-medium text-zinc-500">最近交易</p>
+        <div className="border-t border-line pt-3">
+          <p className="mb-2 text-xs font-medium text-muted">最近交易</p>
           <div className="space-y-2">
             {info.recentTransactions.slice(0, 3).map((tx: BillingTransaction) => (
               <div key={tx.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                   <TransactionIcon type={tx.type} />
-                  <span className="truncate text-sm text-zinc-600">{tx.description}</span>
+                  <span className="truncate text-sm text-muted">{tx.description}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <TransactionAmount amount={tx.amount} type={tx.type} />
-                  <span className="text-xs text-zinc-400">{formatDate(tx.createdAt)}</span>
+                  <span className="text-xs text-subtle">{formatDate(tx.createdAt)}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -44,7 +44,7 @@ import ReviewReportPanel from '@/components/review-report-panel';
 import SEOPanel from '@/components/seo-panel';
 import GEOPanel from '@/components/geo-panel';
 import ChannelPanel from '@/components/channels/channel-panel';
-import { Button, StatusBadge } from '@/components/ui';
+import { Badge, Button, StatusBadge, buttonClasses } from '@/components/ui';
 import {
   ArrowLeft,
   Trash2,
@@ -712,46 +712,48 @@ export default function ArticleEditorPage() {
       {/* Headline Lab Modal */}
       {showHeadlines && (
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-20">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-xl bg-surface p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600" />
                 <h3 className="text-lg font-semibold">标题实验室</h3>
               </div>
-              <button onClick={() => setShowHeadlines(false)} className="text-zinc-400 hover:text-zinc-600">
+              <button onClick={() => setShowHeadlines(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             {headlinesLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
               </div>
             ) : headlines.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
-                <p className="text-zinc-500">暂无标题建议，请稍后重试</p>
+              <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
+                <p className="text-muted">暂无标题建议，请稍后重试</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {headlines.map((h, i) => (
                   <div
                     key={i}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 transition-colors"
+                    className="flex items-start justify-between gap-3 rounded-lg border border-line p-4 hover:bg-surface-muted transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="text-base font-medium text-zinc-900">{h.title}</p>
+                      <p className="text-base font-medium text-foreground">{h.title}</p>
                       <div className="mt-1 flex items-center gap-2">
                         <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-600">
                           {h.style}
                         </span>
-                        <span className="text-xs text-zinc-500">{h.reasoning}</span>
+                        <span className="text-xs text-muted">{h.reasoning}</span>
                       </div>
                     </div>
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={() => applyHeadline(h.title)}
-                      className="shrink-0 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+                      className="shrink-0"
                     >
                       采用
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -763,22 +765,22 @@ export default function ArticleEditorPage() {
       {/* Submit for Review Modal */}
       {showSubmitModal && (
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-20">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">提交审核</h3>
-              <button onClick={() => setShowSubmitModal(false)} className="text-zinc-400 hover:text-zinc-600">
+              <button onClick={() => setShowSubmitModal(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-4 text-sm text-zinc-500">
+            <p className="mb-4 text-sm text-muted">
               提交后稿件将进入待审核状态，编辑将进行审核。
             </p>
             <div className="mb-4">
-              <label className="mb-2 block text-sm font-medium text-zinc-700">选择审核编辑（可选）</label>
+              <label className="mb-2 block text-sm font-medium text-foreground">选择审核编辑（可选）</label>
               <select
                 value={selectedEditor}
                 onChange={(e) => setSelectedEditor(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+                className="w-full rounded-lg border border-line p-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               >
                 <option value="">自动分配</option>
                 {editors.map((editor) => (
@@ -789,24 +791,13 @@ export default function ArticleEditorPage() {
               </select>
             </div>
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowSubmitModal(false)}
-                className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-              >
+              <Button variant="secondary" onClick={() => setShowSubmitModal(false)}>
                 取消
-              </button>
-              <button
-                onClick={handleConfirmSubmit}
-                disabled={submittingReview}
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-              >
-                {submittingReview ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+              </Button>
+              <Button variant="primary" loading={submittingReview} onClick={handleConfirmSubmit}>
+                {!submittingReview && <Send className="h-4 w-4" />}
                 确认提交
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -815,51 +806,52 @@ export default function ArticleEditorPage() {
       {/* Version History Modal */}
       {showVersions && (
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-20">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-zinc-600" />
+                <History className="h-5 w-5 text-muted" />
                 <h3 className="text-lg font-semibold">版本历史</h3>
               </div>
-              <button onClick={() => setShowVersions(false)} className="text-zinc-400 hover:text-zinc-600">
+              <button onClick={() => setShowVersions(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             {versionsLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
               </div>
             ) : versions.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center">
-                <p className="text-zinc-500">暂无版本历史</p>
+              <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
+                <p className="text-muted">暂无版本历史</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {versions.map((v) => (
                   <div
                     key={v.id}
-                    className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50"
+                    className="flex items-center justify-between rounded-lg border border-line p-3 hover:bg-surface-muted"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                        <Badge tone="neutral">
                           v{v.version}
-                        </span>
-                        <span className="text-sm font-medium text-zinc-900">{v.title}</span>
+                        </Badge>
+                        <span className="text-sm font-medium text-foreground">{v.title}</span>
                       </div>
-                      <p className="mt-1 text-xs text-zinc-500">
+                      <p className="mt-1 text-xs text-muted">
                         {new Date(v.createdAt).toLocaleString('zh-CN')}
                       </p>
                     </div>
                     {v.version !== article?.version && (
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleRollback(v.version)}
                         disabled={rollingBack}
-                        className="flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
                       >
                         <RotateCcw className="h-3 w-3" />
                         回滚
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -872,53 +864,44 @@ export default function ArticleEditorPage() {
       {/* AI Draft Preview Modal */}
       {showDraftPreview && draftResult && (
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-10">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl max-h-[85vh] flex flex-col">
+          <div className="w-full max-w-3xl rounded-xl bg-surface p-6 shadow-xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600" />
                 <h3 className="text-lg font-semibold">AI 生成初稿</h3>
               </div>
-              <button onClick={() => setShowDraftPreview(false)} className="text-zinc-400 hover:text-zinc-600">
+              <button onClick={() => setShowDraftPreview(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="flex-1 overflow-auto space-y-4 pr-2">
               <div>
-                <label className="text-xs font-medium text-zinc-500">标题</label>
-                <p className="text-base font-semibold text-zinc-900">{draftResult.title}</p>
+                <label className="text-xs font-medium text-muted">标题</label>
+                <p className="text-base font-semibold text-foreground">{draftResult.title}</p>
               </div>
               {draftResult.subtitle && (
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">副标题</label>
-                  <p className="text-base text-zinc-700">{draftResult.subtitle}</p>
+                  <label className="text-xs font-medium text-muted">副标题</label>
+                  <p className="text-base text-foreground">{draftResult.subtitle}</p>
                 </div>
               )}
               <div>
-                <label className="text-xs font-medium text-zinc-500">正文</label>
+                <label className="text-xs font-medium text-muted">正文</label>
                 <DraftPreview content={draftResult.content} />
               </div>
             </div>
-            <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-zinc-100">
-              <button
-                onClick={() => setShowDraftPreview(false)}
-                className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-              >
+            <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-line">
+              <Button variant="secondary" onClick={() => setShowDraftPreview(false)}>
                 取消
-              </button>
-              <button
-                onClick={() => applyDraft('insert')}
-                className="flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => applyDraft('insert')}>
                 <Plus className="h-4 w-4" />
                 插入到末尾
-              </button>
-              <button
-                onClick={() => applyDraft('replace')}
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-              >
+              </Button>
+              <Button variant="primary" onClick={() => applyDraft('replace')}>
                 <Check className="h-4 w-4" />
                 替换当前内容
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -926,19 +909,19 @@ export default function ArticleEditorPage() {
 
       {/* Editor */}
       <div className="flex flex-1 overflow-hidden">
-        <div ref={editorContainerRef} className="flex-1 overflow-hidden bg-white relative flex flex-col">
+        <div ref={editorContainerRef} className="flex-1 overflow-hidden bg-surface relative flex flex-col">
           <div className="mx-auto max-w-3xl w-full px-8 pt-8">
             <input
               type="text"
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
-              className="mb-4 w-full bg-transparent text-lg text-zinc-600 outline-none"
+              className="mb-4 w-full bg-transparent text-lg text-muted outline-none"
               placeholder="副标题（可选）"
             />
             {/* Cover Image */}
             {article?.coverImage ? (
               <div
-                className="mb-4 rounded-lg border border-zinc-200 overflow-hidden max-h-[300px] cursor-pointer"
+                className="mb-4 rounded-lg border border-line overflow-hidden max-h-[300px] cursor-pointer"
                 onClick={() => setShowImagePreview(true)}
               >
                 <img
@@ -949,21 +932,15 @@ export default function ArticleEditorPage() {
               </div>
             ) : null}
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setShowImageGen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setShowImageGen(true)}>
                 <Sparkles className="h-3.5 w-3.5" />
                 AI 生成
-              </button>
-              <button
-                onClick={() => setShowCoverPicker(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowCoverPicker(true)}>
                 <Image className="h-3.5 w-3.5" />
                 从媒体库选择
-              </button>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+              </Button>
+              <label className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'cursor-pointer' })}>
                 <Upload className="h-3.5 w-3.5" />
                 {coverUploading ? '上传中…' : '上传图片'}
                 <input
@@ -1012,7 +989,7 @@ export default function ArticleEditorPage() {
             <>
               {!showAIResult ? (
                 <div
-                  className="absolute z-40 flex items-center gap-1 rounded-lg bg-zinc-900 px-2 py-1.5 shadow-lg"
+                  className="absolute z-40 flex items-center gap-1 rounded-lg bg-slate-900 px-2 py-1.5 shadow-lg"
                   style={{
                     left: Math.min(selectionPos.x, window.innerWidth - 300),
                     top: Math.max(selectionPos.y - 45, 10),
@@ -1023,19 +1000,19 @@ export default function ArticleEditorPage() {
                     label="改写"
                     onClick={() => handleAIOperation('rewrite', 'serious')}
                   />
-                  <div className="h-4 w-px bg-zinc-700" />
+                  <div className="h-4 w-px bg-slate-700" />
                   <AIOperationButton
                     icon={<Plus className="h-3.5 w-3.5" />}
                     label="扩写"
                     onClick={() => handleAIOperation('expand')}
                   />
-                  <div className="h-4 w-px bg-zinc-700" />
+                  <div className="h-4 w-px bg-slate-700" />
                   <AIOperationButton
                     icon={<Scissors className="h-3.5 w-3.5" />}
                     label="精简"
                     onClick={() => handleAIOperation('condense')}
                   />
-                  <div className="h-4 w-px bg-zinc-700" />
+                  <div className="h-4 w-px bg-slate-700" />
                   <AIOperationButton
                     icon={<Wand2 className="h-3.5 w-3.5" />}
                     label="润色"
@@ -1044,49 +1021,50 @@ export default function ArticleEditorPage() {
                 </div>
               ) : (
                 <div
-                  className="absolute z-40 w-80 rounded-lg bg-white border border-zinc-200 shadow-xl overflow-hidden"
+                  className="absolute z-40 w-80 rounded-lg bg-surface border border-line shadow-xl overflow-hidden"
                   style={{
                     left: Math.min(selectionPos.x - 160, window.innerWidth - 340),
                     top: Math.max(selectionPos.y - 20, 10),
                   }}
                 >
-                  <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2">
-                    <span className="text-xs font-medium text-zinc-600">AI 处理结果</span>
-                    <button onClick={() => setShowAIMenu(false)} className="text-zinc-400 hover:text-zinc-600">
+                  <div className="flex items-center justify-between border-b border-line px-3 py-2">
+                    <span className="text-xs font-medium text-muted">AI 处理结果</span>
+                    <button onClick={() => setShowAIMenu(false)} className="text-subtle hover:text-foreground">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <div className="max-h-48 overflow-auto p-3">
                     {aiLoading ? (
                       <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
                       </div>
                     ) : (
-                      <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">{aiResult}</p>
+                      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{aiResult}</p>
                     )}
                   </div>
                   {!aiLoading && (
-                    <div className="flex gap-2 border-t border-zinc-100 p-2">
-                      <button
+                    <div className="flex gap-2 border-t border-line p-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => applyAIResult('replace')}
-                        className="flex-1 flex items-center justify-center gap-1 rounded-md bg-zinc-900 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+                        className="flex-1"
                       >
                         <Check className="h-3 w-3" />
                         替换
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => applyAIResult('insert')}
-                        className="flex-1 flex items-center justify-center gap-1 rounded-md border border-zinc-200 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                        className="flex-1"
                       >
                         <Plus className="h-3 w-3" />
                         插入
-                      </button>
-                      <button
-                        onClick={() => setShowAIMenu(false)}
-                        className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-                      >
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => setShowAIMenu(false)}>
                         取消
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1096,12 +1074,12 @@ export default function ArticleEditorPage() {
         </div>
 
         {/* Right sidebar */}
-        <aside className="w-[30rem] border-l border-zinc-200 bg-zinc-50 p-4 overflow-auto flex flex-col">
+        <aside className="w-[30rem] border-l border-line bg-canvas p-4 overflow-auto flex flex-col">
           <div className="space-y-6 flex-1">
             {/* Excerpt */}
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-zinc-900">摘要</h3>
+                <h3 className="text-sm font-medium text-foreground">摘要</h3>
                 <button
                   onClick={handleGenerateExcerpt}
                   disabled={excerptLoading}
@@ -1119,29 +1097,29 @@ export default function ArticleEditorPage() {
                 value={excerpt}
                 onChange={(e) => setExcerpt(e.target.value)}
                 rows={4}
-                className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                 placeholder="输入稿件摘要..."
               />
             </div>
 
             {/* Story */}
             <div>
-              <h3 className="text-sm font-medium text-zinc-900">所属选题</h3>
+              <h3 className="text-sm font-medium text-foreground">所属选题</h3>
               {article.story ? (
                 <Link
                   href={`/dashboard/stories/${article.storyId}`}
-                  className="mt-2 block rounded-lg border border-zinc-200 bg-white p-3 text-sm hover:shadow-sm transition-shadow"
+                  className="mt-2 block rounded-lg border border-line bg-surface p-3 text-sm hover:shadow-sm transition-shadow"
                 >
-                  <p className="font-medium text-zinc-900">{article.story.title}</p>
+                  <p className="font-medium text-foreground">{article.story.title}</p>
                 </Link>
               ) : (
-                <p className="mt-2 text-sm text-zinc-500">无关联选题</p>
+                <p className="mt-2 text-sm text-muted">无关联选题</p>
               )}
             </div>
 
             {/* Quick Actions */}
             <div>
-              <h3 className="text-sm font-medium text-zinc-900">快速操作</h3>
+              <h3 className="text-sm font-medium text-foreground">快速操作</h3>
               <div className="mt-2 space-y-2">
                 <button
                   onClick={handleGenerateDraft}
@@ -1217,7 +1195,7 @@ export default function ArticleEditorPage() {
                 </button>
                 <button
                   onClick={() => handleSave('DRAFT')}
-                  className="flex w-full items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground hover:bg-surface-muted"
                 >
                   <RotateCcw className="h-4 w-4" />
                   退回草稿
@@ -1274,17 +1252,17 @@ export default function ArticleEditorPage() {
 
           {/* AI Chat Panel */}
           {showChat && (
-            <div className="mt-4 flex flex-col rounded-lg border border-zinc-200 bg-white overflow-hidden" style={{ height: '320px' }}>
-              <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2">
-                <span className="text-xs font-medium text-zinc-700">AI 创作助手</span>
-                <button onClick={() => setShowChat(false)} className="text-zinc-400 hover:text-zinc-600">
+            <div className="mt-4 flex flex-col rounded-lg border border-line bg-surface overflow-hidden" style={{ height: '320px' }}>
+              <div className="flex items-center justify-between border-b border-line px-3 py-2">
+                <span className="text-xs font-medium text-foreground">AI 创作助手</span>
+                <button onClick={() => setShowChat(false)} className="text-subtle hover:text-foreground">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
               <div className="flex-1 overflow-auto p-3 space-y-3">
                 {chatMessages.length === 0 && (
                   <div className="text-center py-4">
-                    <p className="text-xs text-zinc-400 mb-3">向 AI 助手提问，获取写作建议</p>
+                    <p className="text-xs text-subtle mb-3">向 AI 助手提问，获取写作建议</p>
                     <div className="space-y-1.5">
                       {quickChatPrompts.map((prompt, i) => (
                         <button
@@ -1292,7 +1270,7 @@ export default function ArticleEditorPage() {
                           onClick={() => {
                             setChatInput(prompt);
                           }}
-                          className="block w-full rounded-md border border-zinc-100 bg-zinc-50 px-2 py-1.5 text-left text-xs text-zinc-600 hover:bg-zinc-100"
+                          className="block w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-left text-xs text-muted hover:bg-surface-muted"
                         >
                           {prompt}
                         </button>
@@ -1305,8 +1283,8 @@ export default function ArticleEditorPage() {
                     <div
                       className={`max-w-[90%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
                         msg.role === 'user'
-                          ? 'bg-zinc-900 text-white'
-                          : 'bg-zinc-100 text-zinc-700'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-surface-muted text-foreground'
                       }`}
                     >
                       {msg.content}
@@ -1315,26 +1293,26 @@ export default function ArticleEditorPage() {
                 ))}
                 {chatLoading && (
                   <div className="flex justify-start">
-                    <div className="rounded-lg bg-zinc-100 px-3 py-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+                    <div className="rounded-lg bg-surface-muted px-3 py-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
                     </div>
                   </div>
                 )}
                 <div ref={chatEndRef} />
               </div>
-              <div className="flex items-center gap-2 border-t border-zinc-100 p-2">
+              <div className="flex items-center gap-2 border-t border-line p-2">
                 <input
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
                   placeholder="输入问题..."
-                  className="flex-1 rounded-md border border-zinc-200 px-2 py-1.5 text-xs outline-none focus:border-zinc-400"
+                  className="flex-1 rounded-md border border-line px-2 py-1.5 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
                 <button
                   onClick={handleSendChat}
                   disabled={chatLoading || !chatInput.trim()}
-                  className="rounded-md bg-zinc-900 p-1.5 text-white hover:bg-zinc-800 disabled:opacity-50"
+                  className="rounded-md bg-brand p-1.5 text-white transition hover:bg-brand-hover disabled:opacity-50"
                 >
                   <SendHorizonal className="h-3.5 w-3.5" />
                 </button>
@@ -1347,7 +1325,7 @@ export default function ArticleEditorPage() {
       {/* AI Image Generation Modal */}
       {showImageGen && (
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-10">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-xl bg-surface p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">AI 生成配图</h3>
               <button
@@ -1355,7 +1333,7 @@ export default function ArticleEditorPage() {
                   setShowImageGen(false);
                   setImageGenResult(null);
                 }}
-                className="text-zinc-400 hover:text-zinc-600"
+                className="text-subtle hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1365,7 +1343,7 @@ export default function ArticleEditorPage() {
               <>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">风格</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">风格</label>
                     <div className="flex gap-2">
                       {[
                         { key: 'news', label: '新闻摄影' },
@@ -1378,8 +1356,8 @@ export default function ArticleEditorPage() {
                           onClick={() => setImageGenStyle(s.key as any)}
                           className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
                             imageGenStyle === s.key
-                              ? 'bg-zinc-900 text-white'
-                              : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                              ? 'border border-brand bg-brand-soft text-brand-soft-text'
+                              : 'border border-line bg-surface text-muted hover:bg-surface-muted'
                           }`}
                         >
                           {s.label}
@@ -1388,11 +1366,11 @@ export default function ArticleEditorPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">比例</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">比例</label>
                     <select
                       value={imageGenRatio}
                       onChange={(e) => setImageGenRatio(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+                      className="w-full rounded-lg border border-line p-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="16:9">16:9 (文章横幅)</option>
                       <option value="4:3">4:3 (标准)</option>
@@ -1402,11 +1380,11 @@ export default function ArticleEditorPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">分辨率</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">分辨率</label>
                     <select
                       value={imageGenSize}
                       onChange={(e) => setImageGenSize(e.target.value as '2K' | '3K' | '4K')}
-                      className="w-full rounded-lg border border-zinc-200 p-2.5 text-sm outline-none focus:border-zinc-400"
+                      className="w-full rounded-lg border border-line p-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="2K">2K（快速）</option>
                       <option value="3K">3K（高清）</option>
@@ -1414,65 +1392,51 @@ export default function ArticleEditorPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">额外描述（可选）</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">额外描述（可选）</label>
                     <textarea
                       value={imageGenCustomPrompt}
                       onChange={(e) => setImageGenCustomPrompt(e.target.value)}
                       placeholder="例如：加入香港天际线背景，黄昏时分..."
                       rows={2}
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                      className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                     />
                   </div>
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowImageGen(false)}
-                    className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-                  >
+                  <Button variant="secondary" onClick={() => setShowImageGen(false)}>
                     取消
-                  </button>
-                  <button
-                    onClick={handleGenerateImage}
-                    disabled={imageGenLoading}
-                    className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-                  >
-                    {imageGenLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Image className="h-4 w-4" />
-                    )}
+                  </Button>
+                  <Button variant="primary" loading={imageGenLoading} onClick={handleGenerateImage}>
+                    {!imageGenLoading && <Image className="h-4 w-4" />}
                     {imageGenLoading ? '生成中...' : '生成配图'}
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
               <>
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                <div className="rounded-lg border border-line bg-canvas p-2">
                   <img
                     src={imageGenResult.url}
                     alt="AI 生成配图"
                     className="w-full rounded-lg"
                   />
                 </div>
-                <p className="mt-2 text-xs text-zinc-500 line-clamp-2">
+                <p className="mt-2 text-xs text-muted line-clamp-2">
                   Prompt: {imageGenResult.prompt}
                 </p>
                 <div className="mt-4 flex justify-end gap-3">
-                  <button
-                    onClick={() => setImageGenResult(null)}
-                    className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-                  >
+                  <Button variant="secondary" onClick={() => setImageGenResult(null)}>
                     重新生成
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
                     onClick={() => {
                       setShowImageGen(false);
                       setImageGenResult(null);
                     }}
-                    className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                   >
                     完成
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -1513,7 +1477,7 @@ function DraftPreview({ content }: { content: string }) {
     .replace(/<(?!\/?(?:p|h2|h3|ul|ol|li|blockquote|strong|em|br)\b)[^>]*>/gi, '');
   return (
     <div
-      className="prose prose-zinc max-w-none mt-1 rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+      className="prose prose-slate max-w-none mt-1 rounded-lg border border-line bg-canvas p-4"
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
@@ -1531,7 +1495,7 @@ function AIOperationButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
+      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-white hover:bg-slate-700 transition-colors"
     >
       {icon}
       {label}

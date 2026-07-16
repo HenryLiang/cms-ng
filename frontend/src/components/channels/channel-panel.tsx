@@ -110,7 +110,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
@@ -118,8 +118,8 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-900">平台分发</h3>
-        <Share2 className="h-4 w-4 text-zinc-400" />
+        <h3 className="text-sm font-medium text-foreground">平台分发</h3>
+        <Share2 className="h-4 w-4 text-subtle" />
       </div>
 
       {error && (
@@ -144,7 +144,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                   : publish?.status === PublishStatus.GENERATING
                   ? 'border-purple-200 bg-purple-50 text-purple-700'
-                  : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                  : 'border-line bg-surface text-foreground hover:bg-surface-muted'
               }`}
             >
               {isGenerating ? (
@@ -185,7 +185,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
       )}
 
       {publishes.length === 0 && (
-        <p className="mt-4 text-center text-xs text-zinc-400">
+        <p className="mt-4 text-center text-xs text-subtle">
           选择上方平台，一键生成适配内容
         </p>
       )}

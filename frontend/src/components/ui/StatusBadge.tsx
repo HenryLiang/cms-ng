@@ -12,8 +12,8 @@ export interface StatusBadgeProps {
 export function StatusBadge({ status, withLabel = true, className }: StatusBadgeProps) {
   const meta = getArticleStatusMeta(status);
   return (
-    <span className={cn('inline-flex items-center gap-1.5 text-xs text-muted', className)}>
-      <span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} />
+    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted', className)}>
+      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', meta.dot)} />
       {withLabel && meta.label}
     </span>
   );
