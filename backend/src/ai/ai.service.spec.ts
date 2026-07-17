@@ -44,7 +44,7 @@ describe('AIService', () => {
     chatCompletion: jest.Mock;
     chatCompletionWithTools: jest.Mock;
   };
-  let storageMock: { put: jest.Mock; delete: jest.Mock };
+  let storageMock: { put: jest.Mock; delete: jest.Mock; thumbnailUrl: jest.Mock };
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -77,6 +77,7 @@ describe('AIService', () => {
     storageMock = {
       put: jest.fn(),
       delete: jest.fn(),
+      thumbnailUrl: jest.fn((url: string) => `${url}!thumb`),
     };
 
     const billingMock = {
@@ -1575,6 +1576,80 @@ describe('AIService', () => {
       expect(createCall.data.action).toBe('generate_article_image');
       expect(createCall.data.model).toBe('test-seedream-model');
     });
+
+    it('should register the generated image as an AI_GENERATED media asset', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('News image prompt'),
+      );
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://example.com/img.png' }] },
+      });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png',
+        key: 'cms-ng/articles/article-123/cover_a3f2b109.png',
+      });
+      // onSuccess 的入参 aiOpId 来自审计行 id,必须显式 mock 返回值
+      (prisma.aIOperation.create as jest.Mock).mockResolvedValue({ id: 'aiop-1' });
+      (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({ id: 'asset-1' });
+
+      await service.generateArticleImage(
+        'user-id', 'article-123', '测试标题', '<p>内容</p>',
+      );
+
+      expect(prisma.mediaAsset.create).toHaveBeenCalledTimes(1);
+      const data = (prisma.mediaAsset.create as jest.Mock).mock.calls[0][0].data;
+      expect(data).toMatchObject({
+        storageKey: 'cms-ng/articles/article-123/cover_a3f2b109.png',
+        url: 'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png',
+        thumbnailUrl:
+          'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png!thumb',
+        fileName: 'ai-cover_a3f2b109.png',
+        mimeType: 'image/png',
+        size: Buffer.from('fake-png-bytes').length,
+        source: 'AI_GENERATED',
+        sourceRef: 'aiop-1',
+        prompt: 'News image prompt',
+        title: '测试标题',
+        ownerId: 'user-id',
+        libraryType: 'PERSONAL',
+        status: 'ACTIVE',
+      });
+    });
+
+    it('should still return the image when media-asset registration fails', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('News image prompt'),
+      );
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { data: [{ url: 'https://example.com/img.png' }] },
+      });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      storageMock.put.mockResolvedValue({
+        url: 'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png',
+        key: 'cms-ng/articles/article-123/cover_a3f2b109.png',
+      });
+      (prisma.aIOperation.create as jest.Mock).mockResolvedValue({ id: 'aiop-1' });
+      // 媒体库入库失败被 aiLog.run 兜底(warn + 吞掉),不影响生图结果
+      (prisma.mediaAsset.create as jest.Mock).mockRejectedValue(
+        new Error('DB write failed'),
+      );
+
+      const result = await service.generateArticleImage(
+        'user-id', 'article-123', 'Title', 'Content',
+      );
+
+      expect(result.url).toBe(
+        'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png',
+      );
+      expect(result.prompt).toBe('News image prompt');
+    });
   });
 
   describe('uploadToStorage', () => {
@@ -1619,12 +1694,18 @@ describe('AIService', () => {
         key: 'cms-ng/articles/article-1/cover_a3f2b109.png',
       });
 
-      const url = await (service as any).uploadToStorage(
+      const stored = await (service as any).uploadToStorage(
         'https://seedream.example.com/temp/x',
         'article-1',
       );
 
-      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png');
+      expect(stored.url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png');
+      expect(stored.key).toBe('cms-ng/articles/article-1/cover_a3f2b109.png');
+      expect(stored.mimeType).toBe('image/png');
+      expect(stored.size).toBe(Buffer.from('fake-png-bytes').length);
+      // 非法 PNG 字节无法解析尺寸 → null(不阻塞上传)
+      expect(stored.width).toBeNull();
+      expect(stored.height).toBeNull();
       expect(storageMock.put).toHaveBeenCalledWith(
         expect.stringMatching(/^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.png$/),
         expect.any(Buffer),
@@ -1642,12 +1723,13 @@ describe('AIService', () => {
         key: 'cms-ng/articles/article-1/cover_a3f2b109.jpg',
       });
 
-      const url = await (service as any).uploadToStorage(
+      const stored = await (service as any).uploadToStorage(
         'https://seedream.example.com/temp/x',
         'article-1',
       );
 
-      expect(url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.jpg');
+      expect(stored.url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.jpg');
+      expect(stored.mimeType).toBe('image/jpeg');
       expect(storageMock.put).toHaveBeenCalledWith(
         expect.stringMatching(/^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.jpg$/),
         expect.any(Buffer),
@@ -2061,14 +2143,18 @@ describe('AIService — performSearch branch logic', () => {
   let prisma: ReturnType<typeof createMockPrismaService>;
   let aiTools: AIToolsService;
   let tavilySearch: TavilySearchTool;
-  let storageMock: { put: jest.Mock; delete: jest.Mock };
+  let storageMock: { put: jest.Mock; delete: jest.Mock; thumbnailUrl: jest.Mock };
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     prisma = createMockPrismaService();
-    storageMock = { put: jest.fn(), delete: jest.fn() };
+    storageMock = {
+      put: jest.fn(),
+      delete: jest.fn(),
+      thumbnailUrl: jest.fn((url: string) => `${url}!thumb`),
+    };
     const config = {
       get: jest.fn((key: string) => {
         const map: Record<string, string> = {

@@ -33,7 +33,11 @@ import {
   ContentLanguage,
   TransactionType,
   BillingCategory,
+  MediaSource,
+  MediaLibraryType,
+  MediaStatus,
 } from '@cms-ng/shared';
+import { imageSize } from 'image-size';
 import {
   RewriteTextInput,
   ExpandTextInput,
@@ -81,6 +85,16 @@ import { AuthorStyleService } from '../authors/author-style.service';
  */
 const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg']);
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+/** AI 生成图片转存 COS 后的结果(元数据用于登记媒体库 MediaAsset) */
+interface StoredGeneratedImage {
+  url: string;
+  key: string;
+  size: number;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+}
 
 @Injectable()
 export class AIService {
@@ -1984,12 +1998,12 @@ priority 取值说明：
     );
 
     // Step 3: 下载图片并上传到 COS
-    let publicUrl: string;
+    let stored: StoredGeneratedImage;
     try {
       this.logger.log('[generateArticleImage] Step 3: uploadToStorage ...');
-      publicUrl = await this.uploadToStorage(tempImageUrl, articleId);
+      stored = await this.uploadToStorage(tempImageUrl, articleId);
       this.logger.log(
-        `[generateArticleImage] Step 3 done (${Date.now() - startTime}ms): publicUrl=${publicUrl}`,
+        `[generateArticleImage] Step 3 done (${Date.now() - startTime}ms): publicUrl=${stored.url}`,
       );
     } catch (error: any) {
       this.logger.error(
@@ -2009,25 +2023,72 @@ priority 取值说明：
       prompt: `标题: ${articleTitle}\n风格: ${style}\n${customPrompt}`,
       model: this.seedreamModel,
       fn: async () => ({
-        result: { imagePrompt, publicUrl },
+        result: { imagePrompt, publicUrl: stored.url },
         // image gen doesn't report token usage, so leave it undefined
       }),
       // If the audit row write itself fails, fall back to a plain object
       // describing the partial result so the pipeline can still continue.
-      fallback: { imagePrompt: imagePrompt ?? '', publicUrl: publicUrl ?? '' },
-      onSuccess: (aiOpId) =>
-        this.deductImageBilling({
+      fallback: { imagePrompt: imagePrompt ?? '', publicUrl: stored.url ?? '' },
+      onSuccess: async (aiOpId) => {
+        await this.deductImageBilling({
           userId,
           aiOperationId: aiOpId,
           articleId,
           description: 'AI 配图生成',
-        }),
+        });
+        // 同步登记进媒体库 —— 此前只转存 COS + 写 coverImage,AI 图在媒体库不可见。
+        // 失败由 aiLog.run 兜底(warn + 吞掉),不影响生图主流程
+        await this.registerGeneratedImageAsset({
+          stored,
+          userId,
+          articleTitle,
+          imagePrompt,
+          aiOpId,
+        });
+      },
     });
 
     this.logger.log(
-      `[generateArticleImage] COMPLETE (${Date.now() - startTime}ms) url=${publicUrl}`,
+      `[generateArticleImage] COMPLETE (${Date.now() - startTime}ms) url=${stored.url}`,
     );
-    return { url: publicUrl, prompt: imagePrompt };
+    return { url: stored.url, prompt: imagePrompt };
+  }
+
+  /**
+   * 把 AI 生成并已转存 COS 的图片登记进媒体库(MediaAsset)。
+   * sourceRef 关联 aiOperationId 便于追溯;prompt 留存生成时的英文 prompt。
+   */
+  private async registerGeneratedImageAsset(params: {
+    stored: StoredGeneratedImage;
+    userId: string;
+    articleTitle: string;
+    imagePrompt: string;
+    aiOpId: string;
+  }): Promise<void> {
+    const { stored, userId, articleTitle, imagePrompt, aiOpId } = params;
+    const baseName = stored.key.split('/').pop() || 'cover';
+    await this.prisma.mediaAsset.create({
+      data: {
+        storageKey: stored.key,
+        url: stored.url,
+        thumbnailUrl: this.storageService.thumbnailUrl(stored.url),
+        fileName: `ai-${baseName}`,
+        mimeType: stored.mimeType,
+        size: stored.size,
+        width: stored.width,
+        height: stored.height,
+        source: MediaSource.AI_GENERATED,
+        sourceRef: aiOpId,
+        prompt: imagePrompt,
+        title: articleTitle,
+        ownerId: userId,
+        libraryType: MediaLibraryType.PERSONAL,
+        status: MediaStatus.ACTIVE,
+      },
+    });
+    this.logger.log(
+      `[generateArticleImage] 已登记媒体库: ai-${baseName} url=${stored.url}`,
+    );
   }
 
   private async buildImagePrompt(
@@ -2143,12 +2204,12 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
   }
 
   /**
-   * 下载临时图片并上传到对象存储,返回公网 URL
+   * 下载临时图片并上传到对象存储,返回公网 URL 及元数据(供媒体库登记)
    */
   private async uploadToStorage(
     tempUrl: string,
     articleId: string,
-  ): Promise<string> {
+  ): Promise<StoredGeneratedImage> {
     this.logger.log(
       `[uploadToStorage] Downloading temp image: ${tempUrl.slice(0, 120)}...`,
     );
@@ -2158,7 +2219,7 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
       maxContentLength: MAX_IMAGE_BYTES,
       ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
     });
-    const buffer = Buffer.from(imageResponse.data);
+    const buffer: Buffer = Buffer.from(imageResponse.data as ArrayBuffer);
     const rawType = String(imageResponse.headers['content-type'] || '')
       .split(';')[0]
       .trim()
@@ -2176,9 +2237,19 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     // (e.g. "a3f2b109"), indistinguishable from a CMS-managed asset ID.
     const key = `cms-ng/articles/${articleId}/cover_${crypto.randomBytes(4).toString('hex')}.${ext}`;
     try {
-      const { url } = await this.storageService.put(key, buffer, rawType);
+      const { url, key: storedKey } = await this.storageService.put(
+        key,
+        buffer,
+        rawType,
+      );
       this.logger.log(`[uploadToStorage] Uploaded to COS: ${url}`);
-      return url;
+      return {
+        url,
+        key: storedKey,
+        size: buffer.length,
+        mimeType: rawType,
+        ...this.readImageDimensions(buffer),
+      };
     } catch (error: any) {
       this.logger.error(
         `Failed to upload image to storage: ${error.message}`,
@@ -2187,6 +2258,22 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
       throw new ServiceUnavailableException(
         `图片上传到对象存储失败: ${error.message}`,
       );
+    }
+  }
+
+  /** 读取图片像素尺寸;非法/无法解析的 buffer 返回 null(与媒体库上传路径一致) */
+  private readImageDimensions(buf: Buffer): {
+    width: number | null;
+    height: number | null;
+  } {
+    try {
+      const dim = imageSize(buf);
+      return {
+        width: typeof dim.width === 'number' ? dim.width : null,
+        height: typeof dim.height === 'number' ? dim.height : null,
+      };
+    } catch {
+      return { width: null, height: null };
     }
   }
 }
