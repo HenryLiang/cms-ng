@@ -34,13 +34,19 @@ describe('WebsiteAdapter', () => {
     });
 
     it('should handle missing subtitle', () => {
-      const prompt = adapter.getAdaptationPrompt({ ...mockArticle, subtitle: undefined });
+      const prompt = adapter.getAdaptationPrompt({
+        ...mockArticle,
+        subtitle: undefined,
+      });
       expect(prompt).not.toContain('原文副标题');
     });
 
     it('should truncate content to 3000 chars', () => {
       const longContent = 'A'.repeat(5000);
-      const prompt = adapter.getAdaptationPrompt({ ...mockArticle, content: longContent });
+      const prompt = adapter.getAdaptationPrompt({
+        ...mockArticle,
+        content: longContent,
+      });
       const contentMatch = prompt.match(/正文：\n([\s\S]+?)\n\n要求/);
       expect(contentMatch![1].length).toBeLessThanOrEqual(3000);
     });

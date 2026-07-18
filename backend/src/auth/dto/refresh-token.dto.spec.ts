@@ -14,7 +14,9 @@ describe('RefreshTokenDto (issue #49)', () => {
     const dto = plainToInstance(RefreshTokenDto, { token: '' });
     const errors = await validate(dto as object);
     const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
-    expect(messages.some((m) => /token/.test(m) || /length/i.test(m))).toBe(true);
+    expect(messages.some((m) => /token/.test(m) || /length/i.test(m))).toBe(
+      true,
+    );
   });
 
   it('rejects a non-string token', async () => {

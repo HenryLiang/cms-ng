@@ -8,12 +8,16 @@ import { ChatCompletionProvider } from './providers';
  * Replicate the factory logic from ai.module.ts to test it in isolation.
  * This avoids Nest DI container complexity while testing the same logic.
  */
-function createChatProvider(envMap: Record<string, string | undefined>): ChatCompletionProvider {
+function createChatProvider(
+  envMap: Record<string, string | undefined>,
+): ChatCompletionProvider {
   const config = {
     get: jest.fn((key: string) => envMap[key]),
   } as unknown as ConfigService;
 
-  const provider = (config.get<string>('AI_PROVIDER') || 'deepseek').toLowerCase();
+  const provider = (
+    config.get<string>('AI_PROVIDER') || 'deepseek'
+  ).toLowerCase();
   switch (provider) {
     case 'kimi':
       return new KimiProvider(config);
@@ -136,14 +140,18 @@ describe('AIModule — Provider Factory', () => {
     });
 
     it('should use caller temperature for DeepSeek', () => {
-      const provider = createChatProvider({ AI_PROVIDER: 'deepseek' }) as DeepSeekProvider;
+      const provider = createChatProvider({
+        AI_PROVIDER: 'deepseek',
+      }) as DeepSeekProvider;
 
       expect((provider as any).defaultTemperature).toBeUndefined();
       expect((provider as any).resolveTemperature(0.3)).toBe(0.3);
     });
 
     it('should default to 0.7 when no temperature specified', () => {
-      const provider = createChatProvider({ AI_PROVIDER: 'deepseek' }) as DeepSeekProvider;
+      const provider = createChatProvider({
+        AI_PROVIDER: 'deepseek',
+      }) as DeepSeekProvider;
       expect((provider as any).resolveTemperature(undefined)).toBe(0.7);
     });
   });

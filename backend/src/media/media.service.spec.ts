@@ -53,12 +53,10 @@ describe('MediaService', () => {
   beforeEach(async () => {
     prisma = createMockPrismaService();
     storage = {
-      put: jest
-        .fn()
-        .mockResolvedValue({
-          url: 'https://bkt.cos.ap-shanghai.myqcloud.com/x.png',
-          key: 'x.png',
-        }),
+      put: jest.fn().mockResolvedValue({
+        url: 'https://bkt.cos.ap-shanghai.myqcloud.com/x.png',
+        key: 'x.png',
+      }),
       delete: jest.fn().mockResolvedValue(undefined),
       copy: jest.fn(),
       thumbnailUrl: jest
@@ -84,7 +82,9 @@ describe('MediaService', () => {
 
   describe('upload', () => {
     it('throws when no files provided', async () => {
-      await expect(service.upload([], 'u1')).rejects.toThrow(BadRequestException);
+      await expect(service.upload([], 'u1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws on unsupported type (magic number mismatch)', async () => {
@@ -201,11 +201,15 @@ describe('MediaService', () => {
 
     it('throws NotFound when not found', async () => {
       prisma.mediaAsset.findUnique.mockResolvedValue(null);
-      await expect(service.findOne('x', 'u1')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('x', 'u1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws NotFound when owned by another user (no existence leak)', async () => {
-      prisma.mediaAsset.findUnique.mockResolvedValue(mockAsset({ ownerId: 'u2' }));
+      prisma.mediaAsset.findUnique.mockResolvedValue(
+        mockAsset({ ownerId: 'u2' }),
+      );
       await expect(service.findOne('asset-1', 'u1')).rejects.toThrow(
         NotFoundException,
       );
@@ -234,7 +238,9 @@ describe('MediaService', () => {
     });
 
     it('throws NotFound when not owned', async () => {
-      prisma.mediaAsset.findUnique.mockResolvedValue(mockAsset({ ownerId: 'u2' }));
+      prisma.mediaAsset.findUnique.mockResolvedValue(
+        mockAsset({ ownerId: 'u2' }),
+      );
       await expect(service.update('x', 'u1', { altText: 'a' })).rejects.toThrow(
         NotFoundException,
       );
@@ -267,8 +273,12 @@ describe('MediaService', () => {
     });
 
     it('throws NotFound when not owned', async () => {
-      prisma.mediaAsset.findUnique.mockResolvedValue(mockAsset({ ownerId: 'u2' }));
-      await expect(service.remove('x', 'u1')).rejects.toThrow(NotFoundException);
+      prisma.mediaAsset.findUnique.mockResolvedValue(
+        mockAsset({ ownerId: 'u2' }),
+      );
+      await expect(service.remove('x', 'u1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

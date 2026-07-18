@@ -35,7 +35,10 @@ describe('InstagramAdapter', () => {
 
     it('should truncate content to 1000 chars', () => {
       const longContent = 'A'.repeat(3000);
-      const prompt = adapter.getAdaptationPrompt({ ...mockArticle, content: longContent });
+      const prompt = adapter.getAdaptationPrompt({
+        ...mockArticle,
+        content: longContent,
+      });
       const match = prompt.match(/正文前1000字：\n([\s\S]+?)\n\nInstagram/);
       expect(match![1].length).toBeLessThanOrEqual(1000);
     });
@@ -43,13 +46,21 @@ describe('InstagramAdapter', () => {
 
   describe('validate', () => {
     it('should reject title exceeding 60 chars', () => {
-      const result = adapter.validate({ title: 'A'.repeat(70), content: 'C', tags: [] });
+      const result = adapter.validate({
+        title: 'A'.repeat(70),
+        content: 'C',
+        tags: [],
+      });
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('标题超过 60 字限制');
     });
 
     it('should reject content exceeding 800 chars', () => {
-      const result = adapter.validate({ title: 'T', content: 'A'.repeat(900), tags: [] });
+      const result = adapter.validate({
+        title: 'T',
+        content: 'A'.repeat(900),
+        tags: [],
+      });
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('正文超过 800 字限制');
     });

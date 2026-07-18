@@ -22,10 +22,12 @@ describe('RolesGuard', () => {
 
   describe('canActivate', () => {
     it('should allow public routes', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key: string) => {
-        if (key === 'isPublic') return true;
-        return undefined;
-      });
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return true;
+          return undefined;
+        });
 
       const result = guard.canActivate(createMockContext());
 
@@ -33,11 +35,13 @@ describe('RolesGuard', () => {
     });
 
     it('should allow when no @Roles() decorator', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key: string) => {
-        if (key === 'isPublic') return false;
-        if (key === 'roles') return undefined;
-        return undefined;
-      });
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return false;
+          if (key === 'roles') return undefined;
+          return undefined;
+        });
 
       const result = guard.canActivate(createMockContext());
 
@@ -45,35 +49,43 @@ describe('RolesGuard', () => {
     });
 
     it('should allow when user role matches @Roles()', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key: string) => {
-        if (key === 'isPublic') return false;
-        if (key === 'roles') return ['EDITOR', 'ADMIN'];
-        return undefined;
-      });
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return false;
+          if (key === 'roles') return ['EDITOR', 'ADMIN'];
+          return undefined;
+        });
 
-      const result = guard.canActivate(createMockContext({ user: { role: 'ADMIN' } }));
+      const result = guard.canActivate(
+        createMockContext({ user: { role: 'ADMIN' } }),
+      );
 
       expect(result).toBe(true);
     });
 
     it('should throw ForbiddenException when user role does not match', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key: string) => {
-        if (key === 'isPublic') return false;
-        if (key === 'roles') return ['EDITOR', 'ADMIN'];
-        return undefined;
-      });
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return false;
+          if (key === 'roles') return ['EDITOR', 'ADMIN'];
+          return undefined;
+        });
 
-      expect(() => guard.canActivate(createMockContext({ user: { role: 'REPORTER' } }))).toThrow(
-        ForbiddenException,
-      );
+      expect(() =>
+        guard.canActivate(createMockContext({ user: { role: 'REPORTER' } })),
+      ).toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException when user has no role', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key: string) => {
-        if (key === 'isPublic') return false;
-        if (key === 'roles') return ['EDITOR'];
-        return undefined;
-      });
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return false;
+          if (key === 'roles') return ['EDITOR'];
+          return undefined;
+        });
 
       expect(() => guard.canActivate(createMockContext({ user: {} }))).toThrow(
         ForbiddenException,

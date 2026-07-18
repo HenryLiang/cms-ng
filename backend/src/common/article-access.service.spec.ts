@@ -9,7 +9,9 @@ describe('ArticleAccessService', () => {
   let service: ArticleAccessService;
   let prisma: ReturnType<typeof createMockPrismaService>;
 
-  const mockArticle = (override?: Partial<{ authorId: string; editorId: string | null }>) => ({
+  const mockArticle = (
+    override?: Partial<{ authorId: string; editorId: string | null }>,
+  ) => ({
     id: 'article-id',
     authorId: 'author-id',
     editorId: null,
@@ -36,10 +38,15 @@ describe('ArticleAccessService', () => {
   // ===== checkAccess =====
   describe('checkAccess', () => {
     it('should allow ADMIN regardless of authorship', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ authorId: 'other-id' }),
+      );
 
       await expect(
-        service.checkAccess('article-id', { userId: 'admin-id', role: UserRole.ADMIN }),
+        service.checkAccess('article-id', {
+          userId: 'admin-id',
+          role: UserRole.ADMIN,
+        }),
       ).resolves.toBeUndefined();
       expect(prisma.article.findUnique).toHaveBeenCalledWith({
         where: { id: 'article-id' },
@@ -48,10 +55,15 @@ describe('ArticleAccessService', () => {
     });
 
     it('should allow the author', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'author-id' }));
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ authorId: 'author-id' }),
+      );
 
       await expect(
-        service.checkAccess('article-id', { userId: 'author-id', role: UserRole.REPORTER }),
+        service.checkAccess('article-id', {
+          userId: 'author-id',
+          role: UserRole.REPORTER,
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -61,7 +73,10 @@ describe('ArticleAccessService', () => {
       );
 
       await expect(
-        service.checkAccess('article-id', { userId: 'editor-id', role: UserRole.EDITOR }),
+        service.checkAccess('article-id', {
+          userId: 'editor-id',
+          role: UserRole.EDITOR,
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -69,7 +84,10 @@ describe('ArticleAccessService', () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.checkAccess('nonexistent', { userId: 'user-id', role: UserRole.REPORTER }),
+        service.checkAccess('nonexistent', {
+          userId: 'user-id',
+          role: UserRole.REPORTER,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -79,7 +97,10 @@ describe('ArticleAccessService', () => {
       );
 
       await expect(
-        service.checkAccess('article-id', { userId: 'user-id', role: UserRole.REPORTER }),
+        service.checkAccess('article-id', {
+          userId: 'user-id',
+          role: UserRole.REPORTER,
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -95,7 +116,9 @@ describe('ArticleAccessService', () => {
           { errorMessage: 'You do not have permission to modify this article' },
         ),
       ).rejects.toThrow(
-        new ForbiddenException('You do not have permission to modify this article'),
+        new ForbiddenException(
+          'You do not have permission to modify this article',
+        ),
       );
     });
 
@@ -105,9 +128,14 @@ describe('ArticleAccessService', () => {
       );
 
       await expect(
-        service.checkAccess('article-id', { userId: 'user-id', role: UserRole.REPORTER }),
+        service.checkAccess('article-id', {
+          userId: 'user-id',
+          role: UserRole.REPORTER,
+        }),
       ).rejects.toThrow(
-        new ForbiddenException('You do not have permission to access this article'),
+        new ForbiddenException(
+          'You do not have permission to access this article',
+        ),
       );
     });
   });

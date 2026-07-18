@@ -29,7 +29,7 @@ describe('CosStorageService', () => {
           putObject: mockPutObject,
           deleteObject: mockDeleteObject,
           putObjectCopy: mockPutObjectCopy,
-        } as any),
+        }) as any,
     );
   });
 
@@ -40,7 +40,10 @@ describe('CosStorageService', () => {
       setupConfig({ COS_SECRET_KEY: 'k', COS_BUCKET: 'b', COS_REGION: 'r' });
       await expect(
         Test.createTestingModule({
-          providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+          providers: [
+            CosStorageService,
+            { provide: ConfigService, useValue: config },
+          ],
         }).compile(),
       ).rejects.toThrow(/COS_SECRET_ID/);
     });
@@ -49,7 +52,10 @@ describe('CosStorageService', () => {
       setupConfig({ COS_SECRET_ID: 'i', COS_BUCKET: 'b', COS_REGION: 'r' });
       await expect(
         Test.createTestingModule({
-          providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+          providers: [
+            CosStorageService,
+            { provide: ConfigService, useValue: config },
+          ],
         }).compile(),
       ).rejects.toThrow(/COS_SECRET_KEY/);
     });
@@ -65,7 +71,10 @@ describe('CosStorageService', () => {
         COS_REGION: 'ap-shanghai',
       });
       const mod = await Test.createTestingModule({
-        providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+        providers: [
+          CosStorageService,
+          { provide: ConfigService, useValue: config },
+        ],
       }).compile();
       serviceRef = mod.get(CosStorageService);
     });
@@ -97,7 +106,10 @@ describe('CosStorageService', () => {
         return d ?? '';
       });
       const mod = await Test.createTestingModule({
-        providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+        providers: [
+          CosStorageService,
+          { provide: ConfigService, useValue: config },
+        ],
       }).compile();
       const s = mod.get(CosStorageService);
       const r = await s.put('cms-ng/x.png', Buffer.from('x'), 'image/png');
@@ -121,7 +133,10 @@ describe('CosStorageService', () => {
         COS_REGION: 'ap-shanghai',
       });
       const mod = await Test.createTestingModule({
-        providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+        providers: [
+          CosStorageService,
+          { provide: ConfigService, useValue: config },
+        ],
       }).compile();
       const s = mod.get(CosStorageService);
       await s.delete('cms-ng/x.png');
@@ -142,7 +157,10 @@ describe('CosStorageService', () => {
         COS_REGION: 'ap-shanghai',
       });
       const mod = await Test.createTestingModule({
-        providers: [CosStorageService, { provide: ConfigService, useValue: config }],
+        providers: [
+          CosStorageService,
+          { provide: ConfigService, useValue: config },
+        ],
       }).compile();
       const s = mod.get(CosStorageService);
       const r = await s.copy(

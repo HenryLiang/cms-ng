@@ -50,7 +50,9 @@ describe('TopicCollectionStep', () => {
     jest.clearAllMocks();
   });
 
-  const createCtx = (overrides: Partial<PipelineContext> = {}): PipelineContext => ({
+  const createCtx = (
+    overrides: Partial<PipelineContext> = {},
+  ): PipelineContext => ({
     taskId: 'task-1',
     runId: 'run-1',
     articleId: 'article-1',
@@ -196,9 +198,7 @@ describe('TopicCollectionStep', () => {
       mockPrisma.autoPublishTask.findUnique.mockResolvedValue(task);
       mockPrisma.autoPublishArticle.findMany.mockResolvedValue([]);
 
-      await expect(step.execute(ctx)).rejects.toThrow(
-        'No available topics',
-      );
+      await expect(step.execute(ctx)).rejects.toThrow('No available topics');
     });
   });
 });

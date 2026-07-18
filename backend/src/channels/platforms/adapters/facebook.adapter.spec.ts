@@ -40,7 +40,10 @@ describe('FacebookAdapter', () => {
     });
 
     it('should handle article without subtitle', () => {
-      const prompt = adapter.getAdaptationPrompt({ ...mockArticle, subtitle: undefined });
+      const prompt = adapter.getAdaptationPrompt({
+        ...mockArticle,
+        subtitle: undefined,
+      });
       expect(prompt).not.toContain('原文副标题');
     });
   });
@@ -65,13 +68,21 @@ describe('FacebookAdapter', () => {
     });
 
     it('should reject title exceeding 80 chars', () => {
-      const result = adapter.validate({ title: 'A'.repeat(100), content: 'C', tags: [] });
+      const result = adapter.validate({
+        title: 'A'.repeat(100),
+        content: 'C',
+        tags: [],
+      });
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('标题超过 80 字限制');
     });
 
     it('should reject content exceeding 2000 chars', () => {
-      const result = adapter.validate({ title: 'T', content: 'A'.repeat(2500), tags: [] });
+      const result = adapter.validate({
+        title: 'T',
+        content: 'A'.repeat(2500),
+        tags: [],
+      });
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('正文超过 2000 字限制');
     });

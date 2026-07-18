@@ -55,7 +55,9 @@ describe('UsersController', () => {
 
   describe('findEditors', () => {
     it('should return editor users', async () => {
-      usersService.findEditors.mockResolvedValue([{ id: 'e1', name: 'Editor' }]);
+      usersService.findEditors.mockResolvedValue([
+        { id: 'e1', name: 'Editor' },
+      ]);
 
       const result = await controller.findEditors();
 
@@ -77,7 +79,10 @@ describe('UsersController', () => {
 
   describe('update', () => {
     it('should allow admin to update any user', async () => {
-      const dto = { name: 'Updated Name', preferredLanguage: 'ENGLISH' as const };
+      const dto = {
+        name: 'Updated Name',
+        preferredLanguage: 'ENGLISH' as const,
+      };
       usersService.update.mockResolvedValue({ id: 'u2', name: 'Updated Name' });
       const admin = { userId: 'admin-id', role: UserRole.ADMIN };
 
@@ -123,7 +128,11 @@ describe('UsersController', () => {
 
       const result = await controller.updateStatus('u2', dto, 'admin-id');
 
-      expect(usersService.setStatus).toHaveBeenCalledWith('u2', dto, 'admin-id');
+      expect(usersService.setStatus).toHaveBeenCalledWith(
+        'u2',
+        dto,
+        'admin-id',
+      );
       expect(result.isActive).toBe(false);
     });
   });

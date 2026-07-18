@@ -133,7 +133,7 @@ describe('TrendingTopicsController', () => {
 
       const result = await controller.create('user-id', {
         title: 'Topic',
-      } as any);
+      });
 
       expect(topicsService.create).toHaveBeenCalledWith('user-id', {
         title: 'Topic',
@@ -185,7 +185,7 @@ describe('TrendingTopicsController', () => {
 
       const result = await controller.update('user-id', 'REPORTER', 't1', {
         title: 'Updated',
-      } as any);
+      });
 
       expect(topicsService.update).toHaveBeenCalledWith(
         't1',
@@ -426,7 +426,7 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchXTrends('user-id', 'abc', {} as any);
+      await controller.fetchXTrends('user-id', 'abc', {});
       expect(twitterService.fetchTrends).toHaveBeenCalledWith(
         'user-id',
         1,

@@ -82,9 +82,15 @@ describe('ArticlesController', () => {
     it('should call articlesService.create', async () => {
       articlesService.create.mockResolvedValue(mockArticle());
 
-      const result = await controller.create('author-id', { title: 'Test', storyId: 's1' } as any);
+      const result = await controller.create('author-id', {
+        title: 'Test',
+        storyId: 's1',
+      } as any);
 
-      expect(articlesService.create).toHaveBeenCalledWith('author-id', { title: 'Test', storyId: 's1' });
+      expect(articlesService.create).toHaveBeenCalledWith('author-id', {
+        title: 'Test',
+        storyId: 's1',
+      });
       expect(result.title).toBe('Test Article');
     });
   });
@@ -98,7 +104,9 @@ describe('ArticlesController', () => {
 
       const result = await controller.findAll(mockUser, { storyId: 's1' });
 
-      expect(articlesService.findAll).toHaveBeenCalledWith(mockUser, { storyId: 's1' });
+      expect(articlesService.findAll).toHaveBeenCalledWith(mockUser, {
+        storyId: 's1',
+      });
       expect(result.data).toHaveLength(1);
     });
 
@@ -128,41 +136,62 @@ describe('ArticlesController', () => {
   describe('findOne', () => {
     it('should return article when user is author', async () => {
       articlesService.verifyAccess.mockResolvedValue(undefined);
-      articlesService.findOne.mockResolvedValue(mockArticle({ authorId: 'author-id' }));
+      articlesService.findOne.mockResolvedValue(
+        mockArticle({ authorId: 'author-id' }),
+      );
 
       const result = await controller.findOne('article-id', mockUser);
 
-      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockUser,
+      );
       expect(articlesService.findOne).toHaveBeenCalledWith('article-id');
       expect(result.id).toBe('article-id');
     });
 
     it('should return article when user is admin', async () => {
       articlesService.verifyAccess.mockResolvedValue(undefined);
-      articlesService.findOne.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
+      articlesService.findOne.mockResolvedValue(
+        mockArticle({ authorId: 'other-id' }),
+      );
 
       const result = await controller.findOne('article-id', mockAdmin);
 
-      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockAdmin);
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockAdmin,
+      );
       expect(result.id).toBe('article-id');
     });
 
     it('should throw ForbiddenException when no access', async () => {
       articlesService.verifyAccess.mockRejectedValue(new ForbiddenException());
 
-      await expect(controller.findOne('article-id', mockUser)).rejects.toThrow(ForbiddenException);
+      await expect(controller.findOne('article-id', mockUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
   describe('update', () => {
     it('should verify access then update', async () => {
       articlesService.verifyAccess.mockResolvedValue(undefined);
-      articlesService.update.mockResolvedValue(mockArticle({ title: 'Updated' }));
+      articlesService.update.mockResolvedValue(
+        mockArticle({ title: 'Updated' }),
+      );
 
-      const result = await controller.update(mockUser, 'article-id', { title: 'Updated' } as any);
+      const result = await controller.update(mockUser, 'article-id', {
+        title: 'Updated',
+      });
 
-      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
-      expect(articlesService.update).toHaveBeenCalledWith('article-id', { title: 'Updated' });
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockUser,
+      );
+      expect(articlesService.update).toHaveBeenCalledWith('article-id', {
+        title: 'Updated',
+      });
       expect(result.title).toBe('Updated');
     });
   });
@@ -174,7 +203,10 @@ describe('ArticlesController', () => {
 
       const result = await controller.remove('article-id', mockUser);
 
-      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockUser,
+      );
       expect(articlesService.remove).toHaveBeenCalledWith('article-id');
       expect(result.success).toBe(true);
     });
@@ -187,7 +219,10 @@ describe('ArticlesController', () => {
 
       const result = await controller.getVersions('article-id', mockUser);
 
-      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockUser,
+      );
       expect(articlesService.getVersions).toHaveBeenCalledWith('article-id');
       expect(result).toHaveLength(1);
     });
@@ -195,7 +230,9 @@ describe('ArticlesController', () => {
     it('should throw ForbiddenException when no access', async () => {
       articlesService.verifyAccess.mockRejectedValue(new ForbiddenException());
 
-      await expect(controller.getVersions('article-id', mockUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.getVersions('article-id', mockUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -206,7 +243,10 @@ describe('ArticlesController', () => {
 
       const result = await controller.rollback(mockUser, 'article-id', '3');
 
-      expect(articlesService.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockUser,
+      );
       expect(articlesService.rollback).toHaveBeenCalledWith('article-id', 3);
       expect(result.id).toBe('article-id');
     });
@@ -214,22 +254,38 @@ describe('ArticlesController', () => {
 
   describe('assignEditor', () => {
     it('should call assignEditor', async () => {
-      articlesService.assignEditor.mockResolvedValue(mockArticle({ editorId: 'editor-id' }));
+      articlesService.assignEditor.mockResolvedValue(
+        mockArticle({ editorId: 'editor-id' }),
+      );
 
       const result = await controller.assignEditor('article-id', 'editor-id');
 
-      expect(articlesService.assignEditor).toHaveBeenCalledWith('article-id', 'editor-id');
+      expect(articlesService.assignEditor).toHaveBeenCalledWith(
+        'article-id',
+        'editor-id',
+      );
       expect(result.editorId).toBe('editor-id');
     });
   });
 
   describe('submitReview', () => {
     it('should call submitReview with decision', async () => {
-      articlesService.submitReview.mockResolvedValue({ article: mockArticle(), decision: 'APPROVE' });
+      articlesService.submitReview.mockResolvedValue({
+        article: mockArticle(),
+        decision: 'APPROVE',
+      });
 
-      const result = await controller.submitReview('article-id', 'editor-id', { decision: 'APPROVE', comment: 'Good' });
+      const result = await controller.submitReview('article-id', 'editor-id', {
+        decision: 'APPROVE',
+        comment: 'Good',
+      });
 
-      expect(articlesService.submitReview).toHaveBeenCalledWith('article-id', 'editor-id', 'APPROVE', 'Good');
+      expect(articlesService.submitReview).toHaveBeenCalledWith(
+        'article-id',
+        'editor-id',
+        'APPROVE',
+        'Good',
+      );
       expect(result.decision).toBe('APPROVE');
     });
   });
@@ -238,10 +294,18 @@ describe('ArticlesController', () => {
   const aiTests = [
     { name: 'aiRewrite', method: 'aiRewrite' as const, dto: { text: 'Hello' } },
     { name: 'aiExpand', method: 'aiExpand' as const, dto: { text: 'Hello' } },
-    { name: 'aiCondense', method: 'aiCondense' as const, dto: { text: 'Hello' } },
+    {
+      name: 'aiCondense',
+      method: 'aiCondense' as const,
+      dto: { text: 'Hello' },
+    },
     { name: 'aiPolish', method: 'aiPolish' as const, dto: { text: 'Hello' } },
     { name: 'aiHeadlines', method: 'aiHeadlines' as const, dto: { count: 3 } },
-    { name: 'aiExcerpt', method: 'aiExcerpt' as const, dto: { maxLength: 100 } },
+    {
+      name: 'aiExcerpt',
+      method: 'aiExcerpt' as const,
+      dto: { maxLength: 100 },
+    },
     { name: 'aiChat', method: 'aiChat' as const, dto: { messages: [] } },
     { name: 'aiFactCheck', method: 'aiFactCheck' as const, dto: {} },
     { name: 'aiReview', method: 'aiReview' as const, dto: {} },
@@ -252,9 +316,17 @@ describe('ArticlesController', () => {
       it(`should call articlesService.${method}`, async () => {
         articlesService[method].mockResolvedValue({ result: 'AI output' });
 
-        const result = await (controller as any)[method](mockUser, 'article-id', dto as any);
+        const result = await (controller as any)[method](
+          mockUser,
+          'article-id',
+          dto as any,
+        );
 
-        expect(articlesService[method]).toHaveBeenCalledWith('article-id', mockUser, dto);
+        expect(articlesService[method]).toHaveBeenCalledWith(
+          'article-id',
+          mockUser,
+          dto,
+        );
         expect(result.result).toBe('AI output');
       });
     });

@@ -4,10 +4,12 @@ import { buildCorsOptions } from './cors.config';
 describe('buildCorsOptions', () => {
   it('development env without CORS_ORIGINS allows http://localhost:3000', () => {
     const opts = buildCorsOptions({ NODE_ENV: 'development' });
-    const origin = (opts.origin as (o: string | undefined, cb: (e: Error | null, ok: boolean) => void) => void)(
-      'http://localhost:3000',
-      () => {},
-    );
+    const origin = (
+      opts.origin as (
+        o: string | undefined,
+        cb: (e: Error | null, ok: boolean) => void,
+      ) => void
+    )('http://localhost:3000', () => {});
     // origin is a function; check it via the helper below
     expect(checkOrigin(opts, 'http://localhost:3000')).toBe(true);
   });
@@ -62,12 +64,17 @@ describe('buildCorsOptions', () => {
   it('allows credentials and the documented HTTP methods', () => {
     const opts = buildCorsOptions({ NODE_ENV: 'development' });
     expect(opts.credentials).toBe(true);
-    expect(opts.methods).toEqual(expect.arrayContaining(['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']));
+    expect(opts.methods).toEqual(
+      expect.arrayContaining(['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']),
+    );
   });
 });
 
 // Helper to invoke the origin callback (which can be a function in NestJS CORS options)
-function checkOrigin(opts: ReturnType<typeof buildCorsOptions>, origin: string | undefined): boolean {
+function checkOrigin(
+  opts: ReturnType<typeof buildCorsOptions>,
+  origin: string | undefined,
+): boolean {
   // When opts.origin is a function, call it with the origin and a callback
   if (typeof opts.origin === 'function') {
     let allowed = false;

@@ -69,14 +69,25 @@ describe('TavilySearchTool', () => {
           query: 'test query',
           answer: 'Test answer',
           results: [
-            { title: 'Result 1', url: 'https://example.com/1', content: 'Content 1', score: 0.9, published_date: '2024-01-15' },
-            { title: 'Result 2', url: 'https://example.com/2', content: 'Content 2', score: 0.8 },
+            {
+              title: 'Result 1',
+              url: 'https://example.com/1',
+              content: 'Content 1',
+              score: 0.9,
+              published_date: '2024-01-15',
+            },
+            {
+              title: 'Result 2',
+              url: 'https://example.com/2',
+              content: 'Content 2',
+              score: 0.8,
+            },
           ],
           response_time: 1.23,
         },
       });
 
-      const result = await tool.execute({ query: 'test query' }) as any;
+      const result = (await tool.execute({ query: 'test query' })) as any;
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       const callArgs = mockedAxios.post.mock.calls[0];
@@ -153,7 +164,9 @@ describe('TavilySearchTool', () => {
     it('should return error when API key is not configured', async () => {
       config.get.mockReturnValue(undefined);
 
-      const unconfiguredTool = new TavilySearchTool(config as unknown as ConfigService);
+      const unconfiguredTool = new TavilySearchTool(
+        config as unknown as ConfigService,
+      );
       const result = await unconfiguredTool.execute({ query: 'test' });
 
       expect(result).toEqual({ error: 'Tavily API key not configured' });
@@ -170,7 +183,7 @@ describe('TavilySearchTool', () => {
     it('should handle API failure gracefully', async () => {
       mockedAxios.post.mockRejectedValue(new Error('Network error'));
 
-      const result = await tool.execute({ query: 'test' }) as any;
+      const result = (await tool.execute({ query: 'test' })) as any;
 
       expect(result.error).toBe('Search failed');
       expect(result.message).toBe('Network error');
@@ -181,7 +194,7 @@ describe('TavilySearchTool', () => {
       error.response = { data: { detail: 'Invalid API key' } };
       mockedAxios.post.mockRejectedValue(error);
 
-      const result = await tool.execute({ query: 'test' }) as any;
+      const result = (await tool.execute({ query: 'test' })) as any;
 
       expect(result.error).toBe('Search failed');
       expect(result.message).toBe('Bad request');
@@ -195,7 +208,7 @@ describe('TavilySearchTool', () => {
         },
       });
 
-      const result = await tool.execute({ query: 'test' }) as any;
+      const result = (await tool.execute({ query: 'test' })) as any;
 
       expect(result.answer).toBe('');
       expect(result.results).toEqual([]);

@@ -22,7 +22,8 @@ describe('WordPressService', () => {
     title: '测试文章',
     content: '<p>测试内容</p>',
     excerpt: '摘要',
-    coverImage: 'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-1/cover.png',
+    coverImage:
+      'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-1/cover.png',
     tags: '["标签1"]',
   };
 
@@ -63,7 +64,12 @@ describe('WordPressService', () => {
       checkBalance: jest.fn().mockResolvedValue(true),
       deduct: jest.fn().mockResolvedValue(null),
       credit: jest.fn().mockResolvedValue(null),
-      estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0, breakdown: [], sufficientBalance: true, currentBalance: 100 }),
+      estimateCost: jest.fn().mockResolvedValue({
+        estimatedCost: 0,
+        breakdown: [],
+        sufficientBalance: true,
+        currentBalance: 100,
+      }),
       checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
       getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.02 }),
     };
@@ -91,8 +97,14 @@ describe('WordPressService', () => {
         return 'value';
       });
       const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
-      const svc = new WordPressService(prisma as any, configService as any, mockBilling as any);
-      await expect(svc.publish('article-1')).rejects.toThrow('WordPress 配置不完整');
+      const svc = new WordPressService(
+        prisma as any,
+        configService as any,
+        mockBilling as any,
+      );
+      await expect(svc.publish('article-1')).rejects.toThrow(
+        'WordPress 配置不完整',
+      );
     });
 
     it('should throw if WORDPRESS_USERNAME is missing', async () => {
@@ -101,8 +113,14 @@ describe('WordPressService', () => {
         return 'value';
       });
       const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
-      const svc = new WordPressService(prisma as any, configService as any, mockBilling as any);
-      await expect(svc.publish('article-1')).rejects.toThrow('WordPress 配置不完整');
+      const svc = new WordPressService(
+        prisma as any,
+        configService as any,
+        mockBilling as any,
+      );
+      await expect(svc.publish('article-1')).rejects.toThrow(
+        'WordPress 配置不完整',
+      );
     });
 
     it('should throw if WORDPRESS_APP_PASSWORD is missing', async () => {
@@ -111,21 +129,31 @@ describe('WordPressService', () => {
         return 'value';
       });
       const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
-      const svc = new WordPressService(prisma as any, configService as any, mockBilling as any);
-      await expect(svc.publish('article-1')).rejects.toThrow('WordPress 配置不完整');
+      const svc = new WordPressService(
+        prisma as any,
+        configService as any,
+        mockBilling as any,
+      );
+      await expect(svc.publish('article-1')).rejects.toThrow(
+        'WordPress 配置不完整',
+      );
     });
   });
 
   describe('publish', () => {
     it('should throw if article not found', async () => {
       prisma.article.findUnique.mockResolvedValue(null);
-      await expect(service.publish('nonexistent')).rejects.toThrow('文章不存在');
+      await expect(service.publish('nonexistent')).rejects.toThrow(
+        '文章不存在',
+      );
     });
 
     it('should throw if no WordPress adaptation exists', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle);
       prisma.platformPublish.findFirst.mockResolvedValue(null);
-      await expect(service.publish('article-1')).rejects.toThrow('请先生成 WordPress 适配内容');
+      await expect(service.publish('article-1')).rejects.toThrow(
+        '请先生成 WordPress 适配内容',
+      );
     });
 
     it('should throw if adaptation status is GENERATING', async () => {
@@ -134,7 +162,9 @@ describe('WordPressService', () => {
         ...mockPublish,
         status: PublishStatus.GENERATING,
       });
-      await expect(service.publish('article-1')).rejects.toThrow('适配内容未就绪');
+      await expect(service.publish('article-1')).rejects.toThrow(
+        '适配内容未就绪',
+      );
     });
 
     it('should throw if adaptation status is FAILED', async () => {
@@ -143,7 +173,9 @@ describe('WordPressService', () => {
         ...mockPublish,
         status: PublishStatus.FAILED,
       });
-      await expect(service.publish('article-1')).rejects.toThrow('适配内容未就绪');
+      await expect(service.publish('article-1')).rejects.toThrow(
+        '适配内容未就绪',
+      );
     });
 
     it('should set status to FAILED on WordPress API error', async () => {
@@ -159,7 +191,9 @@ describe('WordPressService', () => {
       });
       global.fetch = mockFetch;
 
-      await expect(service.publish('article-1')).rejects.toThrow('WordPress 发布失败');
+      await expect(service.publish('article-1')).rejects.toThrow(
+        'WordPress 发布失败',
+      );
 
       // Verify status was set to FAILED
       const failedUpdateCall = prisma.platformPublish.update.mock.calls.find(
@@ -176,7 +210,10 @@ describe('WordPressService', () => {
       prisma.platformPublish.update.mockImplementation(() => {
         updateCallCount++;
         if (updateCallCount === 1) {
-          return Promise.resolve({ id: 'publish-1', status: PublishStatus.GENERATING });
+          return Promise.resolve({
+            id: 'publish-1',
+            status: PublishStatus.GENERATING,
+          });
         }
         return Promise.resolve({
           id: 'publish-1',
@@ -198,7 +235,10 @@ describe('WordPressService', () => {
         }
         // Tag creation
         if (fetchCallCount === 2) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 10 }) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 10 }),
+          });
         }
         // Tag search -> no match (2nd tag)
         if (fetchCallCount === 3) {
@@ -206,7 +246,10 @@ describe('WordPressService', () => {
         }
         // Tag creation (2nd tag)
         if (fetchCallCount === 4) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 11 }) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 11 }),
+          });
         }
         // Image download
         if (fetchCallCount === 5) {
@@ -220,13 +263,18 @@ describe('WordPressService', () => {
         if (fetchCallCount === 6) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ id: 20, source_url: 'https://wp.test/wp-content/uploads/cover.jpg' }),
+            json: () =>
+              Promise.resolve({
+                id: 20,
+                source_url: 'https://wp.test/wp-content/uploads/cover.jpg',
+              }),
           });
         }
         // Post creation
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ id: 1, link: 'https://wp.test/post/1' }),
+          json: () =>
+            Promise.resolve({ id: 1, link: 'https://wp.test/post/1' }),
         });
       });
       global.fetch = mockFetch;
@@ -249,7 +297,10 @@ describe('WordPressService', () => {
       prisma.platformPublish.update.mockImplementation(() => {
         updateCallCount++;
         if (updateCallCount === 1) {
-          return Promise.resolve({ id: 'publish-1', status: PublishStatus.GENERATING });
+          return Promise.resolve({
+            id: 'publish-1',
+            status: PublishStatus.GENERATING,
+          });
         }
         return Promise.resolve({
           id: 'publish-1',
@@ -265,7 +316,8 @@ describe('WordPressService', () => {
       global.fetch = jest.fn().mockImplementation(() => {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ id: 2, link: 'https://wp.test/post/2' }),
+          json: () =>
+            Promise.resolve({ id: 2, link: 'https://wp.test/post/2' }),
         });
       });
 
@@ -277,7 +329,10 @@ describe('WordPressService', () => {
 
   describe('publish with draft mode', () => {
     it('should pass draft status to WordPress API', async () => {
-      prisma.article.findUnique.mockResolvedValue({ ...mockArticle, coverImage: null });
+      prisma.article.findUnique.mockResolvedValue({
+        ...mockArticle,
+        coverImage: null,
+      });
       prisma.platformPublish.findFirst.mockResolvedValue(mockPublish);
 
       let updateCallCount = 0;

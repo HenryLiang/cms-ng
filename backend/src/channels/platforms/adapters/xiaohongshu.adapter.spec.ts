@@ -48,9 +48,14 @@ describe('XiaohongshuAdapter', () => {
 
     it('should truncate long content', () => {
       const longContent = 'A'.repeat(5000);
-      const prompt = adapter.getAdaptationPrompt({ ...mockArticle, content: longContent });
+      const prompt = adapter.getAdaptationPrompt({
+        ...mockArticle,
+        content: longContent,
+      });
       // Content should be truncated to ~1500 chars
-      const contentMatch = prompt.match(/正文前1500字：\n([\s\S]+?)\n\n小红书笔记要求/);
+      const contentMatch = prompt.match(
+        /正文前1500字：\n([\s\S]+?)\n\n小红书笔记要求/,
+      );
       expect(contentMatch).not.toBeNull();
       expect(contentMatch![1].length).toBeLessThanOrEqual(1500);
     });
@@ -72,7 +77,8 @@ describe('XiaohongshuAdapter', () => {
     });
 
     it('should parse JSON from markdown code fence', () => {
-      const raw = '```json\n{"title": "Test", "content": "Body", "tags": ["#tag"]}\n```';
+      const raw =
+        '```json\n{"title": "Test", "content": "Body", "tags": ["#tag"]}\n```';
       const result = adapter.postProcess(raw);
       expect(result.title).toBe('Test');
       expect(result.tags).toEqual(['#tag']);
@@ -93,7 +99,11 @@ describe('XiaohongshuAdapter', () => {
     });
 
     it('should handle tags that are not array', () => {
-      const raw = JSON.stringify({ title: 'Test', content: 'Body', tags: 'not-array' });
+      const raw = JSON.stringify({
+        title: 'Test',
+        content: 'Body',
+        tags: 'not-array',
+      });
       const result = adapter.postProcess(raw);
       expect(result.tags).toEqual([]);
     });
@@ -117,7 +127,11 @@ describe('XiaohongshuAdapter', () => {
     });
 
     it('should reject empty content', () => {
-      const result = adapter.validate({ title: 'Title', content: '', tags: [] });
+      const result = adapter.validate({
+        title: 'Title',
+        content: '',
+        tags: [],
+      });
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('正文不能为空');
     });

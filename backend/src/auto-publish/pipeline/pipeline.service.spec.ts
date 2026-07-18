@@ -88,7 +88,12 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
     checkBalance: jest.fn().mockResolvedValue(true),
     deduct: jest.fn().mockResolvedValue(null),
     credit: jest.fn().mockResolvedValue(null),
-    estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0, breakdown: [], sufficientBalance: true, currentBalance: 100 }),
+    estimateCost: jest.fn().mockResolvedValue({
+      estimatedCost: 0,
+      breakdown: [],
+      sufficientBalance: true,
+      currentBalance: 100,
+    }),
     checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
     getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.02 }),
   };
@@ -96,7 +101,9 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
   const billingCheckStep = {
     name: 'billing_check',
     successStatus: ArticleRunStatus.PENDING,
-    execute: jest.fn().mockImplementation((ctx: PipelineContext) => Promise.resolve(ctx)),
+    execute: jest
+      .fn()
+      .mockImplementation((ctx: PipelineContext) => Promise.resolve(ctx)),
   };
 
   beforeEach(async () => {

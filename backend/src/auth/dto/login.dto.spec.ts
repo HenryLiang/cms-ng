@@ -6,7 +6,10 @@ describe('LoginDto', () => {
   const createDto = (data: any) => plainToInstance(LoginDto, data);
 
   it('should pass with valid email and password', async () => {
-    const dto = createDto({ email: 'test@example.com', password: 'password123' });
+    const dto = createDto({
+      email: 'test@example.com',
+      password: 'password123',
+    });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });

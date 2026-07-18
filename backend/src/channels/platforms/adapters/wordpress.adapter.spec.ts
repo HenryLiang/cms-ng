@@ -60,7 +60,8 @@ describe('WordPressAdapter', () => {
         content: longContent,
         tags: [],
       });
-      const contentInPrompt = prompt.split('正文：\n')[1]?.split('\n\n要求')[0] || '';
+      const contentInPrompt =
+        prompt.split('正文：\n')[1]?.split('\n\n要求')[0] || '';
       expect(contentInPrompt.length).toBeLessThanOrEqual(5000);
     });
   });
@@ -89,7 +90,11 @@ describe('WordPressAdapter', () => {
     });
 
     it('should handle non-array tags in JSON', () => {
-      const raw = JSON.stringify({ title: '标题', content: '内容', tags: 'not-array' });
+      const raw = JSON.stringify({
+        title: '标题',
+        content: '内容',
+        tags: 'not-array',
+      });
       const result = adapter.postProcess(raw);
       expect(result.tags).toEqual([]);
     });

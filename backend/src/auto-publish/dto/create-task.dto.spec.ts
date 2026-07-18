@@ -17,7 +17,9 @@ async function validateDto<T extends object>(
   DtoClass: new () => T,
   plain: Record<string, unknown>,
 ): Promise<ValidationError[]> {
-  const instance = plainToInstance(DtoClass, plain, { enableImplicitConversion: false });
+  const instance = plainToInstance(DtoClass, plain, {
+    enableImplicitConversion: false,
+  });
   return validate(instance as object, {
     whitelist: true,
     forbidNonWhitelisted: false,
@@ -45,7 +47,9 @@ describe('CreateTaskDto — #46 ContentConfigDto.language @IsEnum', () => {
       language: 'KLINGON',
     });
     const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
-    expect(messages.some((m) => /language/.test(m) || /ContentLanguage/.test(m))).toBe(true);
+    expect(
+      messages.some((m) => /language/.test(m) || /ContentLanguage/.test(m)),
+    ).toBe(true);
   });
 
   it('accepts every valid ContentLanguage value', async () => {
@@ -66,7 +70,9 @@ describe('CreateTaskDto — #47 PublishConfigDto.platform @IsEnum', () => {
       platform: 'NOT_A_PLATFORM',
     });
     const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
-    expect(messages.some((m) => /platform/.test(m) || /Platform/.test(m))).toBe(true);
+    expect(messages.some((m) => /platform/.test(m) || /Platform/.test(m))).toBe(
+      true,
+    );
   });
 
   it('accepts every valid Platform value', async () => {

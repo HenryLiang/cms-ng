@@ -60,14 +60,20 @@ describe('StoriesController', () => {
     it('should call storiesService.create', async () => {
       storiesService.create.mockResolvedValue(mockStory());
 
-      const result = await controller.create('user-id', { title: 'Test' } as any);
+      const result = await controller.create('user-id', {
+        title: 'Test',
+      });
 
-      expect(storiesService.create).toHaveBeenCalledWith('user-id', { title: 'Test' });
+      expect(storiesService.create).toHaveBeenCalledWith('user-id', {
+        title: 'Test',
+      });
       expect(result.title).toBe('Test Story');
     });
 
     it('should pass contentLanguage when provided', async () => {
-      storiesService.create.mockResolvedValue(mockStory({ contentLanguage: 'TRADITIONAL_CHINESE_HK' }));
+      storiesService.create.mockResolvedValue(
+        mockStory({ contentLanguage: 'TRADITIONAL_CHINESE_HK' }),
+      );
 
       const result = await controller.create('user-id', {
         title: 'Test',
@@ -111,29 +117,41 @@ describe('StoriesController', () => {
   describe('findOne', () => {
     it('should return story when user is author', async () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
-      storiesService.findOne.mockResolvedValue(mockStory({ reporterId: 'user-id' }));
+      storiesService.findOne.mockResolvedValue(
+        mockStory({ reporterId: 'user-id' }),
+      );
 
       const result = await controller.findOne('story-id', mockUser);
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockUser,
+      );
       expect(storiesService.findOne).toHaveBeenCalledWith('story-id');
       expect(result.id).toBe('story-id');
     });
 
     it('should return story when user is admin', async () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
-      storiesService.findOne.mockResolvedValue(mockStory({ reporterId: 'other-id' }));
+      storiesService.findOne.mockResolvedValue(
+        mockStory({ reporterId: 'other-id' }),
+      );
 
       const result = await controller.findOne('story-id', mockAdmin);
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockAdmin);
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockAdmin,
+      );
       expect(result.id).toBe('story-id');
     });
 
     it('should throw ForbiddenException when user has no access', async () => {
       storiesService.verifyAccess.mockRejectedValue(new ForbiddenException());
 
-      await expect(controller.findOne('story-id', mockUser)).rejects.toThrow(ForbiddenException);
+      await expect(controller.findOne('story-id', mockUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -142,21 +160,41 @@ describe('StoriesController', () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
       storiesService.update.mockResolvedValue(mockStory({ title: 'Updated' }));
 
-      const result = await controller.update('story-id', { title: 'Updated' } as any, mockUser);
+      const result = await controller.update(
+        'story-id',
+        { title: 'Updated' },
+        mockUser,
+      );
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
-      expect(storiesService.update).toHaveBeenCalledWith('story-id', { title: 'Updated' });
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockUser,
+      );
+      expect(storiesService.update).toHaveBeenCalledWith('story-id', {
+        title: 'Updated',
+      });
       expect(result.title).toBe('Updated');
     });
 
     it('should pass contentLanguage when updating', async () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
-      storiesService.update.mockResolvedValue(mockStory({ contentLanguage: 'SIMPLIFIED_CHINESE' }));
+      storiesService.update.mockResolvedValue(
+        mockStory({ contentLanguage: 'SIMPLIFIED_CHINESE' }),
+      );
 
-      const result = await controller.update('story-id', { contentLanguage: 'SIMPLIFIED_CHINESE' } as any, mockUser);
+      const result = await controller.update(
+        'story-id',
+        { contentLanguage: 'SIMPLIFIED_CHINESE' } as any,
+        mockUser,
+      );
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
-      expect(storiesService.update).toHaveBeenCalledWith('story-id', { contentLanguage: 'SIMPLIFIED_CHINESE' });
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockUser,
+      );
+      expect(storiesService.update).toHaveBeenCalledWith('story-id', {
+        contentLanguage: 'SIMPLIFIED_CHINESE',
+      });
       expect(result.contentLanguage).toBe('SIMPLIFIED_CHINESE');
     });
   });
@@ -168,7 +206,10 @@ describe('StoriesController', () => {
 
       const result = await controller.remove('story-id', mockUser);
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockUser,
+      );
       expect(storiesService.remove).toHaveBeenCalledWith('story-id');
       expect(result.success).toBe(true);
     });
@@ -176,11 +217,16 @@ describe('StoriesController', () => {
 
   describe('assignEditor', () => {
     it('should call assignEditor', async () => {
-      storiesService.assignEditor.mockResolvedValue(mockStory({ editorId: 'editor-id' }));
+      storiesService.assignEditor.mockResolvedValue(
+        mockStory({ editorId: 'editor-id' }),
+      );
 
       const result = await controller.assignEditor('story-id', 'editor-id');
 
-      expect(storiesService.assignEditor).toHaveBeenCalledWith('story-id', 'editor-id');
+      expect(storiesService.assignEditor).toHaveBeenCalledWith(
+        'story-id',
+        'editor-id',
+      );
       expect(result.editorId).toBe('editor-id');
     });
   });
@@ -189,13 +235,23 @@ describe('StoriesController', () => {
     it('should verify access and call generateResearchKit', async () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
       storiesService.generateResearchKit.mockResolvedValue({
-        timeline: [], people: [], data: [], opinions: [],
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
       });
 
       const result = await controller.generateResearchKit('story-id', mockUser);
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
-      expect(storiesService.generateResearchKit).toHaveBeenCalledWith('user-id', 'story-id', undefined);
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockUser,
+      );
+      expect(storiesService.generateResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        'story-id',
+        undefined,
+      );
       expect(result.timeline).toEqual([]);
     });
 
@@ -203,12 +259,20 @@ describe('StoriesController', () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
       storiesService.generateResearchKit.mockResolvedValue({
         timeline: [{ date: '2024-01-01', event: 'E1' }],
-        people: [], data: [], opinions: [],
+        people: [],
+        data: [],
+        opinions: [],
       });
 
-      const result = await controller.generateResearchKit('story-id', mockAdmin);
+      const result = await controller.generateResearchKit(
+        'story-id',
+        mockAdmin,
+      );
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockAdmin);
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockAdmin,
+      );
       expect(result.timeline).toHaveLength(1);
     });
   });
@@ -216,15 +280,25 @@ describe('StoriesController', () => {
   describe('generateDraftFromResearchKit', () => {
     it('should verify access and return article', async () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
-      storiesService.generateDraftFromResearchKit.mockResolvedValue({ id: 'article-id', title: 'Draft' });
+      storiesService.generateDraftFromResearchKit.mockResolvedValue({
+        id: 'article-id',
+        title: 'Draft',
+      });
 
       const dto = {
         researchKit: { timeline: [], people: [], data: [], opinions: [] },
         instruction: '侧重民生角度',
       };
-      const result = await controller.generateDraftFromResearchKit('story-id', dto as any, mockUser);
+      const result = await controller.generateDraftFromResearchKit(
+        'story-id',
+        dto,
+        mockUser,
+      );
 
-      expect(storiesService.verifyAccess).toHaveBeenCalledWith('story-id', mockUser);
+      expect(storiesService.verifyAccess).toHaveBeenCalledWith(
+        'story-id',
+        mockUser,
+      );
       expect(storiesService.generateDraftFromResearchKit).toHaveBeenCalledWith(
         'user-id',
         'story-id',
@@ -238,10 +312,18 @@ describe('StoriesController', () => {
 
     it('should work without instruction', async () => {
       storiesService.verifyAccess.mockResolvedValue(undefined);
-      storiesService.generateDraftFromResearchKit.mockResolvedValue({ id: 'article-id' });
+      storiesService.generateDraftFromResearchKit.mockResolvedValue({
+        id: 'article-id',
+      });
 
-      const dto = { researchKit: { timeline: [], people: [], data: [], opinions: [] } };
-      const result = await controller.generateDraftFromResearchKit('story-id', dto as any, mockUser);
+      const dto = {
+        researchKit: { timeline: [], people: [], data: [], opinions: [] },
+      };
+      const result = await controller.generateDraftFromResearchKit(
+        'story-id',
+        dto,
+        mockUser,
+      );
 
       expect(storiesService.generateDraftFromResearchKit).toHaveBeenCalledWith(
         'user-id',

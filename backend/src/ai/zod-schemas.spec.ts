@@ -19,13 +19,17 @@ describe('LLM JSON Zod schemas', () => {
 
     it('accepts { suggestions: [...] }', () => {
       const result = storySuggestionsSchema.parse({
-        suggestions: [{ title: 'T', description: 'D', suggestedAngle: 'A', reason: 'R' }],
+        suggestions: [
+          { title: 'T', description: 'D', suggestedAngle: 'A', reason: 'R' },
+        ],
       });
       expect(result.suggestions).toHaveLength(1);
     });
 
     it('rejects an object missing all expected fields', () => {
-      expect(() => storySuggestionsSchema.parse({ unrelated: 'key' })).toThrow();
+      expect(() =>
+        storySuggestionsSchema.parse({ unrelated: 'key' }),
+      ).toThrow();
     });
   });
 
@@ -104,7 +108,9 @@ describe('LLM JSON Zod schemas', () => {
         people: [{ name: 'P1', role: 'R1' }],
         data: [{ label: 'L1', value: 'V1' }],
         opinions: [{ source: 'S1', viewpoint: 'V1' }],
-        wikipedia: [{ language: 'zh', title: 'T1', url: 'https://...', extract: '...' }],
+        wikipedia: [
+          { language: 'zh', title: 'T1', url: 'https://...', extract: '...' },
+        ],
       });
       expect(result.timeline).toHaveLength(1);
       expect(result.wikipedia).toHaveLength(1);
@@ -152,14 +158,10 @@ describe('LLM JSON Zod schemas', () => {
       const result = seoResultSchema.parse({
         overallScore: 78,
         readabilityScore: 82,
-        optimizedTitle: [
-          { title: 'T1', reasoning: 'R1' },
-        ],
+        optimizedTitle: [{ title: 'T1', reasoning: 'R1' }],
         metaDescription: 'M',
         keywords: [{ keyword: 'K1', searchVolume: 'high' }],
-        suggestions: [
-          { category: 'Title', priority: 'high', suggestion: 'S' },
-        ],
+        suggestions: [{ category: 'Title', priority: 'high', suggestion: 'S' }],
       });
       expect(result.keywords).toHaveLength(1);
       expect(result.keywords![0].searchVolume).toBe('high');

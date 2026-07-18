@@ -69,7 +69,9 @@ describe('ChannelsController', () => {
 
   describe('GET /channels/:articleId/publishes', () => {
     it('should return publishes for article', async () => {
-      const mockPublishes = [{ id: 'p1', platform: 'FACEBOOK', status: 'READY' }];
+      const mockPublishes = [
+        { id: 'p1', platform: 'FACEBOOK', status: 'READY' },
+      ];
       service.getPublishes.mockResolvedValue(mockPublishes);
 
       const result = await controller.getPublishes('article-id', mockUser);
@@ -85,9 +87,13 @@ describe('ChannelsController', () => {
       const mockResult = { id: 'p1', status: 'READY', adaptedTitle: 'Title' };
       service.generateAdaptation.mockResolvedValue(mockResult);
 
-      const result = await controller.generateAdaptation(mockUser, 'article-id', {
-        platform: 'FACEBOOK' as any,
-      });
+      const result = await controller.generateAdaptation(
+        mockUser,
+        'article-id',
+        {
+          platform: 'FACEBOOK' as any,
+        },
+      );
 
       expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(service.generateAdaptation).toHaveBeenCalledWith(
@@ -122,26 +128,43 @@ describe('ChannelsController', () => {
       const mockResult = { id: 'p1', status: 'PUBLISHED' };
       service.updatePublish.mockResolvedValue(mockResult);
 
-      const result = await controller.updatePublish(mockUser, 'article-id', 'publish-id', {
-        status: 'PUBLISHED' as any,
-        publishedUrl: 'https://fb.com/post/1',
-      });
+      const result = await controller.updatePublish(
+        mockUser,
+        'article-id',
+        'publish-id',
+        {
+          status: 'PUBLISHED' as any,
+          publishedUrl: 'https://fb.com/post/1',
+        },
+      );
 
       expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
-      expect(service.updatePublish).toHaveBeenCalledWith('article-id', 'publish-id', {
-        status: 'PUBLISHED',
-        publishedUrl: 'https://fb.com/post/1',
-      });
+      expect(service.updatePublish).toHaveBeenCalledWith(
+        'article-id',
+        'publish-id',
+        {
+          status: 'PUBLISHED',
+          publishedUrl: 'https://fb.com/post/1',
+        },
+      );
       expect(result).toEqual(mockResult);
     });
   });
 
   describe('POST /channels/:articleId/publish-wordpress', () => {
     it('should publish to WordPress', async () => {
-      const mockResult = { id: 'p1', status: 'PUBLISHED', publishedUrl: 'https://wuququ.com/post/1' };
+      const mockResult = {
+        id: 'p1',
+        status: 'PUBLISHED',
+        publishedUrl: 'https://wuququ.com/post/1',
+      };
       wpService.publish.mockResolvedValue(mockResult);
 
-      const result = await controller.publishToWordPress(mockUser, 'article-id', {});
+      const result = await controller.publishToWordPress(
+        mockUser,
+        'article-id',
+        {},
+      );
 
       expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
       expect(wpService.publish).toHaveBeenCalledWith('article-id', 'publish');
@@ -151,7 +174,9 @@ describe('ChannelsController', () => {
     it('should pass draft status', async () => {
       wpService.publish.mockResolvedValue({ id: 'p1', status: 'PUBLISHED' });
 
-      await controller.publishToWordPress(mockUser, 'article-id', { wpStatus: 'draft' });
+      await controller.publishToWordPress(mockUser, 'article-id', {
+        wpStatus: 'draft',
+      });
 
       expect(wpService.publish).toHaveBeenCalledWith('article-id', 'draft');
     });
@@ -161,10 +186,17 @@ describe('ChannelsController', () => {
     it('should delete publish', async () => {
       service.deletePublish.mockResolvedValue({ deleted: true });
 
-      const result = await controller.deletePublish(mockUser, 'article-id', 'publish-id');
+      const result = await controller.deletePublish(
+        mockUser,
+        'article-id',
+        'publish-id',
+      );
 
       expect(service.verifyAccess).toHaveBeenCalledWith('article-id', mockUser);
-      expect(service.deletePublish).toHaveBeenCalledWith('article-id', 'publish-id');
+      expect(service.deletePublish).toHaveBeenCalledWith(
+        'article-id',
+        'publish-id',
+      );
       expect(result).toEqual({ deleted: true });
     });
   });

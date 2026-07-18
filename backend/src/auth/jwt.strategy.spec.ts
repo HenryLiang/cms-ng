@@ -10,7 +10,11 @@ describe('JwtStrategy', () => {
   let prisma: { user: { findUnique: jest.Mock } };
   let redis: { get: jest.Mock; set: jest.Mock };
 
-  const payload = { sub: 'user-id', email: 'test@example.com', role: 'REPORTER' };
+  const payload = {
+    sub: 'user-id',
+    email: 'test@example.com',
+    role: 'REPORTER',
+  };
 
   beforeEach(() => {
     prisma = { user: { findUnique: jest.fn() } };
@@ -30,7 +34,9 @@ describe('JwtStrategy', () => {
   it('should deny immediately when cache holds a deny ("0") without hitting the DB', async () => {
     redis.get.mockResolvedValue('0');
 
-    await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(payload)).rejects.toThrow(
+      UnauthorizedException,
+    );
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
@@ -44,7 +50,11 @@ describe('JwtStrategy', () => {
       where: { id: 'user-id' },
       select: { isActive: true },
     });
-    expect(result).toEqual({ userId: 'user-id', email: 'test@example.com', role: 'REPORTER' });
+    expect(result).toEqual({
+      userId: 'user-id',
+      email: 'test@example.com',
+      role: 'REPORTER',
+    });
     // fail-closed: a positive result is never cached
     expect(redis.set).not.toHaveBeenCalled();
   });
@@ -53,15 +63,23 @@ describe('JwtStrategy', () => {
     redis.get.mockResolvedValue(null);
     prisma.user.findUnique.mockResolvedValue({ isActive: false });
 
-    await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
-    expect(redis.set).toHaveBeenCalledWith(userActiveCacheKey('user-id'), '0', expect.any(Number));
+    await expect(strategy.validate(payload)).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(redis.set).toHaveBeenCalledWith(
+      userActiveCacheKey('user-id'),
+      '0',
+      expect.any(Number),
+    );
   });
 
   it('should throw when the user no longer exists (deleted)', async () => {
     redis.get.mockResolvedValue(null);
     prisma.user.findUnique.mockResolvedValue(null);
 
-    await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(payload)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('should NOT trust a cached/positive "1" (race or Redis poisoning) and re-check the DB', async () => {
@@ -69,7 +87,9 @@ describe('JwtStrategy', () => {
     redis.get.mockResolvedValue('1');
     prisma.user.findUnique.mockResolvedValue({ isActive: false });
 
-    await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(payload)).rejects.toThrow(
+      UnauthorizedException,
+    );
     expect(prisma.user.findUnique).toHaveBeenCalled();
   });
 });

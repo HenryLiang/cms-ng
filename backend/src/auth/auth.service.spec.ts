@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegistrationService } from './registration.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,7 +20,10 @@ describe('AuthService', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let jwtService: { sign: jest.Mock; verify: jest.Mock };
-  let registrationService: { isRegistrationOpen: jest.Mock; setRegistrationOpen: jest.Mock };
+  let registrationService: {
+    isRegistrationOpen: jest.Mock;
+    setRegistrationOpen: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
@@ -46,7 +53,12 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    const dto = { email: 'test@example.com', name: 'Test', password: 'password123', role: 'REPORTER' as const };
+    const dto = {
+      email: 'test@example.com',
+      name: 'Test',
+      password: 'password123',
+      role: 'REPORTER' as const,
+    };
 
     it('should create user and return JWT when email is new', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
@@ -60,30 +72,51 @@ describe('AuthService', () => {
 
       const result = await service.register(dto);
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: dto.email } });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: dto.email },
+      });
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: {
           email: dto.email,
           name: dto.name,
-          passwordHash: '$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS',
+          passwordHash:
+            '$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS',
           role: dto.role,
         },
-        select: { id: true, email: true, name: true, role: true, preferredLanguage: true, createdAt: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          preferredLanguage: true,
+          createdAt: true,
+        },
       });
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 'user-id', email: dto.email, role: dto.role });
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        sub: 'user-id',
+        email: dto.email,
+        role: dto.role,
+      });
       expect(result.accessToken).toBe('test_jwt_token');
       expect(result.user.email).toBe(dto.email);
     });
 
     it('should throw ConflictException when email already exists', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'existing-id', email: dto.email });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'existing-id',
+        email: dto.email,
+      });
 
       await expect(service.register(dto)).rejects.toThrow(ConflictException);
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
 
     it('should allow registration without optional role', async () => {
-      const dtoNoRole = { email: 'new@example.com', name: 'Test', password: 'password123' };
+      const dtoNoRole = {
+        email: 'new@example.com',
+        name: 'Test',
+        password: 'password123',
+      };
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.user.create.mockResolvedValue({
         id: 'user-id',
@@ -93,7 +126,7 @@ describe('AuthService', () => {
         createdAt: new Date(),
       });
 
-      const result = await service.register(dtoNoRole as any);
+      const result = await service.register(dtoNoRole);
 
       expect(prisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -116,13 +149,23 @@ describe('AuthService', () => {
   describe('registration status (delegates to RegistrationService)', () => {
     it('getRegistrationStatus should return { registrationOpen } from the service', async () => {
       registrationService.isRegistrationOpen.mockResolvedValue(true);
-      await expect(service.getRegistrationStatus()).resolves.toEqual({ registrationOpen: true });
+      await expect(service.getRegistrationStatus()).resolves.toEqual({
+        registrationOpen: true,
+      });
       expect(registrationService.isRegistrationOpen).toHaveBeenCalled();
     });
 
     it('setRegistrationStatus should delegate and return { registrationOpen: enabled }', async () => {
-      const result = await service.setRegistrationStatus(false, 'admin-id', '维护');
-      expect(registrationService.setRegistrationOpen).toHaveBeenCalledWith(false, 'admin-id', '维护');
+      const result = await service.setRegistrationStatus(
+        false,
+        'admin-id',
+        '维护',
+      );
+      expect(registrationService.setRegistrationOpen).toHaveBeenCalledWith(
+        false,
+        'admin-id',
+        '维护',
+      );
       expect(result).toEqual({ registrationOpen: false });
     });
   });
@@ -143,13 +186,22 @@ describe('AuthService', () => {
 
       const result = await service.login(dto);
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: dto.email } });
-      expect(bcrypt.compare).toHaveBeenCalledWith(dto.password, user.passwordHash);
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: dto.email },
+      });
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        dto.password,
+        user.passwordHash,
+      );
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'user-id' },
         data: { lastLoginAt: expect.any(Date) },
       });
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 'user-id', email: dto.email, role: 'REPORTER' });
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        sub: 'user-id',
+        email: dto.email,
+        role: 'REPORTER',
+      });
       expect(result.user.id).toBe('user-id');
       expect(result.accessToken).toBe('test_jwt_token');
     });
@@ -215,7 +267,9 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException when user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getCurrentUser('nonexistent')).rejects.toThrow(UnauthorizedException);
+      await expect(service.getCurrentUser('nonexistent')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -239,10 +293,9 @@ describe('AuthService', () => {
 
       // verify must be called with ignoreExpiration: true so expired tokens
       // can still be refreshed (issue #49 acceptance criteria)
-      expect(jwtService.verify).toHaveBeenCalledWith(
-        'valid.jwt.token',
-        { ignoreExpiration: true },
-      );
+      expect(jwtService.verify).toHaveBeenCalledWith('valid.jwt.token', {
+        ignoreExpiration: true,
+      });
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: 'user-id',
         email: 'test@example.com',

@@ -16,19 +16,29 @@ describe('CreateArticleDto', () => {
   });
 
   it('should fail when storyId is not a valid UUID', async () => {
-    const dto = createDto({ storyId: 'not-a-uuid', title: 'Test', content: 'Content' });
+    const dto = createDto({
+      storyId: 'not-a-uuid',
+      title: 'Test',
+      content: 'Content',
+    });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'storyId')).toBe(true);
   });
 
   it('should fail when title is missing', async () => {
-    const dto = createDto({ storyId: '550e8400-e29b-41d4-a716-446655440000', content: 'Content' });
+    const dto = createDto({
+      storyId: '550e8400-e29b-41d4-a716-446655440000',
+      content: 'Content',
+    });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'title')).toBe(true);
   });
 
   it('should fail when content is missing', async () => {
-    const dto = createDto({ storyId: '550e8400-e29b-41d4-a716-446655440000', title: 'Test' });
+    const dto = createDto({
+      storyId: '550e8400-e29b-41d4-a716-446655440000',
+      title: 'Test',
+    });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'content')).toBe(true);
   });

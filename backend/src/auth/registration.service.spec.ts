@@ -56,7 +56,11 @@ describe('RegistrationService', () => {
     it('should upsert enabled=false with audit fields and return false', async () => {
       prisma.registrationSwitch.upsert.mockResolvedValue({});
 
-      const result = await service.setRegistrationOpen(false, 'admin-id', '维护收口');
+      const result = await service.setRegistrationOpen(
+        false,
+        'admin-id',
+        '维护收口',
+      );
 
       expect(prisma.registrationSwitch.upsert).toHaveBeenCalledWith({
         where: { id: 'registration' },

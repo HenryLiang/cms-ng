@@ -25,7 +25,10 @@ import { AuthorStyleService } from '../authors/author-style.service';
  *  prompts in these tests are unchanged — author-style injection is opt-in via
  *  authorSlug, which the existing tests don't set. */
 const authorStyleMock = { getSystemPrompt: async () => '' };
-const AUTHOR_STYLE_PROVIDER = { provide: AuthorStyleService, useValue: authorStyleMock };
+const AUTHOR_STYLE_PROVIDER = {
+  provide: AuthorStyleService,
+  useValue: authorStyleMock,
+};
 
 // axios is still used by searchWikipedia (GET requests)
 jest.mock('axios');
@@ -44,7 +47,11 @@ describe('AIService', () => {
     chatCompletion: jest.Mock;
     chatCompletionWithTools: jest.Mock;
   };
-  let storageMock: { put: jest.Mock; delete: jest.Mock; thumbnailUrl: jest.Mock };
+  let storageMock: {
+    put: jest.Mock;
+    delete: jest.Mock;
+    thumbnailUrl: jest.Mock;
+  };
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -115,13 +122,19 @@ describe('AIService', () => {
   ): ChatCompletionResponse => ({
     content,
     finishReason,
-    usage: usage || { promptTokens: 50, completionTokens: 50, totalTokens: 100 },
+    usage: usage || {
+      promptTokens: 50,
+      completionTokens: 50,
+      totalTokens: 100,
+    },
   });
 
   describe('generateStorySuggestions', () => {
     it('should return suggestions on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse('[{"title":"T1","description":"D1","suggestedAngle":"A1","reason":"R1"}]'),
+        mockChatResponse(
+          '[{"title":"T1","description":"D1","suggestedAngle":"A1","reason":"R1"}]',
+        ),
       );
 
       const result = await service.generateStorySuggestions('user-id', {
@@ -137,7 +150,9 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('Network error'),
+      );
 
       const result = await service.generateStorySuggestions('user-id', {
         name: 'Test',
@@ -151,9 +166,13 @@ describe('AIService', () => {
 
   describe('rewriteText', () => {
     it('should return rewritten text on success', async () => {
-      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Rewritten text'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Rewritten text'),
+      );
 
-      const result = await service.rewriteText('user-id', 'article-id', { text: 'Original' });
+      const result = await service.rewriteText('user-id', 'article-id', {
+        text: 'Original',
+      });
 
       expect(result).toBe('Rewritten text');
       expect(prisma.aIOperation.create).toHaveBeenCalled();
@@ -162,7 +181,9 @@ describe('AIService', () => {
     it('should return original text on API failure', async () => {
       mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
-      const result = await service.rewriteText('user-id', 'article-id', { text: 'Original' });
+      const result = await service.rewriteText('user-id', 'article-id', {
+        text: 'Original',
+      });
 
       expect(result).toBe('Original');
       expect(prisma.aIOperation.create).toHaveBeenCalled();
@@ -171,9 +192,13 @@ describe('AIService', () => {
 
   describe('expandText', () => {
     it('should return expanded text on success', async () => {
-      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Expanded text'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Expanded text'),
+      );
 
-      const result = await service.expandText('user-id', 'article-id', { text: 'Short' });
+      const result = await service.expandText('user-id', 'article-id', {
+        text: 'Short',
+      });
 
       expect(result).toBe('Expanded text');
     });
@@ -181,7 +206,9 @@ describe('AIService', () => {
     it('should return original text on API failure', async () => {
       mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
-      const result = await service.expandText('user-id', 'article-id', { text: 'Short' });
+      const result = await service.expandText('user-id', 'article-id', {
+        text: 'Short',
+      });
 
       expect(result).toBe('Short');
     });
@@ -189,9 +216,13 @@ describe('AIService', () => {
 
   describe('condenseText', () => {
     it('should return condensed text on success', async () => {
-      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Short'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Short'),
+      );
 
-      const result = await service.condenseText('user-id', 'article-id', { text: 'Long text here' });
+      const result = await service.condenseText('user-id', 'article-id', {
+        text: 'Long text here',
+      });
 
       expect(result).toBe('Short');
     });
@@ -199,7 +230,9 @@ describe('AIService', () => {
     it('should return original text on API failure', async () => {
       mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
-      const result = await service.condenseText('user-id', 'article-id', { text: 'Original' });
+      const result = await service.condenseText('user-id', 'article-id', {
+        text: 'Original',
+      });
 
       expect(result).toBe('Original');
     });
@@ -207,9 +240,13 @@ describe('AIService', () => {
 
   describe('polishText', () => {
     it('should return polished text on success', async () => {
-      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Polished'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Polished'),
+      );
 
-      const result = await service.polishText('user-id', 'article-id', { text: 'Rough' });
+      const result = await service.polishText('user-id', 'article-id', {
+        text: 'Rough',
+      });
 
       expect(result).toBe('Polished');
     });
@@ -217,7 +254,9 @@ describe('AIService', () => {
     it('should return original text on API failure', async () => {
       mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
-      const result = await service.polishText('user-id', 'article-id', { text: 'Original' });
+      const result = await service.polishText('user-id', 'article-id', {
+        text: 'Original',
+      });
 
       expect(result).toBe('Original');
     });
@@ -229,7 +268,10 @@ describe('AIService', () => {
         mockChatResponse('[{"title":"H1","style":"s","reasoning":"r"}]'),
       );
 
-      const result = await service.generateHeadlines('user-id', 'article-id', { title: 'Article', content: 'Body' });
+      const result = await service.generateHeadlines('user-id', 'article-id', {
+        title: 'Article',
+        content: 'Body',
+      });
 
       expect(result).toHaveLength(1);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
@@ -238,7 +280,10 @@ describe('AIService', () => {
     it('should return fallback on API failure', async () => {
       mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
-      const result = await service.generateHeadlines('user-id', 'article-id', { title: 'Article', content: 'Body' });
+      const result = await service.generateHeadlines('user-id', 'article-id', {
+        title: 'Article',
+        content: 'Body',
+      });
 
       expect(result.length).toBeGreaterThan(0);
       expect(result[0].title).toContain('Article');
@@ -247,9 +292,14 @@ describe('AIService', () => {
 
   describe('generateExcerpt', () => {
     it('should return excerpt on success', async () => {
-      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('Summary'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('Summary'),
+      );
 
-      const result = await service.generateExcerpt('user-id', 'article-id', { title: 'T', content: 'Body text' });
+      const result = await service.generateExcerpt('user-id', 'article-id', {
+        title: 'T',
+        content: 'Body text',
+      });
 
       expect(result).toBe('Summary');
     });
@@ -257,7 +307,10 @@ describe('AIService', () => {
     it('should return content slice on API failure', async () => {
       mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
 
-      const result = await service.generateExcerpt('user-id', 'article-id', { title: 'T', content: 'Body text' });
+      const result = await service.generateExcerpt('user-id', 'article-id', {
+        title: 'T',
+        content: 'Body text',
+      });
 
       expect(result).toBe('Body text');
     });
@@ -265,7 +318,9 @@ describe('AIService', () => {
 
   describe('chatWithAI', () => {
     it('should return reply on success', async () => {
-      mockChatProvider.chatCompletion.mockResolvedValue(mockChatResponse('AI reply'));
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse('AI reply'),
+      );
 
       const result = await service.chatWithAI('user-id', 'article-id', {
         messages: [{ role: 'user', content: 'Hello' }],
@@ -288,11 +343,13 @@ describe('AIService', () => {
   describe('generateDraft', () => {
     it('should return parsed draft on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          title: 'Draft Title',
-          subtitle: 'Draft Subtitle',
-          content: '<p>Draft content</p>',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            title: 'Draft Title',
+            subtitle: 'Draft Subtitle',
+            content: '<p>Draft content</p>',
+          }),
+        ),
       );
 
       const result = await service.generateDraft('user-id', 'article-id', {
@@ -334,17 +391,25 @@ describe('AIService', () => {
 
     it('should inject formatted research kit into prompt', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          title: 'Draft Title',
-          content: '<p>Content</p>',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            title: 'Draft Title',
+            content: '<p>Content</p>',
+          }),
+        ),
       );
 
       const researchKit = {
-        timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
-        people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
+        timeline: [
+          { date: '2024-01-01', event: 'Event 1', source: 'Source 1' },
+        ],
+        people: [
+          { name: 'Person A', role: 'Role A', background: 'Background A' },
+        ],
         data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
-        opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
+        opinions: [
+          { source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' },
+        ],
       };
 
       await service.generateDraft('user-id', 'article-id', {
@@ -363,15 +428,19 @@ describe('AIService', () => {
       expect(prompt).toContain('Label 1：Value 1（來源：Source 1）');
       expect(prompt).toContain('【各方觀點】');
       expect(prompt).toContain('Source A（Stance A）：Viewpoint A');
-      expect(prompt).toContain('注意：背景资料中已包含多方信息，请在行文中自然引用，不要整段搬运。');
+      expect(prompt).toContain(
+        '注意：背景资料中已包含多方信息，请在行文中自然引用，不要整段搬运。',
+      );
     });
 
     it('should skip empty research kit sections in prompt', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          title: 'Draft Title',
-          content: '<p>Content</p>',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            title: 'Draft Title',
+            content: '<p>Content</p>',
+          }),
+        ),
       );
 
       await service.generateDraft('user-id', 'article-id', {
@@ -395,10 +464,12 @@ describe('AIService', () => {
 
     it('should use instruction in prompt when provided', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          title: 'Draft Title',
-          content: '<p>Content</p>',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            title: 'Draft Title',
+            content: '<p>Content</p>',
+          }),
+        ),
       );
 
       await service.generateDraft('user-id', 'article-id', {
@@ -414,10 +485,13 @@ describe('AIService', () => {
 
     it('should sanitize HTML in draft content', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          title: 'Draft Title',
-          content: '<p>Safe</p><script>alert("xss")</script><style>body{color:red}</style><iframe src="evil"></iframe>',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            title: 'Draft Title',
+            content:
+              '<p>Safe</p><script>alert("xss")</script><style>body{color:red}</style><iframe src="evil"></iframe>',
+          }),
+        ),
       );
 
       const result = await service.generateDraft('user-id', 'article-id', {
@@ -430,10 +504,12 @@ describe('AIService', () => {
 
     it('should fallback to currentTitle when AI returns no title', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          subtitle: 'Sub',
-          content: '<p>C</p>',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            subtitle: 'Sub',
+            content: '<p>C</p>',
+          }),
+        ),
       );
 
       const result = await service.generateDraft('user-id', 'article-id', {
@@ -448,28 +524,37 @@ describe('AIService', () => {
 
   describe('sanitizeDraftHTML', () => {
     it('should keep allowed tags', () => {
-      const html = '<p>Text</p><h2>Heading</h3><ul><li>Item</li></ul><ol><li>Num</li></ol><blockquote>Quote</blockquote><strong>Bold</strong><em>Italic</em><br>';
+      const html =
+        '<p>Text</p><h2>Heading</h3><ul><li>Item</li></ul><ol><li>Num</li></ol><blockquote>Quote</blockquote><strong>Bold</strong><em>Italic</em><br>';
       const result = (service as any).sanitizeDraftHTML(html);
       expect(result).toBe(html);
     });
 
     it('should remove script tags and content', () => {
-      const result = (service as any).sanitizeDraftHTML('<p>Safe</p><script>alert("xss")</script>');
+      const result = (service as any).sanitizeDraftHTML(
+        '<p>Safe</p><script>alert("xss")</script>',
+      );
       expect(result).toBe('<p>Safe</p>');
     });
 
     it('should remove style tags and content', () => {
-      const result = (service as any).sanitizeDraftHTML('<p>Safe</p><style>body{color:red}</style>');
+      const result = (service as any).sanitizeDraftHTML(
+        '<p>Safe</p><style>body{color:red}</style>',
+      );
       expect(result).toBe('<p>Safe</p>');
     });
 
     it('should remove disallowed tags but keep their text content', () => {
-      const result = (service as any).sanitizeDraftHTML('<p>Safe</p><div>Bad</div><span>Bad</span><iframe src="evil"></iframe>');
+      const result = (service as any).sanitizeDraftHTML(
+        '<p>Safe</p><div>Bad</div><span>Bad</span><iframe src="evil"></iframe>',
+      );
       expect(result).toBe('<p>Safe</p>BadBad');
     });
 
     it('should preserve attributes on allowed tags', () => {
-      const result = (service as any).sanitizeDraftHTML('<p onclick="evil()" class="foo">Text</p>');
+      const result = (service as any).sanitizeDraftHTML(
+        '<p onclick="evil()" class="foo">Text</p>',
+      );
       expect(result).toBe('<p onclick="evil()" class="foo">Text</p>');
     });
 
@@ -482,14 +567,26 @@ describe('AIService', () => {
   describe('factCheck', () => {
     it('should return fact-check result with score and findings on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          score: 85,
-          summary: 'Overall assessment summary',
-          findings: [
-            { type: 'fact', text: 'Fact A', message: 'Check this', severity: 'info' },
-            { type: 'risk', text: 'Risk B', message: 'Be careful', severity: 'warning' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            score: 85,
+            summary: 'Overall assessment summary',
+            findings: [
+              {
+                type: 'fact',
+                text: 'Fact A',
+                message: 'Check this',
+                severity: 'info',
+              },
+              {
+                type: 'risk',
+                text: 'Risk B',
+                message: 'Be careful',
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
       );
 
       const result = await service.factCheck('user-id', 'article-id', {
@@ -507,11 +604,13 @@ describe('AIService', () => {
 
     it('should clamp score to 0-100 range', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          score: 150,
-          summary: 'Test',
-          findings: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            score: 150,
+            summary: 'Test',
+            findings: [],
+          }),
+        ),
       );
 
       const resultHigh = await service.factCheck('user-id', 'article-id', {
@@ -522,11 +621,13 @@ describe('AIService', () => {
       expect(resultHigh.score).toBe(100);
 
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          score: -20,
-          summary: 'Test',
-          findings: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            score: -20,
+            summary: 'Test',
+            findings: [],
+          }),
+        ),
       );
 
       const resultLow = await service.factCheck('user-id', 'article-id', {
@@ -539,10 +640,12 @@ describe('AIService', () => {
 
     it('should default score to 50 when missing', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          summary: 'No score provided',
-          findings: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            summary: 'No score provided',
+            findings: [],
+          }),
+        ),
       );
 
       const result = await service.factCheck('user-id', 'article-id', {
@@ -555,11 +658,13 @@ describe('AIService', () => {
 
     it('should handle findings that are not an array', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          score: 70,
-          summary: 'Test',
-          findings: null,
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            score: 70,
+            summary: 'Test',
+            findings: null,
+          }),
+        ),
       );
 
       const result = await service.factCheck('user-id', 'article-id', {
@@ -571,7 +676,9 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('Network error'),
+      );
 
       const result = await service.factCheck('user-id', 'article-id', {
         title: 'Test',
@@ -586,11 +693,13 @@ describe('AIService', () => {
 
     it('should strip HTML tags from content before sending to AI', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          score: 80,
-          summary: 'Good',
-          findings: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            score: 80,
+            summary: 'Good',
+            findings: [],
+          }),
+        ),
       );
 
       await service.factCheck('user-id', 'article-id', {
@@ -608,24 +717,43 @@ describe('AIService', () => {
   describe('generateReviewReport', () => {
     it('should return parsed review report on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 78,
-          summary: 'Structure is clear, language is fluent',
-          dimensions: [
-            { name: 'Structure', score: 80, maxScore: 100, comment: 'Good structure' },
-            { name: 'Language', score: 75, maxScore: 100, comment: 'Fluent' },
-          ],
-          suggestions: [
-            { dimension: 'Structure', priority: 'high', suggestion: 'Add more background' },
-            { dimension: 'Language', priority: 'medium', suggestion: 'Simplify sentences' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 78,
+            summary: 'Structure is clear, language is fluent',
+            dimensions: [
+              {
+                name: 'Structure',
+                score: 80,
+                maxScore: 100,
+                comment: 'Good structure',
+              },
+              { name: 'Language', score: 75, maxScore: 100, comment: 'Fluent' },
+            ],
+            suggestions: [
+              {
+                dimension: 'Structure',
+                priority: 'high',
+                suggestion: 'Add more background',
+              },
+              {
+                dimension: 'Language',
+                priority: 'medium',
+                suggestion: 'Simplify sentences',
+              },
+            ],
+          }),
+        ),
       );
 
-      const result = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test Article',
-        content: 'Article content',
-      });
+      const result = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test Article',
+          content: 'Article content',
+        },
+      );
 
       expect(result.overallScore).toBe(78);
       expect(result.summary).toBe('Structure is clear, language is fluent');
@@ -640,55 +768,73 @@ describe('AIService', () => {
 
     it('should clamp overallScore to 0-100', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 150,
-          summary: 'Test high',
-          dimensions: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 150,
+            summary: 'Test high',
+            dimensions: [],
+            suggestions: [],
+          }),
+        ),
       );
 
-      const resultHigh = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const resultHigh = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(resultHigh.overallScore).toBe(100);
 
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: -10,
-          summary: 'Test low',
-          dimensions: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: -10,
+            summary: 'Test low',
+            dimensions: [],
+            suggestions: [],
+          }),
+        ),
       );
 
-      const resultLow = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const resultLow = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(resultLow.overallScore).toBe(0);
     });
 
     it('should clamp each dimension score to 0-100', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 50,
-          summary: 'Test',
-          dimensions: [
-            { name: 'Over', score: 200, maxScore: 100, comment: '' },
-            { name: 'Under', score: -50, maxScore: 100, comment: '' },
-          ],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 50,
+            summary: 'Test',
+            dimensions: [
+              { name: 'Over', score: 200, maxScore: 100, comment: '' },
+              { name: 'Under', score: -50, maxScore: 100, comment: '' },
+            ],
+            suggestions: [],
+          }),
+        ),
       );
 
-      const result = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const result = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(result.dimensions[0].score).toBe(100);
       expect(result.dimensions[1].score).toBe(0);
@@ -696,21 +842,27 @@ describe('AIService', () => {
 
     it('should normalize null priority to medium and pass through valid priority', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 50,
-          summary: 'Test',
-          dimensions: [],
-          suggestions: [
-            { dimension: 'A', priority: null, suggestion: 'S1' },
-            { dimension: 'B', priority: 'high', suggestion: 'S2' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 50,
+            summary: 'Test',
+            dimensions: [],
+            suggestions: [
+              { dimension: 'A', priority: null, suggestion: 'S1' },
+              { dimension: 'B', priority: 'high', suggestion: 'S2' },
+            ],
+          }),
+        ),
       );
 
-      const result = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const result = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(result.suggestions[0].priority).toBe('medium');
       expect(result.suggestions[1].priority).toBe('high');
@@ -721,20 +873,26 @@ describe('AIService', () => {
       // and trigger the static fallback rather than silently being mapped to
       // 'medium' — this matches the LLM-drift defence in other AI sites.
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 50,
-          summary: 'Test',
-          dimensions: [],
-          suggestions: [
-            { dimension: 'A', priority: 'urgent', suggestion: 'S1' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 50,
+            summary: 'Test',
+            dimensions: [],
+            suggestions: [
+              { dimension: 'A', priority: 'urgent', suggestion: 'S1' },
+            ],
+          }),
+        ),
       );
 
-      const result = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const result = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(result.overallScore).toBe(0);
       expect(result.summary).toContain('失败');
@@ -742,12 +900,18 @@ describe('AIService', () => {
     });
 
     it('should return fallback on API failure', async () => {
-      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('Network error'),
+      );
 
-      const result = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const result = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(result.overallScore).toBe(0);
       expect(result.summary).toContain('失败');
@@ -758,18 +922,24 @@ describe('AIService', () => {
 
     it('should handle non-array dimensions and suggestions', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          summary: 'Test',
-          dimensions: null,
-          suggestions: 'invalid',
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            summary: 'Test',
+            dimensions: null,
+            suggestions: 'invalid',
+          }),
+        ),
       );
 
-      const result = await service.generateReviewReport('user-id', 'article-id', {
-        title: 'Test',
-        content: 'Content',
-      });
+      const result = await service.generateReviewReport(
+        'user-id',
+        'article-id',
+        {
+          title: 'Test',
+          content: 'Content',
+        },
+      );
 
       expect(result.dimensions).toEqual([]);
       expect(result.suggestions).toEqual([]);
@@ -777,12 +947,14 @@ describe('AIService', () => {
 
     it('should strip HTML tags from content before sending to AI', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 80,
-          summary: 'Good',
-          dimensions: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 80,
+            summary: 'Good',
+            dimensions: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       await service.generateReviewReport('user-id', 'article-id', {
@@ -800,23 +972,29 @@ describe('AIService', () => {
   describe('optimizeSEO', () => {
     it('should return full SEO result on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 78,
-          readabilityScore: 82,
-          optimizedTitle: [
-            { title: '优化标题1', reasoning: '理由1' },
-            { title: '优化标题2', reasoning: '理由2' },
-          ],
-          metaDescription: '这是元描述',
-          keywords: [
-            { keyword: '关键词A', searchVolume: 'high' },
-            { keyword: '关键词B', searchVolume: 'medium' },
-          ],
-          suggestions: [
-            { category: '标题优化', priority: 'high', suggestion: '改进标题' },
-            { category: '内容优化', priority: 'low', suggestion: '补充数据' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 78,
+            readabilityScore: 82,
+            optimizedTitle: [
+              { title: '优化标题1', reasoning: '理由1' },
+              { title: '优化标题2', reasoning: '理由2' },
+            ],
+            metaDescription: '这是元描述',
+            keywords: [
+              { keyword: '关键词A', searchVolume: 'high' },
+              { keyword: '关键词B', searchVolume: 'medium' },
+            ],
+            suggestions: [
+              {
+                category: '标题优化',
+                priority: 'high',
+                suggestion: '改进标题',
+              },
+              { category: '内容优化', priority: 'low', suggestion: '补充数据' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
@@ -837,14 +1015,16 @@ describe('AIService', () => {
 
     it('should clamp overallScore and readabilityScore to 0-100', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 150,
-          readabilityScore: -10,
-          optimizedTitle: [],
-          metaDescription: '',
-          keywords: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 150,
+            readabilityScore: -10,
+            optimizedTitle: [],
+            metaDescription: '',
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       const resultHigh = await service.optimizeSEO('user-id', 'article-id', {
@@ -856,14 +1036,16 @@ describe('AIService', () => {
       expect(resultHigh.readabilityScore).toBe(0);
 
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: -20,
-          readabilityScore: 200,
-          optimizedTitle: [],
-          metaDescription: '',
-          keywords: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: -20,
+            readabilityScore: 200,
+            optimizedTitle: [],
+            metaDescription: '',
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       const resultLow = await service.optimizeSEO('user-id', 'article-id', {
@@ -877,11 +1059,13 @@ describe('AIService', () => {
 
     it('should default scores to 50 when missing', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          optimizedTitle: [],
-          keywords: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            optimizedTitle: [],
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
@@ -895,14 +1079,16 @@ describe('AIService', () => {
 
     it('should handle non-array fields gracefully', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          readabilityScore: 70,
-          optimizedTitle: null,
-          metaDescription: '描述',
-          keywords: 'invalid',
-          suggestions: undefined,
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            readabilityScore: 70,
+            optimizedTitle: null,
+            metaDescription: '描述',
+            keywords: 'invalid',
+            suggestions: undefined,
+          }),
+        ),
       );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
@@ -917,23 +1103,25 @@ describe('AIService', () => {
 
     it('should filter out entries with empty title/keyword/suggestion', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70,
-          readabilityScore: 75,
-          optimizedTitle: [
-            { title: '', reasoning: '空标题应被过滤' },
-            { title: '有效标题', reasoning: '保留' },
-          ],
-          metaDescription: '描述',
-          keywords: [
-            { keyword: '', searchVolume: 'high' },
-            { keyword: '有效关键词', searchVolume: 'low' },
-          ],
-          suggestions: [
-            { category: 'A', priority: 'high', suggestion: '' },
-            { category: 'B', priority: 'medium', suggestion: '有效建议' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            readabilityScore: 75,
+            optimizedTitle: [
+              { title: '', reasoning: '空标题应被过滤' },
+              { title: '有效标题', reasoning: '保留' },
+            ],
+            metaDescription: '描述',
+            keywords: [
+              { keyword: '', searchVolume: 'high' },
+              { keyword: '有效关键词', searchVolume: 'low' },
+            ],
+            suggestions: [
+              { category: 'A', priority: 'high', suggestion: '' },
+              { category: 'B', priority: 'medium', suggestion: '有效建议' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
@@ -951,19 +1139,21 @@ describe('AIService', () => {
 
     it('should default null searchVolume and priority to medium and pass through valid', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          readabilityScore: 65,
-          optimizedTitle: [],
-          keywords: [
-            { keyword: 'K1', searchVolume: null },
-            { keyword: 'K2', searchVolume: 'high' },
-          ],
-          suggestions: [
-            { category: 'C1', priority: null, suggestion: 'S1' },
-            { category: 'C2', priority: 'low', suggestion: 'S2' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            readabilityScore: 65,
+            optimizedTitle: [],
+            keywords: [
+              { keyword: 'K1', searchVolume: null },
+              { keyword: 'K2', searchVolume: 'high' },
+            ],
+            suggestions: [
+              { category: 'C1', priority: null, suggestion: 'S1' },
+              { category: 'C2', priority: 'low', suggestion: 'S2' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
@@ -981,13 +1171,17 @@ describe('AIService', () => {
       // Truly invalid enum values (e.g. "HUGE") now fail Zod validation and
       // trigger the static fallback rather than being silently mapped.
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          readabilityScore: 65,
-          optimizedTitle: [],
-          keywords: [{ keyword: 'K1', searchVolume: 'HUGE' }],
-          suggestions: [{ category: 'C1', priority: 'urgent', suggestion: 'S1' }],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            readabilityScore: 65,
+            optimizedTitle: [],
+            keywords: [{ keyword: 'K1', searchVolume: 'HUGE' }],
+            suggestions: [
+              { category: 'C1', priority: 'urgent', suggestion: 'S1' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
@@ -1002,7 +1196,9 @@ describe('AIService', () => {
     });
 
     it('should return zero-value fallback on API failure', async () => {
-      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('Network error'),
+      );
 
       const result = await service.optimizeSEO('user-id', 'article-id', {
         title: 'Test',
@@ -1020,13 +1216,15 @@ describe('AIService', () => {
 
     it('should strip HTML tags from content before sending to AI', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70,
-          readabilityScore: 70,
-          optimizedTitle: [],
-          keywords: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            readabilityScore: 70,
+            optimizedTitle: [],
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       await service.optimizeSEO('user-id', 'article-id', {
@@ -1044,13 +1242,15 @@ describe('AIService', () => {
 
     it('should include language-specific SEO context in prompt', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70,
-          readabilityScore: 70,
-          optimizedTitle: [],
-          keywords: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            readabilityScore: 70,
+            optimizedTitle: [],
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       // Simplified Chinese
@@ -1059,15 +1259,21 @@ describe('AIService', () => {
         content: 'Content',
         language: 'SIMPLIFIED_CHINESE' as any,
       });
-      let prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      let prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
       expect(prompt).toContain('中国内地媒体');
 
       mockChatProvider.chatCompletion.mockClear();
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70, readabilityScore: 70,
-          optimizedTitle: [], keywords: [], suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            readabilityScore: 70,
+            optimizedTitle: [],
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       // English
@@ -1076,7 +1282,8 @@ describe('AIService', () => {
         content: 'Content',
         language: 'ENGLISH' as any,
       });
-      prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
       expect(prompt).toContain('英语媒体');
     });
   });
@@ -1084,27 +1291,31 @@ describe('AIService', () => {
   describe('optimizeGEO', () => {
     it('should return full GEO result on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 72,
-          citationScore: 68,
-          answerReadinessScore: 75,
-          optimizedSummary: 'AI 可引用摘要片段',
-          suggestedQuestions: [
-            { question: '问题1', answerSnippet: '答案1' },
-            { question: '问题2', answerSnippet: '答案2' },
-          ],
-          keyStatements: [
-            { statement: '关键陈述1', reason: '理由1' },
-          ],
-          entities: [
-            { name: '张三', type: 'person' },
-            { name: '北京', type: 'place' },
-          ],
-          suggestions: [
-            { category: '事实密度', priority: 'high', suggestion: '补充数据' },
-            { category: '结构化', priority: 'low', suggestion: '加小标题' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 72,
+            citationScore: 68,
+            answerReadinessScore: 75,
+            optimizedSummary: 'AI 可引用摘要片段',
+            suggestedQuestions: [
+              { question: '问题1', answerSnippet: '答案1' },
+              { question: '问题2', answerSnippet: '答案2' },
+            ],
+            keyStatements: [{ statement: '关键陈述1', reason: '理由1' }],
+            entities: [
+              { name: '张三', type: 'person' },
+              { name: '北京', type: 'place' },
+            ],
+            suggestions: [
+              {
+                category: '事实密度',
+                priority: 'high',
+                suggestion: '补充数据',
+              },
+              { category: '结构化', priority: 'low', suggestion: '加小标题' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1129,16 +1340,18 @@ describe('AIService', () => {
 
     it('should clamp all three scores to 0-100', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 150,
-          citationScore: -10,
-          answerReadinessScore: 200,
-          optimizedSummary: '',
-          suggestedQuestions: [],
-          keyStatements: [],
-          entities: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 150,
+            citationScore: -10,
+            answerReadinessScore: 200,
+            optimizedSummary: '',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1153,13 +1366,15 @@ describe('AIService', () => {
 
     it('should default scores to 50 when missing', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          optimizedSummary: '',
-          suggestedQuestions: [],
-          keyStatements: [],
-          entities: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            optimizedSummary: '',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1174,16 +1389,18 @@ describe('AIService', () => {
 
     it('should handle non-array fields gracefully', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          citationScore: 70,
-          answerReadinessScore: 65,
-          optimizedSummary: '摘要',
-          suggestedQuestions: null,
-          keyStatements: 'invalid',
-          entities: undefined,
-          suggestions: null,
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            citationScore: 70,
+            answerReadinessScore: 65,
+            optimizedSummary: '摘要',
+            suggestedQuestions: null,
+            keyStatements: 'invalid',
+            entities: undefined,
+            suggestions: null,
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1199,28 +1416,30 @@ describe('AIService', () => {
 
     it('should filter out entries with empty question/statement/name/suggestion', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70,
-          citationScore: 72,
-          answerReadinessScore: 75,
-          optimizedSummary: '摘要',
-          suggestedQuestions: [
-            { question: '', answerSnippet: '空问题应被过滤' },
-            { question: '有效问题', answerSnippet: '保留' },
-          ],
-          keyStatements: [
-            { statement: '', reason: '空陈述应被过滤' },
-            { statement: '有效陈述', reason: '保留' },
-          ],
-          entities: [
-            { name: '', type: 'person' },
-            { name: '有效实体', type: 'org' },
-          ],
-          suggestions: [
-            { category: 'A', priority: 'high', suggestion: '' },
-            { category: 'B', priority: 'medium', suggestion: '有效建议' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            citationScore: 72,
+            answerReadinessScore: 75,
+            optimizedSummary: '摘要',
+            suggestedQuestions: [
+              { question: '', answerSnippet: '空问题应被过滤' },
+              { question: '有效问题', answerSnippet: '保留' },
+            ],
+            keyStatements: [
+              { statement: '', reason: '空陈述应被过滤' },
+              { statement: '有效陈述', reason: '保留' },
+            ],
+            entities: [
+              { name: '', type: 'person' },
+              { name: '有效实体', type: 'org' },
+            ],
+            suggestions: [
+              { category: 'A', priority: 'high', suggestion: '' },
+              { category: 'B', priority: 'medium', suggestion: '有效建议' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1244,23 +1463,25 @@ describe('AIService', () => {
       // value ('stat') instead of triggering a hard fallback — this is the
       // key behavioral difference from SEO's enum-typed searchVolume.
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          citationScore: 65,
-          answerReadinessScore: 70,
-          optimizedSummary: '摘要',
-          suggestedQuestions: [],
-          keyStatements: [],
-          entities: [
-            { name: 'E1', type: 'number' },
-            { name: 'E2', type: 'organization' },
-            { name: 'E3', type: 'person' },
-          ],
-          suggestions: [
-            { category: 'C1', priority: null, suggestion: 'S1' },
-            { category: 'C2', priority: 'low', suggestion: 'S2' },
-          ],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            citationScore: 65,
+            answerReadinessScore: 70,
+            optimizedSummary: '摘要',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [
+              { name: 'E1', type: 'number' },
+              { name: 'E2', type: 'organization' },
+              { name: 'E3', type: 'person' },
+            ],
+            suggestions: [
+              { category: 'C1', priority: null, suggestion: 'S1' },
+              { category: 'C2', priority: 'low', suggestion: 'S2' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1279,16 +1500,20 @@ describe('AIService', () => {
       // priority IS an enum in zod (prioritySchema), so 'urgent' fails Zod
       // validation and triggers the static fallback — same as SEO.
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 60,
-          citationScore: 65,
-          answerReadinessScore: 70,
-          optimizedSummary: '摘要',
-          suggestedQuestions: [],
-          keyStatements: [],
-          entities: [],
-          suggestions: [{ category: 'C1', priority: 'urgent', suggestion: 'S1' }],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 60,
+            citationScore: 65,
+            answerReadinessScore: 70,
+            optimizedSummary: '摘要',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [
+              { category: 'C1', priority: 'urgent', suggestion: 'S1' },
+            ],
+          }),
+        ),
       );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
@@ -1307,7 +1532,9 @@ describe('AIService', () => {
     });
 
     it('should return zero-value fallback on API failure', async () => {
-      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('Network error'),
+      );
 
       const result = await service.optimizeGEO('user-id', 'article-id', {
         title: 'Test',
@@ -1327,16 +1554,18 @@ describe('AIService', () => {
 
     it('should strip HTML tags from content before sending to AI', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70,
-          citationScore: 70,
-          answerReadinessScore: 70,
-          optimizedSummary: '',
-          suggestedQuestions: [],
-          keyStatements: [],
-          entities: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            citationScore: 70,
+            answerReadinessScore: 70,
+            optimizedSummary: '',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       await service.optimizeGEO('user-id', 'article-id', {
@@ -1354,16 +1583,18 @@ describe('AIService', () => {
 
     it('should include language-specific GEO context in prompt', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70,
-          citationScore: 70,
-          answerReadinessScore: 70,
-          optimizedSummary: '',
-          suggestedQuestions: [],
-          keyStatements: [],
-          entities: [],
-          suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            citationScore: 70,
+            answerReadinessScore: 70,
+            optimizedSummary: '',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       // Simplified Chinese
@@ -1372,16 +1603,24 @@ describe('AIService', () => {
         content: 'Content',
         language: 'SIMPLIFIED_CHINESE' as any,
       });
-      let prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      let prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
       expect(prompt).toContain('中国内地 AI 搜索');
 
       mockChatProvider.chatCompletion.mockClear();
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          overallScore: 70, citationScore: 70, answerReadinessScore: 70,
-          optimizedSummary: '', suggestedQuestions: [], keyStatements: [],
-          entities: [], suggestions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            citationScore: 70,
+            answerReadinessScore: 70,
+            optimizedSummary: '',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [],
+          }),
+        ),
       );
 
       // English
@@ -1390,7 +1629,8 @@ describe('AIService', () => {
         content: 'Content',
         language: 'ENGLISH' as any,
       });
-      prompt = mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
       expect(prompt).toContain('英语 AI 搜索');
     });
   });
@@ -1399,12 +1639,16 @@ describe('AIService', () => {
     it('should complete full image generation flow', async () => {
       // Step 1: buildImagePrompt — chatProvider.chatCompletion
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse('A professional news photograph of a city skyline at dusk'),
+        mockChatResponse(
+          'A professional news photograph of a city skyline at dusk',
+        ),
       );
 
       // Step 2: callSeedream — axios.post
       mockedAxios.post.mockResolvedValueOnce({
-        data: { data: [{ url: 'https://seedream.example.com/temp/image.png' }] },
+        data: {
+          data: [{ url: 'https://seedream.example.com/temp/image.png' }],
+        },
       });
 
       // Step 3: mock storageService.put to avoid real network/COS calls
@@ -1425,10 +1669,16 @@ describe('AIService', () => {
         { style: 'news' },
       );
 
-      expect(result.url).toBe('https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/cover_a3f2b109.png');
-      expect(result.prompt).toBe('A professional news photograph of a city skyline at dusk');
+      expect(result.url).toBe(
+        'https://bkt-1300000000.cos.ap-shanghai.myqcloud.com/cms-ng/articles/article-123/cover_a3f2b109.png',
+      );
+      expect(result.prompt).toBe(
+        'A professional news photograph of a city skyline at dusk',
+      );
       expect(storageMock.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^cms-ng\/articles\/article-123\/cover_[0-9a-f]{8}\.png$/),
+        expect.stringMatching(
+          /^cms-ng\/articles\/article-123\/cover_[0-9a-f]{8}\.png$/,
+        ),
         expect.any(Buffer),
         'image/png',
       );
@@ -1446,7 +1696,12 @@ describe('AIService', () => {
       });
 
       await expect(
-        service.generateArticleImage('user-id', 'article-123', 'Title', 'Content'),
+        service.generateArticleImage(
+          'user-id',
+          'article-123',
+          'Title',
+          'Content',
+        ),
       ).rejects.toThrow('Seedream 未返回图片 URL');
     });
 
@@ -1460,7 +1715,12 @@ describe('AIService', () => {
       });
 
       await expect(
-        service.generateArticleImage('user-id', 'article-123', 'Title', 'Content'),
+        service.generateArticleImage(
+          'user-id',
+          'article-123',
+          'Title',
+          'Content',
+        ),
       ).rejects.toThrow('Seedream 未返回图片 URL');
     });
 
@@ -1483,7 +1743,10 @@ describe('AIService', () => {
       });
 
       await service.generateArticleImage(
-        'user-id', 'article-123', 'Title', 'Content',
+        'user-id',
+        'article-123',
+        'Title',
+        'Content',
         { style: 'illustration' },
       );
 
@@ -1511,7 +1774,10 @@ describe('AIService', () => {
       });
 
       await service.generateArticleImage(
-        'user-id', 'article-123', 'Title', 'Content',
+        'user-id',
+        'article-123',
+        'Title',
+        'Content',
         { customPrompt: '突出科技感' },
       );
 
@@ -1539,13 +1805,19 @@ describe('AIService', () => {
       });
 
       await service.generateArticleImage(
-        'user-id', 'article-123', 'Title', 'Content',
+        'user-id',
+        'article-123',
+        'Title',
+        'Content',
         { aspectRatio: '16:9', size: '2K' },
       );
 
       // Verify Seedream was called with pixel-based size (not aspect_ratio)
       const seedreamCall = mockedAxios.post.mock.calls[0];
-      expect(seedreamCall[1]).toMatchObject({ size: '2848x1600', output_format: 'jpeg' });
+      expect(seedreamCall[1]).toMatchObject({
+        size: '2848x1600',
+        output_format: 'jpeg',
+      });
       expect(seedreamCall[1].aspect_ratio).toBeUndefined();
     });
 
@@ -1568,10 +1840,14 @@ describe('AIService', () => {
       });
 
       await service.generateArticleImage(
-        'user-id', 'article-123', 'Title', 'Content',
+        'user-id',
+        'article-123',
+        'Title',
+        'Content',
       );
 
-      const createCall = (prisma.aIOperation.create as jest.Mock).mock.calls[0][0];
+      const createCall = (prisma.aIOperation.create as jest.Mock).mock
+        .calls[0][0];
       expect(createCall.data.agentType).toBe('VISUAL');
       expect(createCall.data.action).toBe('generate_article_image');
       expect(createCall.data.model).toBe('test-seedream-model');
@@ -1593,15 +1869,23 @@ describe('AIService', () => {
         key: 'cms-ng/articles/article-123/cover_a3f2b109.png',
       });
       // onSuccess 的入参 aiOpId 来自审计行 id,必须显式 mock 返回值
-      (prisma.aIOperation.create as jest.Mock).mockResolvedValue({ id: 'aiop-1' });
-      (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({ id: 'asset-1' });
+      (prisma.aIOperation.create as jest.Mock).mockResolvedValue({
+        id: 'aiop-1',
+      });
+      (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({
+        id: 'asset-1',
+      });
 
       await service.generateArticleImage(
-        'user-id', 'article-123', '测试标题', '<p>内容</p>',
+        'user-id',
+        'article-123',
+        '测试标题',
+        '<p>内容</p>',
       );
 
       expect(prisma.mediaAsset.create).toHaveBeenCalledTimes(1);
-      const data = (prisma.mediaAsset.create as jest.Mock).mock.calls[0][0].data;
+      const data = (prisma.mediaAsset.create as jest.Mock).mock.calls[0][0]
+        .data;
       expect(data).toMatchObject({
         storageKey: 'cms-ng/articles/article-123/cover_a3f2b109.png',
         url: 'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png',
@@ -1635,14 +1919,19 @@ describe('AIService', () => {
         url: 'https://bkt.example.com/cms-ng/articles/article-123/cover_a3f2b109.png',
         key: 'cms-ng/articles/article-123/cover_a3f2b109.png',
       });
-      (prisma.aIOperation.create as jest.Mock).mockResolvedValue({ id: 'aiop-1' });
+      (prisma.aIOperation.create as jest.Mock).mockResolvedValue({
+        id: 'aiop-1',
+      });
       // 媒体库入库失败被 aiLog.run 兜底(warn + 吞掉),不影响生图结果
       (prisma.mediaAsset.create as jest.Mock).mockRejectedValue(
         new Error('DB write failed'),
       );
 
       const result = await service.generateArticleImage(
-        'user-id', 'article-123', 'Title', 'Content',
+        'user-id',
+        'article-123',
+        'Title',
+        'Content',
       );
 
       expect(result.url).toBe(
@@ -1699,7 +1988,9 @@ describe('AIService', () => {
         'article-1',
       );
 
-      expect(stored.url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png');
+      expect(stored.url).toBe(
+        'https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.png',
+      );
       expect(stored.key).toBe('cms-ng/articles/article-1/cover_a3f2b109.png');
       expect(stored.mimeType).toBe('image/png');
       expect(stored.size).toBe(Buffer.from('fake-png-bytes').length);
@@ -1707,7 +1998,9 @@ describe('AIService', () => {
       expect(stored.width).toBeNull();
       expect(stored.height).toBeNull();
       expect(storageMock.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.png$/),
+        expect.stringMatching(
+          /^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.png$/,
+        ),
         expect.any(Buffer),
         'image/png',
       );
@@ -1728,10 +2021,14 @@ describe('AIService', () => {
         'article-1',
       );
 
-      expect(stored.url).toBe('https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.jpg');
+      expect(stored.url).toBe(
+        'https://bkt.example.com/cms-ng/articles/article-1/cover_a3f2b109.jpg',
+      );
       expect(stored.mimeType).toBe('image/jpeg');
       expect(storageMock.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.jpg$/),
+        expect.stringMatching(
+          /^cms-ng\/articles\/article-1\/cover_[0-9a-f]{8}\.jpg$/,
+        ),
         expect.any(Buffer),
         'image/jpeg',
       );
@@ -1768,12 +2065,24 @@ describe('AIService', () => {
       );
       // Mock final kit generation
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          timeline: [{ date: '2024-01-01', event: 'Event 1', source: 'Source 1' }],
-          people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
-          data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
-          opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            timeline: [
+              { date: '2024-01-01', event: 'Event 1', source: 'Source 1' },
+            ],
+            people: [
+              { name: 'Person A', role: 'Role A', background: 'Background A' },
+            ],
+            data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
+            opinions: [
+              {
+                source: 'Source A',
+                viewpoint: 'Viewpoint A',
+                stance: 'Stance A',
+              },
+            ],
+          }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1797,12 +2106,14 @@ describe('AIService', () => {
         mockChatResponse(''),
       );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          timeline: [],
-          people: [],
-          data: [],
-          opinions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            timeline: [],
+            people: [],
+            data: [],
+            opinions: [],
+          }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1821,12 +2132,14 @@ describe('AIService', () => {
         mockChatResponse('search results'),
       );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          timeline: null,
-          people: 'invalid',
-          data: undefined,
-          opinions: [{ source: 'S', viewpoint: 'V' }],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            timeline: null,
+            people: 'invalid',
+            data: undefined,
+            opinions: [{ source: 'S', viewpoint: 'V' }],
+          }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1844,7 +2157,9 @@ describe('AIService', () => {
       mockChatProvider.chatCompletionWithTools.mockResolvedValue(
         mockChatResponse(''),
       );
-      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Network error'));
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('Network error'),
+      );
 
       const result = await service.generateResearchKit('user-id', {
         storyTitle: 'Story Title',
@@ -1863,12 +2178,16 @@ describe('AIService', () => {
         mockChatResponse('Latest news summary from search'),
       );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({
-          timeline: [{ date: '2025-06-01', event: 'Event', source: 'Source' }],
-          people: [],
-          data: [],
-          opinions: [],
-        })),
+        mockChatResponse(
+          JSON.stringify({
+            timeline: [
+              { date: '2025-06-01', event: 'Event', source: 'Source' },
+            ],
+            people: [],
+            data: [],
+            opinions: [],
+          }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1888,7 +2207,9 @@ describe('AIService', () => {
         mockChatResponse(''),
       );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse('```json\n{"timeline":[{"date":"2024-01-01","event":"E1","source":"S1"}],"people":[],"data":[],"opinions":[]}\n```'),
+        mockChatResponse(
+          '```json\n{"timeline":[{"date":"2024-01-01","event":"E1","source":"S1"}],"people":[],"data":[],"opinions":[]}\n```',
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1905,7 +2226,10 @@ describe('AIService', () => {
       // zh.wikipedia returns a hit; en.wikipedia returns nothing.
       mockedAxios.get.mockImplementation(async (url: any) => {
         const urlStr = String(url);
-        if (urlStr.includes('zh.wikipedia.org') && urlStr.includes('w/api.php')) {
+        if (
+          urlStr.includes('zh.wikipedia.org') &&
+          urlStr.includes('w/api.php')
+        ) {
           return {
             data: { query: { search: [{ title: '香港房屋政策' }] } },
           };
@@ -1930,7 +2254,9 @@ describe('AIService', () => {
         mockChatResponse('search results'),
       );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({ timeline: [], people: [], data: [], opinions: [] })),
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1957,7 +2283,9 @@ describe('AIService', () => {
         mockChatResponse(''),
       );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({ timeline: [], people: [], data: [], opinions: [] })),
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -1973,9 +2301,13 @@ describe('AIService', () => {
     });
 
     it('should return fallback when search fails', async () => {
-      mockChatProvider.chatCompletionWithTools.mockRejectedValue(new Error('Search error'));
+      mockChatProvider.chatCompletionWithTools.mockRejectedValue(
+        new Error('Search error'),
+      );
       mockChatProvider.chatCompletion.mockResolvedValue(
-        mockChatResponse(JSON.stringify({ timeline: [], people: [], data: [], opinions: [] })),
+        mockChatResponse(
+          JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        ),
       );
 
       const result = await service.generateResearchKit('user-id', {
@@ -2027,8 +2359,12 @@ describe('AIService', () => {
     });
 
     it('should still call LLM synthesis after both data sources complete', async () => {
-      const wikiSpy = jest.spyOn(service as any, 'searchWikipedia').mockResolvedValue([]);
-      const searchSpy = jest.spyOn(service as any, 'performSearch').mockResolvedValue('tavily');
+      const wikiSpy = jest
+        .spyOn(service as any, 'searchWikipedia')
+        .mockResolvedValue([]);
+      const searchSpy = jest
+        .spyOn(service as any, 'performSearch')
+        .mockResolvedValue('tavily');
 
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse(
@@ -2043,7 +2379,8 @@ describe('AIService', () => {
 
       const wikiOrder = wikiSpy.mock.invocationCallOrder[0];
       const searchOrder = searchSpy.mock.invocationCallOrder[0];
-      const llmOrder = mockChatProvider.chatCompletion.mock.invocationCallOrder[0];
+      const llmOrder =
+        mockChatProvider.chatCompletion.mock.invocationCallOrder[0];
 
       expect(wikiOrder).toBeLessThan(llmOrder);
       expect(searchOrder).toBeLessThan(llmOrder);
@@ -2053,7 +2390,9 @@ describe('AIService', () => {
       jest
         .spyOn(service as any, 'searchWikipedia')
         .mockRejectedValue(new Error('Wikipedia down'));
-      jest.spyOn(service as any, 'performSearch').mockResolvedValue('tavily summary');
+      jest
+        .spyOn(service as any, 'performSearch')
+        .mockResolvedValue('tavily summary');
 
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse(
@@ -2136,14 +2475,17 @@ describe('AIService', () => {
       expect(p95).toBeLessThan(1200);
     });
   });
-
 });
 
 describe('AIService — performSearch branch logic', () => {
   let prisma: ReturnType<typeof createMockPrismaService>;
   let aiTools: AIToolsService;
   let tavilySearch: TavilySearchTool;
-  let storageMock: { put: jest.Mock; delete: jest.Mock; thumbnailUrl: jest.Mock };
+  let storageMock: {
+    put: jest.Mock;
+    delete: jest.Mock;
+    thumbnailUrl: jest.Mock;
+  };
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -2188,12 +2530,19 @@ describe('AIService — performSearch branch logic', () => {
     const kimiProvider = new KimiProvider(config as unknown as ConfigService);
 
     // Mock chatCompletionWithBuiltinSearch on the real instance
-    jest.spyOn(kimiProvider, 'chatCompletionWithBuiltinSearch').mockResolvedValue({
-      content: 'Kimi built-in search results',
-      finishReason: 'stop',
-    });
+    jest
+      .spyOn(kimiProvider, 'chatCompletionWithBuiltinSearch')
+      .mockResolvedValue({
+        content: 'Kimi built-in search results',
+        finishReason: 'stop',
+      });
     jest.spyOn(kimiProvider, 'chatCompletion').mockResolvedValue({
-      content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+      content: JSON.stringify({
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      }),
       finishReason: 'stop',
     });
 
@@ -2248,7 +2597,12 @@ describe('AIService — performSearch branch logic', () => {
       providerName: 'deepseek',
       model: 'test-model',
       chatCompletion: jest.fn().mockResolvedValue({
-        content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        content: JSON.stringify({
+          timeline: [],
+          people: [],
+          data: [],
+          opinions: [],
+        }),
         finishReason: 'stop',
       }),
       chatCompletionWithTools: jest.fn().mockResolvedValue({
@@ -2309,7 +2663,12 @@ describe('AIService — performSearch branch logic', () => {
       providerName: 'test',
       model: 'test-model',
       chatCompletion: jest.fn().mockResolvedValue({
-        content: JSON.stringify({ timeline: [], people: [], data: [], opinions: [] }),
+        content: JSON.stringify({
+          timeline: [],
+          people: [],
+          data: [],
+          opinions: [],
+        }),
         finishReason: 'stop',
       }),
       chatCompletionWithTools: jest.fn().mockResolvedValue({

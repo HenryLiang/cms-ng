@@ -27,7 +27,10 @@ describe('AI Operations DTOs', () => {
     });
 
     it('should fail with invalid style', async () => {
-      const dto = plainToInstance(RewriteTextDto, { text: 'Hello', style: 'invalid' });
+      const dto = plainToInstance(RewriteTextDto, {
+        text: 'Hello',
+        style: 'invalid',
+      });
       const errors = await validate(dto);
       expect(errors.some((e) => e.property === 'style')).toBe(true);
     });
@@ -61,12 +64,18 @@ describe('AI Operations DTOs', () => {
     });
 
     it('should pass with maxLength', async () => {
-      const dto = plainToInstance(CondenseTextDto, { text: 'Hello', maxLength: 100 });
+      const dto = plainToInstance(CondenseTextDto, {
+        text: 'Hello',
+        maxLength: 100,
+      });
       expect(await validate(dto)).toHaveLength(0);
     });
 
     it('should fail when maxLength is not an integer', async () => {
-      const dto = plainToInstance(CondenseTextDto, { text: 'Hello', maxLength: 100.5 });
+      const dto = plainToInstance(CondenseTextDto, {
+        text: 'Hello',
+        maxLength: 100.5,
+      });
       const errors = await validate(dto);
       expect(errors.some((e) => e.property === 'maxLength')).toBe(true);
     });

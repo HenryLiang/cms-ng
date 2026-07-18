@@ -72,7 +72,7 @@ describe('StoriesService', () => {
         description: 'Desc',
         tags: ['tag1'],
         priority: 1,
-      } as any);
+      });
 
       expect(prisma.story.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -96,7 +96,10 @@ describe('StoriesService', () => {
       ]);
       prisma.story.count.mockResolvedValue(2);
 
-      const result = await service.findAll({ userId: 'admin-id', role: 'ADMIN' }, {});
+      const result = await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        {},
+      );
 
       expect(prisma.story.findMany).toHaveBeenCalledWith({
         where: {},
@@ -107,7 +110,12 @@ describe('StoriesService', () => {
       });
       expect(prisma.story.count).toHaveBeenCalledWith({ where: {} });
       expect(result.data).toHaveLength(2);
-      expect(result.meta).toEqual({ page: 1, pageSize: 20, total: 2, totalPages: 1 });
+      expect(result.meta).toEqual({
+        page: 1,
+        pageSize: 20,
+        total: 2,
+        totalPages: 1,
+      });
     });
 
     it('should paginate with page/pageSize (#54)', async () => {
@@ -124,7 +132,12 @@ describe('StoriesService', () => {
       );
       expect(prisma.story.count).toHaveBeenCalledWith({ where: {} });
       expect(result.data).toHaveLength(1);
-      expect(result.meta).toEqual({ page: 1, pageSize: 2, total: 380, totalPages: 190 });
+      expect(result.meta).toEqual({
+        page: 1,
+        pageSize: 2,
+        total: 380,
+        totalPages: 190,
+      });
     });
 
     it('should compute correct skip for page 3 pageSize 5', async () => {
@@ -142,7 +155,9 @@ describe('StoriesService', () => {
     });
 
     it('should filter by status (#54)', async () => {
-      prisma.story.findMany.mockResolvedValue([mockStory({ status: 'APPROVED' })]);
+      prisma.story.findMany.mockResolvedValue([
+        mockStory({ status: 'APPROVED' }),
+      ]);
       prisma.story.count.mockResolvedValue(1);
 
       const result = await service.findAll(
@@ -248,7 +263,9 @@ describe('StoriesService', () => {
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -257,7 +274,9 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
       prisma.story.update.mockResolvedValue(mockStory({ tags: '["updated"]' }));
 
-      const result = await service.update('story-id', { tags: ['updated'] } as any);
+      const result = await service.update('story-id', {
+        tags: ['updated'],
+      });
 
       expect(prisma.story.update).toHaveBeenCalledWith({
         where: { id: 'story-id' },
@@ -270,7 +289,9 @@ describe('StoriesService', () => {
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.update('nonexistent', {})).rejects.toThrow(NotFoundException);
+      await expect(service.update('nonexistent', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -282,7 +303,9 @@ describe('StoriesService', () => {
 
       const result = await service.remove('story-id');
 
-      expect(prisma.story.delete).toHaveBeenCalledWith({ where: { id: 'story-id' } });
+      expect(prisma.story.delete).toHaveBeenCalledWith({
+        where: { id: 'story-id' },
+      });
       expect(result.success).toBe(true);
     });
 
@@ -325,7 +348,9 @@ describe('StoriesService', () => {
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
       expect(prisma.article.updateMany).not.toHaveBeenCalled();
       expect(prisma.story.delete).not.toHaveBeenCalled();
     });
@@ -333,39 +358,71 @@ describe('StoriesService', () => {
 
   describe('verifyAccess', () => {
     it('should allow admin access', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ reporterId: 'other-id' }),
+      );
 
-      await expect(service.verifyAccess('story-id', { userId: 'admin-id', role: 'ADMIN' })).resolves.toBeUndefined();
+      await expect(
+        service.verifyAccess('story-id', { userId: 'admin-id', role: 'ADMIN' }),
+      ).resolves.toBeUndefined();
     });
 
     it('should allow reporter access', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'user-id' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ reporterId: 'user-id' }),
+      );
 
-      await expect(service.verifyAccess('story-id', { userId: 'user-id', role: 'REPORTER' })).resolves.toBeUndefined();
+      await expect(
+        service.verifyAccess('story-id', {
+          userId: 'user-id',
+          role: 'REPORTER',
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('should allow editor access', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id', editorId: 'editor-id' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ reporterId: 'other-id', editorId: 'editor-id' }),
+      );
 
-      await expect(service.verifyAccess('story-id', { userId: 'editor-id', role: 'EDITOR' })).resolves.toBeUndefined();
+      await expect(
+        service.verifyAccess('story-id', {
+          userId: 'editor-id',
+          role: 'EDITOR',
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.verifyAccess('nonexistent', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.verifyAccess('nonexistent', {
+          userId: 'user-id',
+          role: 'REPORTER',
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when no access', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ reporterId: 'other-id', editorId: 'another-id' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ reporterId: 'other-id', editorId: 'another-id' }),
+      );
 
-      await expect(service.verifyAccess('story-id', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.verifyAccess('story-id', {
+          userId: 'user-id',
+          role: 'REPORTER',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('generateResearchKit', () => {
     it('should return research kit for existing story', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '["tag1"]' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ tags: '["tag1"]' }),
+      );
       const aiService = (service as any).aiService;
       aiService.generateResearchKit.mockResolvedValue({
         timeline: [{ date: '2024-01-01', event: 'E1' }],
@@ -376,43 +433,68 @@ describe('StoriesService', () => {
 
       const result = await service.generateResearchKit('user-id', 'story-id');
 
-      expect(prisma.story.findUnique).toHaveBeenCalledWith({ where: { id: 'story-id' } });
-      expect(aiService.generateResearchKit).toHaveBeenCalledWith('user-id', expect.objectContaining({
-        storyTitle: 'Test Story',
-        storyDescription: 'Desc',
-        storyTags: ['tag1'],
-      }));
+      expect(prisma.story.findUnique).toHaveBeenCalledWith({
+        where: { id: 'story-id' },
+      });
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        expect.objectContaining({
+          storyTitle: 'Test Story',
+          storyDescription: 'Desc',
+          storyTags: ['tag1'],
+        }),
+      );
       expect(result.timeline).toHaveLength(1);
     });
 
     it('should pass angle when present', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ angle: 'Angle', tags: '[]' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ angle: 'Angle', tags: '[]' }),
+      );
       const aiService = (service as any).aiService;
-      aiService.generateResearchKit.mockResolvedValue({ timeline: [], people: [], data: [], opinions: [] });
+      aiService.generateResearchKit.mockResolvedValue({
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      });
 
       await service.generateResearchKit('user-id', 'story-id');
 
-      expect(aiService.generateResearchKit).toHaveBeenCalledWith('user-id', expect.objectContaining({
-        storyAngle: 'Angle',
-      }));
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        expect.objectContaining({
+          storyAngle: 'Angle',
+        }),
+      );
     });
 
     it('should handle empty tags string', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '' }));
       const aiService = (service as any).aiService;
-      aiService.generateResearchKit.mockResolvedValue({ timeline: [], people: [], data: [], opinions: [] });
+      aiService.generateResearchKit.mockResolvedValue({
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      });
 
       await service.generateResearchKit('user-id', 'story-id');
 
-      expect(aiService.generateResearchKit).toHaveBeenCalledWith('user-id', expect.objectContaining({
-        storyTags: [],
-      }));
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        expect.objectContaining({
+          storyTags: [],
+        }),
+      );
     });
 
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.generateResearchKit('user-id', 'nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.generateResearchKit('user-id', 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -420,7 +502,9 @@ describe('StoriesService', () => {
     it('should assign editor to story', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
       prisma.user.findUnique.mockResolvedValue({ role: 'EDITOR' });
-      prisma.story.update.mockResolvedValue(mockStory({ editorId: 'editor-id' }));
+      prisma.story.update.mockResolvedValue(
+        mockStory({ editorId: 'editor-id' }),
+      );
 
       const result = await service.assignEditor('story-id', 'editor-id');
 
@@ -440,27 +524,35 @@ describe('StoriesService', () => {
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.assignEditor('nonexistent', 'editor-id')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.assignEditor('nonexistent', 'editor-id'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException when editor not found', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.assignEditor('story-id', 'bad-editor')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.assignEditor('story-id', 'bad-editor'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when user is not an editor', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
       prisma.user.findUnique.mockResolvedValue({ role: 'REPORTER' });
 
-      await expect(service.assignEditor('story-id', 'reporter-id')).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.assignEditor('story-id', 'reporter-id'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('generateDraftFromResearchKit', () => {
     it('should generate draft, create article, and update story status', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '["politics"]' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ tags: '["politics"]' }),
+      );
       const aiService = (service as any).aiService;
       aiService.generateDraft.mockResolvedValue({
         title: 'Draft Title',
@@ -468,7 +560,10 @@ describe('StoriesService', () => {
         content: '<p>Draft content</p>',
       });
       const articlesService = (service as any).articlesService;
-      articlesService.create.mockResolvedValue({ id: 'article-id', title: 'Draft Title' });
+      articlesService.create.mockResolvedValue({
+        id: 'article-id',
+        title: 'Draft Title',
+      });
       prisma.story.update.mockResolvedValue(mockStory({ status: 'WRITING' }));
 
       const researchKit = {
@@ -478,17 +573,28 @@ describe('StoriesService', () => {
         opinions: [{ source: 'S1', viewpoint: 'V1' }],
       };
 
-      const result = await service.generateDraftFromResearchKit('user-id', 'story-id', researchKit, 'instruction');
-
-      expect(prisma.story.findUnique).toHaveBeenCalledWith({ where: { id: 'story-id' } });
-      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, {
-        storyTitle: 'Test Story',
-        storyDescription: 'Desc',
-        storyAngle: undefined,
-        storyTags: ['politics'],
-        instruction: 'instruction',
+      const result = await service.generateDraftFromResearchKit(
+        'user-id',
+        'story-id',
         researchKit,
+        'instruction',
+      );
+
+      expect(prisma.story.findUnique).toHaveBeenCalledWith({
+        where: { id: 'story-id' },
       });
+      expect(aiService.generateDraft).toHaveBeenCalledWith(
+        'user-id',
+        undefined,
+        {
+          storyTitle: 'Test Story',
+          storyDescription: 'Desc',
+          storyAngle: undefined,
+          storyTags: ['politics'],
+          instruction: 'instruction',
+          researchKit,
+        },
+      );
       expect(articlesService.create).toHaveBeenCalledWith('user-id', {
         storyId: 'story-id',
         title: 'Draft Title',
@@ -506,52 +612,93 @@ describe('StoriesService', () => {
     it('should throw NotFoundException when story not found', async () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
-      await expect(service.generateDraftFromResearchKit('user-id', 'nonexistent', {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.generateDraftFromResearchKit(
+          'user-id',
+          'nonexistent',
+          {} as any,
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should handle empty tags string', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '' }));
       const aiService = (service as any).aiService;
-      aiService.generateDraft.mockResolvedValue({ title: 'T', content: '<p>C</p>' });
+      aiService.generateDraft.mockResolvedValue({
+        title: 'T',
+        content: '<p>C</p>',
+      });
       const articlesService = (service as any).articlesService;
       articlesService.create.mockResolvedValue({ id: 'a1' });
       prisma.story.update.mockResolvedValue(mockStory());
 
-      await service.generateDraftFromResearchKit('user-id', 'story-id', {} as any);
+      await service.generateDraftFromResearchKit(
+        'user-id',
+        'story-id',
+        {} as any,
+      );
 
-      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, expect.objectContaining({
-        storyTags: [],
-      }));
+      expect(aiService.generateDraft).toHaveBeenCalledWith(
+        'user-id',
+        undefined,
+        expect.objectContaining({
+          storyTags: [],
+        }),
+      );
     });
 
     it('should pass story angle when present', async () => {
-      prisma.story.findUnique.mockResolvedValue(mockStory({ angle: 'Angle', tags: '[]' }));
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({ angle: 'Angle', tags: '[]' }),
+      );
       const aiService = (service as any).aiService;
-      aiService.generateDraft.mockResolvedValue({ title: 'T', content: '<p>C</p>' });
+      aiService.generateDraft.mockResolvedValue({
+        title: 'T',
+        content: '<p>C</p>',
+      });
       const articlesService = (service as any).articlesService;
       articlesService.create.mockResolvedValue({ id: 'a1' });
       prisma.story.update.mockResolvedValue(mockStory());
 
-      await service.generateDraftFromResearchKit('user-id', 'story-id', {} as any);
+      await service.generateDraftFromResearchKit(
+        'user-id',
+        'story-id',
+        {} as any,
+      );
 
-      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, expect.objectContaining({
-        storyAngle: 'Angle',
-      }));
+      expect(aiService.generateDraft).toHaveBeenCalledWith(
+        'user-id',
+        undefined,
+        expect.objectContaining({
+          storyAngle: 'Angle',
+        }),
+      );
     });
 
     it('should work without instruction', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
       const aiService = (service as any).aiService;
-      aiService.generateDraft.mockResolvedValue({ title: 'T', content: '<p>C</p>' });
+      aiService.generateDraft.mockResolvedValue({
+        title: 'T',
+        content: '<p>C</p>',
+      });
       const articlesService = (service as any).articlesService;
       articlesService.create.mockResolvedValue({ id: 'a1' });
       prisma.story.update.mockResolvedValue(mockStory());
 
-      await service.generateDraftFromResearchKit('user-id', 'story-id', {} as any);
+      await service.generateDraftFromResearchKit(
+        'user-id',
+        'story-id',
+        {} as any,
+      );
 
-      expect(aiService.generateDraft).toHaveBeenCalledWith('user-id', undefined, expect.objectContaining({
-        instruction: undefined,
-      }));
+      expect(aiService.generateDraft).toHaveBeenCalledWith(
+        'user-id',
+        undefined,
+        expect.objectContaining({
+          instruction: undefined,
+        }),
+      );
     });
   });
 });

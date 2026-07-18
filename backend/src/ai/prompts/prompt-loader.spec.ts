@@ -10,9 +10,7 @@ describe('substitute (pure)', () => {
   });
 
   it('replaces multiple variables', () => {
-    expect(
-      substitute('{{a}} and {{b}}', { a: '1', b: '2' }),
-    ).toBe('1 and 2');
+    expect(substitute('{{a}} and {{b}}', { a: '1', b: '2' })).toBe('1 and 2');
   });
 
   it('tolerates whitespace inside placeholders', () => {

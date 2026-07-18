@@ -37,14 +37,18 @@ describe('GoogleTrendsRealtimeAdapter', () => {
       GOOGLE_TRENDS_HOURS: '24',
     };
     const merged = { ...defaults, ...overrides };
-    return { get: jest.fn((k: string) => merged[k]) } as unknown as ConfigService;
+    return {
+      get: jest.fn((k: string) => merged[k]),
+    } as unknown as ConfigService;
   }
 
-  function buildPageChain(evaluateResult: unknown = [
-    'canada wildfires 2026',
-    'weather tomorrow',
-    'fever game',
-  ]) {
+  function buildPageChain(
+    evaluateResult: unknown = [
+      'canada wildfires 2026',
+      'weather tomorrow',
+      'fever game',
+    ],
+  ) {
     const page = {
       route: jest.fn(),
       goto: jest.fn().mockResolvedValue(undefined),
@@ -212,11 +216,7 @@ describe('GoogleTrendsRealtimeAdapter', () => {
       buildRssAdapter(),
     );
     await expect(
-      adapter.fetch(
-        'google-trends-realtime',
-        {},
-        { params: { hours: 99 } },
-      ),
+      adapter.fetch('google-trends-realtime', {}, { params: { hours: 99 } }),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -245,7 +245,11 @@ describe('GoogleTrendsRealtimeAdapter', () => {
       { params: { geo: 'US', hours: 24 } },
     );
 
-    expect(rss.fetch).toHaveBeenCalledWith('google-trends', { userId: 'u1' }, expect.anything());
+    expect(rss.fetch).toHaveBeenCalledWith(
+      'google-trends',
+      { userId: 'u1' },
+      expect.anything(),
+    );
     expect(result.status).toBe('degraded');
     expect(result.warnings?.[0]).toContain('回退');
   });

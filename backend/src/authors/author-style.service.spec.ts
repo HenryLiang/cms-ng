@@ -16,7 +16,10 @@ describe('AuthorStyleService', () => {
   let service: AuthorStyleService;
 
   beforeEach(() => {
-    const config = { get: (key: string) => (key === 'AUTHORS_DATA_DIR' ? fixtureDir : undefined) } as any;
+    const config = {
+      get: (key: string) =>
+        key === 'AUTHORS_DATA_DIR' ? fixtureDir : undefined,
+    } as any;
     service = new AuthorStyleService(config as ConfigService);
   });
 
@@ -49,7 +52,10 @@ describe('AuthorStyleService', () => {
 
     it('falls back when the directory is missing', async () => {
       const config = {
-        get: (key: string) => (key === 'AUTHORS_DATA_DIR' ? '/definitely/not/here/authors' : undefined),
+        get: (key: string) =>
+          key === 'AUTHORS_DATA_DIR'
+            ? '/definitely/not/here/authors'
+            : undefined,
       } as any;
       const missing = new AuthorStyleService(config as ConfigService);
       const info = await missing.listAuthors();

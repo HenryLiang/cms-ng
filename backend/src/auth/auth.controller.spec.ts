@@ -37,8 +37,16 @@ describe('AuthController', () => {
 
   describe('register', () => {
     it('should call authService.register with dto', async () => {
-      const dto = { email: 'test@example.com', name: 'Test', password: 'password123', role: 'REPORTER' };
-      authService.register.mockResolvedValue({ token: 'jwt-token', user: { id: 'u1' } });
+      const dto = {
+        email: 'test@example.com',
+        name: 'Test',
+        password: 'password123',
+        role: 'REPORTER',
+      };
+      authService.register.mockResolvedValue({
+        token: 'jwt-token',
+        user: { id: 'u1' },
+      });
 
       const result = await controller.register(dto as any);
 
@@ -50,9 +58,12 @@ describe('AuthController', () => {
   describe('login', () => {
     it('should call authService.login with dto', async () => {
       const dto = { email: 'test@example.com', password: 'password123' };
-      authService.login.mockResolvedValue({ token: 'jwt-token', user: { id: 'u1' } });
+      authService.login.mockResolvedValue({
+        token: 'jwt-token',
+        user: { id: 'u1' },
+      });
 
-      const result = await controller.login(dto as any);
+      const result = await controller.login(dto);
 
       expect(authService.login).toHaveBeenCalledWith(dto);
       expect(result.token).toBe('jwt-token');
@@ -78,7 +89,9 @@ describe('AuthController', () => {
         user: { id: 'u1' },
       });
 
-      const result = await controller.refresh({ token: 'old.jwt.token' } as any);
+      const result = await controller.refresh({
+        token: 'old.jwt.token',
+      });
 
       expect(authService.refresh).toHaveBeenCalledWith('old.jwt.token');
       expect(result.accessToken).toBe('new_jwt_token');
@@ -88,7 +101,9 @@ describe('AuthController', () => {
   // ===== 注册功能开放开关 =====
   describe('registrationStatus (GET /auth/registration/status)', () => {
     it('should call authService.getRegistrationStatus and return result', async () => {
-      authService.getRegistrationStatus.mockResolvedValue({ registrationOpen: true });
+      authService.getRegistrationStatus.mockResolvedValue({
+        registrationOpen: true,
+      });
 
       const result = await controller.registrationStatus();
 
@@ -99,23 +114,35 @@ describe('AuthController', () => {
 
   describe('toggleRegistration (POST /auth/registration/toggle)', () => {
     it('should call authService.setRegistrationStatus with enabled, userId, reason', async () => {
-      authService.setRegistrationStatus.mockResolvedValue({ registrationOpen: false });
+      authService.setRegistrationStatus.mockResolvedValue({
+        registrationOpen: false,
+      });
 
-      const result = await controller.toggleRegistration(
+      const result = await controller.toggleRegistration('admin-id', {
+        enabled: false,
+        reason: '维护收口',
+      });
+
+      expect(authService.setRegistrationStatus).toHaveBeenCalledWith(
+        false,
         'admin-id',
-        { enabled: false, reason: '维护收口' } as any,
+        '维护收口',
       );
-
-      expect(authService.setRegistrationStatus).toHaveBeenCalledWith(false, 'admin-id', '维护收口');
       expect(result).toEqual({ registrationOpen: false });
     });
 
     it('should pass undefined reason when omitted from dto', async () => {
-      authService.setRegistrationStatus.mockResolvedValue({ registrationOpen: true });
+      authService.setRegistrationStatus.mockResolvedValue({
+        registrationOpen: true,
+      });
 
-      await controller.toggleRegistration('admin-id', { enabled: true } as any);
+      await controller.toggleRegistration('admin-id', { enabled: true });
 
-      expect(authService.setRegistrationStatus).toHaveBeenCalledWith(true, 'admin-id', undefined);
+      expect(authService.setRegistrationStatus).toHaveBeenCalledWith(
+        true,
+        'admin-id',
+        undefined,
+      );
     });
   });
 });

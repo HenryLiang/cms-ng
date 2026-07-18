@@ -2,7 +2,9 @@ import { extractJsonFromOutput } from './platform.adapter';
 
 describe('extractJsonFromOutput', () => {
   it('should parse direct JSON', () => {
-    const result = extractJsonFromOutput('{"title": "Hello", "content": "World"}');
+    const result = extractJsonFromOutput(
+      '{"title": "Hello", "content": "World"}',
+    );
     expect(result).toEqual({ title: 'Hello', content: 'World' });
   });
 
@@ -17,7 +19,9 @@ describe('extractJsonFromOutput', () => {
   });
 
   it('should extract JSON object from text', () => {
-    const result = extractJsonFromOutput('Some text before\n{"title": "Hello"}\nSome text after');
+    const result = extractJsonFromOutput(
+      'Some text before\n{"title": "Hello"}\nSome text after',
+    );
     expect(result).toEqual({ title: 'Hello' });
   });
 

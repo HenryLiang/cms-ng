@@ -82,7 +82,9 @@ describe('AutoPublishService', () => {
 
     service = module.get<AutoPublishService>(AutoPublishService);
     prisma = module.get<PrismaService>(PrismaService);
-    scheduler = module.get<AutoPublishSchedulerService>(AutoPublishSchedulerService);
+    scheduler = module.get<AutoPublishSchedulerService>(
+      AutoPublishSchedulerService,
+    );
     pipeline = module.get<PipelineService>(PipelineService);
     wordpress = module.get<WordPressService>(WordPressService);
 
@@ -134,7 +136,10 @@ describe('AutoPublishService', () => {
       const result = await service.manualRun('task-1');
 
       expect(mockPipeline.runTask).toHaveBeenCalledWith('task-1', 'MANUAL');
-      expect(result).toEqual({ message: 'Manual run triggered', taskId: 'task-1' });
+      expect(result).toEqual({
+        message: 'Manual run triggered',
+        taskId: 'task-1',
+      });
     });
 
     it('should throw NotFoundException for non-existent task', async () => {
@@ -157,7 +162,10 @@ describe('AutoPublishService', () => {
         .mockReturnValue(Promise.reject(new Error('Notification step failed')));
 
       const result = await service.manualRun('task-1');
-      expect(result).toEqual({ message: 'Manual run triggered', taskId: 'task-1' });
+      expect(result).toEqual({
+        message: 'Manual run triggered',
+        taskId: 'task-1',
+      });
 
       // Let the microtask queue drain so the .catch handler logs
       await new Promise((r) => setTimeout(r, 10));
@@ -258,11 +266,9 @@ describe('AutoPublishService', () => {
         resolveRegister = res;
       });
 
-      mockScheduler.registerTaskCron.mockImplementation(
-        async () => {
-          await registerDone;
-        },
-      );
+      mockScheduler.registerTaskCron.mockImplementation(async () => {
+        await registerDone;
+      });
 
       const mockTask = {
         id: 'task-1',
@@ -286,7 +292,9 @@ describe('AutoPublishService', () => {
 
       // Check whether toggleTask has resolved yet using Promise.race trick
       let toggleResolved = false;
-      togglePromise.then(() => { toggleResolved = true; });
+      togglePromise.then(() => {
+        toggleResolved = true;
+      });
 
       // If toggleTask awaited registerTaskCron, it should still be pending after 10ms
       // (because registerDone is not resolved yet)
@@ -327,9 +335,16 @@ describe('AutoPublishService', () => {
     it('should enable kill switch and forward operator + reason', async () => {
       mockScheduler.isKillSwitchActive.mockResolvedValue(true);
 
-      const result = await service.killSwitch(true, 'admin-uuid-1', 'emergency');
+      const result = await service.killSwitch(
+        true,
+        'admin-uuid-1',
+        'emergency',
+      );
 
-      expect(mockScheduler.enableKillSwitch).toHaveBeenCalledWith('admin-uuid-1', 'emergency');
+      expect(mockScheduler.enableKillSwitch).toHaveBeenCalledWith(
+        'admin-uuid-1',
+        'emergency',
+      );
       expect(result).toEqual({ killSwitchActive: true });
     });
 
@@ -338,7 +353,9 @@ describe('AutoPublishService', () => {
 
       const result = await service.killSwitch(false, 'admin-uuid-1');
 
-      expect(mockScheduler.disableKillSwitch).toHaveBeenCalledWith('admin-uuid-1');
+      expect(mockScheduler.disableKillSwitch).toHaveBeenCalledWith(
+        'admin-uuid-1',
+      );
       expect(result).toEqual({ killSwitchActive: false });
     });
   });
@@ -353,7 +370,7 @@ describe('AutoPublishService', () => {
       // 1. totalArticles (no filter), 2. successArticles, 3. failedArticles
       mockPrisma.autoPublishArticle.count
         .mockResolvedValueOnce(100) // totalArticles
-        .mockResolvedValueOnce(80)  // successArticles
+        .mockResolvedValueOnce(80) // successArticles
         .mockResolvedValueOnce(20); // failedArticles
       mockScheduler.isKillSwitchActive.mockResolvedValue(false);
 

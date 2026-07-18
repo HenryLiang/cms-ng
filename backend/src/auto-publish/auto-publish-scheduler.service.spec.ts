@@ -54,7 +54,9 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
       ],
     }).compile();
 
-    service = module.get<AutoPublishSchedulerService>(AutoPublishSchedulerService);
+    service = module.get<AutoPublishSchedulerService>(
+      AutoPublishSchedulerService,
+    );
     jest.clearAllMocks();
   });
 
@@ -73,7 +75,7 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
           timezone: 'Asia/Hong_Kong',
         }),
       };
-      await service.registerTaskCron(task as any);
+      await service.registerTaskCron(task);
 
       expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledTimes(1);
       const [jobName] = mockSchedulerRegistry.addCronJob.mock.calls[0];
@@ -89,9 +91,9 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
           timezone: 'Asia/Hong_Kong',
         }),
       };
-      await expect(service.registerTaskCron(task as any)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.registerTaskCron(task as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
   });
@@ -106,7 +108,7 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
           timezone: 'Asia/Hong_Kong',
         }),
       };
-      await service.registerTaskCron(task as any);
+      await service.registerTaskCron(task);
 
       expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledTimes(1);
       const [jobName] = mockSchedulerRegistry.addCronJob.mock.calls[0];
@@ -122,7 +124,7 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
           timezone: 'Asia/Shanghai',
         }),
       };
-      await service.registerTaskCron(task as any);
+      await service.registerTaskCron(task);
 
       expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledTimes(1);
     });
@@ -139,9 +141,9 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
         }),
       };
 
-      await expect(service.registerTaskCron(task as any)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.registerTaskCron(task as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
 
@@ -155,9 +157,9 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
         }),
       };
 
-      await expect(service.registerTaskCron(task as any)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.registerTaskCron(task as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

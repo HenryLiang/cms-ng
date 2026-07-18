@@ -40,9 +40,9 @@ describe('parsePaginationParams', () => {
   it('clamps pageSize to [1, MAX_PAGE_SIZE]', () => {
     expect(parsePaginationParams({ pageSize: 0 }).pageSize).toBe(1);
     expect(parsePaginationParams({ pageSize: -10 }).pageSize).toBe(1);
-    expect(parsePaginationParams({ pageSize: MAX_PAGE_SIZE + 1 }).pageSize).toBe(
-      MAX_PAGE_SIZE,
-    );
+    expect(
+      parsePaginationParams({ pageSize: MAX_PAGE_SIZE + 1 }).pageSize,
+    ).toBe(MAX_PAGE_SIZE);
   });
 
   it('uses defaults when value is NaN / non-numeric', () => {
@@ -72,7 +72,12 @@ describe('buildPaginatedResponse', () => {
 
   it('handles total=0 (totalPages=0, page=1 still valid)', () => {
     const out = buildPaginatedResponse([], 0, { page: 1, pageSize: 20 });
-    expect(out.meta).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+    expect(out.meta).toEqual({
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 0,
+    });
   });
 
   it('handles pageSize=0 (totalPages=0, avoids divide-by-zero)', () => {

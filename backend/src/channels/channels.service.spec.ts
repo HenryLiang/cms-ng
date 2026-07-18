@@ -3,7 +3,11 @@ jest.mock('https-proxy-agent', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
@@ -26,7 +30,12 @@ describe('ChannelsService', () => {
       checkBalance: jest.fn().mockResolvedValue(true),
       deduct: jest.fn().mockResolvedValue(null),
       credit: jest.fn().mockResolvedValue(null),
-      estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0, breakdown: [], sufficientBalance: true, currentBalance: 100 }),
+      estimateCost: jest.fn().mockResolvedValue({
+        estimatedCost: 0,
+        breakdown: [],
+        sufficientBalance: true,
+        currentBalance: 100,
+      }),
       checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
       getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.02 }),
     };
@@ -112,12 +121,17 @@ describe('ChannelsService', () => {
     it('should return publishes with parsed JSON fields', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.platformPublish.findMany.mockResolvedValue([
-        mockPublish({ adaptedTags: '["#news", "#hongkong"]', coverImages: '["img1.jpg"]' }),
+        mockPublish({
+          adaptedTags: '["#news", "#hongkong"]',
+          coverImages: '["img1.jpg"]',
+        }),
       ]);
 
       const result = await service.getPublishes('article-id');
 
-      expect(prisma.article.findUnique).toHaveBeenCalledWith({ where: { id: 'article-id' } });
+      expect(prisma.article.findUnique).toHaveBeenCalledWith({
+        where: { id: 'article-id' },
+      });
       expect(prisma.platformPublish.findMany).toHaveBeenCalledWith({
         where: { articleId: 'article-id' },
         orderBy: { createdAt: 'desc' },
@@ -141,7 +155,9 @@ describe('ChannelsService', () => {
     it('should throw NotFoundException when article not found', async () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
-      await expect(service.getPublishes('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.getPublishes('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -155,7 +171,9 @@ describe('ChannelsService', () => {
 
     it('should generate adaptation for supported platform (Facebook)', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
       prisma.platformPublish.update.mockResolvedValue(
         mockPublish({
           status: PublishStatus.READY,
@@ -165,10 +183,19 @@ describe('ChannelsService', () => {
       );
       aiService.chatWithAI.mockResolvedValue(validAIResponse);
 
-      const result = await service.generateAdaptation('user-id', 'article-id', Platform.FACEBOOK);
+      const result = await service.generateAdaptation(
+        'user-id',
+        'article-id',
+        Platform.FACEBOOK,
+      );
 
       expect(prisma.platformPublish.upsert).toHaveBeenCalledWith({
-        where: { articleId_platform: { articleId: 'article-id', platform: Platform.FACEBOOK } },
+        where: {
+          articleId_platform: {
+            articleId: 'article-id',
+            platform: Platform.FACEBOOK,
+          },
+        },
         create: expect.objectContaining({
           articleId: 'article-id',
           platform: Platform.FACEBOOK,
@@ -196,7 +223,10 @@ describe('ChannelsService', () => {
     it('should generate adaptation for Xiaohongshu', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.platformPublish.upsert.mockResolvedValue(
-        mockPublish({ platform: Platform.XIAOHONGSHU, status: PublishStatus.GENERATING }),
+        mockPublish({
+          platform: Platform.XIAOHONGSHU,
+          status: PublishStatus.GENERATING,
+        }),
       );
       prisma.platformPublish.update.mockResolvedValue(
         mockPublish({
@@ -213,7 +243,11 @@ describe('ChannelsService', () => {
         }),
       );
 
-      const result = await service.generateAdaptation('user-id', 'article-id', Platform.XIAOHONGSHU);
+      const result = await service.generateAdaptation(
+        'user-id',
+        'article-id',
+        Platform.XIAOHONGSHU,
+      );
 
       expect(aiService.chatWithAI).toHaveBeenCalled();
       const prompt = aiService.chatWithAI.mock.calls[0][2].messages[0].content;
@@ -225,10 +259,16 @@ describe('ChannelsService', () => {
     it('should generate adaptation for Instagram', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.platformPublish.upsert.mockResolvedValue(
-        mockPublish({ platform: Platform.INSTAGRAM, status: PublishStatus.GENERATING }),
+        mockPublish({
+          platform: Platform.INSTAGRAM,
+          status: PublishStatus.GENERATING,
+        }),
       );
       prisma.platformPublish.update.mockResolvedValue(
-        mockPublish({ platform: Platform.INSTAGRAM, status: PublishStatus.READY }),
+        mockPublish({
+          platform: Platform.INSTAGRAM,
+          status: PublishStatus.READY,
+        }),
       );
       aiService.chatWithAI.mockResolvedValue(
         JSON.stringify({
@@ -238,7 +278,11 @@ describe('ChannelsService', () => {
         }),
       );
 
-      await service.generateAdaptation('user-id', 'article-id', Platform.INSTAGRAM);
+      await service.generateAdaptation(
+        'user-id',
+        'article-id',
+        Platform.INSTAGRAM,
+      );
 
       const prompt = aiService.chatWithAI.mock.calls[0][2].messages[0].content;
       expect(prompt).toContain('Instagram');
@@ -247,10 +291,16 @@ describe('ChannelsService', () => {
     it('should generate adaptation for Website', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.platformPublish.upsert.mockResolvedValue(
-        mockPublish({ platform: Platform.WEBSITE, status: PublishStatus.GENERATING }),
+        mockPublish({
+          platform: Platform.WEBSITE,
+          status: PublishStatus.GENERATING,
+        }),
       );
       prisma.platformPublish.update.mockResolvedValue(
-        mockPublish({ platform: Platform.WEBSITE, status: PublishStatus.READY }),
+        mockPublish({
+          platform: Platform.WEBSITE,
+          status: PublishStatus.READY,
+        }),
       );
       aiService.chatWithAI.mockResolvedValue(
         JSON.stringify({
@@ -261,7 +311,11 @@ describe('ChannelsService', () => {
         }),
       );
 
-      await service.generateAdaptation('user-id', 'article-id', Platform.WEBSITE);
+      await service.generateAdaptation(
+        'user-id',
+        'article-id',
+        Platform.WEBSITE,
+      );
 
       const prompt = aiService.chatWithAI.mock.calls[0][2].messages[0].content;
       expect(prompt).toContain('官网/APP');
@@ -269,11 +323,20 @@ describe('ChannelsService', () => {
 
     it('should support custom prompt', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      prisma.platformPublish.update.mockResolvedValue(mockPublish({ status: PublishStatus.READY }));
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      prisma.platformPublish.update.mockResolvedValue(
+        mockPublish({ status: PublishStatus.READY }),
+      );
       aiService.chatWithAI.mockResolvedValue(validAIResponse);
 
-      await service.generateAdaptation('user-id', 'article-id', Platform.FACEBOOK, 'Use more emojis');
+      await service.generateAdaptation(
+        'user-id',
+        'article-id',
+        Platform.FACEBOOK,
+        'Use more emojis',
+      );
 
       const prompt = aiService.chatWithAI.mock.calls[0][2].messages[0].content;
       expect(prompt).toContain('额外要求：Use more emojis');
@@ -297,14 +360,21 @@ describe('ChannelsService', () => {
 
     it('should set FAILED status when AI returns invalid JSON', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      prisma.platformPublish.findUnique.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      prisma.platformPublish.findUnique.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
       aiService.chatWithAI.mockResolvedValue('This is not JSON at all');
 
       // Website adapter doesn't validate length, so it should still succeed
       // But let's test with Facebook which has length limits
       prisma.platformPublish.upsert.mockResolvedValue(
-        mockPublish({ platform: Platform.FACEBOOK, status: PublishStatus.GENERATING }),
+        mockPublish({
+          platform: Platform.FACEBOOK,
+          status: PublishStatus.GENERATING,
+        }),
       );
       aiService.chatWithAI.mockResolvedValue('Invalid output without title');
 
@@ -327,8 +397,12 @@ describe('ChannelsService', () => {
 
     it('should handle AI service failure and set FAILED status', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      prisma.platformPublish.findUnique.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      prisma.platformPublish.findUnique.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
       aiService.chatWithAI.mockRejectedValue(new Error('AI service timeout'));
 
       await expect(
@@ -347,9 +421,15 @@ describe('ChannelsService', () => {
 
     it('should reject AI fallback error messages', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      prisma.platformPublish.findUnique.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      aiService.chatWithAI.mockResolvedValue('AI 助手暂时无法回答，请稍后重试。');
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      prisma.platformPublish.findUnique.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      aiService.chatWithAI.mockResolvedValue(
+        'AI 助手暂时无法回答，请稍后重试。',
+      );
 
       await expect(
         service.generateAdaptation('user-id', 'article-id', Platform.FACEBOOK),
@@ -359,7 +439,9 @@ describe('ChannelsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             status: PublishStatus.FAILED,
-            notes: expect.stringContaining('AI service returned an error response'),
+            notes: expect.stringContaining(
+              'AI service returned an error response',
+            ),
           }),
         }),
       );
@@ -367,8 +449,12 @@ describe('ChannelsService', () => {
 
     it('should not overwrite READY status on error', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      prisma.platformPublish.findUnique.mockResolvedValue(mockPublish({ status: PublishStatus.READY }));
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      prisma.platformPublish.findUnique.mockResolvedValue(
+        mockPublish({ status: PublishStatus.READY }),
+      );
       aiService.chatWithAI.mockRejectedValue(new Error('AI error'));
 
       await expect(
@@ -384,11 +470,19 @@ describe('ChannelsService', () => {
 
     it('should handle article with empty tags', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle({ tags: '[]' }));
-      prisma.platformPublish.upsert.mockResolvedValue(mockPublish({ status: PublishStatus.GENERATING }));
-      prisma.platformPublish.update.mockResolvedValue(mockPublish({ status: PublishStatus.READY }));
+      prisma.platformPublish.upsert.mockResolvedValue(
+        mockPublish({ status: PublishStatus.GENERATING }),
+      );
+      prisma.platformPublish.update.mockResolvedValue(
+        mockPublish({ status: PublishStatus.READY }),
+      );
       aiService.chatWithAI.mockResolvedValue(validAIResponse);
 
-      await service.generateAdaptation('user-id', 'article-id', Platform.FACEBOOK);
+      await service.generateAdaptation(
+        'user-id',
+        'article-id',
+        Platform.FACEBOOK,
+      );
 
       const prompt = aiService.chatWithAI.mock.calls[0][2].messages[0].content;
       expect(prompt).toContain('原文标题：Test Article Title');
@@ -400,7 +494,10 @@ describe('ChannelsService', () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.platformPublish.findFirst.mockResolvedValue(mockPublish());
       prisma.platformPublish.update.mockResolvedValue(
-        mockPublish({ status: PublishStatus.PUBLISHED, publishedAt: new Date() }),
+        mockPublish({
+          status: PublishStatus.PUBLISHED,
+          publishedAt: new Date(),
+        }),
       );
 
       const result = await service.updatePublish('article-id', 'publish-id', {
@@ -438,7 +535,9 @@ describe('ChannelsService', () => {
     it('should update notes', async () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.platformPublish.findFirst.mockResolvedValue(mockPublish());
-      prisma.platformPublish.update.mockResolvedValue(mockPublish({ notes: 'Some notes' }));
+      prisma.platformPublish.update.mockResolvedValue(
+        mockPublish({ notes: 'Some notes' }),
+      );
 
       const result = await service.updatePublish('article-id', 'publish-id', {
         notes: 'Some notes',
@@ -455,7 +554,9 @@ describe('ChannelsService', () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updatePublish('nonexistent', 'publish-id', { status: PublishStatus.PUBLISHED }),
+        service.updatePublish('nonexistent', 'publish-id', {
+          status: PublishStatus.PUBLISHED,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -464,7 +565,9 @@ describe('ChannelsService', () => {
       prisma.platformPublish.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.updatePublish('article-id', 'nonexistent', { status: PublishStatus.PUBLISHED }),
+        service.updatePublish('article-id', 'nonexistent', {
+          status: PublishStatus.PUBLISHED,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -488,39 +591,74 @@ describe('ChannelsService', () => {
     it('should throw NotFoundException when publish not found', async () => {
       prisma.platformPublish.findFirst.mockResolvedValue(null);
 
-      await expect(service.deletePublish('article-id', 'nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deletePublish('article-id', 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('verifyAccess', () => {
     it('should allow admin access', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id' }));
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ authorId: 'other-id' }),
+      );
 
-      await expect(service.verifyAccess('article-id', { userId: 'admin-id', role: 'ADMIN' })).resolves.toBeUndefined();
+      await expect(
+        service.verifyAccess('article-id', {
+          userId: 'admin-id',
+          role: 'ADMIN',
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('should allow author access', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'user-id' }));
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ authorId: 'user-id' }),
+      );
 
-      await expect(service.verifyAccess('article-id', { userId: 'user-id', role: 'REPORTER' })).resolves.toBeUndefined();
+      await expect(
+        service.verifyAccess('article-id', {
+          userId: 'user-id',
+          role: 'REPORTER',
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('should allow assigned editor access', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'editor-id' }));
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ authorId: 'other-id', editorId: 'editor-id' }),
+      );
 
-      await expect(service.verifyAccess('article-id', { userId: 'editor-id', role: 'EDITOR' })).resolves.toBeUndefined();
+      await expect(
+        service.verifyAccess('article-id', {
+          userId: 'editor-id',
+          role: 'EDITOR',
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('should throw NotFoundException when article not found', async () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
-      await expect(service.verifyAccess('nonexistent', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.verifyAccess('nonexistent', {
+          userId: 'user-id',
+          role: 'REPORTER',
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when user has no access', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle({ authorId: 'other-id', editorId: 'another-id' }));
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ authorId: 'other-id', editorId: 'another-id' }),
+      );
 
-      await expect(service.verifyAccess('article-id', { userId: 'user-id', role: 'REPORTER' })).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.verifyAccess('article-id', {
+          userId: 'user-id',
+          role: 'REPORTER',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

@@ -30,48 +30,62 @@ describe('validateEnv', () => {
     const { DATABASE_URL, ...rest } = goodBase;
     const r = validateEnv(rest);
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.errors.some((e) => e.includes('DATABASE_URL'))).toBe(true);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('DATABASE_URL'))).toBe(true);
   });
 
   it('fails when JWT_SECRET is missing', () => {
     const { JWT_SECRET, ...rest } = goodBase;
     const r = validateEnv(rest);
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.errors.some((e) => e.includes('JWT_SECRET'))).toBe(true);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('JWT_SECRET'))).toBe(true);
   });
 
   it('fails when JWT_SECRET is too short (< 16 chars)', () => {
     const r = validateEnv({ ...goodBase, JWT_SECRET: 'short' });
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.errors.some((e) => e.includes('at least 16'))).toBe(true);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('at least 16'))).toBe(true);
   });
 
   it('fails when DATABASE_URL does not start with mysql://', () => {
     const r = validateEnv({ ...goodBase, DATABASE_URL: 'postgres://x/y' });
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.errors.some((e) => e.includes('mysql://'))).toBe(true);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('mysql://'))).toBe(true);
   });
 
   it('fails when AI_PROVIDER is not in the allowed list', () => {
     const r = validateEnv({ ...goodBase, AI_PROVIDER: 'gpt5' });
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.errors.some((e) => e.includes('AI_PROVIDER'))).toBe(true);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('AI_PROVIDER'))).toBe(true);
   });
 
   it('fails when AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing', () => {
     const { DEEPSEEK_API_KEY, ...rest } = goodBase;
     const r = validateEnv(rest);
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.errors.some((e) => e.includes('DEEPSEEK_API_KEY'))).toBe(true);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('DEEPSEEK_API_KEY'))).toBe(true);
   });
 
   it('passes when AI_PROVIDER=kimi with KIMI_API_KEY', () => {
-    const r = validateEnv({ ...goodBase, AI_PROVIDER: 'kimi', KIMI_API_KEY: 'kimi-test' });
+    const r = validateEnv({
+      ...goodBase,
+      AI_PROVIDER: 'kimi',
+      KIMI_API_KEY: 'kimi-test',
+    });
     expect(r.success).toBe(true);
   });
 
   it('passes when AI_PROVIDER=openai with OPENAI_API_KEY', () => {
-    const r = validateEnv({ ...goodBase, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'sk-openai' });
+    const r = validateEnv({
+      ...goodBase,
+      AI_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'sk-openai',
+    });
     expect(r.success).toBe(true);
   });
 

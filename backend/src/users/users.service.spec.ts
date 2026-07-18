@@ -65,7 +65,9 @@ describe('UsersService', () => {
 
   describe('findAll', () => {
     it('should return users with parsed expertise JSON and balance as number', async () => {
-      prisma.user.findMany.mockResolvedValue([mockUser({ balance: '12.5000' })]);
+      prisma.user.findMany.mockResolvedValue([
+        mockUser({ balance: '12.5000' }),
+      ]);
 
       const result = await service.findAll();
 
@@ -154,9 +156,9 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user does not exist', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.update('nonexistent', { name: 'Test' })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update('nonexistent', { name: 'Test' }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -164,7 +166,9 @@ describe('UsersService', () => {
     it('should create a user with a random hashed password and return it once', async () => {
       prisma.user.findUnique.mockResolvedValue(null); // email not taken
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_password');
-      prisma.user.create.mockResolvedValue(mockUser({ email: 'new@example.com' }));
+      prisma.user.create.mockResolvedValue(
+        mockUser({ email: 'new@example.com' }),
+      );
 
       const result = await service.create({
         email: 'new@example.com',
@@ -277,7 +281,10 @@ describe('UsersService', () => {
       });
 
       expect(bcrypt.compare).toHaveBeenCalledWith('old-password', 'old_hash');
-      expect(bcrypt.hash).toHaveBeenCalledWith('new-password', expect.any(Number));
+      expect(bcrypt.hash).toHaveBeenCalledWith(
+        'new-password',
+        expect.any(Number),
+      );
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'user-id' },
         data: { passwordHash: 'new_hash' },
@@ -345,13 +352,17 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user does not exist', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.resetPassword('nope')).rejects.toThrow(NotFoundException);
+      await expect(service.resetPassword('nope')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('getConsumption', () => {
     it('should aggregate consumption, top-ups, and recent transactions', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser({ balance: '80.0000' }));
+      prisma.user.findUnique.mockResolvedValue(
+        mockUser({ balance: '80.0000' }),
+      );
       // recent (paged, all statuses)
       prisma.billingTransaction.findMany
         .mockResolvedValueOnce([
@@ -399,7 +410,9 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user does not exist', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getConsumption('nope')).rejects.toThrow(NotFoundException);
+      await expect(service.getConsumption('nope')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should clamp non-positive / NaN page and pageSize to safe bounds', async () => {

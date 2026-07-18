@@ -31,10 +31,9 @@ describe('JwtAuthGuard', () => {
 
     it('should call super.canActivate for non-public routes', () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
-      const superSpy = jest.spyOn(
-        Object.getPrototypeOf(JwtAuthGuard.prototype),
-        'canActivate',
-      ).mockReturnValue(true);
+      const superSpy = jest
+        .spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
+        .mockReturnValue(true);
 
       const result = guard.canActivate(createMockContext());
 

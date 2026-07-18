@@ -11,7 +11,9 @@ describe('AIOperationLogger', () => {
   // Suppress logger.error noise in test output
   let errorSpy: jest.SpyInstance;
   beforeAll(() => {
-    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
   });
   afterAll(() => {
     errorSpy.mockRestore();
@@ -71,9 +73,7 @@ describe('AIOperationLogger', () => {
     });
 
     it('invokes onSuccess with the persisted op id and tokensUsed', async () => {
-      const fn = jest
-        .fn()
-        .mockResolvedValue({ result: 'ok', tokensUsed: 50 });
+      const fn = jest.fn().mockResolvedValue({ result: 'ok', tokensUsed: 50 });
       const onSuccess = jest.fn().mockResolvedValue(undefined);
 
       await logger.run({
@@ -130,10 +130,14 @@ describe('AIOperationLogger', () => {
     });
 
     it('logs a warn when onSuccess throws (so the failure is not silent)', async () => {
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
       try {
         const fn = jest.fn().mockResolvedValue({ result: 'ok', tokensUsed: 1 });
-        const onSuccess = jest.fn().mockRejectedValue(new Error('billing down'));
+        const onSuccess = jest
+          .fn()
+          .mockRejectedValue(new Error('billing down'));
 
         await logger.run({
           userId: 'u',

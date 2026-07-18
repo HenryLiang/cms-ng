@@ -5,7 +5,10 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { BillingService, InsufficientBalanceException } from './billing.service';
+import {
+  BillingService,
+  InsufficientBalanceException,
+} from './billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import {
@@ -305,7 +308,9 @@ describe('BillingService', () => {
 
     it('should handle idempotency key (return existing transaction)', async () => {
       const existingTx = mockTransaction({ idempotencyKey: 'idem-1' });
-      (prisma as any).billingTransaction.findUnique.mockResolvedValue(existingTx);
+      (prisma as any).billingTransaction.findUnique.mockResolvedValue(
+        existingTx,
+      );
 
       const result = await service.deduct({
         ...deductParams,
@@ -401,7 +406,9 @@ describe('BillingService', () => {
 
     it('should handle idempotency key (return existing transaction)', async () => {
       const existingTx = mockTransaction({ idempotencyKey: 'credit-idem-1' });
-      (prisma as any).billingTransaction.findUnique.mockResolvedValue(existingTx);
+      (prisma as any).billingTransaction.findUnique.mockResolvedValue(
+        existingTx,
+      );
 
       const result = await service.credit({
         ...creditParams,
@@ -568,9 +575,13 @@ describe('BillingService', () => {
         mockConfig({ unitPrice: '0.0500' }),
       );
 
-      const result = await service.updateConfig('admin-1', 'ai_llm_per_1k_tokens', {
-        unitPrice: 0.05,
-      });
+      const result = await service.updateConfig(
+        'admin-1',
+        'ai_llm_per_1k_tokens',
+        {
+          unitPrice: 0.05,
+        },
+      );
 
       expect(result.unitPrice).toBe(0.05);
       expect((prisma as any).billingConfig.update).toHaveBeenCalledWith({
@@ -645,8 +656,12 @@ describe('BillingService', () => {
 
     it('should estimate PUBLISH with multiple platforms', async () => {
       (prisma as any).billingConfig.findFirst
-        .mockResolvedValueOnce(mockConfig({ itemKey: 'publish_facebook', unitPrice: '0.1000' }))
-        .mockResolvedValueOnce(mockConfig({ itemKey: 'publish_instagram', unitPrice: '0.1500' }));
+        .mockResolvedValueOnce(
+          mockConfig({ itemKey: 'publish_facebook', unitPrice: '0.1000' }),
+        )
+        .mockResolvedValueOnce(
+          mockConfig({ itemKey: 'publish_instagram', unitPrice: '0.1500' }),
+        );
 
       const result = await service.estimateCost('user-1', {
         operationType: EstimateOperationType.PUBLISH,
@@ -659,9 +674,18 @@ describe('BillingService', () => {
 
     it('should estimate AUTO_PUBLISH with batch', async () => {
       (prisma as any).billingConfig.findFirst
-        .mockResolvedValueOnce(mockConfig({ itemKey: 'ai_llm_per_1k_tokens', unitPrice: '0.0200' }))
-        .mockResolvedValueOnce(mockConfig({ itemKey: 'publish_website', unitPrice: '0.0000' }))
-        .mockResolvedValueOnce(mockConfig({ itemKey: 'auto_publish_surcharge', unitPrice: '0.0500' }));
+        .mockResolvedValueOnce(
+          mockConfig({ itemKey: 'ai_llm_per_1k_tokens', unitPrice: '0.0200' }),
+        )
+        .mockResolvedValueOnce(
+          mockConfig({ itemKey: 'publish_website', unitPrice: '0.0000' }),
+        )
+        .mockResolvedValueOnce(
+          mockConfig({
+            itemKey: 'auto_publish_surcharge',
+            unitPrice: '0.0500',
+          }),
+        );
 
       const result = await service.estimateCost('user-1', {
         operationType: EstimateOperationType.AUTO_PUBLISH,
@@ -700,7 +724,10 @@ describe('BillingService', () => {
         .mockResolvedValueOnce([mockTransaction()]); // summary query
       (prisma as any).billingTransaction.count.mockResolvedValue(25);
 
-      const result = await service.getTransactions('user-1', { page: 1, pageSize: 20 });
+      const result = await service.getTransactions('user-1', {
+        page: 1,
+        pageSize: 20,
+      });
 
       expect(result.data).toHaveLength(1);
       expect(result.meta.page).toBe(1);
@@ -716,7 +743,8 @@ describe('BillingService', () => {
         type: TransactionType.AI_LLM,
       });
 
-      const findManyCall = (prisma as any).billingTransaction.findMany.mock.calls[0][0];
+      const findManyCall = (prisma as any).billingTransaction.findMany.mock
+        .calls[0][0];
       expect(findManyCall.where.type).toBe(TransactionType.AI_LLM);
     });
 
@@ -729,16 +757,29 @@ describe('BillingService', () => {
         endDate: '2026-05-01',
       });
 
-      const findManyCall = (prisma as any).billingTransaction.findMany.mock.calls[0][0];
+      const findManyCall = (prisma as any).billingTransaction.findMany.mock
+        .calls[0][0];
       expect(findManyCall.where.createdAt.gte).toEqual(new Date('2026-01-01'));
       expect(findManyCall.where.createdAt.lte).toEqual(new Date('2026-05-01'));
     });
 
     it('should include summary (totalSpent, byType, byCategory)', async () => {
       const summaryTxs = [
-        mockTransaction({ amount: '-5.0000', type: TransactionType.AI_LLM, category: BillingCategory.AI }),
-        mockTransaction({ amount: '-3.0000', type: TransactionType.PUBLISH, category: BillingCategory.PUBLISHING }),
-        mockTransaction({ amount: '10.0000', type: TransactionType.TOP_UP, category: BillingCategory.OTHER }),
+        mockTransaction({
+          amount: '-5.0000',
+          type: TransactionType.AI_LLM,
+          category: BillingCategory.AI,
+        }),
+        mockTransaction({
+          amount: '-3.0000',
+          type: TransactionType.PUBLISH,
+          category: BillingCategory.PUBLISHING,
+        }),
+        mockTransaction({
+          amount: '10.0000',
+          type: TransactionType.TOP_UP,
+          category: BillingCategory.OTHER,
+        }),
       ];
       (prisma as any).billingTransaction.findMany
         .mockResolvedValueOnce([mockTransaction()]) // paged data
@@ -752,7 +793,9 @@ describe('BillingService', () => {
       expect(result.summary.byType[TransactionType.AI_LLM]).toBeCloseTo(5);
       expect(result.summary.byType[TransactionType.PUBLISH]).toBeCloseTo(3);
       expect(result.summary.byCategory[BillingCategory.AI]).toBeCloseTo(5);
-      expect(result.summary.byCategory[BillingCategory.PUBLISHING]).toBeCloseTo(3);
+      expect(result.summary.byCategory[BillingCategory.PUBLISHING]).toBeCloseTo(
+        3,
+      );
     });
   });
 
@@ -950,15 +993,38 @@ describe('BillingService', () => {
   describe('getReport', () => {
     it('should return correct totals for revenue, consumption, net change', async () => {
       const transactions = [
-        { type: TransactionType.AI_LLM, category: BillingCategory.AI, amount: '-5.0000', userId: 'u1', createdAt: new Date() },
-        { type: TransactionType.PUBLISH, category: BillingCategory.PUBLISHING, amount: '-3.0000', userId: 'u1', createdAt: new Date() },
-        { type: TransactionType.TOP_UP, category: BillingCategory.OTHER, amount: '10.0000', userId: 'u1', createdAt: new Date() },
+        {
+          type: TransactionType.AI_LLM,
+          category: BillingCategory.AI,
+          amount: '-5.0000',
+          userId: 'u1',
+          createdAt: new Date(),
+        },
+        {
+          type: TransactionType.PUBLISH,
+          category: BillingCategory.PUBLISHING,
+          amount: '-3.0000',
+          userId: 'u1',
+          createdAt: new Date(),
+        },
+        {
+          type: TransactionType.TOP_UP,
+          category: BillingCategory.OTHER,
+          amount: '10.0000',
+          userId: 'u1',
+          createdAt: new Date(),
+        },
       ];
-      (prisma as any).billingTransaction.findMany.mockResolvedValue(transactions);
+      (prisma as any).billingTransaction.findMany.mockResolvedValue(
+        transactions,
+      );
       (prisma as any).topUpRecord.findMany.mockResolvedValue([
         { amount: '200.0000', createdAt: new Date() },
       ]);
-      prisma.user.findUnique.mockResolvedValue({ name: 'User One', email: 'u1@test.com' });
+      prisma.user.findUnique.mockResolvedValue({
+        name: 'User One',
+        email: 'u1@test.com',
+      });
 
       const result = await service.getReport('2026-01-01', '2026-12-31');
 
@@ -969,10 +1035,24 @@ describe('BillingService', () => {
 
     it('should return top users by consumption', async () => {
       const transactions = [
-        { type: TransactionType.AI_LLM, category: BillingCategory.AI, amount: '-50.0000', userId: 'u1', createdAt: new Date() },
-        { type: TransactionType.AI_LLM, category: BillingCategory.AI, amount: '-30.0000', userId: 'u2', createdAt: new Date() },
+        {
+          type: TransactionType.AI_LLM,
+          category: BillingCategory.AI,
+          amount: '-50.0000',
+          userId: 'u1',
+          createdAt: new Date(),
+        },
+        {
+          type: TransactionType.AI_LLM,
+          category: BillingCategory.AI,
+          amount: '-30.0000',
+          userId: 'u2',
+          createdAt: new Date(),
+        },
       ];
-      (prisma as any).billingTransaction.findMany.mockResolvedValue(transactions);
+      (prisma as any).billingTransaction.findMany.mockResolvedValue(
+        transactions,
+      );
       (prisma as any).topUpRecord.findMany.mockResolvedValue([]);
       prisma.user.findUnique
         .mockResolvedValueOnce({ name: 'Alice', email: 'alice@test.com' })
@@ -990,12 +1070,29 @@ describe('BillingService', () => {
 
     it('should return category breakdown', async () => {
       const transactions = [
-        { type: TransactionType.AI_LLM, category: BillingCategory.AI, amount: '-10.0000', userId: 'u1', createdAt: new Date() },
-        { type: TransactionType.PUBLISH, category: BillingCategory.PUBLISHING, amount: '-5.0000', userId: 'u1', createdAt: new Date() },
+        {
+          type: TransactionType.AI_LLM,
+          category: BillingCategory.AI,
+          amount: '-10.0000',
+          userId: 'u1',
+          createdAt: new Date(),
+        },
+        {
+          type: TransactionType.PUBLISH,
+          category: BillingCategory.PUBLISHING,
+          amount: '-5.0000',
+          userId: 'u1',
+          createdAt: new Date(),
+        },
       ];
-      (prisma as any).billingTransaction.findMany.mockResolvedValue(transactions);
+      (prisma as any).billingTransaction.findMany.mockResolvedValue(
+        transactions,
+      );
       (prisma as any).topUpRecord.findMany.mockResolvedValue([]);
-      prisma.user.findUnique.mockResolvedValue({ name: 'User', email: 'u@t.com' });
+      prisma.user.findUnique.mockResolvedValue({
+        name: 'User',
+        email: 'u@t.com',
+      });
 
       const result = await service.getReport('2026-01-01', '2026-12-31');
 
