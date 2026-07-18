@@ -1,0 +1,81 @@
+name: Deploy
+
+# 手动触发 + production environment 审批(GitHub 设置 → Environments 配 required reviewers)
+# 不自动发布:push main 不出生产,与"AI 内容人工把关"原则一致
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '部署的 git ref(默认 origin/main;回滚时输入 tag,如 release-20260718-1)'
+        default: 'origin/main'
+        required: true
+
+# 发布串行:同时进行中的发布不允许并发,也不取消(避免半完成状态)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 需要完整历史以便打 tag
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy via cms-ng-service.sh
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_REF: ${{ inputs.ref }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" bash -s <<'EOF'
+          set -euo pipefail
+          cd "${DEPLOY_PATH}"
+          echo "=== git fetch & checkout ${DEPLOY_REF} ==="
+          git fetch origin --tags
+          git reset --hard "${DEPLOY_REF}"
+          echo "=== .env 模板差异(仅提示,不阻断) ==="
+          diff backend/.env.example backend/.env || true
+          echo "=== 执行标准发布 ==="
+          ./scripts/cms-ng-service.sh start --prod
+          echo "=== 状态验证 ==="
+          ./scripts/cms-ng-service.sh status --prod
+          EOF
+
+      - name: Health check via public URL
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${{ secrets.PROD_URL }}/login")
+          echo "GET /login → $code"
+          [ "$code" = "200" ]
+          api=$(curl -s -o /dev/null -w '%{http_code}' "${{ secrets.PROD_URL }}/users")
+          echo "GET /users (无 token) → $api"
+          [ "$api" = "401" ]
+
+      - name: Tag release
+        if: success()
+        run: |
+          tag="release-$(date -u +%Y%m%d)-$(git rev-list --count HEAD)"
+          git tag "$tag" "${{ inputs.ref == 'origin/main' && 'origin/main' || inputs.ref }}" 2>/dev/null || true
+          git push origin "$tag" || true
+          echo "已打 tag: $tag(回滚时以此 tag 作为 ref 重新触发本工作流)"
+
+      - name: Failure diagnostics
+        if: failure()
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
+            "cd '${DEPLOY_PATH}' && tail -n 100 .cms-ng-backend.log 2>/dev/null; tail -n 50 .cms-ng-frontend.log 2>/dev/null" || true

@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 同一 PR/分支的新 push 自动取消进行中的旧 run,省资源
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  lint:
+    name: Lint (backend + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # lint 规则是类型化的(recommendedTypeChecked),需要 shared 的构建产物
+      - run: npm run build --workspace=@cms-ng/shared
+      - name: Backend lint
+        run: cd backend && npx eslint "{src,apps,libs,test}/**/*.ts" --max-warnings=0
+      - name: Frontend lint
+        run: cd frontend && npx eslint . --max-warnings=0
+
+  test-backend:
+    name: Backend unit tests (Jest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=@cms-ng/shared
+      - run: cd backend && npm run test
+
+  test-frontend:
+    name: Frontend unit tests (Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=@cms-ng/shared
+      - run: cd frontend && npm run test
+
+  build:
+    name: Build (shared + backend + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  e2e:
+    name: Backend E2E (real MySQL + Redis)
+    runs-on: ubuntu-latest
+    # CI 初期非阻断:e2e 需真实 MySQL 迁移 + 可能依赖外部 AI 服务,稳定后再设为必需
+    continue-on-error: true
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cms_ng_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      # AppModule 启动时的 validateEnv() 必需项;密钥为 CI 占位值,仅要求存在
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/cms_ng_test
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci-e2e-secret-at-least-16-chars
+      AI_PROVIDER: deepseek
+      DEEPSEEK_API_KEY: ci-placeholder-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=@cms-ng/shared
+      - name: Apply migrations
+        run: cd backend && npx prisma migrate deploy
+      - name: Run E2E
+        run: cd backend && npm run test:e2e
