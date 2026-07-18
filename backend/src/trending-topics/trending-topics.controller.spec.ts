@@ -4,6 +4,7 @@ import { TrendingTopicsController } from './trending-topics.controller';
 import { TrendingTopicsService } from './trending-topics.service';
 import { TwitterService } from './twitter.service';
 import { WikipediaService } from './wikipedia.service';
+import { SourcePaginationDto } from './dto/source-pagination.dto';
 import { TopicSourceCatalog } from './sources/topic-source.catalog';
 
 jest.mock('https-proxy-agent', () => ({
@@ -272,7 +273,7 @@ describe('TrendingTopicsController', () => {
       await controller.fetchBilibiliHotSearch({
         page: '1',
         limit: '10',
-      } as any);
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
         'bilibili-hot-search',
         1,
@@ -288,7 +289,10 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchBilibiliRanking({ page: '2', limit: '5' } as any);
+      await controller.fetchBilibiliRanking({
+        page: '2',
+        limit: '5',
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
         'bilibili-ranking',
         2,
@@ -307,7 +311,7 @@ describe('TrendingTopicsController', () => {
       await controller.fetchBilibiliPartitionRanking('36', {
         page: '1',
         limit: '10',
-      } as any);
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchBilibiliPartitionRanking).toHaveBeenCalledWith(
         36,
         1,
@@ -320,13 +324,13 @@ describe('TrendingTopicsController', () => {
         controller.fetchBilibiliPartitionRanking('abc', {
           page: '1',
           limit: '10',
-        } as any),
+        } as unknown as SourcePaginationDto),
       ).toThrow(BadRequestException);
       expect(() =>
         controller.fetchBilibiliPartitionRanking('0', {
           page: '1',
           limit: '10',
-        } as any),
+        } as unknown as SourcePaginationDto),
       ).toThrow('分区 ID tid 必须是正整数');
     });
   });
@@ -340,7 +344,10 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchWeiboHot({ page: '1', limit: '10' } as any);
+      await controller.fetchWeiboHot({
+        page: '1',
+        limit: '10',
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
         'weibo-hot',
         1,
@@ -356,7 +363,10 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchZhihuHot({ page: '2', limit: '5' } as any);
+      await controller.fetchZhihuHot({
+        page: '2',
+        limit: '5',
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
         'zhihu-hot',
         2,
@@ -374,7 +384,10 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchNHK({ page: '1', limit: '10' } as any);
+      await controller.fetchNHK({
+        page: '1',
+        limit: '10',
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchNHKNews).toHaveBeenCalledWith(1, 10);
     });
   });
@@ -388,7 +401,10 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchReuters({ page: '1', limit: '10' } as any);
+      await controller.fetchReuters({
+        page: '1',
+        limit: '10',
+      } as unknown as SourcePaginationDto);
       expect(topicsService.fetchNewsBySource).toHaveBeenCalledWith(
         'reuters',
         1,
@@ -409,7 +425,7 @@ describe('TrendingTopicsController', () => {
       await controller.fetchXTrends('user-id', '23424977', {
         page: '2',
         limit: '5',
-      } as any);
+      } as unknown as SourcePaginationDto);
       expect(twitterService.fetchTrends).toHaveBeenCalledWith(
         'user-id',
         23424977,
@@ -453,7 +469,7 @@ describe('TrendingTopicsController', () => {
       await controller.fetchXAccounts('user-id', {
         page: '1',
         limit: '20',
-      } as any);
+      } as unknown as SourcePaginationDto);
       expect(twitterService.fetchAggregatedAccounts).toHaveBeenCalledWith(
         'user-id',
         1,
@@ -482,10 +498,10 @@ describe('TrendingTopicsController', () => {
         limit: 10,
         totalPages: 1,
       });
-      await controller.fetchThisDay(undefined as any, undefined, {
+      await controller.fetchThisDay(undefined as unknown as string, undefined, {
         page: '1',
         limit: '10',
-      } as any);
+      } as unknown as SourcePaginationDto);
       expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith(
         'CN',
         undefined,
@@ -505,7 +521,7 @@ describe('TrendingTopicsController', () => {
       await controller.fetchThisDay('HK', '2026-07-03', {
         page: '2',
         limit: '5',
-      } as any);
+      } as unknown as SourcePaginationDto);
       expect(wikipediaService.fetchOnThisDay).toHaveBeenCalledWith(
         'HK',
         '2026-07-03',

@@ -14,7 +14,7 @@ import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { TopicSourceCatalog } from './sources/topic-source.catalog';
 
-interface ImportTopicInput {
+export interface ImportTopicInput {
   title: string;
   description?: string;
   source?: string;
