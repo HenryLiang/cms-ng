@@ -167,14 +167,14 @@ export class AuthorStyleService {
       // Stable order by name so the frontend dropdown is deterministic.
       summaries.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
       return summaries;
-    } catch (err: any) {
+    } catch (err) {
       // ENOENT (missing dir) is the common case in prod without the data
       // folder — treat as "no authors" rather than crashing the request.
-      if (err?.code === 'ENOENT') {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
         return [];
       }
       this.logger.warn(
-        `Failed to scan authors directory ${this.authorsDir}: ${err?.message || err}`,
+        `Failed to scan authors directory ${this.authorsDir}: ${(err as Error)?.message || String(err)}`,
       );
       return null;
     }
@@ -199,10 +199,10 @@ export class AuthorStyleService {
       const bio = await this.deriveBio(slug, name, fields);
 
       return { slug, name, fields, bio };
-    } catch (err: any) {
-      if (err?.code === 'ENOENT') return null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
       this.logger.warn(
-        `Failed to read profile for author "${slug}": ${err?.message || err}`,
+        `Failed to read profile for author "${slug}": ${(err as Error)?.message || String(err)}`,
       );
       return null;
     }
@@ -213,15 +213,15 @@ export class AuthorStyleService {
     try {
       const text = await readFile(promptPath, 'utf-8');
       return text.trim();
-    } catch (err: any) {
-      if (err?.code === 'ENOENT') {
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
         this.logger.warn(
           `system_prompt.md missing for author "${slug}" — falling back to default generation`,
         );
         return '';
       }
       this.logger.warn(
-        `Failed to read system_prompt.md for author "${slug}": ${err?.message || err}`,
+        `Failed to read system_prompt.md for author "${slug}": ${(err as Error)?.message || String(err)}`,
       );
       return '';
     }

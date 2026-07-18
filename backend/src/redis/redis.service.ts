@@ -33,10 +33,12 @@ export class RedisService implements OnModuleDestroy {
           this.logger.warn(`Redis connection error: ${err.message}`);
         });
         this.client.connect().catch((err) => {
-          this.logger.warn(`Redis initial connect failed: ${err.message}`);
+          this.logger.warn(
+            `Redis initial connect failed: ${(err as Error).message}`,
+          );
         });
-      } catch (err: any) {
-        this.logger.warn(`Redis init failed: ${err.message}`);
+      } catch (err) {
+        this.logger.warn(`Redis init failed: ${(err as Error).message}`);
         this.client = null;
       }
     } else {
@@ -78,9 +80,9 @@ export class RedisService implements OnModuleDestroy {
         'NX',
       );
       return result === 'OK';
-    } catch (err: any) {
+    } catch (err) {
       this.logger.error(
-        `[FAIL-CLOSED] Redis SET NX failed for ${key}: ${err.message}`,
+        `[FAIL-CLOSED] Redis SET NX failed for ${key}: ${(err as Error).message}`,
       );
       return false;
     }
@@ -94,9 +96,9 @@ export class RedisService implements OnModuleDestroy {
     if (!this.isAvailable) return;
     try {
       await this.client!.del(`lock:${key}`);
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `Redis DEL failed for ${key}: ${err.message} — lock will expire via TTL`,
+        `Redis DEL failed for ${key}: ${(err as Error).message} — lock will expire via TTL`,
       );
     }
   }

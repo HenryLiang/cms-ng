@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AgentType } from '@prisma/client';
 
 export interface AIOperationLogOptions<T> {
   userId: string;
@@ -82,17 +83,17 @@ export class AIOperationLogger {
       if (opts.onSuccess) {
         try {
           await opts.onSuccess(aiOp.id, tokensUsed);
-        } catch (hookError: any) {
+        } catch (hookError) {
           this.logger.warn(
-            `${opts.action} post-success hook failed: ${hookError?.message ?? String(hookError)}`,
+            `${opts.action} post-success hook failed: ${(hookError as Error)?.message ?? String(hookError)}`,
           );
         }
       }
       return result;
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
         `${opts.action} failed:`,
-        error?.message ?? String(error),
+        (error as Error)?.message ?? String(error),
       );
       await this.persistFailure(opts, error, Date.now() - startTime);
       return opts.fallback;
@@ -110,7 +111,7 @@ export class AIOperationLogger {
         // Cast: callers pass string literals like 'STORY' / 'WRITING' that
         // are valid AgentType enum values, but TS can't prove that across
         // a string-typed parameter.
-        agentType: opts.agentType as any,
+        agentType: opts.agentType as AgentType,
         action: opts.action,
         prompt: opts.prompt,
         result: JSON.stringify(result),
@@ -125,15 +126,17 @@ export class AIOperationLogger {
 
   private async persistFailure<T>(
     opts: AIOperationLogOptions<T>,
-    error: any,
+    error: unknown,
     durationMs: number,
   ) {
     return this.prisma.aIOperation.create({
       data: {
-        agentType: opts.agentType as any,
+        agentType: opts.agentType as AgentType,
         action: opts.action,
         prompt: opts.prompt,
-        result: JSON.stringify({ error: error?.message ?? String(error) }),
+        result: JSON.stringify({
+          error: (error as Error)?.message ?? String(error),
+        }),
         model: opts.model,
         durationMs,
         articleId: opts.articleId,

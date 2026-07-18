@@ -51,7 +51,7 @@ export class AutoPublishSchedulerService
     this.logger.log(`Found ${tasks.length} active auto-publish tasks`);
 
     for (const task of tasks) {
-      this.registerTaskCron(task);
+      void this.registerTaskCron(task);
     }
   }
 
@@ -95,8 +95,10 @@ export class AutoPublishSchedulerService
           this.logger.log(`Cron triggered: ${task.name} at ${time}`);
           try {
             await this.pipelineService.runTask(task.id, 'SCHEDULED');
-          } catch (error: any) {
-            this.logger.error(`Task ${task.name} failed: ${error.message}`);
+          } catch (error) {
+            this.logger.error(
+              `Task ${task.name} failed: ${(error as Error).message}`,
+            );
           }
         },
         undefined,
@@ -123,7 +125,7 @@ export class AutoPublishSchedulerService
     const jobs = this.schedulerRegistry.getCronJobs();
     jobs.forEach((job, name) => {
       if (name.startsWith(prefix)) {
-        job.stop();
+        void job.stop();
         this.schedulerRegistry.deleteCronJob(name);
       }
     });

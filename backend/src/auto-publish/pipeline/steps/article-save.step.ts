@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ArticleStatus, ArticleRunStatus } from '@cms-ng/shared';
+import {
+  ArticleStatus,
+  ArticleRunStatus,
+  ContentLanguage,
+} from '@cms-ng/shared';
 import { PipelineStep, PipelineContext } from '../step.interface';
 
 @Injectable()
@@ -35,7 +39,7 @@ export class ArticleSaveStep implements PipelineStep {
           status: ArticleStatus.AUTO_PUBLISHED,
           reporterId: ctx.userId,
           tags: JSON.stringify(ctx.draft.tags || []),
-          contentLanguage: ctx.contentConfig.language as any,
+          contentLanguage: ctx.contentConfig.language as ContentLanguage,
         },
       });
     }
@@ -60,7 +64,7 @@ export class ArticleSaveStep implements PipelineStep {
           'content',
           'excerpt',
         ]),
-        contentLanguage: ctx.contentConfig.language as any,
+        contentLanguage: ctx.contentConfig.language as ContentLanguage,
         publishedAt: new Date(),
       },
     });

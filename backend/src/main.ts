@@ -5,6 +5,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { buildCorsOptions } from './common/cors.config';
+import type { Server } from 'http';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
@@ -67,9 +68,10 @@ async function bootstrap() {
 
   // PORT has been validated + coerced to a number by env.validation.ts
   const port = config.get<number>('PORT') ?? 3001;
-  const server = await app.listen(port);
+  await app.listen(port);
   // Increase server timeout for long-running AI operations (image generation can take 2-3 minutes)
+  const server = app.getHttpServer() as Server;
   server.timeout = 180_000; // 3 minutes
   server.keepAliveTimeout = 190_000; // Slightly longer than timeout to prevent race conditions
 }
-bootstrap();
+void bootstrap();

@@ -23,7 +23,7 @@ export type ArticleJsonField = (typeof ARTICLE_JSON_FIELDS)[number];
  * Mutates and returns the input for convenience. The mutation is
  * safe because Prisma rows are fresh objects.
  */
-export function deserializeArticle<T extends Record<string, any>>(
+export function deserializeArticle<T extends Record<string, unknown>>(
   article: T,
 ): T {
   if (article == null) return article;
@@ -31,9 +31,9 @@ export function deserializeArticle<T extends Record<string, any>>(
     const value = article[field];
     if (value == null) {
       // null / undefined → empty array (matches Prisma `@default("[]")`)
-      (article as any)[field] = [];
+      (article as Record<string, unknown>)[field] = [];
     } else if (typeof value === 'string') {
-      (article as any)[field] = safeJsonParse(value, []);
+      (article as Record<string, unknown>)[field] = safeJsonParse(value, []);
     }
     // already an array or object: leave alone
   }
@@ -70,7 +70,7 @@ export type SerializedArticleInput<T> = Omit<
  * narrows the three JSON fields to `string` so callers can pass the
  * result directly to `prisma.article.create` / `update` without casts.
  */
-export function serializeArticleInput<T extends Record<string, any>>(
+export function serializeArticleInput<T extends Record<string, unknown>>(
   input: T,
 ): SerializedArticleInput<T> {
   for (const field of ARTICLE_JSON_FIELDS) {
@@ -79,7 +79,7 @@ export function serializeArticleInput<T extends Record<string, any>>(
     if (value === null) continue; // explicit null stays null
     if (typeof value === 'string') continue; // already serialized
     if (Array.isArray(value) || typeof value === 'object') {
-      (input as any)[field] = JSON.stringify(value);
+      (input as Record<string, unknown>)[field] = JSON.stringify(value);
     }
   }
   return input;

@@ -45,11 +45,11 @@ export class ImageGenerationStep implements PipelineStep {
       });
 
       this.logger.log(`Cover image generated: ${result.url}`);
-    } catch (error: any) {
+    } catch (error) {
       // Image generation is non-critical — log warning but don't fail the pipeline
-      imageFailureReason = error.message;
+      imageFailureReason = (error as Error).message;
       this.logger.warn(
-        `Cover image generation failed (non-critical): ${error.message}`,
+        `Cover image generation failed (non-critical): ${(error as Error).message}`,
       );
     }
 

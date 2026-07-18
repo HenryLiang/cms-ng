@@ -30,7 +30,10 @@ export class AutoPublishController {
 
   @Post('tasks')
   @ApiOperation({ summary: 'Create a new auto-publish task' })
-  async create(@Request() req: any, @Body() dto: CreateTaskDto) {
+  async create(
+    @Request() req: { user: { userId: string } },
+    @Body() dto: CreateTaskDto,
+  ) {
     return this.service.createTask(req.user.userId, dto);
   }
 
@@ -125,7 +128,7 @@ export class AutoPublishController {
     summary: 'Toggle the global auto-publish kill switch (admin only)',
   })
   async killSwitch(
-    @Request() req: any,
+    @Request() req: { user: { userId?: string; id?: string } },
     @Body('enable') enable: boolean,
     @Body('reason') reason?: string,
   ) {

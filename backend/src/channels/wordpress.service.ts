@@ -106,8 +106,10 @@ export class WordPressService {
             `Failed to create tag "${name}": ${createRes.status}`,
           );
         }
-      } catch (error: any) {
-        this.logger.warn(`Error resolving tag "${name}": ${error.message}`);
+      } catch (error) {
+        this.logger.warn(
+          `Error resolving tag "${name}": ${(error as Error).message}`,
+        );
       }
     }
 
@@ -175,8 +177,8 @@ export class WordPressService {
         );
         return null;
       }
-    } catch (error: any) {
-      this.logger.warn(`Error uploading image: ${error.message}`);
+    } catch (error) {
+      this.logger.warn(`Error uploading image: ${(error as Error).message}`);
       return null;
     }
   }
@@ -337,16 +339,18 @@ export class WordPressService {
         adaptedTags: safeJsonParse(updated.adaptedTags, []),
         coverImages: safeJsonParse(updated.coverImages, []),
       };
-    } catch (error: any) {
+    } catch (error) {
       // 恢复状态为 READY（发布失败）
       await this.prisma.platformPublish.update({
         where: { id: publish.id },
         data: {
           status: PublishStatus.FAILED,
-          notes: error.message || 'WordPress 发布失败',
+          notes: (error as Error).message || 'WordPress 发布失败',
         },
       });
-      throw new BadRequestException(`WordPress 发布失败: ${error.message}`);
+      throw new BadRequestException(
+        `WordPress 发布失败: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -403,9 +407,9 @@ export class WordPressService {
             return;
           }
         }
-      } catch (error: any) {
+      } catch (error) {
         this.logger.warn(
-          `Error looking up post by slug "${slug}": ${error.message}`,
+          `Error looking up post by slug "${slug}": ${(error as Error).message}`,
         );
       }
     }
@@ -436,9 +440,9 @@ export class WordPressService {
         `WordPress DELETE post/${postId} failed (${res.status}): ${errorBody}`,
       );
       return false;
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Error deleting WordPress post ${postId}: ${error.message}`,
+        `Error deleting WordPress post ${postId}: ${(error as Error).message}`,
       );
       return false;
     }
@@ -510,9 +514,9 @@ export class WordPressService {
       this.logger.log(
         `WordPress publish billing deducted: user=${userId}, amount=¥${unitPrice}, publishId=${platformPublishId}`,
       );
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Failed to deduct WordPress publish billing (non-blocking): publishId=${platformPublishId}, error=${error.message}`,
+        `Failed to deduct WordPress publish billing (non-blocking): publishId=${platformPublishId}, error=${(error as Error).message}`,
       );
     }
   }

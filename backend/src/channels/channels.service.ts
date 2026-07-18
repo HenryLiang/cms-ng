@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { BillingService } from '../billing/billing.service';
@@ -167,7 +168,7 @@ export class ChannelsService {
         adaptedTags: adapted.tags,
         coverImages: safeJsonParse(updated.coverImages, []),
       };
-    } catch (error: any) {
+    } catch (error) {
       // If already updated to READY or FAILED, don't overwrite
       const current = await this.prisma.platformPublish.findUnique({
         where: { id: publish.id },
@@ -177,7 +178,7 @@ export class ChannelsService {
           where: { id: publish.id },
           data: {
             status: PublishStatus.FAILED,
-            notes: error.message || 'AI adaptation failed',
+            notes: (error as Error).message || 'AI adaptation failed',
           },
         });
       }
@@ -200,7 +201,7 @@ export class ChannelsService {
     });
     if (!publish) throw new NotFoundException('Publish record not found');
 
-    const updateData: any = {};
+    const updateData: Prisma.PlatformPublishUpdateInput = {};
     if (dto.status !== undefined) updateData.status = dto.status;
     if (dto.publishedUrl !== undefined)
       updateData.publishedUrl = dto.publishedUrl;
@@ -291,9 +292,9 @@ export class ChannelsService {
       this.logger.log(
         `Publish billing deducted: user=${userId}, platform=${platform}, amount=¥${unitPrice}, publishId=${platformPublishId}`,
       );
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Failed to deduct publish billing (non-blocking): platform=${platform}, publishId=${platformPublishId}, error=${error.message}`,
+        `Failed to deduct publish billing (non-blocking): platform=${platform}, publishId=${platformPublishId}, error=${(error as Error).message}`,
       );
     }
   }

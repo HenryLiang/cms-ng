@@ -32,16 +32,18 @@ export interface RawAdaptedJson {
   tags?: unknown;
 }
 
-export function extractJsonFromOutput(rawOutput: string): RawAdaptedJson | null {
+export function extractJsonFromOutput(
+  rawOutput: string,
+): RawAdaptedJson | null {
   // Try direct parse first
   try {
-    return JSON.parse(rawOutput.trim());
+    return JSON.parse(rawOutput.trim()) as RawAdaptedJson;
   } catch {
     // Try to extract JSON block from markdown code fence
     const jsonMatch = rawOutput.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
     if (jsonMatch) {
       try {
-        return JSON.parse(jsonMatch[1].trim());
+        return JSON.parse(jsonMatch[1].trim()) as RawAdaptedJson;
       } catch {
         // fall through
       }
@@ -50,7 +52,7 @@ export function extractJsonFromOutput(rawOutput: string): RawAdaptedJson | null 
     const braceMatch = rawOutput.match(/\{[\s\S]*\}/);
     if (braceMatch) {
       try {
-        return JSON.parse(braceMatch[0].trim());
+        return JSON.parse(braceMatch[0].trim()) as RawAdaptedJson;
       } catch {
         // fall through
       }

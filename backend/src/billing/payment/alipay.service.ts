@@ -104,15 +104,17 @@ export class AlipayService {
       });
     } catch (error) {
       this.logger.error(
-        `Alipay createOrder failed: ${error.message}`,
-        error.stack,
+        `Alipay createOrder failed: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       // Mark record as failed so it doesn't stay in PENDING forever
       await this.prisma.topUpRecord.update({
         where: { id: record.id },
         data: { status: TransactionStatus.FAILED },
       });
-      throw new Error(`Failed to create Alipay order: ${error.message}`);
+      throw new Error(
+        `Failed to create Alipay order: ${(error as Error).message}`,
+      );
     }
 
     this.logger.log(
@@ -136,7 +138,9 @@ export class AlipayService {
           return 'failure';
         }
       } catch (error) {
-        this.logger.error(`Alipay signature check error: ${error.message}`);
+        this.logger.error(
+          `Alipay signature check error: ${(error as Error).message}`,
+        );
         return 'failure';
       }
     } else {
