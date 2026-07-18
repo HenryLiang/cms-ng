@@ -92,6 +92,11 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "/node_modules/",
+      "@cms-ng/shared",
+      "packages/shared"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
