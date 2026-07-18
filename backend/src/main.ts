@@ -54,7 +54,10 @@ async function bootstrap() {
       )
       .addTag('ai', 'AI writing operations (draft, research kit, fact-check)')
       .addTag('billing', 'Top-ups, balance, transactions, billing config')
-      .addTag('media', 'Media asset library (image upload, AI-generated, management)')
+      .addTag(
+        'media',
+        'Media asset library (image upload, AI-generated, management)',
+      )
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api-docs', app, document, {

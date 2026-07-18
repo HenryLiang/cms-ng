@@ -7,7 +7,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma, MediaAsset } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { STORAGE_SERVICE, type StorageService } from '../storage/storage.service';
+import {
+  STORAGE_SERVICE,
+  type StorageService,
+} from '../storage/storage.service';
 import {
   parsePaginationParams,
   buildPaginatedResponse,
@@ -87,7 +90,9 @@ export class MediaService {
     }
     return {
       buffer: file.buffer,
-      fileName: sanitizeFileName(file.originalname) || `upload.${MIME_TO_EXT[detected]}`,
+      fileName:
+        sanitizeFileName(file.originalname) ||
+        `upload.${MIME_TO_EXT[detected]}`,
       mimeType: detected,
       ext: MIME_TO_EXT[detected],
       size: file.size,
@@ -182,9 +187,10 @@ export class MediaService {
     return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   }
 
-  private readDimensions(
-    buf: Buffer,
-  ): { width: number | null; height: number | null } {
+  private readDimensions(buf: Buffer): {
+    width: number | null;
+    height: number | null;
+  } {
     try {
       const dim = imageSize(buf);
       return {
@@ -282,7 +288,11 @@ export class MediaService {
     userId: string,
   ): Promise<MediaAsset> {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
-    if (!asset || asset.ownerId !== userId || asset.status === MediaStatus.DELETED) {
+    if (
+      !asset ||
+      asset.ownerId !== userId ||
+      asset.status === MediaStatus.DELETED
+    ) {
       throw new NotFoundException('Media asset not found');
     }
     return asset;

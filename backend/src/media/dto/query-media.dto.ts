@@ -18,7 +18,10 @@ export class QueryMediaDto {
   @IsOptional()
   status?: MediaStatus;
 
-  @ApiProperty({ description: '文件名/alt/title/prompt 模糊搜索', required: false })
+  @ApiProperty({
+    description: '文件名/alt/title/prompt 模糊搜索',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   search?: string;
