@@ -14,6 +14,38 @@ import {
   TopicSourceQuery,
 } from './sources/topic-source.types';
 
+/** Wikipedia On This Day 事件中的相关词条页 */
+interface WikiPage {
+  normalizedtitle?: string;
+  extract?: string;
+  description?: string;
+  thumbnail?: { source?: string };
+  content_urls?: {
+    desktop?: { page?: string };
+    mobile?: { page?: string };
+  };
+}
+
+/** Wikipedia On This Day 单条事件 */
+interface WikiOnThisDayEvent {
+  text?: string;
+  year?: number;
+  pages?: WikiPage[];
+}
+
+/** normalizeAll 产出的通用选题条目 */
+interface WikiTopicItem {
+  title: string;
+  description: string;
+  source: string;
+  heatScore: number;
+  tags: string[];
+  articles: { title: string; source: string; snippet: string; url: string }[];
+  coverImage?: string;
+  year?: number;
+  type: string;
+}
+
 /**
  * 当年今日 / 历史上的今天 数据源服务 — 基于 Wikipedia On This Day REST API。
  *
@@ -40,7 +72,7 @@ export class WikipediaService implements TopicSourceAdapter {
 
   private readonly proxyEnabled: boolean;
   private readonly proxyUrl: string | undefined;
-  private proxyAgent: any; // lazy singleton，避免每请求新建 ProxyAgent 泄漏连接池
+  private proxyAgent: unknown; // lazy singleton，避免每请求新建 ProxyAgent 泄漏连接池
 
   // 地区 → 语言/变体 映射。variant 为空表示该语言无需变体（en 不分简繁）。
   // CN/HK 共用 zh 但 variant 不同（简/繁），故缓存键按 variant 区分。
@@ -168,12 +200,12 @@ export class WikipediaService implements TopicSourceAdapter {
     const { month, day } = this.parseDate(date);
     const cacheKey = `wiki:otd:${cfg.lang}:${cfg.variant || 'default'}:${month}-${day}`;
 
-    let items: any[] = [];
+    let items: WikiTopicItem[] = [];
     const cached = await this.redis.get(cacheKey);
     let cacheHit = false;
     if (cached) {
       try {
-        items = JSON.parse(cached);
+        items = JSON.parse(cached) as WikiTopicItem[];
         cacheHit = true;
       } catch (err) {
         // 缓存值损坏（非 JSON）—— 当作未命中：删脏值、回源重取、重写缓存，
@@ -241,9 +273,9 @@ export class WikipediaService implements TopicSourceAdapter {
     month: number,
     day: number,
     type: string,
-  ): Promise<any> {
+  ): Promise<Record<string, WikiOnThisDayEvent[]>> {
     const url = `https://${lang}.wikipedia.org/api/rest_v1/feed/onthisday/${type}/${month}/${day}`;
-    const init: any = {
+    const init: RequestInit & { dispatcher?: unknown } = {
       method: 'GET',
       headers: {
         'User-Agent': this.userAgent,
@@ -257,7 +289,9 @@ export class WikipediaService implements TopicSourceAdapter {
       // ProxyAgent 缓存为 singleton，避免每请求新建泄漏连接池。
       if (!this.proxyAgent) {
         // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CommonJS 环境下 require 才能被 jest.mock('undici') 拦截;动态 import 会触发 --experimental-vm-modules 报错
-        const { ProxyAgent } = require('undici');
+        const { ProxyAgent } = require('undici') as {
+          ProxyAgent: new (url: string) => unknown;
+        };
         this.proxyAgent = new ProxyAgent(this.proxyUrl);
       }
       init.dispatcher = this.proxyAgent;
@@ -270,7 +304,7 @@ export class WikipediaService implements TopicSourceAdapter {
           `Wikipedia API ${res.status}: ${body.slice(0, 200)}`,
         );
       }
-      return res.json();
+      return (await res.json()) as Record<string, WikiOnThisDayEvent[]>;
     } catch (err) {
       if (err instanceof ServiceUnavailableException) throw err;
       // 网络错误 / 代理失败 / 超时 —— 统一转 503，前端友好提示
@@ -326,16 +360,16 @@ export class WikipediaService implements TopicSourceAdapter {
    *       优先取有缩略图的 page 做 bestPage（其 extract 做 description、thumbnail 做 coverImage）。
    */
   private normalizeAll(
-    typeResults: Array<{ type: string; items: any[] }>,
-  ): any[] {
+    typeResults: Array<{ type: string; items: WikiOnThisDayEvent[] }>,
+  ): WikiTopicItem[] {
     const currentYear = new Date().getFullYear();
-    const all: any[] = [];
+    const all: WikiTopicItem[] = [];
     for (const { type, items } of typeResults) {
       const typeLabel = WikipediaService.TYPE_MAP[type] || type;
       for (const ev of items) {
         const text = typeof ev.text === 'string' ? ev.text : '';
         const year = typeof ev.year === 'number' ? ev.year : 0;
-        const pages: any[] = Array.isArray(ev.pages) ? ev.pages : [];
+        const pages = Array.isArray(ev.pages) ? ev.pages : [];
 
         // 跳过年份页（zh: "2013年"；en: "2013"）
         const nonYearPages = pages.filter(
