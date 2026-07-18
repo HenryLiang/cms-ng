@@ -21,6 +21,60 @@ import {
   TopicSourceQuery,
 } from './sources/topic-source.types';
 
+/** twitterapi.io 趋势榜原始条目(trend 是对象;兼容平铺形态) */
+interface TwitterTrendRaw {
+  trend?: {
+    name?: string;
+    rank?: number;
+    tweet_volume?: number;
+    tweetVolume?: number;
+    url?: string;
+  };
+  name?: string;
+  rank?: number;
+  tweet_volume?: number;
+  tweetVolume?: number;
+  url?: string;
+}
+
+/** twitterapi.io 用户推文原始条目 */
+interface TwitterTweetRaw {
+  id?: string;
+  text?: string;
+  likeCount?: number;
+  isReply?: boolean;
+  type?: string;
+  url?: string;
+}
+
+/** twitterapi.io 响应体(trends 端点顶层放 trends;user/tweets 端点用 {status,msg,data}) */
+interface TwitterApiResponse {
+  status?: string;
+  msg?: string;
+  message?: string;
+  trends?: TwitterTrendRaw[];
+  data?: {
+    tweets?: TwitterTweetRaw[];
+    unavailable?: boolean;
+    message?: string;
+    unavailableReason?: string;
+  };
+  tweets?: TwitterTweetRaw[];
+  unavailable?: boolean;
+  message?: string;
+  unavailableReason?: string;
+}
+
+/** normalize 后的通用选题条目 */
+interface NormalizedTopicItem {
+  title: string;
+  description: string;
+  source: string;
+  heatScore: number;
+  tags: string[];
+  articles: { title: string; source: string; snippet: string; url: string }[];
+}
+
 /**
  * X (Twitter) 数据源服务 — 基于 twitterapi.io REST API。
  *
@@ -204,9 +258,9 @@ export class TwitterService implements TopicSourceAdapter {
     this.requireApiKey();
     const cacheKey = `x:trends:${woeid}`;
     const cached = await this.redis.get(cacheKey);
-    let items: any[];
+    let items: NormalizedTopicItem[];
     if (cached) {
-      items = JSON.parse(cached);
+      items = JSON.parse(cached) as NormalizedTopicItem[];
     } else {
       // 缓存未命中 → 计费 + 实打 API
       await this.checkAndCharge(userId, 'trends', String(woeid), 600);
@@ -232,9 +286,9 @@ export class TwitterService implements TopicSourceAdapter {
     this.requireApiKey();
     const cacheKey = 'x:accounts:all';
     const cached = await this.redis.get(cacheKey);
-    let items: any[];
+    let items: NormalizedTopicItem[];
     if (cached) {
-      items = JSON.parse(cached);
+      items = JSON.parse(cached) as NormalizedTopicItem[];
     } else {
       // 聚合层一次扣费（非每账号扣费）
       await this.checkAndCharge(userId, 'accounts-all', 'all', 300);
@@ -259,9 +313,9 @@ export class TwitterService implements TopicSourceAdapter {
               false,
             );
             items.push(...acctItems);
-          } catch (err: any) {
+          } catch (err) {
             this.logger.warn(
-              `Failed to fetch tweets for @${a.userName}: ${err.message}`,
+              `Failed to fetch tweets for @${a.userName}: ${(err as Error).message}`,
             );
           }
           // 间隔 1.2s 拉取（避开 free-tier 5s/次的 QPS；命中缓存则免等待）
@@ -287,16 +341,16 @@ export class TwitterService implements TopicSourceAdapter {
     limit?: number,
     userId?: string,
     charge = true,
-  ): Promise<any[]> {
+  ): Promise<NormalizedTopicItem[]> {
     this.requireApiKey();
     const handle = userName.replace(/^@/, '').trim();
     if (!handle) throw new BadRequestException('userName 不能为空');
 
     const cacheKey = `x:acct:${handle.toLowerCase()}`;
     const cached = await this.redis.get(cacheKey);
-    let items: any[];
+    let items: NormalizedTopicItem[];
     if (cached) {
-      items = JSON.parse(cached);
+      items = JSON.parse(cached) as NormalizedTopicItem[];
     } else {
       if (charge && userId) {
         await this.checkAndCharge(userId, 'acct', handle.toLowerCase(), 300);
@@ -336,10 +390,10 @@ export class TwitterService implements TopicSourceAdapter {
       if (!data || data.unavailable || !data.userName) {
         throw new BadRequestException(`X 账号 @${handle} 不存在或不可访问`);
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof BadRequestException) throw err;
       throw new BadRequestException(
-        `X 账号 @${handle} 校验失败: ${err.message}`,
+        `X 账号 @${handle} 校验失败: ${(err as Error).message}`,
       );
     }
 
@@ -405,16 +459,18 @@ export class TwitterService implements TopicSourceAdapter {
         unitPrice,
         idempotencyKey,
       });
-    } catch (err: any) {
+    } catch (err) {
       // 扣费失败不阻断拉取（best-effort，与 AI/publish 一致）
-      this.logger.warn(`X fetch billing failed (non-blocking): ${err.message}`);
+      this.logger.warn(
+        `X fetch billing failed (non-blocking): ${(err as Error).message}`,
+      );
     }
   }
 
   /** 调用 twitterapi.io REST API。按需挂代理。返回解包后的 payload（剥掉 {status,msg,data} 外壳）。 */
-  private async callTwitterApi(path: string): Promise<any> {
+  private async callTwitterApi(path: string): Promise<TwitterApiResponse> {
     const url = `${this.baseUrl}${path}`;
-    const init: any = {
+    const init: RequestInit & { dispatcher?: unknown } = {
       method: 'GET',
       headers: { 'x-api-key': this.apiKey! },
       signal: AbortSignal.timeout(15000),
@@ -429,7 +485,7 @@ export class TwitterService implements TopicSourceAdapter {
       const body = await res.text().catch(() => '');
       throw new Error(`twitterapi.io ${res.status}: ${body.slice(0, 200)}`);
     }
-    const json = await res.json();
+    const json = (await res.json()) as TwitterApiResponse;
     // twitterapi.io 多数端点返回 {status, msg, data:{...}}；trends 端点直接在顶层放 trends。
     // 这里返回整个 json，由各 normalize 方法自行解包；同时把 HTTP 层错误信息抛出。
     if (
@@ -451,8 +507,8 @@ export class TwitterService implements TopicSourceAdapter {
    * （trend 是对象，不是字符串；返回 rank 排名而非 tweet_volume）
    * 兼容顶层平铺的 {name, tweet_volume, url} 形态作回退。
    */
-  private normalizeTrends(raw: any): any[] {
-    const trends: any[] = raw?.trends || [];
+  private normalizeTrends(raw: TwitterApiResponse): NormalizedTopicItem[] {
+    const trends = raw?.trends || [];
     if (trends.length > 0) {
       this.logger.debug(
         `normalizeTrends first item shape: ${JSON.stringify(trends[0]).slice(0, 300)}`,
@@ -460,8 +516,9 @@ export class TwitterService implements TopicSourceAdapter {
     }
     return trends.map((t) => {
       // twitterapi.io: t.trend 是 {name, rank, ...}；也兼容平铺形态
-      const inner = t.trend && typeof t.trend === 'object' ? t.trend : t;
-      const name = String(inner.name ?? inner.trend ?? '');
+      const inner: TwitterTrendRaw =
+        t.trend && typeof t.trend === 'object' ? t.trend : t;
+      const name = String(inner.name ?? '');
       const rank = typeof inner.rank === 'number' ? inner.rank : undefined;
       const volume =
         inner.tweet_volume ?? inner.tweetVolume ?? t.tweet_volume ?? undefined;
@@ -492,7 +549,10 @@ export class TwitterService implements TopicSourceAdapter {
    * twitterapi.io 结构：{status, msg, data:{tweets:[{id,text,likeCount,...}]}}
    * 账号被冻结/私有/不可用时 data 为 {unavailable:true, message} → 返回空数组 + 日志。
    */
-  private normalizeTweets(raw: any, handle: string): any[] {
+  private normalizeTweets(
+    raw: TwitterApiResponse,
+    handle: string,
+  ): NormalizedTopicItem[] {
     // 解包 data 外壳（user/tweets 用 {status,msg,data:{...}}；兼容顶层平铺）
     const payload =
       raw &&
@@ -509,7 +569,7 @@ export class TwitterService implements TopicSourceAdapter {
       );
       return [];
     }
-    const tweets: any[] = payload?.tweets || [];
+    const tweets = payload?.tweets || [];
     return tweets
       .filter((tw) => {
         // 剔除回复（回复不适合做选题）
