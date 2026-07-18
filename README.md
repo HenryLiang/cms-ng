@@ -613,4 +613,10 @@ server {
 
 ## 许可证
 
-UNLICENSED — 私有项目。
+**Business Source License 1.1 (BUSL-1.1)** — 源码公开、保留商业权利：
+
+- ✅ **允许**：查看、复制、修改、再分发，以及**非生产**使用（学习、评估、开发测试）
+- ❌ **限制**：生产环境使用需获得版权方商业许可
+- 🔓 **2030-07-18 起**：自动转为 Apache License 2.0，完全开源
+
+Copyright © 2026 Chao Liang。完整条款见根目录 [LICENSE](LICENSE)。

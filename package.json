@@ -2,6 +2,7 @@
   "name": "cms-ng",
   "version": "1.0.0",
   "private": true,
+  "license": "BUSL-1.1",
   "description": "01创作大脑 — AI驱动的内容创作作业系统",
   "scripts": {
     "dev": "turbo run dev",
