@@ -8,6 +8,7 @@ import {
   TransactionType,
   BillingCategory,
 } from '@cms-ng/shared';
+import { AutoPublishTask } from '@prisma/client';
 import {
   PipelineStep,
   PipelineContext,
@@ -138,7 +139,7 @@ export class PipelineService {
   }
 
   private async executeRun(
-    task: any,
+    task: AutoPublishTask,
     triggerType: 'SCHEDULED' | 'MANUAL',
   ): Promise<void> {
     const taskId = task.id;
@@ -157,8 +158,14 @@ export class PipelineService {
       maxRetries: number;
       retryDelayMs: number;
     }>(task.retryConfig, { maxRetries: 2, retryDelayMs: 30000 });
-    const contentConfig = safeJsonParse(task.contentConfig, {});
-    const publishConfig = safeJsonParse(task.publishConfig, {});
+    const contentConfig = safeJsonParse(
+      task.contentConfig,
+      {} as PipelineContext['contentConfig'],
+    );
+    const publishConfig = safeJsonParse(
+      task.publishConfig,
+      {} as PipelineContext['publishConfig'],
+    );
 
     let successCount = 0;
     let failedCount = 0;
@@ -180,18 +187,18 @@ export class PipelineService {
         runId: run.id,
         articleId: articleRecord.id,
         userId: task.createdBy,
-        contentConfig: contentConfig as any,
-        publishConfig: publishConfig as any,
+        contentConfig,
+        publishConfig,
       };
 
       try {
         await this.executeWithRetry(ctx, retryConfig);
         successCount++;
-      } catch (error: any) {
+      } catch (error) {
         failedCount++;
-        errors.push(`Article ${i + 1}: ${error.message}`);
+        errors.push(`Article ${i + 1}: ${(error as Error).message}`);
         this.logger.error(
-          `Pipeline failed for article ${i + 1} in run ${run.id}: ${error.message}`,
+          `Pipeline failed for article ${i + 1} in run ${run.id}: ${(error as Error).message}`,
         );
 
         // Mark as PIPELINE_FAILED if we saved a partial article
@@ -291,8 +298,14 @@ export class PipelineService {
       maxRetries: number;
       retryDelayMs: number;
     }>(task.retryConfig, { maxRetries: 2, retryDelayMs: 30000 });
-    const contentConfig = safeJsonParse(task.contentConfig, {});
-    const publishConfig = safeJsonParse(task.publishConfig, {});
+    const contentConfig = safeJsonParse(
+      task.contentConfig,
+      {} as PipelineContext['contentConfig'],
+    );
+    const publishConfig = safeJsonParse(
+      task.publishConfig,
+      {} as PipelineContext['publishConfig'],
+    );
 
     // Reset the article status to PENDING for retry
     await this.prisma.autoPublishArticle.update({
@@ -310,8 +323,8 @@ export class PipelineService {
       runId: record.runId,
       articleId: record.id,
       userId: task.createdBy,
-      contentConfig: contentConfig as any,
-      publishConfig: publishConfig as any,
+      contentConfig: contentConfig,
+      publishConfig: publishConfig,
       // Preserve topic from previous run if available
       topic: record.topic || undefined,
     };
@@ -345,9 +358,9 @@ export class PipelineService {
       }
 
       this.logger.log(`Single article retry succeeded: ${articleId}`);
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `Single article retry failed for ${articleId}: ${error.message}`,
+        `Single article retry failed for ${articleId}: ${(error as Error).message}`,
       );
 
       if (ctx.savedArticleId) {
@@ -417,13 +430,13 @@ export class PipelineService {
             currentCtx = await step.execute(currentCtx);
             traceEntry.durationMs = Date.now() - t0;
             traceEntry.completedAt = new Date().toISOString();
-          } catch (stepError: any) {
+          } catch (stepError) {
             traceEntry.durationMs = Date.now() - t0;
             traceEntry.completedAt = new Date().toISOString();
             traceEntry.status = 'failed';
             traceEntry.error = {
-              message: stepError.message,
-              stack: stepError.stack,
+              message: (stepError as Error).message,
+              stack: (stepError as Error).stack,
             };
             currentCtx.trace!.push(traceEntry);
 
@@ -433,7 +446,7 @@ export class PipelineService {
             if (step.name === 'notification') {
               this.logger.warn(
                 `Notification step failed for "${ctx.topic || 'unknown'}" ` +
-                  `(non-critical, run status preserved): ${stepError.message}`,
+                  `(non-critical, run status preserved): ${(stepError as Error).message}`,
               );
               // Deduct billing even if notification fails (article was published)
               await this.deductAutoPublishBilling(currentCtx);
@@ -452,10 +465,10 @@ export class PipelineService {
         // Persist execution trace
         await this.persistTrace(ctx);
         return; // success
-      } catch (error: any) {
-        lastError = error;
+      } catch (error) {
+        lastError = error as Error;
         this.logger.warn(
-          `Pipeline step failed for "${ctx.topic || 'unknown'}" (attempt ${attempt + 1}): ${error.message}`,
+          `Pipeline step failed for "${ctx.topic || 'unknown'}" (attempt ${attempt + 1}): ${(error as Error).message}`,
         );
       }
     }
@@ -539,7 +552,7 @@ export class PipelineService {
     } catch (error: any) {
       this.logger.warn(
         `Failed to deduct auto-publish billing (article still published): ` +
-          `articleId=${ctx.articleId}, error=${error.message}`,
+          `articleId=${ctx.articleId}, error=${(error as Error).message}`,
       );
     }
   }
@@ -562,7 +575,7 @@ export class PipelineService {
   }
 
   private async sendRunNotification(
-    task: any,
+    task: AutoPublishTask,
     runId: string,
     status: RunStatus,
     success: number,
@@ -600,7 +613,9 @@ export class PipelineService {
         text: body,
       });
     } catch (error: any) {
-      this.logger.warn(`Failed to send notification email: ${error.message}`);
+      this.logger.warn(
+        `Failed to send notification email: ${(error as Error).message}`,
+      );
     }
   }
 

@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma, AutoPublishTask } from '@prisma/client';
 import {
   AutoTaskStatus,
   ArticleRunStatus,
@@ -100,7 +101,7 @@ export class AutoPublishService {
     });
     if (!existing) throw new NotFoundException('Task not found');
 
-    const data: any = {};
+    const data: Prisma.AutoPublishTaskUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.status !== undefined) data.status = dto.status;
@@ -182,7 +183,9 @@ export class AutoPublishService {
 
     // Run asynchronously — don't block the response
     this.pipeline.runTask(id, 'MANUAL').catch((error) => {
-      this.logger.error(`Manual run for task ${id} failed: ${error.message}`);
+      this.logger.error(
+        `Manual run for task ${id} failed: ${(error as Error).message}`,
+      );
     });
 
     return { message: 'Manual run triggered', taskId: id };
@@ -198,7 +201,7 @@ export class AutoPublishService {
   }) {
     const page = query.page || 1;
     const pageSize = query.pageSize || 20;
-    const where: any = {};
+    const where: Prisma.AutoPublishRunWhereInput = {};
     if (query.taskId) where.taskId = query.taskId;
     if (query.status) where.status = query.status;
 
@@ -311,9 +314,9 @@ export class AutoPublishService {
     if (publish?.publishedUrl) {
       try {
         await this.wordpress.deletePost(publish.publishedUrl, publish.notes);
-      } catch (error: any) {
+      } catch (error) {
         this.logger.warn(
-          `WordPress deletion failed for ${publish.publishedUrl}: ${error.message}`,
+          `WordPress deletion failed for ${publish.publishedUrl}: ${(error as Error).message}`,
         );
       }
     }
@@ -344,7 +347,9 @@ export class AutoPublishService {
 
     // Retry only this single article, not the entire batch
     this.pipeline.retrySingleArticle(id).catch((error) => {
-      this.logger.error(`Retry for article ${id} failed: ${error.message}`);
+      this.logger.error(
+        `Retry for article ${id} failed: ${(error as Error).message}`,
+      );
     });
 
     return { message: 'Retry triggered for single article', articleId: id };
@@ -402,7 +407,7 @@ export class AutoPublishService {
 
   // ===== Helpers =====
 
-  private formatTask(task: any) {
+  private formatTask(task: AutoPublishTask) {
     return {
       ...task,
       scheduleConfig: safeJsonParse(task.scheduleConfig, {}),
