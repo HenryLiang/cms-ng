@@ -31,10 +31,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadStories();
-  }, []);
-
   async function loadStories() {
     try {
       const data = await getStories();
@@ -43,6 +39,10 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    loadStories();
+  }, []);
 
   async function moveStory(storyId: string, newStatus: string) {
     await updateStory(storyId, { status: newStatus as Story['status'] });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ResearchKitPanel from './research-kit-panel';
+import type { WikipediaEntry } from '@/lib/story-api';
 
 describe('ResearchKitPanel', () => {
   const mockResearchKit = {
@@ -8,7 +9,7 @@ describe('ResearchKitPanel', () => {
     people: [{ name: 'Person A', role: 'Role A', background: 'Background A' }],
     data: [{ label: 'Label 1', value: 'Value 1', source: 'Source 1' }],
     opinions: [{ source: 'Source A', viewpoint: 'Viewpoint A', stance: 'Stance A' }],
-    wikipedia: [] as any[],
+    wikipedia: [] as WikipediaEntry[],
     wikipediaStatus: 'no_results' as const,
   };
 

@@ -43,10 +43,6 @@ export default function TransactionsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, [page, typeFilter, startDate, endDate]);
-
   async function loadData() {
     setLoading(true);
     try {
@@ -64,6 +60,12 @@ export default function TransactionsPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:loadData 内 setLoading(true) 同步触发,React 19 规则对此过严
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
+  }, [page, typeFilter, startDate, endDate]);
 
   const totalPages = Math.ceil(total / pageSize);
 

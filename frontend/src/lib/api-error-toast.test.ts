@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 
 const mockShow = vi.fn();
 vi.mock('@/store/toast-store', () => ({
@@ -10,10 +11,10 @@ import { reportApiError } from './api-error-toast';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  if (typeof window === 'undefined') (global as any).window = {};
+  if (typeof window === 'undefined') (globalThis as unknown as { window: unknown }).window = {};
 });
 
-const makeAxiosError = (status: number, body?: any) => {
+const makeAxiosError = (status: number, body?: Record<string, unknown>) => {
   const err = new axios.AxiosError('Request failed');
   if (status) {
     err.response = {
@@ -21,7 +22,7 @@ const makeAxiosError = (status: number, body?: any) => {
       data: body ?? {},
       statusText: '',
       headers: {},
-      config: {} as any,
+      config: {} as InternalAxiosRequestConfig,
     };
   }
   return err;

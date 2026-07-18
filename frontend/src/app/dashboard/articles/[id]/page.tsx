@@ -32,6 +32,7 @@ import {
   type SEOResult,
   type GEOResult,
   type GenerateImageResult,
+  type ArticleStatus,
 } from '@/lib/article-api';
 import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
 import { ContentLanguage } from '@cms-ng/shared';
@@ -58,19 +59,14 @@ import {
   Check,
   CheckCircle2,
   Plus,
-  Type,
   Scissors,
-  AlignLeft,
   PenTool,
-  ChevronRight,
   SendHorizonal,
   History,
   ShieldCheck,
   ClipboardCheck,
-  Target,
-  AlertTriangle,
   TrendingUp,
-  Image,
+  Image as ImageIcon,
   Bot,
   Upload,
 } from 'lucide-react';
@@ -177,6 +173,7 @@ export default function ArticleEditorPage() {
 
   useEffect(() => {
     loadArticle();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
   }, [articleId]);
 
   // Fetch author personas once. When the backend reports no data on disk
@@ -246,7 +243,7 @@ export default function ArticleEditorPage() {
         subtitle: subtitle || undefined,
         content,
         excerpt: excerpt || undefined,
-        status: status as any,
+        status: status as ArticleStatus,
         contentLanguage,
         coverImage: article?.coverImage ?? null,
       });
@@ -372,7 +369,7 @@ export default function ArticleEditorPage() {
       let result = '';
       switch (operation) {
         case 'rewrite':
-          result = await aiRewrite(articleId, text, style as any, undefined, contentLanguage, authorSlug);
+          result = await aiRewrite(articleId, text, style, undefined, contentLanguage, authorSlug);
           break;
         case 'expand':
           result = await aiExpand(articleId, text, undefined, contentLanguage, authorSlug);
@@ -924,6 +921,7 @@ export default function ArticleEditorPage() {
                 className="mb-4 rounded-lg border border-line overflow-hidden max-h-[300px] cursor-pointer"
                 onClick={() => setShowImagePreview(true)}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- 外链 COS 封面图,用 img 务实(避免 next/image remotePatterns 配置) */}
                 <img
                   src={article.coverImage}
                   alt="封面图"
@@ -937,7 +935,7 @@ export default function ArticleEditorPage() {
                 AI 生成
               </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowCoverPicker(true)}>
-                <Image className="h-3.5 w-3.5" />
+                <ImageIcon className="h-3.5 w-3.5" />
                 从媒体库选择
               </Button>
               <label className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'cursor-pointer' })}>
@@ -1189,7 +1187,7 @@ export default function ArticleEditorPage() {
                   {imageGenLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Image className="h-4 w-4" />
+                    <ImageIcon className="h-4 w-4" />
                   )}
                   AI 生成配图
                 </button>
@@ -1353,7 +1351,7 @@ export default function ArticleEditorPage() {
                       ].map((s) => (
                         <button
                           key={s.key}
-                          onClick={() => setImageGenStyle(s.key as any)}
+                          onClick={() => setImageGenStyle(s.key as 'news' | 'illustration' | 'photo' | 'social')}
                           className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
                             imageGenStyle === s.key
                               ? 'border border-brand bg-brand-soft text-brand-soft-text'
@@ -1407,7 +1405,7 @@ export default function ArticleEditorPage() {
                     取消
                   </Button>
                   <Button variant="primary" loading={imageGenLoading} onClick={handleGenerateImage}>
-                    {!imageGenLoading && <Image className="h-4 w-4" />}
+                    {!imageGenLoading && <ImageIcon className="h-4 w-4" />}
                     {imageGenLoading ? '生成中...' : '生成配图'}
                   </Button>
                 </div>
@@ -1415,6 +1413,7 @@ export default function ArticleEditorPage() {
             ) : (
               <>
                 <div className="rounded-lg border border-line bg-canvas p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 外链 COS 封面图,用 img 务实(避免 next/image remotePatterns 配置) */}
                   <img
                     src={imageGenResult.url}
                     alt="AI 生成配图"
@@ -1457,6 +1456,7 @@ export default function ArticleEditorPage() {
             >
               <X className="h-6 w-6" />
             </button>
+            {/* eslint-disable-next-line @next/next/no-img-element -- 外链 COS 封面图预览,用 img 务实 */}
             <img
               src={article.coverImage}
               alt="封面图预览"

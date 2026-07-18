@@ -16,6 +16,7 @@ import {
   updateUserStatus,
   getUserConsumption,
 } from '@/lib/users-api';
+import { UserRole } from '@cms-ng/shared';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -25,7 +26,7 @@ const activeUser = {
   id: 'u1',
   email: 'reporter@example.com',
   name: '张三',
-  role: 'REPORTER',
+  role: 'REPORTER' as UserRole,
   department: '要闻',
   isActive: true,
   balance: 80,
@@ -58,7 +59,7 @@ describe('AccountsPage', () => {
   it('creates an account and shows the one-time password', async () => {
     vi.mocked(getUsers).mockResolvedValue([]);
     vi.mocked(createUser).mockResolvedValue({
-      user: { id: 'u2', email: 'new@example.com', name: '新用户', role: 'REPORTER' },
+      user: { id: 'u2', email: 'new@example.com', name: '新用户', role: 'REPORTER' as UserRole },
       initialPassword: 'Ab3xY9Km2pQr',
     });
 

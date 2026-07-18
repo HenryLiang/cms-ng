@@ -15,7 +15,8 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/store/auth-store', () => ({
   useAuthStore: Object.assign(
-    (selector?: any) => selector({ register: vi.fn() }),
+    (selector: (state: { register: ReturnType<typeof vi.fn> }) => unknown) =>
+      selector({ register: vi.fn() }),
     { getState: () => ({ register: vi.fn() }) },
   ),
 }));

@@ -43,10 +43,6 @@ export default function ReportPage() {
   const [report, setReport] = useState<BillingReport | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadReport();
-  }, [startDate, endDate]);
-
   async function loadReport() {
     setLoading(true);
     try {
@@ -56,6 +52,12 @@ export default function ReportPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount: loadReport 内 setLoading(true) 同步触发,React 19 规则对此过严
+    loadReport();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
+  }, [startDate, endDate]);
 
   // Calculate max value for bar chart scaling
   function getMaxValue(obj: Record<string, number>): number {

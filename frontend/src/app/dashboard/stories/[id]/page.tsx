@@ -22,7 +22,6 @@ import {
   FileText,
   Save,
   BookOpen,
-  Sparkles,
 } from 'lucide-react';
 import { ContentLanguage } from '@cms-ng/shared';
 import LanguageBadge from '@/components/language-badge';
@@ -63,6 +62,7 @@ export default function StoryDetailPage() {
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
   }, [storyId]);
 
   // Fetch author personas once for the author-style dropdown.

@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import axios from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
+
+interface MockAuthState {
+  user: { id: string; email: string; name: string; role: string; preferredLanguage: string };
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  _hasHydrated: boolean;
+  logout: ReturnType<typeof vi.fn>;
+}
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({
@@ -12,7 +21,7 @@ vi.mock('next/navigation', () => ({
 // Mock auth store with an authenticated user
 vi.mock('@/store/auth-store', () => ({
   useAuthStore: Object.assign(
-    (selector?: any) => {
+    (selector?: (state: MockAuthState) => unknown) => {
       const state = {
         user: { id: 'u1', email: 'b@test.com', name: 'B', role: 'REPORTER', preferredLanguage: 'TRADITIONAL_CHINESE_HK' },
         isAuthenticated: true,
@@ -73,7 +82,7 @@ describe('StoryDetailPage - error handling for getStory', () => {
       data: { message: 'You do not have permission to modify this story' },
       statusText: 'Forbidden',
       headers: {},
-      config: {} as any,
+      config: {} as InternalAxiosRequestConfig,
     };
     vi.mocked(storyApi.getStory).mockRejectedValue(axiosError);
     vi.mocked(articleApi.getArticles).mockResolvedValue({
@@ -100,7 +109,7 @@ describe('StoryDetailPage - error handling for getStory', () => {
       data: { message: 'Story not found' },
       statusText: 'Not Found',
       headers: {},
-      config: {} as any,
+      config: {} as InternalAxiosRequestConfig,
     };
     vi.mocked(storyApi.getStory).mockRejectedValue(axiosError);
     vi.mocked(articleApi.getArticles).mockResolvedValue({

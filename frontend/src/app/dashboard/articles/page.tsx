@@ -12,10 +12,6 @@ export default function ArticlesPage() {
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadArticles();
-  }, []);
-
   async function loadArticles() {
     try {
       const { data, meta } = await getArticles();
@@ -25,6 +21,10 @@ export default function ArticlesPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    loadArticles();
+  }, []);
 
   if (loading) {
     return (

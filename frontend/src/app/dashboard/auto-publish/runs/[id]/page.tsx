@@ -68,6 +68,7 @@ export default function RunDetailPage() {
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
   }, [id]);
 
   async function handleWithdraw(articleId: string) {

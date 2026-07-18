@@ -3,10 +3,12 @@ import { UserRole } from '@cms-ng/shared';
 
 // Mock zustand persist middleware before importing store
 vi.mock('zustand/middleware', () => ({
-  persist: (createFn: any) => (set: any, get: any, api: any) => {
-    const store = createFn(set, get, api);
-    return store;
-  },
+  persist:
+    <T>(createFn: (set: unknown, get: unknown, api: unknown) => T) =>
+    (set: unknown, get: unknown, api: unknown): T => {
+      const store = createFn(set, get, api);
+      return store;
+    },
   createJSONStorage: () => ({
     getItem: vi.fn(),
     setItem: vi.fn(),

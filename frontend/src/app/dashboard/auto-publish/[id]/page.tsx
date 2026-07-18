@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   getTask,
@@ -26,7 +26,6 @@ import {
 
 export default function TaskDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
 
   const [task, setTask] = useState<AutoPublishTask | null>(null);
@@ -36,6 +35,7 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
   }, [id]);
 
   async function loadData() {

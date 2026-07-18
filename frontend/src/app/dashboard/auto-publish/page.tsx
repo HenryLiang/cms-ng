@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   getTasks,
   getStats,
@@ -29,10 +28,10 @@ import {
   XCircle,
   BarChart3,
   Clock,
+  type LucideIcon,
 } from 'lucide-react';
 
 export default function AutoPublishPage() {
-  const router = useRouter();
   const [tasks, setTasks] = useState<AutoPublishTask[]>([]);
   const [stats, setStats] = useState<AutoPublishStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -251,7 +250,7 @@ function StatCard({
   sub,
   color = 'text-foreground',
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   sub?: string;

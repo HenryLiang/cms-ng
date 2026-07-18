@@ -26,7 +26,6 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     this.props.onError?.(error, info);
     // Log to console for developer visibility; in production this would
     // be wired to an error reporting service (Sentry / Datadog / etc.).
-    // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 

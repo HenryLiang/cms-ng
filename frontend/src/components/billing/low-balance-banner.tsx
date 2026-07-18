@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, X, Loader2 } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { getBalance } from '@/lib/billing-api';
 
 export default function LowBalanceBanner() {

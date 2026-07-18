@@ -55,6 +55,7 @@ export default function TopUpPage() {
   // otherwise they get a 403 toast on page load (api.ts reports all non-401 errors).
   useEffect(() => {
     if (!isAdmin) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 非管理员直接结束 loading
       setLoading(false);
       return;
     }
@@ -66,6 +67,7 @@ export default function TopUpPage() {
   // but if role/payment state ever disagree, fall back to a visible method.
   useEffect(() => {
     if (!isAdmin && paymentMethod === 'manual') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 防御性回退支付方式
       setPaymentMethod('alipay');
     }
   }, [isAdmin, paymentMethod]);
@@ -74,6 +76,7 @@ export default function TopUpPage() {
   useEffect(() => {
     if (!isAdmin || paymentMethod !== 'manual' || users.length > 0) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:setUsersLoading 同步触发
     setUsersLoading(true);
     getUsers()
       .then((data) => {

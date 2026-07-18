@@ -20,10 +20,6 @@ export default function ReviewPage() {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadQueue();
-  }, []);
-
   async function loadQueue() {
     setLoading(true);
     try {
@@ -36,6 +32,12 @@ export default function ReviewPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:loadQueue 内 setLoading(true) 同步触发,React 19 规则对此过严
+    loadQueue();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
+  }, []);
 
   async function handleSelect(article: ReviewArticle) {
     setSelectedArticle(article);

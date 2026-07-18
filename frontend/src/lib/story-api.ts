@@ -33,7 +33,7 @@ export interface CreateStoryInput {
   contentLanguage?: ContentLanguage;
 }
 
-export interface UpdateStoryInput extends Partial<CreateStoryInput> {}
+export type UpdateStoryInput = Partial<CreateStoryInput>;
 
 export async function getStories(): Promise<Story[]> {
   const res = await api.get('/stories');

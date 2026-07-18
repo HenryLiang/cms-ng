@@ -14,10 +14,6 @@ export default function SettingsPage() {
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
   async function loadStatus() {
     try {
       const data = await getRegistrationStatus();
@@ -29,6 +25,11 @@ export default function SettingsPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:loadStatus 内 setState 同步触发,React 19 规则对此过严
+    loadStatus();
+  }, []);
 
   async function handleSave() {
     setSaving(true);

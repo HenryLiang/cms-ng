@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AuthState, User } from '@/types/auth';
+import { AuthState } from '@/types/auth';
 import { UserRole } from '@cms-ng/shared';
 import { login as loginApi, register as registerApi, getCurrentUser, logoutClient } from '@/lib/auth-api';
 

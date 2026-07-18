@@ -31,9 +31,6 @@ const typeLabels: Record<string, string> = {
   ADJUSTMENT: '调整',
 };
 
-function formatCurrency(amount: number): string {
-  return `¥${Math.abs(amount).toFixed(2)}`;
-}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN', {
@@ -59,11 +56,13 @@ export default function BillingPage() {
 
   // 解析支付宝 return URL 的查询参数,判定支付结果显示横幅
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- 从 URL 查询参数同步支付状态,React 19 规则对此过严 */
     if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED' || paymentResult === 'success') {
       setPaymentStatus('success');
     } else if (paymentResult === 'failed' || (outTradeNo && tradeStatus && tradeStatus !== 'TRADE_SUCCESS' && tradeStatus !== 'TRADE_FINISHED' && tradeStatus !== 'WAIT_BUYER_PAY')) {
       setPaymentStatus('failed');
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [paymentResult, tradeStatus, outTradeNo]);
 
   const loadData = useCallback(async () => {

@@ -43,6 +43,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
   }, [articleId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:loadData 内 setState 同步触发,React 19 规则对此过严
     loadData();
   }, [loadData]);
 

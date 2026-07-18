@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { UserRole } from '@cms-ng/shared';
 
 vi.mock('@/store/auth-store', () => ({
-  useAuthStore: (selector?: (state: any) => any) => {
+  useAuthStore: (selector?: (state: { user: { role: UserRole } | null }) => unknown) => {
     const state = {
       user: mockUser,
     };

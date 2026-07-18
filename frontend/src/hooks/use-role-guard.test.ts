@@ -11,7 +11,12 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/store/auth-store', () => ({
-  useAuthStore: (selector?: (state: any) => any) => {
+  useAuthStore: (selector?: (state: {
+    user: { role: UserRole } | null;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    _hasHydrated: boolean;
+  }) => unknown) => {
     const state = {
       user: mockUser,
       isAuthenticated: mockIsAuthenticated,
