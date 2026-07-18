@@ -20,7 +20,7 @@ describe('WikipediaService', () => {
 
   beforeEach(async () => {
     fetchMock = jest.fn();
-    (global as any).fetch = fetchMock;
+    (global as never).fetch = fetchMock;
 
     redis = {
       get: jest.fn().mockResolvedValue(null),

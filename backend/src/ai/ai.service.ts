@@ -1544,9 +1544,10 @@ priority 取值说明：
           suggestions: Array.isArray(parsed.suggestions)
             ? parsed.suggestions.map((s) => ({
                 dimension: s.dimension || '综合',
-                priority: ['high', 'medium', 'low'].includes(s.priority)
-                  ? s.priority
-                  : 'medium',
+                priority:
+                  s.priority && ['high', 'medium', 'low'].includes(s.priority)
+                    ? s.priority
+                    : 'medium',
                 suggestion: s.suggestion || '',
               }))
             : [],
@@ -1646,11 +1647,11 @@ priority 取值说明：
             ? parsed.keywords
                 .map((k) => ({
                   keyword: k.keyword || '',
-                  searchVolume: ['high', 'medium', 'low'].includes(
-                    k.searchVolume,
-                  )
-                    ? k.searchVolume
-                    : 'medium',
+                  searchVolume:
+                    k.searchVolume &&
+                    ['high', 'medium', 'low'].includes(k.searchVolume)
+                      ? k.searchVolume
+                      : 'medium',
                 }))
                 .filter((k) => k.keyword)
             : [],
@@ -1658,9 +1659,10 @@ priority 取值说明：
             ? parsed.suggestions
                 .map((s) => ({
                   category: s.category || '綜合',
-                  priority: ['high', 'medium', 'low'].includes(s.priority)
-                    ? s.priority
-                    : 'medium',
+                  priority:
+                    s.priority && ['high', 'medium', 'low'].includes(s.priority)
+                      ? s.priority
+                      : 'medium',
                   suggestion: s.suggestion || '',
                 }))
                 .filter((s) => s.suggestion)
@@ -1777,11 +1779,11 @@ priority 取值说明：
             ? parsed.entities
                 .map((e) => ({
                   name: e.name || '',
-                  type: ['person', 'org', 'place', 'date', 'stat'].includes(
-                    e.type,
-                  )
-                    ? e.type
-                    : 'stat',
+                  type:
+                    e.type &&
+                    ['person', 'org', 'place', 'date', 'stat'].includes(e.type)
+                      ? (e.type as 'person' | 'org' | 'place' | 'date' | 'stat')
+                      : 'stat',
                 }))
                 .filter((e) => e.name)
             : [],
@@ -1789,9 +1791,10 @@ priority 取值说明：
             ? parsed.suggestions
                 .map((s) => ({
                   category: s.category || '综合',
-                  priority: ['high', 'medium', 'low'].includes(s.priority)
-                    ? s.priority
-                    : 'medium',
+                  priority:
+                    s.priority && ['high', 'medium', 'low'].includes(s.priority)
+                      ? s.priority
+                      : 'medium',
                   suggestion: s.suggestion || '',
                 }))
                 .filter((s) => s.suggestion)

@@ -127,7 +127,7 @@ describe('ArticlesService', () => {
         storyId: 'story-id',
         title: 'Test Article',
         content: 'Content',
-        contentLanguage: 'SIMPLIFIED_CHINESE' as any,
+        contentLanguage: 'SIMPLIFIED_CHINESE' as never,
       });
 
       expect(prisma.article.create).toHaveBeenCalledWith({
@@ -148,7 +148,7 @@ describe('ArticlesService', () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.create('author-id', { storyId: 'bad' } as any),
+        service.create('author-id', { storyId: 'bad' } as never),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -282,7 +282,7 @@ describe('ArticlesService', () => {
       );
 
       const result = await service.update('article-id', {
-        contentLanguage: 'TRADITIONAL_CHINESE_CANTONESE' as any,
+        contentLanguage: 'TRADITIONAL_CHINESE_CANTONESE' as never,
       });
 
       expect(prisma.article.update).toHaveBeenCalledWith({
@@ -301,7 +301,7 @@ describe('ArticlesService', () => {
         mockArticle({ status: 'WRITING' }),
       );
 
-      await service.update('article-id', { status: 'WRITING' } as any);
+      await service.update('article-id', { status: 'WRITING' } as never);
 
       expect(prisma.articleVersion.create).not.toHaveBeenCalled();
     });
@@ -455,7 +455,7 @@ describe('ArticlesService', () => {
       prisma.story.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.aiGenerateDraft('article-id', mockUser, {} as any),
+        service.aiGenerateDraft('article-id', mockUser, {}),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -507,7 +507,7 @@ describe('ArticlesService', () => {
       );
 
       await expect(
-        service.aiRewrite('article-id', mockUser, { text: 'Hello' } as any),
+        service.aiRewrite('article-id', mockUser, { text: 'Hello' }),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -567,7 +567,7 @@ describe('ArticlesService', () => {
       );
 
       await expect(
-        service.aiFactCheck('article-id', mockUser, {} as any),
+        service.aiFactCheck('article-id', mockUser, {}),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -575,7 +575,7 @@ describe('ArticlesService', () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.aiFactCheck('nonexistent', mockUser, {} as any),
+        service.aiFactCheck('nonexistent', mockUser, {}),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -643,7 +643,7 @@ describe('ArticlesService', () => {
       );
 
       await expect(
-        service.aiReview('article-id', mockUser, {} as any),
+        service.aiReview('article-id', mockUser, {}),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -691,7 +691,7 @@ describe('ArticlesService', () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.aiReview('nonexistent', mockUser, {} as any),
+        service.aiReview('nonexistent', mockUser, {}),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -920,7 +920,7 @@ describe('ArticlesService', () => {
       });
 
       await expect(
-        service.submitReview('article-id', 'editor-id', 'INVALID' as any),
+        service.submitReview('article-id', 'editor-id', 'INVALID' as never),
       ).rejects.toThrow('Decision must be APPROVE or REVISION');
     });
 
@@ -1104,7 +1104,7 @@ describe('ArticlesService', () => {
           mockArticle({ status: from }),
         );
         await expect(
-          service.update('article-id', { status: to } as any),
+          service.update('article-id', { status: to } as never),
         ).rejects.toThrow(BadRequestException);
       } else {
         prisma.article.findUnique.mockResolvedValue({
@@ -1132,7 +1132,7 @@ describe('ArticlesService', () => {
         prisma.article.update.mockResolvedValue(mockArticle({ status: to }));
         const result = await service.update('article-id', {
           status: to,
-        } as any);
+        } as never);
         expect(result.status).toBe(to);
       } else {
         prisma.article.findUnique.mockResolvedValue({
@@ -1247,7 +1247,7 @@ describe('ArticlesService', () => {
 
       const result = await service.update('article-id', {
         status: 'DRAFT',
-      } as any);
+      } as never);
       expect(result.status).toBe('DRAFT');
     });
 
@@ -1257,7 +1257,7 @@ describe('ArticlesService', () => {
       );
 
       try {
-        await service.update('article-id', { status: 'PUBLISHED' } as any);
+        await service.update('article-id', { status: 'PUBLISHED' } as never);
         fail('expected BadRequestException');
       } catch (err) {
         expect(err).toBeInstanceOf(BadRequestException);

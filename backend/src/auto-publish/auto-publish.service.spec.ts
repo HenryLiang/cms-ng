@@ -116,7 +116,7 @@ describe('AutoPublishService', () => {
 
       mockPrisma.autoPublishTask.create.mockResolvedValue(mockTask);
 
-      const result = await service.createTask('user-1', dto as any);
+      const result = await service.createTask('user-1', dto as never);
 
       expect(mockPrisma.autoPublishTask.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -293,7 +293,7 @@ describe('AutoPublishService', () => {
 
       // Check whether toggleTask has resolved yet using Promise.race trick
       let toggleResolved = false;
-      togglePromise.then(() => {
+      void togglePromise.then(() => {
         toggleResolved = true;
       });
 

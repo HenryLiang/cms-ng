@@ -1,6 +1,7 @@
 import { IsNotEmpty, IsOptional, IsString, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ContentLanguage } from '@cms-ng/shared';
+import type { ResearchKitResult } from '../../ai/dto/writing-operations.dto';
 
 export class GenerateDraftFromResearchKitDto {
   @ApiProperty({
@@ -14,7 +15,7 @@ export class GenerateDraftFromResearchKitDto {
     },
   })
   @IsNotEmpty()
-  researchKit: any;
+  researchKit: ResearchKitResult;
 
   @ApiProperty({
     description: 'Optional additional instruction guiding the draft',

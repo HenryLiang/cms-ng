@@ -201,9 +201,9 @@ export class WechatPayService {
           trade_state: string;
           transaction_id: string;
         }>(
-          resource?.ciphertext,
-          resource?.associated_data,
-          resource?.nonce,
+          resource?.ciphertext ?? '',
+          resource?.associated_data ?? '',
+          resource?.nonce ?? '',
           this.apiV3Key,
         );
         outTradeNo = decrypted.out_trade_no;

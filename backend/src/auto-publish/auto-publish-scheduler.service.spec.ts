@@ -92,7 +92,7 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
         }),
       };
       await expect(
-        service.registerTaskCron(task as any),
+        service.registerTaskCron(task as never),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
@@ -142,7 +142,7 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
       };
 
       await expect(
-        service.registerTaskCron(task as any),
+        service.registerTaskCron(task as never),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
@@ -158,7 +158,7 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
       };
 
       await expect(
-        service.registerTaskCron(task as any),
+        service.registerTaskCron(task as never),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

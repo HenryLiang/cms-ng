@@ -17,10 +17,8 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import {
-  TrendingTopicsService,
-  ImportTopicInput,
-} from './trending-topics.service';
+import { TrendingTopicsService } from './trending-topics.service';
+import type { ImportTopicInput } from './trending-topics.service';
 import { TwitterService } from './twitter.service';
 import { WikipediaService } from './wikipedia.service';
 import { CreateTopicDto } from './dto/create-topic.dto';

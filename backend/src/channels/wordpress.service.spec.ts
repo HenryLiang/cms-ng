@@ -97,9 +97,9 @@ describe('WordPressService', () => {
       });
       const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
       const svc = new WordPressService(
-        prisma as any,
-        configService as any,
-        mockBilling as any,
+        prisma as never,
+        configService as never,
+        mockBilling as never,
       );
       await expect(svc.publish('article-1')).rejects.toThrow(
         'WordPress 配置不完整',
@@ -113,9 +113,9 @@ describe('WordPressService', () => {
       });
       const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
       const svc = new WordPressService(
-        prisma as any,
-        configService as any,
-        mockBilling as any,
+        prisma as never,
+        configService as never,
+        mockBilling as never,
       );
       await expect(svc.publish('article-1')).rejects.toThrow(
         'WordPress 配置不完整',
@@ -129,9 +129,9 @@ describe('WordPressService', () => {
       });
       const mockBilling = { isEnabled: jest.fn().mockReturnValue(false) };
       const svc = new WordPressService(
-        prisma as any,
-        configService as any,
-        mockBilling as any,
+        prisma as never,
+        configService as never,
+        mockBilling as never,
       );
       await expect(svc.publish('article-1')).rejects.toThrow(
         'WordPress 配置不完整',
@@ -359,7 +359,7 @@ describe('WordPressService', () => {
 
       // The last fetch call should be the post creation with status: 'draft'
       const postCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
-      const body = JSON.parse(postCall[1]?.body || '{}');
+      const body = JSON.parse((postCall[1] as { body?: string })?.body || '{}');
       expect(body.status).toBe('draft');
     });
   });

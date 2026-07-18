@@ -48,7 +48,7 @@ describe('AuthController', () => {
         user: { id: 'u1' },
       });
 
-      const result = await controller.register(dto as any);
+      const result = await controller.register(dto as never);
 
       expect(authService.register).toHaveBeenCalledWith(dto);
       expect(result.token).toBe('jwt-token');

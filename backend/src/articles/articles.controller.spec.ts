@@ -85,7 +85,7 @@ describe('ArticlesController', () => {
       const result = await controller.create('author-id', {
         title: 'Test',
         storyId: 's1',
-      } as any);
+      } as never);
 
       expect(articlesService.create).toHaveBeenCalledWith('author-id', {
         title: 'Test',
@@ -316,10 +316,10 @@ describe('ArticlesController', () => {
       it(`should call articlesService.${method}`, async () => {
         articlesService[method].mockResolvedValue({ result: 'AI output' });
 
-        const result = await (controller as any)[method](
+        const result = await (controller as never)[method](
           mockUser,
           'article-id',
-          dto as any,
+          dto,
         );
 
         expect(articlesService[method]).toHaveBeenCalledWith(

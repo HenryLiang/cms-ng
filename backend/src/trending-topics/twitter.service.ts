@@ -42,6 +42,8 @@ interface TwitterTweetRaw {
   id?: string;
   text?: string;
   likeCount?: number;
+  retweetCount?: number;
+  replyCount?: number;
   isReply?: boolean;
   type?: string;
   url?: string;
@@ -58,15 +60,15 @@ interface TwitterApiResponse {
     unavailable?: boolean;
     message?: string;
     unavailableReason?: string;
+    userName?: string;
   };
   tweets?: TwitterTweetRaw[];
   unavailable?: boolean;
-  message?: string;
   unavailableReason?: string;
 }
 
 /** normalize 后的通用选题条目 */
-interface NormalizedTopicItem {
+export interface NormalizedTopicItem {
   title: string;
   description: string;
   source: string;
@@ -387,7 +389,11 @@ export class TwitterService implements TopicSourceAdapter {
       );
       const data =
         raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw;
-      if (!data || data.unavailable || !data.userName) {
+      if (
+        !data ||
+        data.unavailable ||
+        !(data as { userName?: string }).userName
+      ) {
         throw new BadRequestException(`X 账号 @${handle} 不存在或不可访问`);
       }
     } catch (err) {

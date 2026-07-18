@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, AutoPublishTask } from '@prisma/client';
 import {
   AutoTaskStatus,
+  RunStatus,
   ArticleRunStatus,
   PublishStatus,
 } from '@cms-ng/shared';
@@ -203,7 +204,7 @@ export class AutoPublishService {
     const pageSize = query.pageSize || 20;
     const where: Prisma.AutoPublishRunWhereInput = {};
     if (query.taskId) where.taskId = query.taskId;
-    if (query.status) where.status = query.status;
+    if (query.status) where.status = query.status as RunStatus;
 
     const [runs, total] = await Promise.all([
       this.prisma.autoPublishRun.findMany({

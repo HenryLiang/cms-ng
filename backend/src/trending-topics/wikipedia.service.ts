@@ -34,7 +34,7 @@ interface WikiOnThisDayEvent {
 }
 
 /** normalizeAll 产出的通用选题条目 */
-interface WikiTopicItem {
+export interface WikiTopicItem {
   title: string;
   description: string;
   source: string;
@@ -184,7 +184,7 @@ export class WikipediaService implements TopicSourceAdapter {
     page = 1,
     limit = 10,
   ): Promise<{
-    items: any[];
+    items: WikiTopicItem[];
     total: number;
     page: number;
     limit: number;
@@ -404,7 +404,7 @@ export class WikipediaService implements TopicSourceAdapter {
           tags: nonYearPages
             .slice(0, 10)
             .map((p) => p.normalizedtitle)
-            .filter(Boolean),
+            .filter((t): t is string => typeof t === 'string'),
           articles,
           coverImage: bestPage?.thumbnail?.source || undefined,
           year: year || undefined,

@@ -423,7 +423,7 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(
         mockStory({ tags: '["tag1"]' }),
       );
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateResearchKit.mockResolvedValue({
         timeline: [{ date: '2024-01-01', event: 'E1' }],
         people: [{ name: 'P1', role: 'R1' }],
@@ -451,7 +451,7 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(
         mockStory({ angle: 'Angle', tags: '[]' }),
       );
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateResearchKit.mockResolvedValue({
         timeline: [],
         people: [],
@@ -471,7 +471,7 @@ describe('StoriesService', () => {
 
     it('should handle empty tags string', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '' }));
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateResearchKit.mockResolvedValue({
         timeline: [],
         people: [],
@@ -553,13 +553,13 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(
         mockStory({ tags: '["politics"]' }),
       );
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateDraft.mockResolvedValue({
         title: 'Draft Title',
         subtitle: 'Draft Subtitle',
         content: '<p>Draft content</p>',
       });
-      const articlesService = (service as any).articlesService;
+      const articlesService = (service as never).articlesService;
       articlesService.create.mockResolvedValue({
         id: 'article-id',
         title: 'Draft Title',
@@ -616,26 +616,26 @@ describe('StoriesService', () => {
         service.generateDraftFromResearchKit(
           'user-id',
           'nonexistent',
-          {} as any,
+          {} as never,
         ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should handle empty tags string', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory({ tags: '' }));
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateDraft.mockResolvedValue({
         title: 'T',
         content: '<p>C</p>',
       });
-      const articlesService = (service as any).articlesService;
+      const articlesService = (service as never).articlesService;
       articlesService.create.mockResolvedValue({ id: 'a1' });
       prisma.story.update.mockResolvedValue(mockStory());
 
       await service.generateDraftFromResearchKit(
         'user-id',
         'story-id',
-        {} as any,
+        {} as never,
       );
 
       expect(aiService.generateDraft).toHaveBeenCalledWith(
@@ -651,19 +651,19 @@ describe('StoriesService', () => {
       prisma.story.findUnique.mockResolvedValue(
         mockStory({ angle: 'Angle', tags: '[]' }),
       );
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateDraft.mockResolvedValue({
         title: 'T',
         content: '<p>C</p>',
       });
-      const articlesService = (service as any).articlesService;
+      const articlesService = (service as never).articlesService;
       articlesService.create.mockResolvedValue({ id: 'a1' });
       prisma.story.update.mockResolvedValue(mockStory());
 
       await service.generateDraftFromResearchKit(
         'user-id',
         'story-id',
-        {} as any,
+        {} as never,
       );
 
       expect(aiService.generateDraft).toHaveBeenCalledWith(
@@ -677,19 +677,19 @@ describe('StoriesService', () => {
 
     it('should work without instruction', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
-      const aiService = (service as any).aiService;
+      const aiService = (service as never).aiService;
       aiService.generateDraft.mockResolvedValue({
         title: 'T',
         content: '<p>C</p>',
       });
-      const articlesService = (service as any).articlesService;
+      const articlesService = (service as never).articlesService;
       articlesService.create.mockResolvedValue({ id: 'a1' });
       prisma.story.update.mockResolvedValue(mockStory());
 
       await service.generateDraftFromResearchKit(
         'user-id',
         'story-id',
-        {} as any,
+        {} as never,
       );
 
       expect(aiService.generateDraft).toHaveBeenCalledWith(

@@ -69,7 +69,7 @@ describe('AIOperationLogger', () => {
       });
       expect(data.durationMs).toEqual(expect.any(Number));
       // result is JSON-stringified
-      expect(JSON.parse(data.result)).toEqual(['s1', 's2']);
+      expect(JSON.parse(data.result as string)).toEqual(['s1', 's2']);
     });
 
     it('invokes onSuccess with the persisted op id and tokensUsed', async () => {
@@ -187,7 +187,9 @@ describe('AIOperationLogger', () => {
         createdBy: 'user-1',
       });
       expect(data.tokensUsed).toBeUndefined();
-      expect(JSON.parse(data.result)).toEqual({ error: 'provider 502' });
+      expect(JSON.parse(data.result as string)).toEqual({
+        error: 'provider 502',
+      });
       expect(data.durationMs).toEqual(expect.any(Number));
     });
 

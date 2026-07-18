@@ -78,7 +78,7 @@ describe('StoriesController', () => {
       const result = await controller.create('user-id', {
         title: 'Test',
         contentLanguage: 'TRADITIONAL_CHINESE_HK',
-      } as any);
+      } as never);
 
       expect(storiesService.create).toHaveBeenCalledWith('user-id', {
         title: 'Test',
@@ -184,7 +184,7 @@ describe('StoriesController', () => {
 
       const result = await controller.update(
         'story-id',
-        { contentLanguage: 'SIMPLIFIED_CHINESE' } as any,
+        { contentLanguage: 'SIMPLIFIED_CHINESE' } as never,
         mockUser,
       );
 
