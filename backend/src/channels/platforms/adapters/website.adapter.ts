@@ -48,7 +48,7 @@ ${article.content.slice(0, 3000)}
         title: parsed.title || '',
         content: parsed.content || '',
         excerpt: parsed.excerpt,
-        tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+        tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]) : [],
       };
     }
     // Fallback: try to extract title from first line

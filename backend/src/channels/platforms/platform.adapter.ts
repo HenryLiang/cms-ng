@@ -24,7 +24,15 @@ export interface ValidationResult {
   errors: string[];
 }
 
-export function extractJsonFromOutput(rawOutput: string): any {
+/** LLM 适配输出的原始 JSON 结构(字段可能缺失/类型松散,postProcess 兜底) */
+export interface RawAdaptedJson {
+  title?: string;
+  content?: string;
+  excerpt?: string;
+  tags?: unknown;
+}
+
+export function extractJsonFromOutput(rawOutput: string): RawAdaptedJson | null {
   // Try direct parse first
   try {
     return JSON.parse(rawOutput.trim());

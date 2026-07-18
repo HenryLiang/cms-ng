@@ -50,7 +50,7 @@ Facebook 帖子要求：
         title: parsed.title || '',
         content: parsed.content || '',
         excerpt: parsed.excerpt,
-        tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+        tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]) : [],
       };
     }
     const lines = rawOutput

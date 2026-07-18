@@ -96,6 +96,29 @@ interface StoredGeneratedImage {
   height: number | null;
 }
 
+/** Seedream(豆包)图片生成 API 响应体 */
+interface SeedreamImageResponse {
+  data?: { url?: string }[];
+}
+
+/** Wikipedia Action API 搜索响应(search 列表) */
+interface WikipediaSearchResponse {
+  query?: { search?: { title: string }[] };
+}
+
+/** Wikipedia REST page/summary 响应 */
+interface WikipediaSummary {
+  type?: string;
+  extract?: string;
+  title?: string;
+  content_urls?: { desktop?: { page?: string } };
+}
+
+/** axios 等 HTTP 错误的最小形状(用于 duck-type 检查 response.status) */
+interface HttpLikeError {
+  response?: { status?: number };
+}
+
 @Injectable()
 export class AIService {
   private readonly logger = new Logger(AIService.name);
@@ -195,9 +218,9 @@ export class AIService {
         unitPrice,
         idempotencyKey: `ai:${params.aiOperationId}`,
       });
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Billing deduction failed for AI operation ${params.aiOperationId}: ${error.message}`,
+        `Billing deduction failed for AI operation ${params.aiOperationId}: ${(error as Error).message}`,
       );
     }
   }
@@ -232,9 +255,9 @@ export class AIService {
         unitPrice,
         idempotencyKey: `image:${params.aiOperationId}`,
       });
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Billing deduction failed for image operation ${params.aiOperationId}: ${error.message}`,
+        `Billing deduction failed for image operation ${params.aiOperationId}: ${(error as Error).message}`,
       );
     }
   }
@@ -1053,7 +1076,7 @@ type 取值说明：
     ): Promise<WikipediaEntry | null> => {
       try {
         // Step 1: Search for matching article titles
-        const searchRes = await axios.get(
+        const searchRes = await axios.get<WikipediaSearchResponse>(
           `https://${lang}.wikipedia.org/w/api.php`,
           {
             params: {
@@ -1081,7 +1104,7 @@ type 取值说明：
           if (seenTitles.has(candidateTitle)) continue;
 
           const encodedTitle = encodeURIComponent(candidateTitle);
-          const summaryRes = await axios.get(
+          const summaryRes = await axios.get<WikipediaSummary>(
             `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodedTitle}`,
             {
               headers: {
@@ -1115,7 +1138,7 @@ type 取值说明：
           err &&
           typeof err === 'object' &&
           'response' in err &&
-          (err as any).response?.status !== 404
+          (err as HttpLikeError).response?.status !== 404
         ) {
           // Only warn; the caller can check `error` for diagnostics.
         } else if (!(err && typeof err === 'object' && 'response' in err)) {
@@ -1131,7 +1154,7 @@ type 取值说明：
             err &&
             typeof err === 'object' &&
             'response' in err &&
-            (err as any).response?.status === 404
+            (err as HttpLikeError).response?.status === 404
           )
         ) {
           errors.push(`[${lang}] ${msg}`);
@@ -1511,7 +1534,7 @@ priority 取值说明：
           overallScore: Math.min(100, Math.max(0, parsed.overallScore ?? 50)),
           summary: parsed.summary || '已完成稿件质量预审评估',
           dimensions: Array.isArray(parsed.dimensions)
-            ? parsed.dimensions.map((d: any) => ({
+            ? parsed.dimensions.map((d) => ({
                 name: d.name || '未知维度',
                 score: Math.min(100, Math.max(0, d.score ?? 50)),
                 maxScore: d.maxScore || 100,
@@ -1519,7 +1542,7 @@ priority 取值说明：
               }))
             : [],
           suggestions: Array.isArray(parsed.suggestions)
-            ? parsed.suggestions.map((s: any) => ({
+            ? parsed.suggestions.map((s) => ({
                 dimension: s.dimension || '综合',
                 priority: ['high', 'medium', 'low'].includes(s.priority)
                   ? s.priority
@@ -1612,16 +1635,16 @@ priority 取值说明：
           ),
           optimizedTitle: Array.isArray(parsed.optimizedTitle)
             ? parsed.optimizedTitle
-                .map((t: any) => ({
+                .map((t) => ({
                   title: t.title || '',
                   reasoning: t.reasoning || '',
                 }))
-                .filter((t: any) => t.title)
+                .filter((t) => t.title)
             : [],
           metaDescription: parsed.metaDescription || '',
           keywords: Array.isArray(parsed.keywords)
             ? parsed.keywords
-                .map((k: any) => ({
+                .map((k) => ({
                   keyword: k.keyword || '',
                   searchVolume: ['high', 'medium', 'low'].includes(
                     k.searchVolume,
@@ -1629,18 +1652,18 @@ priority 取值说明：
                     ? k.searchVolume
                     : 'medium',
                 }))
-                .filter((k: any) => k.keyword)
+                .filter((k) => k.keyword)
             : [],
           suggestions: Array.isArray(parsed.suggestions)
             ? parsed.suggestions
-                .map((s: any) => ({
+                .map((s) => ({
                   category: s.category || '綜合',
                   priority: ['high', 'medium', 'low'].includes(s.priority)
                     ? s.priority
                     : 'medium',
                   suggestion: s.suggestion || '',
                 }))
-                .filter((s: any) => s.suggestion)
+                .filter((s) => s.suggestion)
             : [],
         };
 
@@ -1736,23 +1759,23 @@ priority 取值说明：
           optimizedSummary: parsed.optimizedSummary || '',
           suggestedQuestions: Array.isArray(parsed.suggestedQuestions)
             ? parsed.suggestedQuestions
-                .map((q: any) => ({
+                .map((q) => ({
                   question: q.question || '',
                   answerSnippet: q.answerSnippet || '',
                 }))
-                .filter((q: any) => q.question)
+                .filter((q) => q.question)
             : [],
           keyStatements: Array.isArray(parsed.keyStatements)
             ? parsed.keyStatements
-                .map((s: any) => ({
+                .map((s) => ({
                   statement: s.statement || '',
                   reason: s.reason || '',
                 }))
-                .filter((s: any) => s.statement)
+                .filter((s) => s.statement)
             : [],
           entities: Array.isArray(parsed.entities)
             ? parsed.entities
-                .map((e: any) => ({
+                .map((e) => ({
                   name: e.name || '',
                   type: ['person', 'org', 'place', 'date', 'stat'].includes(
                     e.type,
@@ -1760,18 +1783,18 @@ priority 取值说明：
                     ? e.type
                     : 'stat',
                 }))
-                .filter((e: any) => e.name)
+                .filter((e) => e.name)
             : [],
           suggestions: Array.isArray(parsed.suggestions)
             ? parsed.suggestions
-                .map((s: any) => ({
+                .map((s) => ({
                   category: s.category || '综合',
                   priority: ['high', 'medium', 'low'].includes(s.priority)
                     ? s.priority
                     : 'medium',
                   suggestion: s.suggestion || '',
                 }))
-                .filter((s: any) => s.suggestion)
+                .filter((s) => s.suggestion)
             : [],
         };
 
@@ -1956,16 +1979,16 @@ priority 取值说明：
       this.logger.log(
         `[generateArticleImage] Step 1 done (${Date.now() - startTime}ms): prompt="${imagePrompt.slice(0, 120)}..."`,
       );
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `[generateArticleImage] Step 1 buildImagePrompt FAILED (${Date.now() - startTime}ms): ${error.message}`,
-        error.stack,
+        `[generateArticleImage] Step 1 buildImagePrompt FAILED (${Date.now() - startTime}ms): ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
 
     // Step 2: 调用 Seedream 生成图片
-    let seedreamResponse: any;
+    let seedreamResponse: SeedreamImageResponse;
     try {
       this.logger.log('[generateArticleImage] Step 2: callSeedream ...');
       seedreamResponse = await this.callSeedream(
@@ -1976,10 +1999,10 @@ priority 取值说明：
       this.logger.log(
         `[generateArticleImage] Step 2 done (${Date.now() - startTime}ms): response keys=${JSON.stringify(Object.keys(seedreamResponse || {}))}`,
       );
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `[generateArticleImage] Step 2 callSeedream FAILED (${Date.now() - startTime}ms): ${error.message}`,
-        error.stack,
+        `[generateArticleImage] Step 2 callSeedream FAILED (${Date.now() - startTime}ms): ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -2003,10 +2026,10 @@ priority 取值说明：
       this.logger.log(
         `[generateArticleImage] Step 3 done (${Date.now() - startTime}ms): publicUrl=${stored.url}`,
       );
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `[generateArticleImage] Step 3 uploadToStorage FAILED (${Date.now() - startTime}ms): ${error.message}`,
-        error.stack,
+        `[generateArticleImage] Step 3 uploadToStorage FAILED (${Date.now() - startTime}ms): ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -2172,7 +2195,7 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
     prompt: string,
     size: string,
     aspectRatio?: string,
-  ): Promise<any> {
+  ): Promise<SeedreamImageResponse> {
     const resolvedSize = this.resolveSeedreamSize(size, aspectRatio);
     this.logger.log(
       `[callSeedream] resolution=${size} aspectRatio=${aspectRatio || 'none'} → size=${resolvedSize}`,
@@ -2186,7 +2209,7 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
       watermark: false,
     };
 
-    const response = await axios.post(
+    const response = await axios.post<SeedreamImageResponse>(
       `${this.seedreamApiBase}/images/generations`,
       body,
       {
@@ -2247,13 +2270,13 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
         mimeType: rawType,
         ...this.readImageDimensions(buffer),
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(
-        `Failed to upload image to storage: ${error.message}`,
-        error.stack,
+        `Failed to upload image to storage: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw new ServiceUnavailableException(
-        `图片上传到对象存储失败: ${error.message}`,
+        `图片上传到对象存储失败: ${(error as Error).message}`,
       );
     }
   }
