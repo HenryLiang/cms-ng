@@ -10,6 +10,22 @@ import {
 import WxPay from 'wechatpay-node-v3';
 import * as fs from 'fs';
 
+/** 微信支付统一下单(native)响应 */
+interface WeChatOrderResponse {
+  status: number;
+  data?: { code_url?: string };
+  error?: unknown;
+}
+
+/** 微信支付回调通知体(含加密资源) */
+interface WeChatNotification {
+  resource?: {
+    ciphertext?: string;
+    associated_data?: string;
+    nonce?: string;
+  };
+}
+
 @Injectable()
 export class WechatPayService {
   private readonly logger = new Logger(WechatPayService.name);
@@ -86,7 +102,7 @@ export class WechatPayService {
 
     let qrCodeUrl: string;
     try {
-      const result = await this.wxPay.transactions_native({
+      const result = (await this.wxPay.transactions_native({
         description,
         out_trade_no: record.id,
         notify_url: `${this.getNotifyUrl()}/billing/payment/wechat/notify`,
@@ -94,7 +110,7 @@ export class WechatPayService {
           total: Math.round(amount * 100), // WeChat uses cents (分)
           currency: 'CNY',
         },
-      });
+      })) as WeChatOrderResponse;
 
       if (result.status !== 200 || !result.data?.code_url) {
         throw new Error(
@@ -104,15 +120,17 @@ export class WechatPayService {
       qrCodeUrl = result.data.code_url;
     } catch (error) {
       this.logger.error(
-        `WeChat Pay createOrder failed: ${error.message}`,
-        error.stack,
+        `WeChat Pay createOrder failed: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       // Mark record as failed so it doesn't stay in PENDING forever
       await this.prisma.topUpRecord.update({
         where: { id: record.id },
         data: { status: TransactionStatus.FAILED },
       });
-      throw new Error(`Failed to create WeChat Pay order: ${error.message}`);
+      throw new Error(
+        `Failed to create WeChat Pay order: ${(error as Error).message}`,
+      );
     }
 
     this.logger.log(
@@ -135,7 +153,7 @@ export class WechatPayService {
     }
 
     try {
-      const notification = JSON.parse(body);
+      const notification = JSON.parse(body) as WeChatNotification;
       const resource = notification.resource;
 
       // Verify signature using WeChat Pay platform certificate
@@ -167,7 +185,7 @@ export class WechatPayService {
         }
       } catch (signError) {
         this.logger.error(
-          `WeChat Pay signature verification error: ${signError.message}`,
+          `WeChat Pay signature verification error: ${(signError as Error).message}`,
         );
         return { code: 'FAIL', message: 'Signature verification error' };
       }
@@ -193,7 +211,7 @@ export class WechatPayService {
         transactionId = decrypted.transaction_id;
       } catch (decryptError) {
         this.logger.error(
-          `WeChat Pay notification decryption failed: ${decryptError.message}`,
+          `WeChat Pay notification decryption failed: ${(decryptError as Error).message}`,
         );
         return { code: 'FAIL', message: 'Decryption failed' };
       }
@@ -261,8 +279,8 @@ export class WechatPayService {
       return { code: 'SUCCESS', message: 'OK' };
     } catch (error) {
       this.logger.error(
-        `WeChat Pay notification error: ${error.message}`,
-        error.stack,
+        `WeChat Pay notification error: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       return { code: 'FAIL', message: 'Processing error' };
     }
