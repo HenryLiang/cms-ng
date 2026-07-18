@@ -3,7 +3,7 @@ jest.mock('https-proxy-agent', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { StoriesController } from './stories.controller';
 import { StoriesService } from './stories.service';
 

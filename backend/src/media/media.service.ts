@@ -291,7 +291,7 @@ export class MediaService {
     if (
       !asset ||
       asset.ownerId !== userId ||
-      asset.status === MediaStatus.DELETED
+      (asset.status as MediaStatus) === MediaStatus.DELETED
     ) {
       throw new NotFoundException('Media asset not found');
     }
@@ -309,6 +309,7 @@ export class MediaService {
 /** 取 basename + 截断长度，防路径穿越与 DB 列溢出 */
 function sanitizeFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? name;
+  // eslint-disable-next-line no-control-regex -- 刻意剔除 ASCII 控制字符,防注入与文件名异常
   const clean = base.replace(/[\x00-\x1f\x7f]/g, '');
   return clean.slice(0, MAX_FILENAME_LENGTH);
 }

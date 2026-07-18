@@ -9,7 +9,6 @@ import {
   GenerateHeadlinesDto,
   GenerateExcerptDto,
   ChatWithAIDto,
-  ChatMessageDto,
 } from './ai-operations.dto';
 
 describe('AI Operations DTOs', () => {

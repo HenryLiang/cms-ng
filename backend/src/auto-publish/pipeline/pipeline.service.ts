@@ -279,7 +279,7 @@ export class PipelineService {
       return;
     }
 
-    if (record.status !== ArticleRunStatus.FAILED) {
+    if ((record.status as ArticleRunStatus) !== ArticleRunStatus.FAILED) {
       this.logger.warn(
         `Article ${articleId} is not FAILED (status=${record.status}), skipping retry`,
       );
@@ -326,10 +326,10 @@ export class PipelineService {
       });
       if (run) {
         const successCount = run.articles.filter(
-          (a) => a.status === ArticleRunStatus.PUBLISHED,
+          (a) => (a.status as ArticleRunStatus) === ArticleRunStatus.PUBLISHED,
         ).length;
         const failedCount = run.articles.filter(
-          (a) => a.status === ArticleRunStatus.FAILED,
+          (a) => (a.status as ArticleRunStatus) === ArticleRunStatus.FAILED,
         ).length;
         const runStatus =
           failedCount === 0

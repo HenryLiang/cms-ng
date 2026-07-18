@@ -55,10 +55,10 @@ describe('RssTopicSourceAdapter', () => {
     );
   });
 
-  it('exposes ordinary and parameterized RSS sources from one catalog', async () => {
+  it('exposes ordinary and parameterized RSS sources from one catalog', () => {
     const adapter = new RssTopicSourceAdapter(config);
 
-    const definitions = await adapter.listDefinitions({});
+    const definitions = adapter.listDefinitions({});
 
     expect(definitions.map((source) => source.id)).toEqual(
       expect.arrayContaining([
@@ -144,7 +144,7 @@ describe('RssTopicSourceAdapter', () => {
   });
 
   it('aggregates and deduplicates NHK category feeds', async () => {
-    const parseURL = jest.fn().mockImplementation(async (url: string) => ({
+    const parseURL = jest.fn().mockImplementation((url: string) => ({
       items: [
         {
           title: url.endsWith('cat0.xml') ? 'Shared story' : 'Shared story',
@@ -163,7 +163,7 @@ describe('RssTopicSourceAdapter', () => {
   });
 
   it('aggregates configured feeds while isolating an upstream failure', async () => {
-    const parseURL = jest.fn().mockImplementation(async (url: string) => {
+    const parseURL = jest.fn().mockImplementation((url: string) => {
       if (url.includes('people.com.cn'))
         throw new Error('upstream unavailable');
       return {

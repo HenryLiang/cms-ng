@@ -7,7 +7,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AutoTaskStatus,
-  RunStatus,
   ArticleRunStatus,
   PublishStatus,
 } from '@cms-ng/shared';
@@ -127,7 +126,7 @@ export class AutoPublishService {
 
     // Update cron if schedule or status changed
     if (dto.status !== undefined || dto.scheduleConfig) {
-      if (task.status === AutoTaskStatus.ACTIVE) {
+      if ((task.status as AutoTaskStatus) === AutoTaskStatus.ACTIVE) {
         await this.scheduler.registerTaskCron(task);
       } else {
         this.scheduler.removeTaskCron(id);
@@ -155,7 +154,7 @@ export class AutoPublishService {
     if (!task) throw new NotFoundException('Task not found');
 
     const newStatus =
-      task.status === AutoTaskStatus.ACTIVE
+      (task.status as AutoTaskStatus) === AutoTaskStatus.ACTIVE
         ? AutoTaskStatus.PAUSED
         : AutoTaskStatus.ACTIVE;
 
@@ -296,7 +295,7 @@ export class AutoPublishService {
       where: { id },
     });
     if (!record) throw new NotFoundException('Auto-publish article not found');
-    if (record.status !== ArticleRunStatus.PUBLISHED) {
+    if ((record.status as ArticleRunStatus) !== ArticleRunStatus.PUBLISHED) {
       throw new BadRequestException('Only published articles can be withdrawn');
     }
     if (!record.platformPublishId) {
@@ -339,7 +338,7 @@ export class AutoPublishService {
       where: { id },
     });
     if (!record) throw new NotFoundException('Auto-publish article not found');
-    if (record.status !== ArticleRunStatus.FAILED) {
+    if ((record.status as ArticleRunStatus) !== ArticleRunStatus.FAILED) {
       throw new BadRequestException('Only failed articles can be retried');
     }
 

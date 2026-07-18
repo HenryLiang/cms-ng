@@ -5,7 +5,6 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { buildCorsOptions } from './common/cors.config';
-import type { IncomingMessage, Server, ServerResponse } from 'http';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());

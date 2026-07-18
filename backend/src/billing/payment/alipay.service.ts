@@ -166,7 +166,9 @@ export class AlipayService {
       }
 
       // Idempotent: already processed
-      if (record.status === TransactionStatus.COMPLETED) {
+      if (
+        (record.status as TransactionStatus) === TransactionStatus.COMPLETED
+      ) {
         this.logger.debug(
           `Alipay notification: already processed record=${record.id}`,
         );
@@ -188,13 +190,13 @@ export class AlipayService {
         userId: record.userId,
         amount: Number(record.creditsAdded),
         type: TransactionType.TOP_UP,
-        description: `支付宝充值 ¥${record.amount}`,
+        description: `支付宝充值 ¥${record.amount.toString()}`,
         topUpRecordId: record.id,
         idempotencyKey: `topup:${record.id}`,
       });
 
       this.logger.log(
-        `Alipay payment success: record=${record.id}, amount=${record.amount}`,
+        `Alipay payment success: record=${record.id}, amount=${record.amount.toString()}`,
       );
     } else if (tradeStatus === 'WAIT_BUYER_PAY') {
       this.logger.debug(`Alipay payment pending: record=${outTradeNo}`);

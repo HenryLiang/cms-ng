@@ -216,7 +216,9 @@ export class WechatPayService {
         }
 
         // Idempotent: already processed
-        if (record.status === TransactionStatus.COMPLETED) {
+        if (
+          (record.status as TransactionStatus) === TransactionStatus.COMPLETED
+        ) {
           this.logger.debug(
             `WeChat Pay notification: already processed record=${record.id}`,
           );
@@ -238,13 +240,13 @@ export class WechatPayService {
           userId: record.userId,
           amount: Number(record.creditsAdded),
           type: TransactionType.TOP_UP,
-          description: `微信支付充值 ¥${record.amount}`,
+          description: `微信支付充值 ¥${record.amount.toString()}`,
           topUpRecordId: record.id,
           idempotencyKey: `topup:${record.id}`,
         });
 
         this.logger.log(
-          `WeChat Pay success: record=${record.id}, amount=${record.amount}`,
+          `WeChat Pay success: record=${record.id}, amount=${record.amount.toString()}`,
         );
       } else if (tradeState === 'CLOSED') {
         this.logger.log(`WeChat Pay closed: record=${outTradeNo}`);

@@ -256,6 +256,7 @@ export class WikipediaService implements TopicSourceAdapter {
       // 原生 fetch 不读 HTTP_PROXY，须显式 dispatcher。
       // ProxyAgent 缓存为 singleton，避免每请求新建泄漏连接池。
       if (!this.proxyAgent) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CommonJS 环境下 require 才能被 jest.mock('undici') 拦截;动态 import 会触发 --experimental-vm-modules 报错
         const { ProxyAgent } = require('undici');
         this.proxyAgent = new ProxyAgent(this.proxyUrl);
       }

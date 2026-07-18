@@ -12,7 +12,7 @@ import { CronJob, validateCronExpression } from 'cron';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PipelineService } from './pipeline/pipeline.service';
-import { AutoTaskStatus, AutoTaskStatus as TaskStatus } from '@cms-ng/shared';
+import { AutoTaskStatus } from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
 
 @Injectable()

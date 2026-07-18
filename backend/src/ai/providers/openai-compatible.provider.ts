@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 import { Logger } from '@nestjs/common';
 import {
   ChatCompletionProvider,
@@ -7,6 +7,29 @@ import {
   ChatMessage,
   ToolCall,
 } from './chat-completion.interface';
+
+/**
+ * Raw snake_case response body of an OpenAI-compatible chat completion.
+ * Only the fields consumed by this provider are modeled; `message` is
+ * required because non-streaming responses always carry one.
+ */
+interface RawChatCompletionChoice {
+  message: {
+    content?: string | null;
+    reasoning_content?: string | null;
+    tool_calls?: ToolCall[];
+  };
+  finish_reason?: string;
+}
+
+interface RawChatCompletionResponse {
+  choices?: RawChatCompletionChoice[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
 
 /**
  * Shared base class for OpenAI-compatible API providers (DeepSeek, Kimi, OpenAI, etc.).
@@ -72,7 +95,10 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
         const toolName = tc.function?.name;
         let toolArgs: Record<string, unknown> = {};
         try {
-          toolArgs = JSON.parse(tc.function?.arguments || '{}');
+          toolArgs = JSON.parse(tc.function?.arguments || '{}') as Record<
+            string,
+            unknown
+          >;
         } catch {
           // ignore parse errors, use empty args
         }
@@ -80,8 +106,10 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
         let result: unknown;
         try {
           result = await executeTool(toolName, toolArgs);
-        } catch (error: any) {
-          result = { error: error.message };
+        } catch (error: unknown) {
+          result = {
+            error: error instanceof Error ? error.message : String(error),
+          };
         }
 
         toolResults.push({
@@ -131,23 +159,31 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
   }
 
   /** Send the HTTP request to the chat completions endpoint */
-  protected async postChatCompletions(body: Record<string, any>): Promise<any> {
-    return axios.post(`${this.apiBase}/chat/completions`, body, {
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
+  protected async postChatCompletions(
+    body: Record<string, any>,
+  ): Promise<AxiosResponse<RawChatCompletionResponse>> {
+    return axios.post<RawChatCompletionResponse>(
+      `${this.apiBase}/chat/completions`,
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 300000,
       },
-      timeout: 300000,
-    });
+    );
   }
 
   /** Parse the raw API response into ChatCompletionResponse */
-  protected parseResponse(data: any): ChatCompletionResponse {
+  protected parseResponse(
+    data: RawChatCompletionResponse,
+  ): ChatCompletionResponse {
     const choice = data.choices?.[0];
     return {
       content: choice?.message?.content || '',
       reasoningContent: choice?.message?.reasoning_content || '',
-      toolCalls: choice?.message?.tool_calls as ToolCall[] | undefined,
+      toolCalls: choice?.message?.tool_calls,
       finishReason: choice?.finish_reason || 'stop',
       usage: data.usage
         ? {

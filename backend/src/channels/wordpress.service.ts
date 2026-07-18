@@ -241,8 +241,8 @@ export class WordPressService {
       throw new BadRequestException('请先生成 WordPress 适配内容');
     }
     if (
-      publish.status !== PublishStatus.READY &&
-      publish.status !== PublishStatus.PUBLISHED
+      (publish.status as PublishStatus) !== PublishStatus.READY &&
+      (publish.status as PublishStatus) !== PublishStatus.PUBLISHED
     ) {
       throw new BadRequestException('适配内容未就绪，请先生成或重新生成');
     }

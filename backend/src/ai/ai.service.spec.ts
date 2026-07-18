@@ -12,11 +12,10 @@ import { AIToolsService } from './tools/ai-tools.service';
 import { TavilySearchTool } from './tools/tavily-search.tool';
 import {
   CHAT_PROVIDER,
-  type ChatCompletionProvider,
   type ChatCompletionResponse,
   KimiProvider,
 } from './providers';
-import { STORAGE_SERVICE, StorageService } from '../storage/storage.service';
+import { STORAGE_SERVICE } from '../storage/storage.service';
 import { BillingService } from '../billing/billing.service';
 import { AIOperationLogger } from '../common/ai-operation-logger';
 import { AuthorStyleService } from '../authors/author-style.service';
@@ -24,7 +23,7 @@ import { AuthorStyleService } from '../authors/author-style.service';
 /** Shared mock for AuthorStyleService. Returns '' (no persona) so the system
  *  prompts in these tests are unchanged — author-style injection is opt-in via
  *  authorSlug, which the existing tests don't set. */
-const authorStyleMock = { getSystemPrompt: async () => '' };
+const authorStyleMock = { getSystemPrompt: () => Promise.resolve('') };
 const AUTHOR_STYLE_PROVIDER = {
   provide: AuthorStyleService,
   useValue: authorStyleMock,
@@ -2224,7 +2223,7 @@ describe('AIService', () => {
     it('should include Wikipedia entries in prompt and result when search succeeds', async () => {
       // Use order-independent mocks: respond based on URL.
       // zh.wikipedia returns a hit; en.wikipedia returns nothing.
-      mockedAxios.get.mockImplementation(async (url: any) => {
+      mockedAxios.get.mockImplementation((url: any) => {
         const urlStr = String(url);
         if (
           urlStr.includes('zh.wikipedia.org') &&

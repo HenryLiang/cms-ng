@@ -160,18 +160,19 @@ describe('TwitterService', () => {
       // twitterapi.io 真实结构：trends: [{ trend: { name, rank, ... } }]
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          trends: [
-            {
-              trend: {
-                name: '#AI',
-                rank: 1,
-                url: 'https://x.com/search?q=%23AI',
+        json: () =>
+          Promise.resolve({
+            trends: [
+              {
+                trend: {
+                  name: '#AI',
+                  rank: 1,
+                  url: 'https://x.com/search?q=%23AI',
+                },
               },
-            },
-            { trend: { name: 'BreakingNews', rank: 5 } },
-          ],
-        }),
+              { trend: { name: 'BreakingNews', rank: 5 } },
+            ],
+          }),
       });
 
       const result = await service.fetchTrends('u1', 1, 1, 10);
@@ -214,7 +215,7 @@ describe('TwitterService', () => {
       billing.isEnabled.mockReturnValue(false);
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ trends: [] }),
+        json: () => Promise.resolve({ trends: [] }),
       });
 
       await service.fetchTrends('u1', 1);
@@ -229,33 +230,34 @@ describe('TwitterService', () => {
       // twitterapi.io /twitter/user/last_tweets 真实结构：{status, msg, data:{tweets:[...], pin_tweet}}
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          status: 'success',
-          msg: 'success',
-          data: {
-            tweets: [
-              {
-                id: '1',
-                text: 'Original post',
-                likeCount: 10,
-                retweetCount: 5,
-                replyCount: 2,
-                isReply: false,
-                type: 'tweet',
-              },
-              { id: '2', text: 'A reply', isReply: true },
-              { id: '3', text: 'RT @someone: shared', type: 'retweet' },
-              {
-                id: '4',
-                text: 'Second original',
-                likeCount: 0,
-                retweetCount: 0,
-                replyCount: 0,
-                isReply: false,
-              },
-            ],
-          },
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'success',
+            msg: 'success',
+            data: {
+              tweets: [
+                {
+                  id: '1',
+                  text: 'Original post',
+                  likeCount: 10,
+                  retweetCount: 5,
+                  replyCount: 2,
+                  isReply: false,
+                  type: 'tweet',
+                },
+                { id: '2', text: 'A reply', isReply: true },
+                { id: '3', text: 'RT @someone: shared', type: 'retweet' },
+                {
+                  id: '4',
+                  text: 'Second original',
+                  likeCount: 0,
+                  retweetCount: 0,
+                  replyCount: 0,
+                  isReply: false,
+                },
+              ],
+            },
+          }),
       });
 
       const items = await service.fetchAccountTweets('elonmusk', 5, 'u1', true);
@@ -274,11 +276,12 @@ describe('TwitterService', () => {
       // 防御性：万一某端点把 tweets 放顶层（无 data 外壳），解包逻辑应回退到 raw
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          status: 'success',
-          msg: 'success',
-          tweets: [{ id: '9', text: 'x', isReply: false }],
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'success',
+            msg: 'success',
+            tweets: [{ id: '9', text: 'x', isReply: false }],
+          }),
       });
       const items = await service.fetchAccountTweets(
         'someacct',
@@ -293,15 +296,16 @@ describe('TwitterService', () => {
     it('returns empty array when account unavailable (suspended/protected)', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          status: 'success',
-          msg: 'success',
-          data: {
-            unavailable: true,
-            message: 'User is suspended',
-            unavailableReason: 'Suspended',
-          },
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'success',
+            msg: 'success',
+            data: {
+              unavailable: true,
+              message: 'User is suspended',
+              unavailableReason: 'Suspended',
+            },
+          }),
       });
       const items = await service.fetchAccountTweets('someacct', 5, 'u1', true);
       expect(items).toEqual([]);
@@ -310,11 +314,12 @@ describe('TwitterService', () => {
     it('strips leading @ from userName and lowercases cache key', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          status: 'success',
-          msg: 'success',
-          data: { tweets: [] },
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'success',
+            msg: 'success',
+            data: { tweets: [] },
+          }),
       });
       await service.fetchAccountTweets('@ElonMusk', 5, 'u1', true);
       expect(redis.set).toHaveBeenCalledWith(
@@ -341,11 +346,12 @@ describe('TwitterService', () => {
       fetchMock
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({
-            status: 'success',
-            msg: 'success',
-            data: { tweets: [{ id: '1', text: 'hi', isReply: false }] },
-          }),
+          json: () =>
+            Promise.resolve({
+              status: 'success',
+              msg: 'success',
+              data: { tweets: [{ id: '1', text: 'hi', isReply: false }] },
+            }),
         })
         .mockRejectedValueOnce(new Error('account suspended'));
 
@@ -378,11 +384,12 @@ describe('TwitterService', () => {
       // user/info 真实结构：{status, msg, data:{userName,...}}
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          status: 'success',
-          msg: 'success',
-          data: { userName: 'elonmusk', id: '1' },
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'success',
+            msg: 'success',
+            data: { userName: 'elonmusk', id: '1' },
+          }),
       });
       prisma.twitterWatchAccount.upsert.mockResolvedValue({
         id: '1',
@@ -406,11 +413,12 @@ describe('TwitterService', () => {
     it('throws BadRequestException when handle is unavailable/not found', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          status: 'success',
-          msg: 'success',
-          data: { unavailable: true, message: 'User not found' },
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'success',
+            msg: 'success',
+            data: { unavailable: true, message: 'User not found' },
+          }),
       });
       await expect(service.addAccount('nonexistent')).rejects.toThrow(
         BadRequestException,

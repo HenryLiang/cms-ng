@@ -4,13 +4,6 @@ import { buildCorsOptions } from './cors.config';
 describe('buildCorsOptions', () => {
   it('development env without CORS_ORIGINS allows http://localhost:3000', () => {
     const opts = buildCorsOptions({ NODE_ENV: 'development' });
-    const origin = (
-      opts.origin as (
-        o: string | undefined,
-        cb: (e: Error | null, ok: boolean) => void,
-      ) => void
-    )('http://localhost:3000', () => {});
-    // origin is a function; check it via the helper below
     expect(checkOrigin(opts, 'http://localhost:3000')).toBe(true);
   });
 

@@ -258,7 +258,7 @@ export class ChannelsService {
       if (!this.billingService.isEnabled()) return;
 
       // Website publishing is free
-      if (platform === Platform.WEBSITE) return;
+      if ((platform as Platform) === Platform.WEBSITE) return;
 
       // Look up unit price from billing config
       const configKey = `publish_${platform.toLowerCase()}`;

@@ -261,7 +261,7 @@ export class BillingService {
       where: { id: adminId },
       select: { role: true },
     });
-    if (!admin || admin.role !== UserRole.ADMIN) {
+    if (!admin || (admin.role as UserRole) !== UserRole.ADMIN) {
       throw new ForbiddenException('Only admins can perform manual top-ups');
     }
 
@@ -453,7 +453,6 @@ export class BillingService {
         );
         const surchargePrice = surchargeConfig?.unitPrice || 0.05;
 
-        const perArticleCost = aiCost + publishPrice;
         breakdown.push({
           item: 'AI 生成 (每篇)',
           quantity: batchSize,
@@ -709,7 +708,7 @@ export class BillingService {
       where: { id: adminId },
       select: { role: true },
     });
-    if (!admin || admin.role !== UserRole.ADMIN) {
+    if (!admin || (admin.role as UserRole) !== UserRole.ADMIN) {
       throw new ForbiddenException('Only admins can process refunds');
     }
 
@@ -720,7 +719,7 @@ export class BillingService {
     if (!original) {
       throw new NotFoundException('Original transaction not found');
     }
-    if (original.status === TransactionStatus.REFUNDED) {
+    if ((original.status as TransactionStatus) === TransactionStatus.REFUNDED) {
       throw new BadRequestException('Transaction already refunded');
     }
 

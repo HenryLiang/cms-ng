@@ -789,7 +789,7 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
           messages: [
             {
               role: 'system',
-              content: `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：\「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
+              content: `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
             },
             { role: 'user', content: prompt },
           ],
@@ -1277,8 +1277,6 @@ type 取值说明：
 
     // 动态计算时效性要求的时间范围
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const prevYear = currentYear - 1;
     const currentDateStr = now.toISOString().split('T')[0];
 
     const searchResults = searchSummary
@@ -1898,7 +1896,7 @@ priority 取值说明：
 ]`;
   }
 
-  private getFallbackSuggestions(userProfile: {
+  private getFallbackSuggestions(_userProfile: {
     name: string;
     expertise: string[];
     department?: string;
@@ -2022,10 +2020,11 @@ priority 取值说明：
       action: 'generate_article_image',
       prompt: `标题: ${articleTitle}\n风格: ${style}\n${customPrompt}`,
       model: this.seedreamModel,
-      fn: async () => ({
-        result: { imagePrompt, publicUrl: stored.url },
-        // image gen doesn't report token usage, so leave it undefined
-      }),
+      fn: () =>
+        Promise.resolve({
+          result: { imagePrompt, publicUrl: stored.url },
+          // image gen doesn't report token usage, so leave it undefined
+        }),
       // If the audit row write itself fails, fall back to a plain object
       // describing the partial result so the pipeline can still continue.
       fallback: { imagePrompt: imagePrompt ?? '', publicUrl: stored.url ?? '' },
@@ -2220,10 +2219,8 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
       ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
     });
     const buffer: Buffer = Buffer.from(imageResponse.data as ArrayBuffer);
-    const rawType = String(imageResponse.headers['content-type'] || '')
-      .split(';')[0]
-      .trim()
-      .toLowerCase();
+    const ct = imageResponse.headers['content-type'] as string | undefined;
+    const rawType = (ct || '').split(';')[0].trim().toLowerCase();
     this.logger.log(
       `[uploadToStorage] Downloaded: ${buffer.length} bytes, content-type=${rawType}`,
     );

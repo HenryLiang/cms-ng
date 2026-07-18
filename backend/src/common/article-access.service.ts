@@ -92,7 +92,7 @@ export class ArticleAccessService {
     options: CheckAccessOptions,
   ): void {
     const canAccess =
-      user.role === UserRole.ADMIN ||
+      (user.role as UserRole) === UserRole.ADMIN ||
       authorId === user.userId ||
       editorId === user.userId;
 

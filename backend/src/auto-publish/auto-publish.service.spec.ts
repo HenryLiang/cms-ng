@@ -21,10 +21,11 @@ jest.mock('../ai/ai.service', () => ({
 
 describe('AutoPublishService', () => {
   let service: AutoPublishService;
-  let prisma: PrismaService;
-  let scheduler: AutoPublishSchedulerService;
-  let pipeline: PipelineService;
-  let wordpress: WordPressService;
+  // DI wiring sanity checks:module.get 会抛错若 provider 未注册,虽不读但保留隐式校验
+  let _prisma: PrismaService;
+  let _scheduler: AutoPublishSchedulerService;
+  let _pipeline: PipelineService;
+  let _wordpress: WordPressService;
 
   const mockPrisma = {
     autoPublishTask: {
@@ -81,12 +82,12 @@ describe('AutoPublishService', () => {
     }).compile();
 
     service = module.get<AutoPublishService>(AutoPublishService);
-    prisma = module.get<PrismaService>(PrismaService);
-    scheduler = module.get<AutoPublishSchedulerService>(
+    _prisma = module.get<PrismaService>(PrismaService);
+    _scheduler = module.get<AutoPublishSchedulerService>(
       AutoPublishSchedulerService,
     );
-    pipeline = module.get<PipelineService>(PipelineService);
-    wordpress = module.get<WordPressService>(WordPressService);
+    _pipeline = module.get<PipelineService>(PipelineService);
+    _wordpress = module.get<WordPressService>(WordPressService);
 
     jest.clearAllMocks();
   });

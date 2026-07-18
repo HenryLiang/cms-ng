@@ -3,7 +3,6 @@ import { AIService } from '../../../ai/ai.service';
 import { ContentLanguage } from '@cms-ng/shared';
 import { ArticleRunStatus } from '@cms-ng/shared';
 import { PipelineStep, PipelineContext } from '../step.interface';
-import type { ResearchKitResult } from '../../../ai/dto/writing-operations.dto';
 
 @Injectable()
 export class ResearchStep implements PipelineStep {

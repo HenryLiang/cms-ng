@@ -11,7 +11,7 @@ export class NotificationStep implements PipelineStep {
 
   constructor(private config: ConfigService) {}
 
-  async execute(ctx: PipelineContext): Promise<PipelineContext> {
+  execute(ctx: PipelineContext): Promise<PipelineContext> {
     // Trace observability
     const trace = ctx.trace?.[ctx.trace.length - 1];
     if (trace) {
@@ -30,6 +30,6 @@ export class NotificationStep implements PipelineStep {
       `Pipeline completed for article: topic="${ctx.topic}", ` +
         `title="${ctx.draft?.title}", status=PUBLISHED`,
     );
-    return ctx;
+    return Promise.resolve(ctx);
   }
 }

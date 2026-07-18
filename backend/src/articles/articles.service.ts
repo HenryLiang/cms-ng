@@ -170,9 +170,9 @@ export class ArticlesService {
 
     let where: Prisma.ArticleWhereInput = {};
 
-    if (user.role === UserRole.REPORTER) {
+    if ((user.role as UserRole) === UserRole.REPORTER) {
       where.authorId = user.userId;
-    } else if (user.role === UserRole.EDITOR) {
+    } else if ((user.role as UserRole) === UserRole.EDITOR) {
       where = {
         OR: [
           { authorId: user.userId },
@@ -254,7 +254,7 @@ export class ArticlesService {
     if (!existing) throw new NotFoundException('Article not found');
 
     // Validate state-machine transition when status is being changed
-    if (dto.status && dto.status !== existing.status) {
+    if (dto.status && dto.status !== (existing.status as ArticleStatus)) {
       this.validateStateTransition(existing.status, dto.status);
     }
 
@@ -317,7 +317,10 @@ export class ArticlesService {
       select: { role: true },
     });
     if (!editor) throw new NotFoundException('Editor not found');
-    if (editor.role !== UserRole.EDITOR && editor.role !== UserRole.ADMIN) {
+    if (
+      (editor.role as UserRole) !== UserRole.EDITOR &&
+      (editor.role as UserRole) !== UserRole.ADMIN
+    ) {
       throw new ForbiddenException('Assigned user is not an editor');
     }
 
@@ -378,7 +381,7 @@ export class ArticlesService {
     // is approved only after an editor has claimed it" intact while
     // preserving the one-click UX.
     if (
-      article.status === ArticleStatus.PENDING_REVIEW &&
+      (article.status as ArticleStatus) === ArticleStatus.PENDING_REVIEW &&
       newStatus === ArticleStatus.APPROVED
     ) {
       this.validateStateTransition(article.status, ArticleStatus.IN_REVIEW);

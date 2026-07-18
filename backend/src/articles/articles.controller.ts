@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArticlesService } from './articles.service';

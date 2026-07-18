@@ -27,7 +27,7 @@ describe('validateEnv', () => {
   });
 
   it('fails when DATABASE_URL is missing', () => {
-    const { DATABASE_URL, ...rest } = goodBase;
+    const { DATABASE_URL: _omit, ...rest } = goodBase;
     const r = validateEnv(rest);
     expect(r.success).toBe(false);
     if (!r.success)
@@ -35,7 +35,7 @@ describe('validateEnv', () => {
   });
 
   it('fails when JWT_SECRET is missing', () => {
-    const { JWT_SECRET, ...rest } = goodBase;
+    const { JWT_SECRET: _omit, ...rest } = goodBase;
     const r = validateEnv(rest);
     expect(r.success).toBe(false);
     if (!r.success)
@@ -64,7 +64,7 @@ describe('validateEnv', () => {
   });
 
   it('fails when AI_PROVIDER=deepseek but DEEPSEEK_API_KEY is missing', () => {
-    const { DEEPSEEK_API_KEY, ...rest } = goodBase;
+    const { DEEPSEEK_API_KEY: _omit, ...rest } = goodBase;
     const r = validateEnv(rest);
     expect(r.success).toBe(false);
     if (!r.success)

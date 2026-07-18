@@ -78,7 +78,7 @@ describe('BillingService', () => {
       update: jest.fn(),
     };
 
-    prisma.$transaction = jest.fn().mockImplementation(async (fn) => {
+    prisma.$transaction = jest.fn().mockImplementation((fn) => {
       const tx = mockTxClient();
       return fn(tx);
     });

@@ -86,7 +86,7 @@ describe('WikipediaService', () => {
   it('describes and fetches the historical source through the generic interface', async () => {
     redis.get.mockResolvedValue(JSON.stringify([]));
 
-    const definitions = await service.listDefinitions({});
+    const definitions = service.listDefinitions({});
     const result = await service.fetch(
       'this-day',
       {},
@@ -124,7 +124,10 @@ describe('WikipediaService', () => {
     });
 
     it('fetches, normalizes (skipping year pages), caches on cache miss', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => wikiResponse });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(wikiResponse),
+      });
 
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
@@ -164,7 +167,10 @@ describe('WikipediaService', () => {
     });
 
     it('sorts by heatScore descending (modern events rank higher than ancient)', async () => {
-      fetchMock.mockResolvedValue({ ok: true, json: async () => wikiResponse });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(wikiResponse),
+      });
 
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
@@ -178,7 +184,7 @@ describe('WikipediaService', () => {
     it('HK uses zh-hk variant (traditional Chinese)', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: [] }),
+        json: () => Promise.resolve({ events: [] }),
       });
 
       await service.fetchOnThisDay('HK', '2026-07-03', 1, 10);
@@ -199,7 +205,7 @@ describe('WikipediaService', () => {
     it('US and EU use en without Accept-Language, sharing the same cache key', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: [] }),
+        json: () => Promise.resolve({ events: [] }),
       });
 
       await service.fetchOnThisDay('US', '2026-07-03', 1, 10);
@@ -227,7 +233,7 @@ describe('WikipediaService', () => {
       }));
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: many }),
+        json: () => Promise.resolve({ events: many }),
       });
 
       const page1 = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
@@ -243,7 +249,7 @@ describe('WikipediaService', () => {
     it('defaults to today when date omitted', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: [] }),
+        json: () => Promise.resolve({ events: [] }),
       });
 
       await service.fetchOnThisDay('CN', undefined, 1, 10);
@@ -258,7 +264,7 @@ describe('WikipediaService', () => {
       fetchMock.mockResolvedValue({
         ok: false,
         status: 503,
-        text: async () => 'upstream error',
+        text: () => Promise.resolve('upstream error'),
       });
 
       await expect(
@@ -284,20 +290,21 @@ describe('WikipediaService', () => {
     it('falls back to event text when all pages are year-pages (no informative page)', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          events: [
-            {
-              text: '某冷门事件描述。',
-              year: 2013,
-              pages: [
-                {
-                  normalizedtitle: '2013年',
-                  extract: '2013年是一個平年，第一天是星期二。',
-                },
-              ],
-            },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            events: [
+              {
+                text: '某冷门事件描述。',
+                year: 2013,
+                pages: [
+                  {
+                    normalizedtitle: '2013年',
+                    extract: '2013年是一個平年，第一天是星期二。',
+                  },
+                ],
+              },
+            ],
+          }),
       });
 
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
@@ -313,9 +320,10 @@ describe('WikipediaService', () => {
     it('formats BC (negative) years as 公元前', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({
-          events: [{ text: '凱撒遇刺。', year: -44, pages: [] }],
-        }),
+        json: () =>
+          Promise.resolve({
+            events: [{ text: '凱撒遇刺。', year: -44, pages: [] }],
+          }),
       });
 
       const result = await service.fetchOnThisDay('US', '2026-03-15', 1, 10);
@@ -328,7 +336,7 @@ describe('WikipediaService', () => {
       redis.get.mockResolvedValue('{not valid json');
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: [] }),
+        json: () => Promise.resolve({ events: [] }),
       });
 
       await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
@@ -355,7 +363,7 @@ describe('WikipediaService', () => {
         };
         return Promise.resolve({
           ok: true,
-          json: async () => ({ [type]: data[type] || [] }),
+          json: () => Promise.resolve({ [type]: data[type] || [] }),
         });
       });
 
@@ -379,16 +387,17 @@ describe('WikipediaService', () => {
           return Promise.resolve({
             ok: false,
             status: 500,
-            text: async () => 'err',
+            text: () => Promise.resolve('err'),
           });
         }
         const m = /\/onthisday\/(\w+)\//.exec(url);
         const type = m ? m[1] : 'events';
         return Promise.resolve({
           ok: true,
-          json: async () => ({
-            [type]: [{ text: `${type}条目`, year: 2000, pages: [] }],
-          }),
+          json: () =>
+            Promise.resolve({
+              [type]: [{ text: `${type}条目`, year: 2000, pages: [] }],
+            }),
         });
       });
 
@@ -425,7 +434,7 @@ describe('WikipediaService', () => {
       const proxyService = module.get<WikipediaService>(WikipediaService);
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: [] }),
+        json: () => Promise.resolve({ events: [] }),
       });
 
       await proxyService.fetchOnThisDay('CN', '2026-07-03', 1, 10);
@@ -438,7 +447,7 @@ describe('WikipediaService', () => {
     it('does not attach ProxyAgent when WIKIPEDIA_PROXY_ENABLED=false', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ events: [] }),
+        json: () => Promise.resolve({ events: [] }),
       });
 
       await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);

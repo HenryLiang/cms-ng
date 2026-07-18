@@ -1,5 +1,5 @@
-import { Controller, Get, ExecutionContext } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Controller, Get } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { CurrentUser } from './current-user.decorator';
 
 describe('CurrentUser decorator', () => {

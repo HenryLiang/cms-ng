@@ -315,11 +315,11 @@ describe('StoriesService', () => {
       prisma.story.delete.mockResolvedValue(mockStory());
 
       const callOrder: string[] = [];
-      (prisma.article.updateMany as jest.Mock).mockImplementation(async () => {
+      (prisma.article.updateMany as jest.Mock).mockImplementation(() => {
         callOrder.push('article.updateMany');
         return { count: 3 };
       });
-      (prisma.story.delete as jest.Mock).mockImplementation(async () => {
+      (prisma.story.delete as jest.Mock).mockImplementation(() => {
         callOrder.push('story.delete');
         return mockStory();
       });

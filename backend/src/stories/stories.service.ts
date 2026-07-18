@@ -69,9 +69,9 @@ export class StoriesService {
     // 1) 角色基线 where
     const where: Prisma.StoryWhereInput = {};
 
-    if (user.role === UserRole.REPORTER) {
+    if ((user.role as UserRole) === UserRole.REPORTER) {
       where.reporterId = user.userId;
-    } else if (user.role === UserRole.EDITOR) {
+    } else if ((user.role as UserRole) === UserRole.EDITOR) {
       where.OR = [
         { reporterId: user.userId },
         { editorId: user.userId },
@@ -194,7 +194,7 @@ export class StoriesService {
     if (!story) throw new NotFoundException('Story not found');
 
     const canAccess =
-      user.role === UserRole.ADMIN ||
+      (user.role as UserRole) === UserRole.ADMIN ||
       story.reporterId === user.userId ||
       story.editorId === user.userId;
 
@@ -214,7 +214,10 @@ export class StoriesService {
       select: { role: true },
     });
     if (!editor) throw new NotFoundException('Editor not found');
-    if (editor.role !== UserRole.EDITOR && editor.role !== UserRole.ADMIN) {
+    if (
+      (editor.role as UserRole) !== UserRole.EDITOR &&
+      (editor.role as UserRole) !== UserRole.ADMIN
+    ) {
       throw new ForbiddenException('Assigned user is not an editor');
     }
 

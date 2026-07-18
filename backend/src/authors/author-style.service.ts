@@ -243,15 +243,15 @@ export class AuthorStyleService {
   }
 
   /** Short one-line bio for the dropdown subtitle. */
-  private async deriveBio(
+  private deriveBio(
     slug: string,
     name: string,
     fields: string[],
   ): Promise<string> {
     if (fields.length > 0) {
-      return `${name} · ${fields.slice(0, 3).join(' / ')}`;
+      return Promise.resolve(`${name} · ${fields.slice(0, 3).join(' / ')}`);
     }
-    return name;
+    return Promise.resolve(name);
   }
 
   private detectOnBoot(): void {

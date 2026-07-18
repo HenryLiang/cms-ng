@@ -5,7 +5,7 @@ import { RedisService } from '../../redis/redis.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { PipelineService } from './pipeline.service';
 import { PipelineStep, PipelineContext } from './step.interface';
-import { ArticleRunStatus, RunStatus, ArticleStatus } from '@cms-ng/shared';
+import { ArticleRunStatus, RunStatus } from '@cms-ng/shared';
 import { TopicCollectionStep } from './steps/topic-collection.step';
 import { ResearchStep } from './steps/research.step';
 import { ArticleGenerationStep } from './steps/article-generation.step';

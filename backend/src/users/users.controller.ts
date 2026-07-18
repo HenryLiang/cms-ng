@@ -55,7 +55,7 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: { userId: string; role: string },
   ) {
-    if (user.role !== UserRole.ADMIN && id !== user.userId) {
+    if ((user.role as UserRole) !== UserRole.ADMIN && id !== user.userId) {
       throw new ForbiddenException('You can only update your own profile');
     }
     return this.usersService.update(id, dto);

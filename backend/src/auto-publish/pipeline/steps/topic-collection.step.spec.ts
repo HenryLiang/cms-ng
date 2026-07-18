@@ -14,8 +14,9 @@ jest.mock('../../../ai/ai.service', () => ({
 
 describe('TopicCollectionStep', () => {
   let step: TopicCollectionStep;
-  let prisma: PrismaService;
-  let trendingTopics: TrendingTopicsService;
+  // DI wiring sanity checks:module.get 会抛错若 provider 未注册,虽不读但保留隐式校验
+  let _prisma: PrismaService;
+  let _trendingTopics: TrendingTopicsService;
 
   const mockPrisma = {
     autoPublishArticle: {
@@ -44,8 +45,8 @@ describe('TopicCollectionStep', () => {
     }).compile();
 
     step = module.get<TopicCollectionStep>(TopicCollectionStep);
-    prisma = module.get<PrismaService>(PrismaService);
-    trendingTopics = module.get<TrendingTopicsService>(TrendingTopicsService);
+    _prisma = module.get<PrismaService>(PrismaService);
+    _trendingTopics = module.get<TrendingTopicsService>(TrendingTopicsService);
 
     jest.clearAllMocks();
   });

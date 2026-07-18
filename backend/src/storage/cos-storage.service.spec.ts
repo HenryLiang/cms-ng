@@ -7,7 +7,6 @@ import { CosStorageService } from './cos-storage.service';
 jest.mock('cos-nodejs-sdk-v5');
 
 describe('CosStorageService', () => {
-  let service: CosStorageService;
   let mockPutObject: jest.Mock;
   let mockDeleteObject: jest.Mock;
   let mockPutObjectCopy: jest.Mock;
