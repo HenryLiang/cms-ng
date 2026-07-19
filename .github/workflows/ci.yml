@@ -27,6 +27,8 @@ jobs:
       - run: npm ci
       # lint 规则是类型化的(recommendedTypeChecked),需要 shared 的构建产物
       - run: npm run build --workspace=@cms-ng/shared
+      # 生成 Prisma Client:@prisma/client 的类型(UserRole/ArticleWhereInput 等)由 schema 生成,npm ci 不会生成
+      - run: cd backend && npx prisma generate
       - name: Backend lint
         run: cd backend && npx eslint "{src,apps,libs,test}/**/*.ts" --max-warnings=0
       - name: Frontend lint
@@ -43,6 +45,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build --workspace=@cms-ng/shared
+      - run: cd backend && npx prisma generate
       - run: cd backend && npm run test
 
   test-frontend:
@@ -68,6 +71,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: cd backend && npx prisma generate
       - run: npm run build
 
   e2e:
