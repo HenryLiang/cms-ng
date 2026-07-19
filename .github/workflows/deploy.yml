@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # 需要完整历史以便打 tag
 
@@ -39,9 +39,14 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_REF: ${{ inputs.ref }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" bash -s <<'EOF'
+          # heredoc 带引号('EOF')→ 变量在远端展开,但 step 的 env 不会随 SSH 传过去
+          # 因此把 DEPLOY_PATH/DEPLOY_REF 作为远端命令前缀传入(此处本地展开),远端 bash 才能拿到
+          ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
+            "DEPLOY_PATH='${DEPLOY_PATH}' DEPLOY_REF='${DEPLOY_REF}' bash -s" <<'EOF'
           set -euo pipefail
           cd "${DEPLOY_PATH}"
+          echo "=== 服务器 Node 版本 ==="
+          node -v
           echo "=== git fetch & checkout ${DEPLOY_REF} ==="
           git fetch origin --tags
           git reset --hard "${DEPLOY_REF}"
