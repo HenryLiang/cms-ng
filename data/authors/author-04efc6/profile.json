@@ -1,0 +1,66 @@
+{
+  "author_name": "張涵語",
+  "author_slug": "author-04efc6",
+  "article_count": 770,
+  "earliest_date": "2024-12",
+  "latest_date": "2026-05",
+  "top_categories": [
+    [
+      "國際",
+      770
+    ]
+  ],
+  "top_tags": [
+    [
+      "美國",
+      363
+    ],
+    [
+      "特朗普",
+      220
+    ],
+    [
+      "日本",
+      98
+    ],
+    [
+      "關稅",
+      65
+    ],
+    [
+      "俄羅斯",
+      57
+    ],
+    [
+      "中國外交",
+      51
+    ],
+    [
+      "以巴衝突",
+      48
+    ],
+    [
+      "英國",
+      45
+    ],
+    [
+      "以色列",
+      45
+    ],
+    [
+      "韓國",
+      44
+    ]
+  ],
+  "avg_content_length": 443,
+  "total_content_chars": 341623,
+  "sample_article_ids": [
+    "1086129",
+    "1086436",
+    "1086675",
+    "1086761",
+    "1086789"
+  ],
+  "is_internal": true,
+  "personal_background": {}
+}

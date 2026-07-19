@@ -1,0 +1,66 @@
+{
+  "author_name": "格隆匯",
+  "author_slug": "author-0c9d9b",
+  "article_count": 666,
+  "earliest_date": "2024-04",
+  "latest_date": "2026-05",
+  "top_categories": [
+    [
+      "經濟",
+      666
+    ]
+  ],
+  "top_tags": [
+    [
+      "格隆匯",
+      664
+    ],
+    [
+      "美國聯儲局",
+      116
+    ],
+    [
+      "特朗普",
+      63
+    ],
+    [
+      "聯儲局議息",
+      58
+    ],
+    [
+      "鮑威爾",
+      45
+    ],
+    [
+      "美股",
+      40
+    ],
+    [
+      "電動車",
+      31
+    ],
+    [
+      "美國經濟",
+      30
+    ],
+    [
+      "A股",
+      30
+    ],
+    [
+      "金價",
+      30
+    ]
+  ],
+  "avg_content_length": 484,
+  "total_content_chars": 322557,
+  "sample_article_ids": [
+    "1013794",
+    "1014857",
+    "1015055",
+    "1045183",
+    "1069845"
+  ],
+  "is_internal": true,
+  "personal_background": {}
+}
