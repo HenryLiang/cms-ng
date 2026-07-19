@@ -54,8 +54,8 @@ jobs:
           echo "=== git fetch & checkout ${DEPLOY_REF} ==="
           git fetch origin --tags
           git reset --hard "${DEPLOY_REF}"
-          echo "=== .env 模板差异(仅提示,不阻断) ==="
-          diff backend/.env.example backend/.env || true
+          echo "=== .env 键名差异(只比键名不打印值——公开仓库日志任何人可读,严禁打印 .env 内容) ==="
+          comm -3 <(grep -oE '^[A-Z_]+=' backend/.env.example | sort -u) <(grep -oE '^[A-Z_]+=' backend/.env | sort -u) || true
           echo "=== 执行标准发布 ==="
           ./scripts/cms-ng-service.sh start --prod
           echo "=== 状态验证 ==="
