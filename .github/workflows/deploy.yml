@@ -15,6 +15,10 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+# Tag release 步骤需要推 tag(默认 GITHUB_TOKEN 只读会 403)
+permissions:
+  contents: write
+
 jobs:
   deploy:
     name: Deploy to production
