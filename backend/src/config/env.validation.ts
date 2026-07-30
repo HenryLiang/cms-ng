@@ -11,7 +11,7 @@
 
 const REQUIRED_VARS = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'] as const;
 const MIN_JWT_SECRET_LENGTH = 16;
-const VALID_AI_PROVIDERS = ['deepseek', 'kimi', 'openai'] as const;
+const VALID_AI_PROVIDERS = ['deepseek', 'gemini', 'kimi', 'openai'] as const;
 type AiProvider = (typeof VALID_AI_PROVIDERS)[number];
 
 export interface ValidatedEnv {
@@ -23,6 +23,7 @@ export interface ValidatedEnv {
   AI_PROVIDER: AiProvider;
   // Optional — surfaced if the matching provider is selected
   DEEPSEEK_API_KEY?: string;
+  GEMINI_API_KEY?: string;
   KIMI_API_KEY?: string;
   OPENAI_API_KEY?: string;
   [key: string]: string | number | undefined;
@@ -75,6 +76,7 @@ export function validateEnv(
     // If a provider is selected, the matching API key must be present
     const keyMap: Record<AiProvider, string> = {
       deepseek: 'DEEPSEEK_API_KEY',
+      gemini: 'GEMINI_API_KEY',
       kimi: 'KIMI_API_KEY',
       openai: 'OPENAI_API_KEY',
     };

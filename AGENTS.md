@@ -136,13 +136,13 @@ cms-ng/
 
 ### Env Validation at Boot
 
-`backend/src/config/env.validation.ts` uses a **manual `validateEnv()` function** (a `REQUIRED_VARS` list of `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET` plus targeted hand-written checks) run via NestJS `ConfigModule.forRoot({ validate })` — **not Zod**. If any required var is missing or invalid, the app fails fast with a readable error message instead of a mysterious runtime crash. It also enforces: `JWT_SECRET` ≥ 16 chars, `DATABASE_URL` must start with `mysql://`, and `AI_PROVIDER` must be one of `deepseek`/`kimi`/`openai` with its matching API key present. Optional vars (SMTP, billing keys) are validated lazily at their respective modules. Note: `zod` is declared in `backend/package.json` but is neither installed nor used — a dead-dependency candidate for removal.
+`backend/src/config/env.validation.ts` uses a **manual `validateEnv()` function** (a `REQUIRED_VARS` list of `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET` plus targeted hand-written checks) run via NestJS `ConfigModule.forRoot({ validate })` — **not Zod**. If any required var is missing or invalid, the app fails fast with a readable error message instead of a mysterious runtime crash. It also enforces: `JWT_SECRET` ≥ 16 chars, `DATABASE_URL` must start with `mysql://`, and `AI_PROVIDER` must be one of `deepseek`/`gemini`/`kimi`/`openai` with its matching API key present. Optional vars (SMTP, billing keys) are validated lazily at their respective modules. Note: `zod` is declared in `backend/package.json` but is neither installed nor used — a dead-dependency candidate for removal.
 
 ### AI Layer
 
 `backend/src/ai/` has two distinct subsystems:
 
-1. **LLM calls** (`ai.service.ts` + `providers/`): Provider-agnostic architecture — `AIService` is a facade that delegates to a `ChatCompletionProvider` (injected via `CHAT_PROVIDER` DI token). Available providers: `DeepSeekProvider` (default), `KimiProvider`, `OpenAIProvider` — all extend `OpenAICompatibleProvider`. Switch via `AI_PROVIDER` env var. Exposes operations: rewrite, expand, condense, polish, generate-headlines, generate-excerpt, generate-story-suggestions, chat, generate-draft, fact-check, research-kit, review-report, SEO optimize. All operations are logged to the `AIOperation` table via the injected `AIOperationLogger` (`backend/src/common/ai-operation-logger.ts`), which wraps each call in `aiLog.run(...)`.
+1. **LLM calls** (`ai.service.ts` + `providers/`): Provider-agnostic architecture — `AIService` is a facade that delegates to a `ChatCompletionProvider` (injected via `CHAT_PROVIDER` DI token). Available providers: `DeepSeekProvider` (default), `GeminiProvider`, `KimiProvider`, `OpenAIProvider` — all extend `OpenAICompatibleProvider`. Switch via `AI_PROVIDER` env var. Gemini uses Google's OpenAI-compatible Chat Completions endpoint. Exposes operations: rewrite, expand, condense, polish, generate-headlines, generate-excerpt, generate-story-suggestions, chat, generate-draft, fact-check, research-kit, review-report, SEO optimize. All operations are logged to the `AIOperation` table via the injected `AIOperationLogger` (`backend/src/common/ai-operation-logger.ts`), which wraps each call in `aiLog.run(...)`.
 
 2. **Tool registry** (`tools/`): `AIToolsService` is a plugin registry implementing `ToolExecutor` / `ToolDefinition` interfaces. Current tool: `TavilySearchTool`. To add a new tool, implement the `ToolExecutor` interface and register it in `AIToolsService`'s constructor. Tools are exposed to the LLM via function-calling inside the private `performSearch` helper (used by research-kit/fact-check) when `SEARCH_PROVIDER` is not `kimi`; the `kimi` branch additionally requires the active provider to be `KimiProvider`.
 
@@ -269,11 +269,14 @@ FRONTEND_BASE_URL="http://localhost:3000"   # Frontend URL (for CORS, payment re
 # Production: set to your frontend domain(s).
 # CORS_ORIGINS="https://app.example.com,https://admin.example.com"
 
-# ===== AI Provider: 'deepseek' (default) | 'kimi' | 'openai' =====
+# ===== AI Provider: 'deepseek' (default) | 'gemini' | 'kimi' | 'openai' =====
 AI_PROVIDER="deepseek"
 DEEPSEEK_API_KEY="..."
 DEEPSEEK_API_BASE="https://api.deepseek.com"
 DEEPSEEK_MODEL="deepseek-v4-pro"
+# GEMINI_API_KEY="..."        # when AI_PROVIDER=gemini
+# GEMINI_API_BASE="https://generativelanguage.googleapis.com/v1beta/openai"
+# GEMINI_MODEL="gemini-3.6-flash"
 # KIMI_API_KEY="..."          # when AI_PROVIDER=kimi
 # KIMI_API_BASE="https://api.kimi.com/coding/v1"
 # KIMI_MODEL="kimi-for-coding"

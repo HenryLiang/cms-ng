@@ -104,7 +104,7 @@ SKILL_TARGETS=codebuddy bash scripts/agent/install.sh
    bash scripts/agent/login.sh your-account@hk01.com 'your-password'
    # 写入 .cms-ng-token(在 CWD、脚本目录、$HOME 中第一个可写位置)
    ```
-3. **(可选)AI key 配在 backend 的 `.env`**:有 `DEEPSEEK_API_KEY` / `KIMI_API_KEY` / `OPENAI_API_KEY` 任一时,`full-flow.sh` 才会真跑 AI polish;否则跳过该步
+3. **(可选)AI key 配在 backend 的 `.env`**:有 `DEEPSEEK_API_KEY` / `GEMINI_API_KEY` / `KIMI_API_KEY` / `OPENAI_API_KEY` 任一时,`full-flow.sh` 才会真跑 AI polish;否则跳过该步
 
 ## 在 Claude Code 里使用
 
