@@ -9,14 +9,13 @@
  * surface their own errors at the module that needs them.
  */
 
-const REQUIRED_VARS = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'] as const;
+const REQUIRED_VARS = ['DATABASE_URL', 'JWT_SECRET'] as const;
 const MIN_JWT_SECRET_LENGTH = 16;
 const VALID_AI_PROVIDERS = ['deepseek', 'gemini', 'kimi', 'openai'] as const;
 type AiProvider = (typeof VALID_AI_PROVIDERS)[number];
 
 export interface ValidatedEnv {
   DATABASE_URL: string;
-  REDIS_URL: string;
   JWT_SECRET: string;
   PORT: number;
   NODE_ENV: 'development' | 'production' | 'test';
@@ -98,7 +97,6 @@ export function validateEnv(
     data: {
       ...env,
       DATABASE_URL: env.DATABASE_URL!,
-      REDIS_URL: env.REDIS_URL!,
       JWT_SECRET: env.JWT_SECRET!,
       PORT: env.PORT ? Number(env.PORT) : 3001,
       NODE_ENV: (env.NODE_ENV as ValidatedEnv['NODE_ENV']) || 'development',

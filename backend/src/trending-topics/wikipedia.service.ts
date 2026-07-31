@@ -5,8 +5,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { RedisService } from '../redis/redis.service';
 import { TopicSourceAdapter } from './sources/topic-source.adapter';
+import { InMemoryCache } from './sources/in-memory-cache';
 import {
   TopicSourceContext,
   TopicSourceDefinition,
@@ -60,7 +60,7 @@ export interface WikiTopicItem {
  *     额外保留 coverImage / year 两个可选字段供前端「当年今日」面板增强渲染（封面图 + 年份徽章）。
  *   - 信息最大化保留：title 带年份前缀且不截断；tags 保留前 10；articles 全部保留（snippet 用完整 extract）。
  *   - 跳过 ^\d{4}年?$ 年份页 —— 其 extract 是「20XX年是一个平年」，零信息量；优先取有缩略图的 page 做 bestPage。
- *   - Redis 缓存（TTL 86400s）—— 历史事件按日固定，当天内容不变；Wikipedia 免费，缓存纯为加速。
+ *   - 进程内内存缓存（TTL 86400s）—— 历史事件按日固定，当天内容不变；Wikipedia 免费，缓存纯为加速。
  *   - 不计费（Wikipedia 免费，不注入 BillingService）。
  *   - 代理：原生 fetch 不读 HTTP_PROXY，WIKIPEDIA_PROXY_ENABLED=true 时显式传 undici ProxyAgent
  *     （大陆开发需代理访问 Wikipedia，新加坡生产直连）—— 与 Twitter 的 undici 模式一致，与 RSS 的 https-proxy-agent 独立。
@@ -87,6 +87,7 @@ export class WikipediaService implements TopicSourceAdapter {
   };
 
   private static readonly CACHE_TTL = 86400; // 1 天（历史事件按日固定）
+  private readonly cache = new InMemoryCache();
 
   // Wikipedia On This Day 无 all 端点（实测 /feed/onthisday/all 与 /aggregated/.../all 均 404），
   // 需并发拉 5 个单类型再合并。type → 中文标签，归一化后写入 item.type 供前端类型徽章渲染。
@@ -98,10 +99,7 @@ export class WikipediaService implements TopicSourceAdapter {
     holidays: '节日',
   };
 
-  constructor(
-    private readonly config: ConfigService,
-    private readonly redis: RedisService,
-  ) {
+  constructor(private readonly config: ConfigService) {
     this.proxyEnabled =
       (
         this.config.get<string>('WIKIPEDIA_PROXY_ENABLED') || ''
@@ -201,19 +199,19 @@ export class WikipediaService implements TopicSourceAdapter {
     const cacheKey = `wiki:otd:${cfg.lang}:${cfg.variant || 'default'}:${month}-${day}`;
 
     let items: WikiTopicItem[] = [];
-    const cached = await this.redis.get(cacheKey);
+    const cached = this.cache.get(cacheKey);
     let cacheHit = false;
     if (cached) {
       try {
         items = JSON.parse(cached) as WikiTopicItem[];
         cacheHit = true;
       } catch (err) {
-        // 缓存值损坏（非 JSON）—— 当作未命中：删脏值、回源重取、重写缓存，
+        // 缓存值损坏（非 JSON）-- 当作未命中：删脏值、回源重取、重写缓存，
         // 避免 86400s TTL 内同一 key 每次请求都抛 500。
         this.logger.warn(
           `缓存值损坏，丢弃并重新拉取: key=${cacheKey} err=${(err as Error).message}`,
         );
-        await this.redis.del(cacheKey);
+        this.cache.del(cacheKey);
       }
     }
     if (!cacheHit) {
@@ -225,9 +223,9 @@ export class WikipediaService implements TopicSourceAdapter {
         day,
       );
       items = this.normalizeAll(typeResults);
-      // 按 heatScore 倒序 —— 最新且相关词条最多的事件排前面
+      // 按 heatScore 倒序 -- 最新且相关词条最多的事件排前面
       items.sort((a, b) => b.heatScore - a.heatScore);
-      await this.redis.set(
+      this.cache.set(
         cacheKey,
         JSON.stringify(items),
         WikipediaService.CACHE_TTL,

@@ -7,9 +7,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
-import { userActiveCacheKey } from '../common/user-active.util';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
@@ -21,21 +19,14 @@ import * as bcrypt from 'bcryptjs';
 describe('UsersService', () => {
   let service: UsersService;
   let prisma: ReturnType<typeof createMockPrismaService>;
-  let redis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
-    redis = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      del: jest.fn().mockResolvedValue(undefined),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: PrismaService, useValue: prisma },
-        { provide: RedisService, useValue: redis },
       ],
     }).compile();
 
@@ -206,7 +197,7 @@ describe('UsersService', () => {
   });
 
   describe('setStatus', () => {
-    it('should disable a user and invalidate the active cache', async () => {
+    it('should disable a user', async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser({ isActive: true }));
       prisma.user.update.mockResolvedValue(mockUser({ isActive: false }));
 
@@ -221,11 +212,10 @@ describe('UsersService', () => {
         data: { isActive: false },
         select: expect.any(Object),
       });
-      expect(redis.del).toHaveBeenCalledWith(userActiveCacheKey('user-id'));
       expect(result.isActive).toBe(false);
     });
 
-    it('should enable a user and invalidate the active cache', async () => {
+    it('should enable a user', async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser({ isActive: false }));
       prisma.user.update.mockResolvedValue(mockUser({ isActive: true }));
 
@@ -235,7 +225,6 @@ describe('UsersService', () => {
         'admin-id',
       );
 
-      expect(redis.del).toHaveBeenCalledWith(userActiveCacheKey('user-id'));
       expect(result.isActive).toBe(true);
     });
 

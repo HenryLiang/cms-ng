@@ -14,7 +14,7 @@ import {
   PipelineContext,
   StepTraceEntry,
 } from './step.interface';
-import { RedisService } from '../../redis/redis.service';
+import { MemoryLockService } from './memory-lock.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { BillingService } from '../../billing/billing.service';
 import { TopicCollectionStep } from './steps/topic-collection.step';
@@ -55,7 +55,7 @@ export class PipelineService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
-    private redis: RedisService,
+    private lock: MemoryLockService,
     private billingService: BillingService,
     @Inject(forwardRef(() => AutoPublishSchedulerService))
     private scheduler: AutoPublishSchedulerService,
@@ -131,27 +131,22 @@ export class PipelineService {
       return;
     }
 
-    // Acquire concurrency lock to prevent duplicate runs
+    // Acquire concurrency lock to prevent duplicate runs.
+    // In-process mutex (single-instance deployment); equivalent to the old
+    // Redis SET NX lock with TTL-based self-healing on crash.
     const lockKey = `auto-publish:task:${taskId}`;
-    const lockAcquired = await this.redis.acquireLock(lockKey, 600); // 10 min TTL
+    const lockAcquired = this.lock.acquireLock(lockKey, 600); // 10 min TTL
     if (!lockAcquired) {
-      // 区分两种场景：Redis 不可用 (fail-closed) vs. 同任务并发去重
-      if (!this.redis.isAvailable) {
-        this.logger.error(
-          `Task ${taskId} BLOCKED: Redis unavailable, fail-closed lock denied (${triggerType})`,
-        );
-      } else {
-        this.logger.warn(
-          `Task ${taskId} is already running — skipping duplicate trigger`,
-        );
-      }
+      this.logger.warn(
+        `Task ${taskId} is already running - skipping duplicate trigger (${triggerType})`,
+      );
       return;
     }
 
     try {
       await this.executeRun(task, triggerType);
     } finally {
-      await this.redis.releaseLock(lockKey);
+      this.lock.releaseLock(lockKey);
     }
   }
 
@@ -289,9 +284,10 @@ export class PipelineService {
    * Unlike runTask, this only processes one article, not the full batch.
    */
   async retrySingleArticle(articleId: string): Promise<void> {
-    // Check kill switch
-    const killSwitchActive =
-      (await this.redis.get('auto-publish:kill-switch')) === 'true';
+    // Check kill switch - MySQL is the source of truth (issue #48 P0).
+    // Previously this read a Redis key with a mismatched value ('true' vs
+    // written '1') and never matched; now consistent with runTask's check.
+    const killSwitchActive = await this.scheduler.isKillSwitchActive();
     if (killSwitchActive) {
       this.logger.warn(
         `Kill switch active — skipping retry for article ${articleId}`,

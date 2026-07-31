@@ -6,7 +6,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { TwitterService } from './twitter.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { BillingService } from '../billing/billing.service';
 
 // Mock undici ProxyAgent (dynamic import in service)
@@ -17,7 +16,6 @@ jest.mock('undici', () => ({
 describe('TwitterService', () => {
   let service: TwitterService;
   let prisma: { twitterWatchAccount: any };
-  let redis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let billing: {
     isEnabled: jest.Mock;
     getConfig: jest.Mock;
@@ -38,11 +36,6 @@ describe('TwitterService', () => {
         delete: jest.fn(),
       },
     };
-    redis = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      del: jest.fn().mockResolvedValue(undefined),
-    };
     billing = {
       isEnabled: jest.fn().mockReturnValue(true),
       getConfig: jest.fn().mockResolvedValue({ unitPrice: 0.05 }),
@@ -54,7 +47,6 @@ describe('TwitterService', () => {
       providers: [
         TwitterService,
         { provide: PrismaService, useValue: prisma },
-        { provide: RedisService, useValue: redis },
         { provide: BillingService, useValue: billing },
         {
           provide: ConfigService,
@@ -91,7 +83,10 @@ describe('TwitterService', () => {
   });
 
   it('describes X sources and dispatches a generic source query', async () => {
-    redis.get.mockResolvedValue(JSON.stringify([]));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ trends: [] }),
+    });
     prisma.twitterWatchAccount.findMany.mockResolvedValue([
       { userName: 'openai', displayName: 'OpenAI' },
     ]);
@@ -121,7 +116,6 @@ describe('TwitterService', () => {
         options: [{ value: 'openai', label: '@openai · OpenAI' }],
       }),
     );
-    expect(redis.get).toHaveBeenCalledWith('x:trends:23424977');
     expect(page).toEqual(expect.objectContaining({ page: 2, limit: 5 }));
   });
 
@@ -132,7 +126,6 @@ describe('TwitterService', () => {
         providers: [
           TwitterService,
           { provide: PrismaService, useValue: prisma },
-          { provide: RedisService, useValue: redis },
           { provide: BillingService, useValue: billing },
           { provide: ConfigService, useValue: { get: () => undefined } },
         ],
@@ -145,11 +138,10 @@ describe('TwitterService', () => {
 
     it('returns cached trends without calling API or charging', async () => {
       const cached = [{ title: '#cached', source: 'x-trends' }];
-      redis.get.mockResolvedValue(JSON.stringify(cached));
+      (service as any).cache.set('x:trends:1', JSON.stringify(cached), 600);
 
       const result = await service.fetchTrends('u1', 1, 1, 10);
 
-      expect(redis.get).toHaveBeenCalledWith('x:trends:1');
       expect(fetchMock).not.toHaveBeenCalled();
       expect(billing.deduct).not.toHaveBeenCalled();
       expect(result.items).toEqual(cached);
@@ -190,12 +182,8 @@ describe('TwitterService', () => {
         'https://api.twitterapi.io/twitter/trends?woeid=1',
         expect.objectContaining({ headers: { 'x-api-key': 'test-key' } }),
       );
-      // Cached
-      expect(redis.set).toHaveBeenCalledWith(
-        'x:trends:1',
-        expect.any(String),
-        600,
-      );
+      // Cached into the in-memory cache
+      expect((service as any).cache.get('x:trends:1')).not.toBeNull();
       // Normalized — rank-based heatScore: rank 1 → 99, rank 5 → 95
       expect(result.items).toHaveLength(2);
       expect(result.items[0]).toMatchObject({
@@ -312,21 +300,16 @@ describe('TwitterService', () => {
     });
 
     it('strips leading @ from userName and lowercases cache key', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            status: 'success',
-            msg: 'success',
-            data: { tweets: [] },
-          }),
-      });
-      await service.fetchAccountTweets('@ElonMusk', 5, 'u1', true);
-      expect(redis.set).toHaveBeenCalledWith(
+      // Pre-seed the lowercase key; a hit means we never call fetch, proving
+      // '@ElonMusk' was normalized to 'elonmusk' for the cache lookup.
+      (service as any).cache.set(
         'x:acct:elonmusk',
-        expect.any(String),
+        JSON.stringify([{ title: 'x', source: 'elonmusk' }]),
         300,
       );
+      const items = await service.fetchAccountTweets('@ElonMusk', 5, 'u1', true);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(items).toHaveLength(1);
     });
 
     it('throws BadRequestException for empty userName', async () => {
@@ -371,7 +354,7 @@ describe('TwitterService', () => {
 
     it('serves from aggregate cache without charging', async () => {
       const cached = [{ title: 'cached tweet', source: 'someacct' }];
-      redis.get.mockResolvedValue(JSON.stringify(cached));
+      (service as any).cache.set('x:accounts:all', JSON.stringify(cached), 300);
       const result = await service.fetchAggregatedAccounts('u1', 1, 20);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(billing.deduct).not.toHaveBeenCalled();

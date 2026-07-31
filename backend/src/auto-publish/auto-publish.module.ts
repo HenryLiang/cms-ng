@@ -4,6 +4,7 @@ import { AutoPublishController } from './auto-publish.controller';
 import { AutoPublishService } from './auto-publish.service';
 import { AutoPublishSchedulerService } from './auto-publish-scheduler.service';
 import { PipelineService } from './pipeline/pipeline.service';
+import { MemoryLockService } from './pipeline/memory-lock.service';
 import { TopicCollectionStep } from './pipeline/steps/topic-collection.step';
 import { ResearchStep } from './pipeline/steps/research.step';
 import { ArticleGenerationStep } from './pipeline/steps/article-generation.step';
@@ -23,6 +24,7 @@ import { BillingModule } from '../billing/billing.module';
     AutoPublishService,
     AutoPublishSchedulerService,
     PipelineService,
+    MemoryLockService,
     BillingCheckStep,
     TopicCollectionStep,
     ResearchStep,

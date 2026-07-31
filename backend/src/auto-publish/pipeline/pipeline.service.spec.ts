@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { RedisService } from '../../redis/redis.service';
+import { MemoryLockService } from './memory-lock.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { PipelineService } from './pipeline.service';
 import { PipelineStep, PipelineContext } from './step.interface';
@@ -73,10 +73,9 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
     }),
   };
 
-  const mockRedis = {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn().mockResolvedValue(true),
-    isAvailable: true,
+  const mockLock = {
+    acquireLock: jest.fn().mockReturnValue(true),
+    releaseLock: jest.fn().mockReturnValue(undefined),
   };
 
   const mockScheduler = {
@@ -140,7 +139,7 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
         PipelineService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: RedisService, useValue: mockRedis },
+        { provide: MemoryLockService, useValue: mockLock },
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: BillingService, useValue: billingService },
         { provide: BillingCheckStep, useValue: billingCheckStep },
@@ -334,10 +333,9 @@ describe('PipelineService - kill switch mid-batch interruption (issue #115)', ()
           : defaultValue,
     ),
   };
-  const mockRedis = {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn().mockResolvedValue(true),
-    isAvailable: true,
+  const mockLock = {
+    acquireLock: jest.fn().mockReturnValue(true),
+    releaseLock: jest.fn().mockReturnValue(undefined),
   };
   const mockScheduler = {
     isKillSwitchActive: jest.fn().mockResolvedValue(false),
@@ -389,7 +387,7 @@ describe('PipelineService - kill switch mid-batch interruption (issue #115)', ()
         PipelineService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: RedisService, useValue: mockRedis },
+        { provide: MemoryLockService, useValue: mockLock },
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: BillingService, useValue: billingService },
         { provide: BillingCheckStep, useValue: billingCheckStep },

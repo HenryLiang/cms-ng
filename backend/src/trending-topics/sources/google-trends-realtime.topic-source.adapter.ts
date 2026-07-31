@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Browser } from 'playwright';
-import { RedisService } from '../../redis/redis.service';
 import { RssTopicSourceAdapter } from './rss-topic-source.adapter';
+import { InMemoryCache } from './in-memory-cache';
 import type { TopicSourceAdapter } from './topic-source.adapter';
 import type {
   TopicCandidate,
@@ -31,7 +31,7 @@ import type {
  *   不崩 boot、idle 10min 回收、并发信号量限流。
  * - PLAYWRIGHT_ENABLED=false / 缺 Chromium 时 visible:false 且 fail-open 回退
  *   到 RSS 每日源（status:'degraded'），绝不崩溃后端。
- * - 缓存走 Redis（gt:realtime:{geo}:{hours}，TTL 默认 60s），存全量列表让
+ * - 缓存走进程内内存（gt:realtime:{geo}:{hours}，TTL 默认 60s），存全量列表让
  *   paginate 切片，不按 page 驱动浏览器导航。
  */
 @Injectable()
@@ -45,6 +45,7 @@ export class GoogleTrendsRealtimeAdapter
   private readonly fallbackToRss: boolean;
   private readonly cacheTtl: number;
   private readonly defaultHours: number;
+  private readonly cache = new InMemoryCache();
 
   private browser: Browser | null = null;
   private launchPromise: Promise<Browser | null> | null = null;
@@ -83,7 +84,6 @@ export class GoogleTrendsRealtimeAdapter
 
   constructor(
     private readonly config: ConfigService,
-    private readonly redis: RedisService,
     private readonly rssAdapter: RssTopicSourceAdapter,
   ) {
     this.enabled =
@@ -177,7 +177,7 @@ export class GoogleTrendsRealtimeAdapter
     }
 
     const cacheKey = `gt:realtime:${geo || 'global'}:${hours}`;
-    const cached = await this.redis.get(cacheKey);
+    const cached = this.cache.get(cacheKey);
     if (cached) {
       try {
         const items = JSON.parse(cached) as TopicCandidate[];
@@ -193,7 +193,7 @@ export class GoogleTrendsRealtimeAdapter
     });
 
     if (items && items.length > 0) {
-      await this.redis.set(cacheKey, JSON.stringify(items), this.cacheTtl);
+      this.cache.set(cacheKey, JSON.stringify(items), this.cacheTtl);
       return this.paginate(items, query.page, query.limit);
     }
 

@@ -3,7 +3,6 @@ import { validateEnv, formatValidationErrors } from './env.validation';
 
 const goodBase = {
   DATABASE_URL: 'mysql://root:root123@localhost:3306/cms_ng',
-  REDIS_URL: 'redis://localhost:6379',
   JWT_SECRET: 'a'.repeat(32),
   AI_PROVIDER: 'deepseek',
   DEEPSEEK_API_KEY: 'sk-test',
@@ -112,8 +111,8 @@ describe('validateEnv', () => {
     const r = validateEnv({ JWT_SECRET: 'short' });
     expect(r.success).toBe(false);
     if (!r.success) {
-      // Should report missing DATABASE_URL, missing REDIS_URL, short JWT_SECRET
-      expect(r.errors.length).toBeGreaterThanOrEqual(3);
+      // Should report missing DATABASE_URL, short JWT_SECRET
+      expect(r.errors.length).toBeGreaterThanOrEqual(2);
     }
   });
 

@@ -287,9 +287,9 @@ test.describe('auto-publish — §4.2 manual trigger & controls', () => {
     const runBody = await run.json();
     expect(runBody).toMatchObject({ message: 'Manual run triggered', taskId: task.id });
 
-    // The pipeline is dispatched asynchronously: kill-switch check, Redis lock
-    // acquisition, and run-record creation all happen server-side AFTER the
-    // 200 response. Poll up to 15 s for the record to materialise.
+    // The pipeline is dispatched asynchronously: kill-switch check, in-process
+    // lock acquisition, and run-record creation all happen server-side AFTER
+    // the 200 response. Poll up to 15 s for the record to materialise.
     let listBody: any = null;
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 500));
@@ -305,26 +305,11 @@ test.describe('auto-publish — §4.2 manual trigger & controls', () => {
     expect(['RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED']).toContain(newRun.status);
   });
 
-  test('TC-AP-007 kill switch API contract (behavior check requires Redis)', async ({ api }) => {
+  test('TC-AP-007 kill switch API contract and behavior (MySQL-backed)', async ({ api }) => {
     const { token } = await loginByApi('admin');
 
-    // Pre-flight: detect whether the kill-switch can persist. The QA env in
-    // this run has Redis unavailable (RedisService.isAvailable === false →
-    // silent no-op), so enable + read-back may both be false. In that case
-    // we verify the API contract only and skip the behavior assertion.
-    const pre = await killSwitch(api, token, true);
-    expect(pre.status()).toBe(200);
-    const preBody = await pre.json();
-    await killSwitch(api, token, false); // always reset to a known-off state
-    const redisBacked = preBody.killSwitchActive === true;
-
-    if (!redisBacked) {
-      console.log('[TC-AP-007] Redis unavailable in QA — kill-switch cannot persist. Endpoint contract verified; behavior assertion skipped.');
-      test.skip(true, 'Redis unavailable in QA — kill-switch persistence cannot be tested');
-      return;
-    }
-
-    // Behaviour test path: Redis is healthy
+    // Kill switch is persisted in MySQL (KillSwitch singleton table). No Redis
+    // dependency remains, so the behavior path always runs.
     const create = await createTask(api, token, makeTask({ name: `${PREFIX}kill-${uniqueSuffix()}` }));
     const task = await create.json();
     createdTaskIds.push(task.id);

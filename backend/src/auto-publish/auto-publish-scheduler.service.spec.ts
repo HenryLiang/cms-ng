@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { AutoPublishSchedulerService } from './auto-publish-scheduler.service';
 import { PipelineService } from './pipeline/pipeline.service';
 
@@ -33,12 +32,6 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
     getCronJobs: jest.fn().mockReturnValue(new Map()),
   };
 
-  const mockRedis = {
-    get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue(undefined),
-    del: jest.fn().mockResolvedValue(undefined),
-  };
-
   const mockPipeline = {
     runTask: jest.fn().mockResolvedValue(undefined),
   };
@@ -48,7 +41,6 @@ describe('AutoPublishSchedulerService — timeToCron (issue #50)', () => {
       providers: [
         AutoPublishSchedulerService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: RedisService, useValue: mockRedis },
         { provide: SchedulerRegistry, useValue: mockSchedulerRegistry },
         { provide: PipelineService, useValue: mockPipeline },
       ],

@@ -69,7 +69,7 @@ async function main() {
   }
 
   // Make sure registration is OPEN so registration-switch test can toggle freely.
-  // Registration status is stored in Redis; we'll just note it for the runner.
+  // Registration status is stored in MySQL (RegistrationSwitch table).
   console.log('Done.');
   await prisma.$disconnect();
 }

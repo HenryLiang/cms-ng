@@ -11,7 +11,7 @@ cms-ng/
 ├── frontend/          # Next.js 16 + React 19 + Tailwind CSS v4
 ├── backend/           # NestJS 11 + Prisma ORM + MySQL 8
 ├── packages/shared/   # 前后端共享类型与常量
-└── docker-compose.yml # 仅编排 RSSHub（MySQL/Redis 为外部中间件）
+└── docker-compose.yml # 仅编排 RSSHub（MySQL 为外部中间件）
 ```
 
 | 层级        | 技术                                                              |
@@ -22,7 +22,6 @@ cms-ng/
 | UI 样式     | Tailwind CSS v4, Lucide Icons, TipTap 富文本编辑器                |
 | 后端框架    | NestJS 11, Express                                                |
 | ORM         | Prisma 6（MySQL 8，外部实例）                                    |
-| 缓存/队列   | Redis（ioredis，外部实例，fail-open）                             |
 | RSS 聚合    | RSSHub（dev 通过 compose 起 :1200，prod 走 `RSS_HUB_URL`）       |
 | AI 模型     | 可切换 Provider 抽象层：DeepSeek / Kimi / OpenAI（OpenAI 兼容协议）|
 | AI 工具     | Tavily 联网搜索（SEARCH_PROVIDER=tavily）                         |
@@ -55,7 +54,6 @@ cms-ng/
 
 - Node.js >= 20
 - 外部 MySQL 8 实例（自管或云 RDS）
-- 外部 Redis 实例（自管或云托管）
 - Docker & Docker Compose（仅用于 RSSHub 聚合代理及生产应用容器）
 - AI Provider 至少一个的 API Key：DeepSeek（默认） / Kimi / OpenAI 三选一
 
@@ -72,7 +70,6 @@ npm install
 确保以下中间件已可访问：
 
 - **MySQL 8** — 在外部主机/容器/云 RDS 上启动，建好数据库 `cms_ng`（root 用户或专用账号皆可）
-- **Redis** — 任意可达的 Redis 实例
 - **RSSHub**（可选，用于 trending-topics 抓取国内 RSS 源）：
 
 ```bash
@@ -97,7 +94,7 @@ RSSHub 启动于 `localhost:1200`。如果你的部署环境已有独立 RSSHub�
 ```bash
 # 后端
 cp backend/.env.example backend/.env
-# 编辑 backend/.env：填入 DATABASE_URL / REDIS_URL / JWT_SECRET / 所选 AI Provider 的 API Key
+# 编辑 backend/.env：填入 DATABASE_URL / JWT_SECRET / 所选 AI Provider 的 API Key
 
 # 前端
 cp frontend/.env.example frontend/.env.local
@@ -111,7 +108,6 @@ cp frontend/.env.example frontend/.env.local
 # ===== 后端：必改（backend/.env） =====
 # 数据库与缓存（外部中间件）
 DATABASE_URL="mysql://USER:PASS@HOST:3306/cms_ng"      # 密码含 @ 必须 URL-encode 为 %40
-REDIS_URL="redis://HOST:6379"                          # 带密码: redis://:PASS@HOST:6379
 
 # 应用秘钥
 JWT_SECRET="change-me-in-production"                    # 32 字节以上随机串
@@ -275,7 +271,7 @@ BillingConfig        (各操作单价配置，category + itemKey 唯一)
 BillingTransaction   ──1:1── AIOperation           # AI 操作 → 计费流水
                      ──1:1── PlatformPublish       # 平台发布 → 计费流水
                      ──1:1── TopUpRecord           # 充值 → 计费流水
-KillSwitch           (紧急杀戮开关单例表，issue #48 P0 修复，MySQL 真源 + Redis 缓存)
+KillSwitch           (紧急杀戮开关单例表，issue #48 P0 修复，MySQL 真源)
 ```
 
 完整 Schema 见 `backend/prisma/schema.prisma`（15 张表）。
@@ -351,7 +347,6 @@ cms-ng/
 │   │   │   └── auto-publish.controller.ts          # 任务/执行/kill-switch
 │   │   ├── billing/                   # 计费系统（流水 / 充值 / 支付宝 / 微信支付 / 余额预警）
 │   │   ├── storage/                   # 腾讯云 COS 对象存储
-│   │   ├── redis/                     # RedisService（ioredis，fail-open）
 │   │   ├── prisma/                    # PrismaService 单例
 │   │   └── common/                    # 守卫 / 拦截器 / 过滤器 / 测试工具 / json.utils
 │   └── prisma/
@@ -435,7 +430,7 @@ cms-ng/
 nginx (80/443) ──┬──> 127.0.0.1:3000  (frontend, next start)
                  └──> 127.0.0.1:3001  (backend, node dist/src/main)
 rsshub (docker, :1200)
-MySQL / Redis     (外部中间件)
+MySQL             (外部中间件)
 ```
 
 ### 2. 部署前必备
@@ -445,8 +440,7 @@ MySQL / Redis     (外部中间件)
 | Node.js ≥ 20 | 宿主机直接运行 backend (`node dist/src/main`) 与 frontend (`next start`) |
 | nginx        | 反代 `:80`/`:443` → `127.0.0.1:3000` / `127.0.0.1:3001`（站点配置示例见下方第 6 节） |
 | 外部 MySQL 8 | 已建库 `cms_ng`，账号可远程连接                                  |
-| 外部 Redis   | 可选密码，URL 通过 `REDIS_URL` 注入                              |
-| `backend/.env` | 必须含 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET` 及所选 AI Provider 的 API Key |
+| `backend/.env` | 必须含 `DATABASE_URL` / `JWT_SECRET` 及所选 AI Provider 的 API Key |
 | Docker       | 仅用于 RSSHub 容器（`docker-compose.yml`）                       |
 
 > 脚本会 `grep -E "^${var}="` 校验 `backend/.env` 是否含必要变量，缺失即 fail-fast。
@@ -475,7 +469,7 @@ diff backend/.env.example backend/.env
 
 脚本自动完成的 7 个步骤：
 
-1. **前置检查** — node 可用、`backend/.env` 存在且含 `DATABASE_URL`/`REDIS_URL`/`JWT_SECRET`
+1. **前置检查** — node 可用、`backend/.env` 存在且含 `DATABASE_URL`/`JWT_SECRET`
 2. **构建** — `shared` → `backend` (nest build) → `frontend` (next build)
 3. **停止旧进程** — 按 PID 文件停 backend/frontend，并 pkill 兜底清理遗留进程
 4. **启动** — backend (`nohup node dist/src/main`)、frontend (`nohup npm run start`) 为后台进程；`docker compose up -d` 拉起 RSSHub 容器
@@ -598,7 +592,7 @@ server {
 仓库内 Docker Compose **仅编排 RSSHub**（开发与生产共用 `docker-compose.yml`），**不编排应用本身与数据中间件**：
 
 - 应用（backend + frontend）以宿主机进程运行，由 nginx 反代
-- MySQL / Redis 为外部依赖，部署前先准备好
+- MySQL 为外部依赖，部署前先准备好
 - RSSHub 唯一进容器的应用层服务（`docker-compose.yml`，端口 `1200`）
 
 ---

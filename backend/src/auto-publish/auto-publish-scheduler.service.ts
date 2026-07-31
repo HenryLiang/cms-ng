@@ -10,7 +10,6 @@ import {
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob, validateCronExpression } from 'cron';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { PipelineService } from './pipeline/pipeline.service';
 import { AutoTaskStatus } from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
@@ -20,12 +19,10 @@ export class AutoPublishSchedulerService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(AutoPublishSchedulerService.name);
-  private static readonly KILL_SWITCH_KEY = 'auto-publish:kill-switch';
   private static readonly KILL_SWITCH_ID = 'auto-publish'; // KillSwitch 表的单例 id
 
   constructor(
     private prisma: PrismaService,
-    private redis: RedisService,
     private schedulerRegistry: SchedulerRegistry,
     @Inject(forwardRef(() => PipelineService))
     private pipelineService: PipelineService,
@@ -132,8 +129,8 @@ export class AutoPublishSchedulerService
   }
 
   /**
-   * Enable the kill switch — stops all scheduled and manual runs.
-   * MySQL 为唯一真源（issue #48 P0 修复），Redis 仅作 best-effort 缓存。
+   * Enable the kill switch - stops all scheduled and manual runs.
+   * MySQL 为唯一真源（issue #48 P0 修复）。
    */
   async enableKillSwitch(operatorId: string, reason?: string): Promise<void> {
     await this.prisma.killSwitch.upsert({
@@ -152,8 +149,6 @@ export class AutoPublishSchedulerService
         reason: reason ?? null,
       },
     });
-    // Redis 缓存失败不影响业务（DB 已是真源）
-    await this.redis.set(AutoPublishSchedulerService.KILL_SWITCH_KEY, '1');
     this.logger.warn(
       `Kill switch ENABLED by ${operatorId} (reason: ${reason || 'n/a'})`,
     );
@@ -176,13 +171,11 @@ export class AutoPublishSchedulerService
         reason: null,
       },
     });
-    await this.redis.del(AutoPublishSchedulerService.KILL_SWITCH_KEY);
     this.logger.log(`Kill switch DISABLED by ${operatorId}`);
   }
 
   /**
-   * 查询 kill switch 状态 — MySQL 为唯一真源（issue #48 P0 修复）。
-   * 不读 Redis，避免 Redis 不可用时返回错误结果。
+   * 查询 kill switch 状态 - MySQL 为唯一真源（issue #48 P0 修复）。
    */
   async isKillSwitchActive(): Promise<boolean> {
     const row = await this.prisma.killSwitch.findUnique({
