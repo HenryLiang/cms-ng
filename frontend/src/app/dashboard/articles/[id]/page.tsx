@@ -238,10 +238,14 @@ export default function ArticleEditorPage() {
   async function handleSave(status?: string) {
     setSaving(true);
     try {
+      // Read the live editor HTML directly (editor onChange is debounced 500ms,
+      // so the `content` state may lag the editor - issue #114). This guarantees
+      // Save always persists the latest edits regardless of debounce timing.
+      const latestContent = editorRef.current?.editor?.getHTML() ?? content;
       await updateArticle(articleId, {
         title,
         subtitle: subtitle || undefined,
-        content,
+        content: latestContent,
         excerpt: excerpt || undefined,
         status: status as ArticleStatus,
         contentLanguage,
