@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv, formatValidationErrors } from './config/env.validation';
@@ -35,6 +37,22 @@ import { MediaModule } from './media/media.module';
         return result.data as Record<string, unknown>;
       },
     }),
+    // Global rate limiting (issue #107). Defaults: 100 req/min per IP;
+    // auth endpoints override with tighter limits via @Throttle. Skipped in
+    // NODE_ENV=test so Jest e2e (which hammers login/register) stays stable —
+    // Jest sets NODE_ENV=test automatically.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: Number(config.get('THROTTLE_TTL_MS')) || 60_000,
+            limit: Number(config.get('THROTTLE_LIMIT')) || 100,
+          },
+        ],
+        skipIf: () => (config.get('NODE_ENV') ?? 'development') === 'test',
+      }),
+    }),
     PrismaModule,
     StorageModule,
     RedisModule,
@@ -51,6 +69,12 @@ import { MediaModule } from './media/media.module';
     MediaModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

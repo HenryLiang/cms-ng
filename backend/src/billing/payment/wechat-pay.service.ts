@@ -88,12 +88,16 @@ export class WechatPayService {
       );
     }
 
+    // Normalize to cents before persisting so the record matches what the
+    // user is actually charged (WeChat bills Math.round(amount*100) cents).
+    const orderAmount = Math.round(amount * 100) / 100;
+
     // Create TopUpRecord
     const record = await this.prisma.topUpRecord.create({
       data: {
         userId,
-        amount,
-        creditsAdded: amount,
+        amount: orderAmount,
+        creditsAdded: orderAmount,
         bonusCredits: 0,
         paymentMethod: PaymentMethod.WECHAT_PAY,
         status: TransactionStatus.PENDING,
@@ -107,7 +111,7 @@ export class WechatPayService {
         out_trade_no: record.id,
         notify_url: `${this.getNotifyUrl()}/billing/payment/wechat/notify`,
         amount: {
-          total: Math.round(amount * 100), // WeChat uses cents (分)
+          total: Math.round(orderAmount * 100), // WeChat uses cents (分)
           currency: 'CNY',
         },
       })) as WeChatOrderResponse;
@@ -179,9 +183,12 @@ export class WechatPayService {
             return { code: 'FAIL', message: 'Invalid signature' };
           }
         } else {
+          // issue #106 — fail closed: this endpoint is @Public, so a missing
+          // signature must be a rejection, not a skip.
           this.logger.warn(
-            'WeChat Pay notification missing signature headers, skipping verification',
+            'WeChat Pay notification missing signature headers, rejecting',
           );
+          return { code: 'FAIL', message: 'Missing signature headers' };
         }
       } catch (signError) {
         this.logger.error(
@@ -194,12 +201,16 @@ export class WechatPayService {
       let outTradeNo: string | undefined;
       let tradeState: string | undefined;
       let transactionId: string | undefined;
+      let paidTotalCents: number | undefined;
 
       try {
         const decrypted = this.wxPay.decipher_gcm<{
           out_trade_no: string;
           trade_state: string;
           transaction_id: string;
+          mchid?: string;
+          appid?: string;
+          amount?: { total?: number; payer_total?: number; currency?: string };
         }>(
           resource?.ciphertext ?? '',
           resource?.associated_data ?? '',
@@ -209,6 +220,18 @@ export class WechatPayService {
         outTradeNo = decrypted.out_trade_no;
         tradeState = decrypted.trade_state;
         transactionId = decrypted.transaction_id;
+        paidTotalCents = decrypted.amount?.total;
+
+        // Bind to THIS merchant (adversarial review, round 2): WeChat
+        // platform certificates are shared across merchants, so a
+        // signature-valid notification meant for another mchid must never
+        // touch our ledger.
+        if (decrypted.mchid !== this.mchId) {
+          this.logger.warn(
+            `WeChat Pay notification: mchid mismatch (got ${decrypted.mchid})`,
+          );
+          return { code: 'FAIL', message: 'Merchant mismatch' };
+        }
       } catch (decryptError) {
         this.logger.error(
           `WeChat Pay notification decryption failed: ${(decryptError as Error).message}`,
@@ -233,6 +256,19 @@ export class WechatPayService {
           return { code: 'FAIL', message: 'Order not found' };
         }
 
+        // issue #106 — verify the paid amount (cents) matches the recorded
+        // order before crediting; a mismatched amount must never credit.
+        if (
+          paidTotalCents === undefined ||
+          paidTotalCents !== Math.round(Number(record.amount) * 100)
+        ) {
+          this.logger.warn(
+            `WeChat Pay notification: amount mismatch for record=${record.id} ` +
+              `(notify=${paidTotalCents} cents, expected=${Math.round(Number(record.amount) * 100)} cents)`,
+          );
+          return { code: 'FAIL', message: 'Amount mismatch' };
+        }
+
         // Idempotent: already processed
         if (
           (record.status as TransactionStatus) === TransactionStatus.COMPLETED
@@ -243,17 +279,8 @@ export class WechatPayService {
           return { code: 'SUCCESS', message: 'OK' };
         }
 
-        // Update record status
-        await this.prisma.topUpRecord.update({
-          where: { id: record.id },
-          data: {
-            status: TransactionStatus.COMPLETED,
-            externalOrderId: transactionId,
-            paidAt: new Date(),
-          },
-        });
-
-        // Credit balance
+        // Credit FIRST (idempotent via idempotencyKey), then mark COMPLETED
+        // — same non-atomicity fix as the Alipay path.
         await this.billingService.credit({
           userId: record.userId,
           amount: Number(record.creditsAdded),
@@ -263,13 +290,26 @@ export class WechatPayService {
           idempotencyKey: `topup:${record.id}`,
         });
 
+        // Mark record as completed
+        await this.prisma.topUpRecord.update({
+          where: { id: record.id },
+          data: {
+            status: TransactionStatus.COMPLETED,
+            externalOrderId: transactionId,
+            paidAt: new Date(),
+          },
+        });
+
         this.logger.log(
           `WeChat Pay success: record=${record.id}, amount=${record.amount.toString()}`,
         );
       } else if (tradeState === 'CLOSED') {
+        // Only ever transition a PENDING order to FAILED — a replayed CLOSED
+        // notification must never overwrite a COMPLETED record (adversarial
+        // review, round 2).
         this.logger.log(`WeChat Pay closed: record=${outTradeNo}`);
-        await this.prisma.topUpRecord.update({
-          where: { id: outTradeNo },
+        await this.prisma.topUpRecord.updateMany({
+          where: { id: outTradeNo, status: TransactionStatus.PENDING },
           data: { status: TransactionStatus.FAILED },
         });
       } else if (tradeState === 'NOTPAY') {

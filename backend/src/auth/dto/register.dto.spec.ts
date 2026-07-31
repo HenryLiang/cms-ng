@@ -56,14 +56,21 @@ describe('RegisterDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('should fail with invalid role enum', async () => {
+  // issue #105 — role was removed from the DTO entirely: public registration
+  // must not accept a client-supplied role (mass assignment). There is no
+  // `role` validator on the DTO anymore, and at the HTTP layer the global
+  // ValidationPipe(whitelist) strips the field before it reaches the
+  // service; the service itself forces REPORTER (covered in
+  // auth.service.spec.ts).
+  it('should have no role validation rules (field removed from the contract)', async () => {
     const dto = createDto({
       email: 'test@example.com',
       name: 'Test',
       password: 'password123',
-      role: 'INVALID_ROLE',
+      role: 'ADMIN',
     });
     const errors = await validate(dto);
-    expect(errors.some((e) => e.property === 'role')).toBe(true);
+    expect(errors).toHaveLength(0);
+    expect(errors.some((e) => e.property === 'role')).toBe(false);
   });
 });

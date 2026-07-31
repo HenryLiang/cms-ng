@@ -704,6 +704,15 @@ export class BillingService {
    * Process a refund (admin only).
    */
   async refund(adminId: string, dto: CreateRefundDto) {
+    // Refund moves real balances — refuse to run while the billing ledger is
+    // disabled, otherwise the original transaction would be marked REFUNDED
+    // while deduct()/credit() silently no-op (adversarial review, round 2).
+    if (!this.billingEnabled) {
+      throw new BadRequestException(
+        'Billing is disabled (BILLING_ENABLED=false), cannot process refunds',
+      );
+    }
+
     const admin = await this.prisma.user.findUnique({
       where: { id: adminId },
       select: { role: true },
@@ -732,14 +741,38 @@ export class BillingService {
       );
     }
 
-    // Credit the refund
-    const transaction = await this.credit({
-      userId: original.userId,
-      amount: refundAmount,
-      type: TransactionType.REFUND,
-      description: `退款: ${dto.reason} (原交易: ${original.description})`,
-      idempotencyKey: `refund:${original.id}`,
-    });
+    // Refunding a top-up (money returned to the user's bank account) must
+    // REMOVE the credits from their balance; refunding a charge (AI op,
+    // publish fee…) ADDS them back. The old code always credited — refunding
+    // a TOP_UP literally doubled the user's money (adversarial review).
+    // Positive original amount = credit-type transaction (TOP_UP/REFUND/
+    // ADJUSTMENT-in); negative = charge.
+    const description = `退款: ${dto.reason} (原交易: ${original.description})`;
+    const transaction =
+      Number(original.amount) > 0
+        ? await this.deduct({
+            userId: original.userId,
+            amount: refundAmount,
+            type: TransactionType.REFUND,
+            category: BillingCategory.OTHER,
+            description,
+            idempotencyKey: `refund:${original.id}`,
+          })
+        : await this.credit({
+            userId: original.userId,
+            amount: refundAmount,
+            type: TransactionType.REFUND,
+            description,
+            idempotencyKey: `refund:${original.id}`,
+          });
+
+    if (!transaction) {
+      // deduct()/credit() return null when no ledger movement happened
+      // (non-positive amount). Never mark the original REFUNDED in that case.
+      throw new BadRequestException(
+        'Refund failed: no balance change was recorded',
+      );
+    }
 
     // Mark original as refunded
     await this.prisma.billingTransaction.update({

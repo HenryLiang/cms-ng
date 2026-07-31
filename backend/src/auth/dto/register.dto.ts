@@ -1,12 +1,5 @@
-import {
-  IsEmail,
-  IsString,
-  MinLength,
-  IsEnum,
-  IsOptional,
-} from 'class-validator';
+import { IsEmail, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
 
 export class RegisterDto {
   @ApiProperty({
@@ -34,13 +27,9 @@ export class RegisterDto {
   @MinLength(6)
   password: string;
 
-  @ApiProperty({
-    description: 'User role determining permissions',
-    enum: UserRole,
-    example: UserRole.REPORTER,
-    required: false,
-  })
-  @IsEnum(UserRole)
-  @IsOptional()
-  role?: UserRole;
+  // NOTE (issue #105): no `role` field on purpose. Public registration always
+  // creates a REPORTER; privileged accounts are provisioned out-of-band
+  // (admin bootstrap script / DB ops). (ValidationPipe whitelist would strip
+  // it anyway, but keeping it out of the DTO keeps it out of the API
+  // contract/Swagger.)
 }

@@ -3,12 +3,32 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+import type { Express } from 'express';
 import { AppModule } from './app.module';
 import { buildCorsOptions } from './common/cors.config';
 import type { Server } from 'http';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter());
+  // rawBody: true — the WeChat Pay notify callback verifies the signature
+  // over the RAW request body; a re-serialized parsed body would never
+  // match (issue #106 follow-up).
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(), {
+    rawBody: true,
+  });
+  // Production runs behind nginx (127.0.0.1 reverse proxy). Without
+  // 'trust proxy', req.ip is always 127.0.0.1 and the rate limiter
+  // (@nestjs/throttler tracks req.ip) degrades to one shared bucket for
+  // ALL users — a DoS lever. 'loopback' trusts only X-Forwarded-For set
+  // by the loopback proxy, not by arbitrary clients (adversarial review).
+  const expressApp = app.getHttpAdapter().getInstance() as Express;
+  expressApp.set('trust proxy', 'loopback');
+  const config = app.get(ConfigService);
+  const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
+  // Security headers (issue #107). CSP is disabled outside production because
+  // Swagger UI (dev-only) needs inline scripts/styles; the API itself serves
+  // JSON only, so default CSP in production is safe.
+  app.use(helmet({ contentSecurityPolicy: nodeEnv === 'production' }));
   // CORS: whitelist from CORS_ORIGINS env var. In dev, http://localhost:3000
   // is always allowed. In production, no whitelist = deny all cross-origin.
   app.enableCors(buildCorsOptions());
@@ -21,8 +41,6 @@ async function bootstrap() {
   // OpenAPI / Swagger UI — only in non-production. The dev/QA E2E
   // fixtures use it to discover endpoint contracts; production hides it
   // by not mounting the route at all.
-  const config = app.get(ConfigService);
-  const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
   if (nodeEnv !== 'production') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('CMS-NG API')

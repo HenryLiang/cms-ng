@@ -917,6 +917,85 @@ describe('BillingService', () => {
         service.refund('admin-1', { ...refundDto, refundAmount: 10 }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    // Adversarial-review regression: refunding a TOP_UP must REMOVE credits
+    // from the balance (money goes back to the user's bank). The old code
+    // credited — literally doubling the user's money.
+    it('should DEDUCT balance when refunding a top-up (positive original)', async () => {
+      prisma.user.findUnique.mockResolvedValueOnce({ role: UserRole.ADMIN }); // admin check
+      (prisma as any).billingTransaction.findUnique
+        .mockResolvedValueOnce(
+          mockTransaction({
+            id: 'orig-topup-1',
+            userId: 'user-1',
+            amount: '100.0000', // positive = TOP_UP
+            status: TransactionStatus.COMPLETED,
+            description: '支付宝充值',
+          }),
+        )
+        .mockResolvedValueOnce(null); // deduct idempotency check
+      (prisma as any).billingTransaction.update.mockResolvedValue({});
+
+      const tx = mockTxClient();
+      tx.$queryRaw.mockResolvedValue([{ balance: '150.0000' }]);
+      tx.billingTransaction.create.mockResolvedValue(
+        mockTransaction({
+          id: 'refund-tx-deduct',
+          type: TransactionType.REFUND,
+          amount: '-100.0000',
+        }),
+      );
+      prisma.$transaction.mockImplementation(async (fn) => fn(tx));
+
+      const result = await service.refund('admin-1', {
+        originalTransactionId: 'orig-topup-1',
+        reason: '用户提现',
+      });
+
+      expect(result.id).toBe('refund-tx-deduct');
+      // balance must DECREASE: 150 - 100 = 50
+      expect(tx.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { balance: 50 },
+      });
+      // recorded as a negative transaction
+      expect(tx.billingTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ amount: -100 }),
+        }),
+      );
+      expect((prisma as any).billingTransaction.update).toHaveBeenCalledWith({
+        where: { id: 'orig-topup-1' },
+        data: { status: TransactionStatus.REFUNDED },
+      });
+    });
+
+    it('should reject a top-up refund when the user already spent the credits', async () => {
+      prisma.user.findUnique.mockResolvedValueOnce({ role: UserRole.ADMIN });
+      (prisma as any).billingTransaction.findUnique
+        .mockResolvedValueOnce(
+          mockTransaction({
+            id: 'orig-topup-2',
+            userId: 'user-1',
+            amount: '100.0000',
+            status: TransactionStatus.COMPLETED,
+          }),
+        )
+        .mockResolvedValueOnce(null); // deduct idempotency check
+
+      const tx = mockTxClient();
+      tx.$queryRaw.mockResolvedValue([{ balance: '30.0000' }]); // spent most of it
+      prisma.$transaction.mockImplementation(async (fn) => fn(tx));
+
+      await expect(
+        service.refund('admin-1', {
+          originalTransactionId: 'orig-topup-2',
+          reason: '用户提现',
+        }),
+      ).rejects.toThrow(BadRequestException); // InsufficientBalanceException
+      // original must NOT be marked refunded when the deduct fails
+      expect((prisma as any).billingTransaction.update).not.toHaveBeenCalled();
+    });
   });
 
   // ─── checkAndAlertBalance ───

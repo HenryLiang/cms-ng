@@ -110,11 +110,6 @@ BACKEND_ENV="$BACKEND_DIR/.env"
 PROD_FRONTEND_PORT=3000
 PROD_BACKEND_PORT=3001
 
-# admin 账号
-ADMIN_EMAIL="admin@cms-ng.local"
-ADMIN_PASSWORD="123456"
-ADMIN_PASSWORD_HASH='$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS'
-
 # backend/.env 中必须存在的变量
 REQUIRED_ENV_VARS=(DATABASE_URL REDIS_URL JWT_SECRET)
 
@@ -301,14 +296,35 @@ prod_build() {
 
     echo "[2/7] 构建 (可能需要 3-10 分钟)..."
 
+    # 部署机不会自己装依赖:新代码引入的新包(如 helmet/@nestjs/throttler)
+    # 不在旧 node_modules 里,缺了会在启动时才崩。每次发布先按 lockfile 同步。
+    echo "        同步依赖 (npm ci)..."
+    if ! (cd "$PROJECT_DIR" && npm ci >/tmp/cms-ng-build.log 2>&1); then
+        echo "        ✗ npm ci 失败,日志末尾:"
+        tail -n 20 /tmp/cms-ng-build.log
+        exit 1
+    fi
+
     echo "        构建 shared..."
-    cd "$PROJECT_DIR/packages/shared" && npm run build >/dev/null 2>&1
+    if ! (cd "$PROJECT_DIR/packages/shared" && npm run build >/tmp/cms-ng-build.log 2>&1); then
+        echo "        ✗ shared 构建失败,日志末尾:"
+        tail -n 20 /tmp/cms-ng-build.log
+        exit 1
+    fi
 
     echo "        构建 backend..."
-    cd "$BACKEND_DIR" && npm run build >/dev/null 2>&1
+    if ! (cd "$BACKEND_DIR" && npm run build >/tmp/cms-ng-build.log 2>&1); then
+        echo "        ✗ backend 构建失败,日志末尾:"
+        tail -n 20 /tmp/cms-ng-build.log
+        exit 1
+    fi
 
     echo "        构建 frontend..."
-    cd "$FRONTEND_DIR" && npm run build >/dev/null 2>&1
+    if ! (cd "$FRONTEND_DIR" && npm run build >/tmp/cms-ng-build.log 2>&1); then
+        echo "        ✗ frontend 构建失败,日志末尾:"
+        tail -n 20 /tmp/cms-ng-build.log
+        exit 1
+    fi
 
     echo "        构建完成"
 }
@@ -352,7 +368,9 @@ prod_start_apps() {
     echo "[4/7] 启动应用..."
 
     cd "$BACKEND_DIR"
-    nohup node dist/src/main > "$BACKEND_LOG_FILE" 2>&1 &
+    # NODE_ENV=production: Swagger 不挂载、helmet CSP 生效(main.ts 依赖此判断)。
+    # 不设置时后端按 development 运行,生产会意外暴露 /api-docs。
+    NODE_ENV=production nohup node dist/src/main > "$BACKEND_LOG_FILE" 2>&1 &
     echo $! > "$BACKEND_PID_FILE"
     echo "        backend  PID: $(cat "$BACKEND_PID_FILE")  日志: $BACKEND_LOG_FILE"
 
@@ -416,22 +434,31 @@ prod_health() {
 prod_init_admin() {
     echo "[7/7] 初始化 admin 账号..."
 
-    if ! curl -s -o /dev/null "http://localhost:${PROD_BACKEND_PORT}/users" 2>/dev/null; then
-        echo "        Warning: backend 未就绪，跳过 admin 初始化"
+    # 安全基线(issue #105 后续):公开注册接口永远只创建 REPORTER,admin 必须由
+    # 本机脚本直写 DB(backend/scripts/create-admin.ts)。仅在显式提供
+    # ADMIN_BOOTSTRAP_PASSWORD 时执行,避免每次发布都确保一个"公开仓库里的
+    # 已知凭证账号"存在(红队审查发现)。
+    local bootstrap_email="$1"
+    local bootstrap_password="$2"
+    if [ -z "$bootstrap_password" ]; then
+        echo "        跳过: 未设置 ADMIN_BOOTSTRAP_PASSWORD"
+        echo "        初始化/重置 admin: ADMIN_BOOTSTRAP_EMAIL=ops@example.com ADMIN_BOOTSTRAP_PASSWORD='强密码' $0 start --prod --no-build"
         return
     fi
 
-    local http_code
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:${PROD_BACKEND_PORT}/auth/register" \
-        -H "Content-Type: application/json" \
-        -d "{\"email\":\"$ADMIN_EMAIL\",\"name\":\"Super Admin\",\"password\":\"$ADMIN_PASSWORD\",\"role\":\"ADMIN\"}")
-
-    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ]; then
-        echo "        Admin 账号已创建: $ADMIN_EMAIL"
-    elif [ "$http_code" = "409" ]; then
-        echo "        Admin 账号已存在: $ADMIN_EMAIL"
+    cd "$BACKEND_DIR"
+    # 优先运行构建产物:ts-node 是 devDependency,生产环境未必可用
+    # (红队审查 round 2)。dist/scripts/create-admin.js 由 nest build 生成。
+    local runner="npx ts-node scripts/create-admin.ts"
+    if [ -f "dist/scripts/create-admin.js" ]; then
+        runner="node dist/scripts/create-admin.js"
+    fi
+    if ADMIN_EMAIL="${bootstrap_email:-admin@cms-ng.local}" \
+       ADMIN_PASSWORD="$bootstrap_password" \
+       $runner; then
+        echo "        Admin 账号已就绪(密码未记录于日志)"
     else
-        echo "        Warning: Admin 注册返回 HTTP $http_code"
+        echo "        Warning: admin 初始化失败,可稍后手动执行上面的命令"
     fi
 }
 
@@ -441,13 +468,20 @@ start_prod() {
     echo "  Time: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "========================================"
 
+    # 捕获引导凭证后立即从环境移除:否则它们会随环境变量传给长驻的
+    # node/next 进程,任何能读 /proc/<pid>/environ 的人都能拿到明文密码
+    # (红队审查 round 2)。之后通过函数参数传递,不再依赖环境。
+    local bootstrap_email="${ADMIN_BOOTSTRAP_EMAIL:-}"
+    local bootstrap_password="${ADMIN_BOOTSTRAP_PASSWORD:-}"
+    unset ADMIN_BOOTSTRAP_EMAIL ADMIN_BOOTSTRAP_PASSWORD
+
     prod_preflight
     prod_build "$@"
     prod_stop_apps
     prod_start_apps
     prod_migrate
     prod_health
-    prod_init_admin
+    prod_init_admin "$bootstrap_email" "$bootstrap_password"
 
     echo ""
     echo "========================================"
