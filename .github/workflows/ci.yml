@@ -77,8 +77,9 @@ jobs:
   e2e:
     name: Backend E2E (real MySQL + Redis)
     runs-on: ubuntu-latest
-    # CI 初期非阻断:e2e 需真实 MySQL 迁移 + 可能依赖外部 AI 服务,稳定后再设为必需
-    continue-on-error: true
+    # e2e 是真实阻断关卡,不再 continue-on-error 掩盖 conclusion(消除绿灯幻觉)。
+    # 套件为 Auth/Stories/Articles 纯 CRUD(无外部 AI 调用,确定性),红了就该红。
+    # 是否 required(阻断合并)由分支保护单独控制,此处只保证 conclusion 诚实。
     services:
       mysql:
         image: mysql:8.0
@@ -112,6 +113,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build --workspace=@cms-ng/shared
+      # migrate deploy 不生成 Client:e2e 要 import @prisma/client(PrismaService),
+      # 必须先 prisma generate,否则 AppModule 编译/启动即失败——e2e 一直红的根因之一
+      - name: Generate Prisma Client
+        run: cd backend && npx prisma generate
       - name: Apply migrations
         run: cd backend && npx prisma migrate deploy
       - name: Run E2E

@@ -39,7 +39,7 @@ set -e
 #
 #   4. 执行完整发布:
 #        ./scripts/cms-ng-service.sh start --prod
-#      脚本自动完成: 前置检查 -> 构建 -> 停旧 -> 启动 -> 迁移 -> 健康检查 -> admin
+#      脚本自动完成: 前置检查 -> 构建 -> 停旧 -> 迁移 -> 启动 -> 健康检查 -> admin
 #
 #   5. 验证:
 #        ./scripts/cms-ng-service.sh status --prod
@@ -73,8 +73,9 @@ set -e
 #                .env 变量缺失、DATABASE_URL 不可达
 #
 #   Q: 数据库迁移失败
-#   A: 脚本不会中断 (Warning 提示)，可手动重试:
-#        cd backend && npx prisma migrate deploy
+#   A: 脚本会中止发布 (exit 1)。迁移在启动前执行，不会出现新代码对旧 schema 运行。
+#      此时应用已停 (未启动新版本)，修复后重跑: ./scripts/cms-ng-service.sh start --prod
+#      可手动重试迁移: cd backend && npx prisma migrate deploy
 #      若需创建新迁移 (仅开发环境): npx prisma migrate dev --name <描述>
 #
 #   Q: frontend 容器/进程起来但页面 502
@@ -365,7 +366,7 @@ prod_stop_apps() {
 }
 
 prod_start_apps() {
-    echo "[4/7] 启动应用..."
+    echo "[5/7] 启动应用..."
 
     cd "$BACKEND_DIR"
     # NODE_ENV=production: Swagger 不挂载、helmet CSP 生效(main.ts 依赖此判断)。
@@ -385,28 +386,18 @@ prod_start_apps() {
 }
 
 prod_migrate() {
-    echo "[5/7] 数据库迁移 (prisma migrate deploy)..."
+    echo "[4/7] 数据库迁移 (prisma migrate deploy)..."
 
-    local ready=false
-    for i in $(seq 1 15); do
-        if curl -s -o /dev/null "http://localhost:${PROD_BACKEND_PORT}/users" 2>/dev/null; then
-            ready=true
-            break
-        fi
-        sleep 2
-    done
-
-    if [ "$ready" != "true" ]; then
-        echo "        Warning: backend 未就绪，跳过迁移"
-        echo "               可手动执行: cd backend && npx prisma migrate deploy"
-        return
-    fi
-
+    # 迁移在启动应用之前执行: prisma migrate deploy 直连 DATABASE_URL，
+    # 不依赖 backend 进程就绪。失败必须 exit 1 中断发布，
+    # 避免新代码对旧 schema 运行 / 迁移失败假成功。
     cd "$BACKEND_DIR"
     if npx prisma migrate deploy 2>&1; then
         echo "        迁移完成"
     else
-        echo "        Warning: 迁移失败 (常见原因: DATABASE_URL 不可达)"
+        echo "        Error: 数据库迁移失败 (常见原因: DATABASE_URL 不可达 / 迁移 SQL 错误)"
+        echo "               发布中止。此时应用已停，修复后重跑: ./scripts/cms-ng-service.sh start --prod"
+        exit 1
     fi
 }
 
@@ -478,8 +469,8 @@ start_prod() {
     prod_preflight
     prod_build "$@"
     prod_stop_apps
-    prod_start_apps
     prod_migrate
+    prod_start_apps
     prod_health
     prod_init_admin "$bootstrap_email" "$bootstrap_password"
 
