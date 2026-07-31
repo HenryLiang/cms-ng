@@ -292,3 +292,218 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
     expect(articleTableCalls).toHaveLength(0);
   });
 });
+
+describe('PipelineService - kill switch mid-batch interruption (issue #115)', () => {
+  let service: PipelineService;
+  const steps: PipelineStep[] = [];
+  const stepBehavior: Record<string, () => Promise<PipelineContext>> = {};
+
+  const buildStep = (
+    name: string,
+    successStatus: ArticleRunStatus,
+  ): PipelineStep => ({
+    name,
+    successStatus,
+    execute: jest.fn(async (ctx: PipelineContext) => {
+      await stepBehavior[name]();
+      return ctx;
+    }),
+  });
+
+  const mockPrisma = {
+    autoPublishTask: {
+      findUnique: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    autoPublishRun: {
+      create: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    autoPublishArticle: {
+      create: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    article: { update: jest.fn().mockResolvedValue({}) },
+  };
+  const mockConfig = {
+    get: jest.fn((key: string, defaultValue?: any) =>
+      key === 'SMTP_HOST' || key === 'SMTP_USER' || key === 'SMTP_PASS'
+        ? undefined
+        : key === 'SMTP_PORT'
+          ? 587
+          : defaultValue,
+    ),
+  };
+  const mockRedis = {
+    acquireLock: jest.fn().mockResolvedValue(true),
+    releaseLock: jest.fn().mockResolvedValue(true),
+    isAvailable: true,
+  };
+  const mockScheduler = {
+    isKillSwitchActive: jest.fn().mockResolvedValue(false),
+  };
+  const billingService = {
+    isEnabled: jest.fn().mockReturnValue(false),
+    estimateCost: jest.fn().mockResolvedValue({ estimatedCost: 0 }),
+    deduct: jest.fn().mockResolvedValue(null),
+    checkAndAlertBalance: jest.fn().mockResolvedValue(undefined),
+  };
+  const billingCheckStep = {
+    name: 'billing_check',
+    successStatus: ArticleRunStatus.PENDING,
+    execute: jest
+      .fn()
+      .mockImplementation((ctx: PipelineContext) => Promise.resolve(ctx)),
+  };
+
+  beforeEach(async () => {
+    steps.length = 0;
+    Object.keys(stepBehavior).forEach((k) => delete stepBehavior[k]);
+    [
+      'billing_check',
+      'topic-collection',
+      'research',
+      'article-generation',
+      'article-save',
+      'image-generation',
+      'publish',
+      'notification',
+    ].forEach((name) => {
+      stepBehavior[name] = jest.fn().mockResolvedValue(undefined);
+    });
+    [
+      ['billing_check', ArticleRunStatus.PENDING],
+      ['topic-collection', ArticleRunStatus.TOPIC_SELECTED],
+      ['research', ArticleRunStatus.RESEARCHED],
+      ['article-generation', ArticleRunStatus.DRAFTED],
+      ['article-save', ArticleRunStatus.SAVED],
+      ['image-generation', ArticleRunStatus.IMAGED],
+      ['publish', ArticleRunStatus.PUBLISHED],
+      ['notification', ArticleRunStatus.PUBLISHED],
+    ].forEach(([name, status]) =>
+      steps.push(buildStep(name, status as ArticleRunStatus)),
+    );
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PipelineService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: ConfigService, useValue: mockConfig },
+        { provide: RedisService, useValue: mockRedis },
+        { provide: AutoPublishSchedulerService, useValue: mockScheduler },
+        { provide: BillingService, useValue: billingService },
+        { provide: BillingCheckStep, useValue: billingCheckStep },
+        { provide: TopicCollectionStep, useValue: {} },
+        { provide: ResearchStep, useValue: {} },
+        { provide: ArticleGenerationStep, useValue: {} },
+        { provide: ImageGenerationStep, useValue: {} },
+        { provide: ArticleSaveStep, useValue: {} },
+        { provide: PublishStep, useValue: {} },
+        { provide: NotificationStep, useValue: {} },
+      ],
+    }).compile();
+    service = module.get<PipelineService>(PipelineService);
+    (service as any).steps = steps;
+    jest.clearAllMocks();
+  });
+
+  const setupTask = (batchSize: number, maxRetries = 0) => {
+    mockPrisma.autoPublishTask.findUnique.mockResolvedValue({
+      id: 'task-1',
+      status: 'ACTIVE',
+      batchSize,
+      retryConfig: JSON.stringify({ maxRetries, retryDelayMs: 100 }),
+      contentConfig: '{}',
+      publishConfig: '{}',
+      createdBy: 'user-1',
+    });
+    mockPrisma.autoPublishRun.create.mockResolvedValue({
+      id: 'run-1',
+      taskId: 'task-1',
+    });
+    mockPrisma.autoPublishArticle.create.mockResolvedValue({ id: 'article-1' });
+  };
+
+  it('interrupts the batch when kill switch activates between articles', async () => {
+    setupTask(2, 0);
+    // Article 0 runs fully (entry check + batch-top + 8 steps = 10 calls, all false);
+    // the 11th call (batch-top before article 1) returns true -> batch stops.
+    let ksCalls = 0;
+    mockScheduler.isKillSwitchActive.mockImplementation(() => {
+      ksCalls += 1;
+      return Promise.resolve(ksCalls > 10);
+    });
+
+    await service.runTask('task-1', 'MANUAL');
+
+    // Only article 0 was created (article 1 never started)
+    expect(mockPrisma.autoPublishArticle.create).toHaveBeenCalledTimes(1);
+    // All 8 steps of article 0 executed
+    expect(steps[7].execute).toHaveBeenCalledTimes(1); // notification (last)
+
+    const updateCall = mockPrisma.autoPublishRun.update.mock.calls[0][0];
+    expect(updateCall.data.successCount).toBe(1);
+    expect(updateCall.data.failedCount).toBe(0);
+    expect(updateCall.data.status).toBe(RunStatus.COMPLETED);
+  });
+
+  it('marks the in-progress article FAILED when kill switch activates before a step', async () => {
+    setupTask(1, 0);
+    // entry(false) -> batch-top(false) -> before billing_check(false, executes)
+    // -> before topic-collection(true, interrupts)
+    mockScheduler.isKillSwitchActive
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValue(true);
+
+    await service.runTask('task-1', 'MANUAL');
+
+    // billing_check executed, topic-collection (steps[1]) did NOT
+    expect(steps[0].execute).toHaveBeenCalledTimes(1);
+    expect(steps[1].execute).not.toHaveBeenCalled();
+
+    // Article marked FAILED with kill-switch message
+    const failedUpdate = mockPrisma.autoPublishArticle.update.mock.calls.find(
+      (c) => c[0].data.status === ArticleRunStatus.FAILED,
+    );
+    expect(failedUpdate).toBeDefined();
+    expect(failedUpdate![0].data.errorMessage).toMatch(/Kill switch/);
+
+    const updateCall = mockPrisma.autoPublishRun.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe(RunStatus.FAILED);
+    expect(updateCall.data.failedCount).toBe(1);
+    expect(updateCall.data.successCount).toBe(0);
+  });
+
+  it('does not retry an article when kill switch is active', async () => {
+    setupTask(1, 2); // maxRetries=2 -> would normally retry twice
+    stepBehavior['billing_check'] = jest
+      .fn()
+      .mockRejectedValue(new Error('billing check fail'));
+    // entry(false) -> batch-top(false) -> before billing_check(false, fails)
+    // -> before retry attempt 1(true, aborts retry)
+    mockScheduler.isKillSwitchActive
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValue(true);
+
+    await service.runTask('task-1', 'MANUAL');
+
+    // billing_check executed exactly once - no retry against the active kill switch
+    expect(steps[0].execute).toHaveBeenCalledTimes(1);
+    // No retryCount update was written (retry aborted before the retryCount bump)
+    const retryCountUpdates =
+      mockPrisma.autoPublishArticle.update.mock.calls.filter(
+        (c) => c[0].data.retryCount !== undefined,
+      );
+    expect(retryCountUpdates).toHaveLength(0);
+
+    const updateCall = mockPrisma.autoPublishRun.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe(RunStatus.FAILED);
+    expect(updateCall.data.failedCount).toBe(1);
+  });
+});
