@@ -10,7 +10,10 @@
  * optional TTL in seconds) so call sites need minimal changes.
  */
 export class InMemoryCache {
-  private readonly store = new Map<string, { value: string; expiresAt: number }>();
+  private readonly store = new Map<
+    string,
+    { value: string; expiresAt: number }
+  >();
 
   /**
    * Get a cached value by key. Returns null on miss or expiry (expired

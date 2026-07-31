@@ -129,7 +129,9 @@ describe('WikipediaService', () => {
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
       // 缓存键按 lang+variant 区分，已写入内存缓存
-      expect((service as any).cache.get('wiki:otd:zh:zh-cn:7-3')).not.toBeNull();
+      expect(
+        (service as any).cache.get('wiki:otd:zh:zh-cn:7-3'),
+      ).not.toBeNull();
       // 调用了 zh.wikipedia.org，并带 zh-cn Accept-Language（简体）
       expect(fetchMock).toHaveBeenCalledWith(
         'https://zh.wikipedia.org/api/rest_v1/feed/onthisday/events/7/3',
@@ -188,7 +190,9 @@ describe('WikipediaService', () => {
           headers: expect.objectContaining({ 'Accept-Language': 'zh-hk' }),
         }),
       );
-      expect((service as any).cache.get('wiki:otd:zh:zh-hk:7-3')).not.toBeNull();
+      expect(
+        (service as any).cache.get('wiki:otd:zh:zh-hk:7-3'),
+      ).not.toBeNull();
     });
 
     it('US and EU use en without Accept-Language, sharing the same cache key', async () => {
@@ -207,7 +211,9 @@ describe('WikipediaService', () => {
 
       await service.fetchOnThisDay('EU', '2026-07-03', 1, 10);
       // US 与 EU 共用 en 源 -> 同一缓存键
-      expect((service as any).cache.get('wiki:otd:en:default:7-3')).not.toBeNull();
+      expect(
+        (service as any).cache.get('wiki:otd:en:default:7-3'),
+      ).not.toBeNull();
     });
 
     it('paginates results', async () => {
@@ -335,7 +341,9 @@ describe('WikipediaService', () => {
         '{not valid json',
       );
       expect(fetchMock).toHaveBeenCalled();
-      expect((service as any).cache.get('wiki:otd:zh:zh-cn:7-3')).not.toBeNull();
+      expect(
+        (service as any).cache.get('wiki:otd:zh:zh-cn:7-3'),
+      ).not.toBeNull();
     });
 
     it('merges all 5 types with type labels (events/selected/births/deaths/holidays)', async () => {

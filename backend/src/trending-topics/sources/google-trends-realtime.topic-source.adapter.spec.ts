@@ -213,10 +213,7 @@ describe('GoogleTrendsRealtimeAdapter', () => {
       totalPages: 1,
       status: 'available',
     });
-    const adapter = new GoogleTrendsRealtimeAdapter(
-      buildConfig(),
-      rss,
-    );
+    const adapter = new GoogleTrendsRealtimeAdapter(buildConfig(), rss);
 
     const result = await adapter.fetch(
       'google-trends-realtime',
@@ -239,10 +236,7 @@ describe('GoogleTrendsRealtimeAdapter', () => {
     );
     const rss = buildRssAdapter();
     (rss.fetch as jest.Mock).mockRejectedValue(new Error('rss down'));
-    const adapter = new GoogleTrendsRealtimeAdapter(
-      buildConfig(),
-      rss,
-    );
+    const adapter = new GoogleTrendsRealtimeAdapter(buildConfig(), rss);
 
     const result = await adapter.fetch(
       'google-trends-realtime',

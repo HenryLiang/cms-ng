@@ -307,7 +307,12 @@ describe('TwitterService', () => {
         JSON.stringify([{ title: 'x', source: 'elonmusk' }]),
         300,
       );
-      const items = await service.fetchAccountTweets('@ElonMusk', 5, 'u1', true);
+      const items = await service.fetchAccountTweets(
+        '@ElonMusk',
+        5,
+        'u1',
+        true,
+      );
       expect(fetchMock).not.toHaveBeenCalled();
       expect(items).toHaveLength(1);
     });
