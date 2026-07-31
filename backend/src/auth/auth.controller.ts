@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Get, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { UserRole } from '@cms-ng/shared';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -17,6 +18,8 @@ export class AuthController {
 
   @Public()
   @Post('register')
+  // issue #107 — registration is a spam/abuse vector: 5/min per IP
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Register a new user account' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -25,6 +28,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
+  // issue #107 — brute-force protection: 5 attempts/min per IP
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Log in with email + password' })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
@@ -36,6 +41,8 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
+  // issue #107 — token minting stays cheap but bounded: 20/min per IP
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Refresh an existing (possibly expired) access token',
   })

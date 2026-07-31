@@ -7,9 +7,13 @@ import {
   Headers,
   Param,
   Query,
+  Req,
   BadRequestException,
 } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Public } from '../auth/public.decorator';
@@ -194,6 +198,10 @@ export class BillingController {
    */
   @Public()
   @Post('payment/alipay/notify')
+  // Exempt from throttling: Alipay retries notifications on non-'success'
+  // responses and a 429 would delay legitimate settlement. Abuse is bounded
+  // by fail-closed signature verification (issue #106).
+  @SkipThrottle()
   @ApiOperation({
     summary: 'Alipay async payment notification (public callback)',
   })
@@ -206,13 +214,27 @@ export class BillingController {
    */
   @Public()
   @Post('payment/wechat/notify')
+  // NOTE: NOT @SkipThrottle (unlike Alipay). Alipay verifies signatures
+  // locally against the configured public key, but wechatpay-node-v3 may
+  // fetch platform certificates over the network for an unknown serial —
+  // an unauthenticated caller could otherwise amplify cert fetches
+  // (adversarial review, round 2). The global 100/min limit leaves ample
+  // room for WeChat's legitimate retries.
   @ApiOperation({
     summary: 'WeChat Pay async payment notification (public callback)',
   })
   async wechatNotify(
     @Headers() headers: Record<string, string>,
-    @Body() body: string,
+    @Req() req: RawBodyRequest<Request>,
   ) {
-    return this.wechatPayService.handleNotification(headers, body);
+    // Signature verification must run over the RAW body — @Body() would be
+    // the already-parsed object and JSON.parse would throw, making every
+    // legitimate notification fail (found by adversarial review). rawBody is
+    // enabled in main.ts.
+    const raw = req.rawBody?.toString('utf8');
+    if (!raw) {
+      return { code: 'FAIL', message: 'Missing raw body' };
+    }
+    return this.wechatPayService.handleNotification(headers, raw);
   }
 }

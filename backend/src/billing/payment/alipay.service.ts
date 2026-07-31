@@ -77,12 +77,19 @@ export class AlipayService {
       );
     }
 
+    // Normalize to cents BEFORE persisting: Alipay charges the 2-decimal
+    // amount we send (totalAmount.toFixed(2)), and the notify callback
+    // verifies params.total_amount against record.amount. Storing an
+    // unrounded amount (e.g. 10.999) would make every legitimate
+    // notification mismatch and never credit (adversarial review, #106).
+    const orderAmount = Math.round(amount * 100) / 100;
+
     // Create TopUpRecord
     const record = await this.prisma.topUpRecord.create({
       data: {
         userId,
-        amount,
-        creditsAdded: amount,
+        amount: orderAmount,
+        creditsAdded: orderAmount,
         bonusCredits: 0,
         paymentMethod: PaymentMethod.ALIPAY,
         status: TransactionStatus.PENDING,
@@ -97,7 +104,7 @@ export class AlipayService {
         returnUrl: `${this.getReturnUrl()}/dashboard/billing?payment=success`,
         bizContent: {
           outTradeNo: record.id,
-          totalAmount: amount.toFixed(2),
+          totalAmount: orderAmount.toFixed(2),
           subject,
           productCode: 'FAST_INSTANT_TRADE_PAY',
         },
@@ -127,26 +134,33 @@ export class AlipayService {
   /**
    * Handle Alipay async notification callback.
    * Returns 'success' to acknowledge receipt (Alipay requirement).
+   *
+   * Security (issue #106): this endpoint is @Public, so signature
+   * verification is the ONLY defense against forged credit. Fail CLOSED:
+   * any missing config, bad signature, wrong app_id, or amount mismatch
+   * rejects the notification before touching the ledger.
    */
   async handleNotification(params: Record<string, string>): Promise<string> {
-    // Verify signature with alipay public key
-    if (this.alipaySdk && this.publicKey) {
-      try {
-        const isValid = this.alipaySdk.checkNotifySign(params);
-        if (!isValid) {
-          this.logger.warn('Alipay notification signature verification failed');
-          return 'failure';
-        }
-      } catch (error) {
-        this.logger.error(
-          `Alipay signature check error: ${(error as Error).message}`,
-        );
+    // Verify signature with alipay public key — fail closed when the SDK or
+    // public key is not configured (previously this skipped verification and
+    // let forged TRADE_SUCCESS callbacks credit balances).
+    if (!this.alipaySdk || !this.publicKey) {
+      this.logger.error(
+        'Alipay SDK or public key not configured, rejecting notification (fail-closed)',
+      );
+      return 'failure';
+    }
+    try {
+      const isValid = this.alipaySdk.checkNotifySign(params);
+      if (!isValid) {
+        this.logger.warn('Alipay notification signature verification failed');
         return 'failure';
       }
-    } else {
-      this.logger.warn(
-        'Alipay public key not configured, skipping signature verification',
+    } catch (error) {
+      this.logger.error(
+        `Alipay signature check error: ${(error as Error).message}`,
       );
+      return 'failure';
     }
 
     const outTradeNo = params.out_trade_no;
@@ -169,6 +183,28 @@ export class AlipayService {
         return 'fail';
       }
 
+      // Bind the notification to THIS app and THIS order: a signature-valid
+      // callback from another merchant app, or one whose amount differs from
+      // the recorded order, must never credit the ledger.
+      if (params.app_id !== this.appId) {
+        this.logger.warn(
+          `Alipay notification: app_id mismatch (got ${params.app_id})`,
+        );
+        return 'failure';
+      }
+      // Tolerance of half a cent: orders created before amount normalization
+      // may store an unrounded value (e.g. 10.999) while Alipay always
+      // notifies the 2-decimal charged amount.
+      if (
+        Math.abs(Number(params.total_amount) - Number(record.amount)) >= 0.005
+      ) {
+        this.logger.warn(
+          `Alipay notification: amount mismatch for record=${record.id} ` +
+            `(notify=${params.total_amount}, expected=${record.amount.toString()})`,
+        );
+        return 'failure';
+      }
+
       // Idempotent: already processed
       if (
         (record.status as TransactionStatus) === TransactionStatus.COMPLETED
@@ -179,17 +215,10 @@ export class AlipayService {
         return 'success';
       }
 
-      // Update record status
-      await this.prisma.topUpRecord.update({
-        where: { id: record.id },
-        data: {
-          status: TransactionStatus.COMPLETED,
-          externalOrderId: params.trade_no,
-          paidAt: new Date(),
-        },
-      });
-
-      // Credit balance
+      // Credit FIRST (idempotent via idempotencyKey), then mark COMPLETED.
+      // The previous order (COMPLETED → credit) was non-atomic: a credit
+      // failure left the record COMPLETED, and every retry short-circuited
+      // as "already processed" — user paid but never got credited.
       await this.billingService.credit({
         userId: record.userId,
         amount: Number(record.creditsAdded),
@@ -199,15 +228,36 @@ export class AlipayService {
         idempotencyKey: `topup:${record.id}`,
       });
 
+      // Mark record as completed
+      await this.prisma.topUpRecord.update({
+        where: { id: record.id },
+        data: {
+          status: TransactionStatus.COMPLETED,
+          externalOrderId: params.trade_no,
+          paidAt: new Date(),
+        },
+      });
+
       this.logger.log(
         `Alipay payment success: record=${record.id}, amount=${record.amount.toString()}`,
       );
     } else if (tradeStatus === 'WAIT_BUYER_PAY') {
       this.logger.debug(`Alipay payment pending: record=${outTradeNo}`);
     } else if (tradeStatus === 'TRADE_CLOSED') {
+      // Guard the close transition (adversarial review, round 2): the Alipay
+      // platform public key is shared across merchants, so a signature-valid
+      // TRADE_CLOSED meant for another app must be rejected (app_id binding),
+      // and a replayed close must only ever move a PENDING order — never
+      // overwrite a COMPLETED one back to FAILED.
+      if (params.app_id !== this.appId) {
+        this.logger.warn(
+          `Alipay notification: app_id mismatch on TRADE_CLOSED (got ${params.app_id})`,
+        );
+        return 'failure';
+      }
       this.logger.log(`Alipay payment closed: record=${outTradeNo}`);
-      await this.prisma.topUpRecord.update({
-        where: { id: outTradeNo },
+      await this.prisma.topUpRecord.updateMany({
+        where: { id: outTradeNo, status: TransactionStatus.PENDING },
         data: { status: TransactionStatus.FAILED },
       });
     }

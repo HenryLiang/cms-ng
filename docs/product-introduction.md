@@ -154,7 +154,7 @@ import type {
 import { CHAT_PROVIDER, KimiProvider } from './providers';
 ```
 
-`DeepSeekProvider` / `KimiProvider` / `OpenAIProvider` 三个 provider 均继承自 `OpenAICompatibleProvider` 抽象基类——任何兼容 OpenAI 协议（DeepSeek、Kimi、Azure OpenAI、Qwen、火山方舟等）的模型都能**在不改业务代码的前提下**通过 `AI_PROVIDER` 环境变量切换。配合 `AIToolsService` 的 Tool Registry 模式，新增一个"联网搜索"或"知识库检索"工具只需实现 `ToolExecutor` 接口并在构造函数中注册即可，**业务侧完全无感**。
+`DeepSeekProvider` / `GeminiProvider` / `KimiProvider` / `OpenAIProvider` 四个 provider 均继承自 `OpenAICompatibleProvider` 抽象基类——任何兼容 OpenAI 协议（DeepSeek、Gemini、Kimi、Azure OpenAI、Qwen、火山方舟等）的模型都能**在不改业务代码的前提下**通过 `AI_PROVIDER` 环境变量切换。配合 `AIToolsService` 的 Tool Registry 模式，新增一个"联网搜索"或"知识库检索"工具只需实现 `ToolExecutor` 接口并在构造函数中注册即可，**业务侧完全无感**。
 
 #### 2.2.2 内容级语言（Content-Language）贯穿全栈
 
@@ -204,7 +204,7 @@ export enum UserRole {
 
 - **外部中间件策略**：应用以宿主机进程运行（nginx 反代 + `node dist/src/main` / `next start`），MySQL / Redis 全部视为外部依赖，**不与具体云厂商绑定**；Docker Compose 仅编排 RSSHub 一个服务；
 - **地域感知的代理开关**：`RSS_PROXY_ENABLED` + `HTTP_PROXY` 一对环境变量即可在"大陆开发（走代理）"与"海外生产（直连）"之间切换，**业务代码零修改**；
-- **AI Provider 切换零成本**：`AI_PROVIDER=deepseek|kimi|openai` 切换后，prompt、Tool、审计、调用统计全部沿用。
+- **AI Provider 切换零成本**：`AI_PROVIDER=deepseek|gemini|kimi|openai` 切换后，prompt、Tool、审计、调用统计全部沿用。
 
 ---
 

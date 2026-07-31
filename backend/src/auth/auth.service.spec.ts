@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import {
   ConflictException,
   UnauthorizedException,
@@ -12,6 +13,7 @@ import { createMockPrismaService } from '../prisma/prisma.service.mock';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
+  hash: jest.fn(),
 }));
 
 import * as bcrypt from 'bcryptjs';
@@ -42,6 +44,16 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwtService },
         { provide: RegistrationService, useValue: registrationService },
+        {
+          provide: ConfigService,
+          // Pin the refresh window at 30d so the age-boundary tests stay
+          // independent of the production default (90d).
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'JWT_REFRESH_MAX_AGE' ? '30d' : undefined,
+            ),
+          },
+        },
       ],
     }).compile();
 
@@ -57,8 +69,11 @@ describe('AuthService', () => {
       email: 'test@example.com',
       name: 'Test',
       password: 'password123',
-      role: 'REPORTER' as const,
     };
+
+    beforeEach(() => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('bcrypt_hashed_password');
+    });
 
     it('should create user and return JWT when email is new', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
@@ -66,7 +81,7 @@ describe('AuthService', () => {
         id: 'user-id',
         email: dto.email,
         name: dto.name,
-        role: dto.role,
+        role: 'REPORTER',
         createdAt: new Date(),
       });
 
@@ -75,13 +90,15 @@ describe('AuthService', () => {
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: dto.email },
       });
+      // issue #104 — the caller-supplied password must be hashed, never a
+      // shared default hash
+      expect(bcrypt.hash).toHaveBeenCalledWith(dto.password, 12);
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: {
           email: dto.email,
           name: dto.name,
-          passwordHash:
-            '$2b$12$J7rpHCrlCYUeDlxLcqQjKeLBdDZjpzKC5KaDO0NqgQ8TkmVnIk1nS',
-          role: dto.role,
+          passwordHash: 'bcrypt_hashed_password',
+          role: 'REPORTER',
         },
         select: {
           id: true,
@@ -95,7 +112,7 @@ describe('AuthService', () => {
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: 'user-id',
         email: dto.email,
-        role: dto.role,
+        role: 'REPORTER',
       });
       expect(result.accessToken).toBe('test_jwt_token');
       expect(result.user.email).toBe(dto.email);
@@ -111,28 +128,35 @@ describe('AuthService', () => {
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
 
-    it('should allow registration without optional role', async () => {
-      const dtoNoRole = {
-        email: 'new@example.com',
-        name: 'Test',
+    it('issue #105 — should always register as REPORTER even if the client passes an elevated role (mass assignment)', async () => {
+      const dtoWithRole = {
+        email: 'evil@example.com',
+        name: 'Evil',
         password: 'password123',
-      };
+        role: 'ADMIN',
+      } as unknown as Parameters<AuthService['register']>[0];
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.user.create.mockResolvedValue({
         id: 'user-id',
-        email: dtoNoRole.email,
-        name: dtoNoRole.name,
-        role: undefined,
+        email: dtoWithRole.email,
+        name: dtoWithRole.name,
+        role: 'REPORTER',
         createdAt: new Date(),
       });
 
-      const result = await service.register(dtoNoRole);
+      const result = await service.register(dtoWithRole);
 
       expect(prisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ role: undefined }),
+          data: expect.objectContaining({ role: 'REPORTER' }),
         }),
       );
+      // the issued JWT must carry REPORTER, never the requested ADMIN
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        sub: 'user-id',
+        email: dtoWithRole.email,
+        role: 'REPORTER',
+      });
       expect(result.accessToken).toBe('test_jwt_token');
     });
 
@@ -275,11 +299,14 @@ describe('AuthService', () => {
 
   // ===== issue #49 — POST /auth/refresh =====
   describe('refresh (issue #49)', () => {
+    const freshIat = () => Math.floor(Date.now() / 1000) - 60; // issued 1 min ago
+
     it('should return a new access token for a valid, non-expired token', async () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-id',
         email: 'test@example.com',
         role: 'REPORTER',
+        iat: freshIat(),
       });
       prisma.user.findUnique.mockResolvedValue({
         id: 'user-id',
@@ -296,13 +323,81 @@ describe('AuthService', () => {
       expect(jwtService.verify).toHaveBeenCalledWith('valid.jwt.token', {
         ignoreExpiration: true,
       });
+      // issue #108 — renewed token pins the family start (fiat) so the
+      // absolute window cannot be reset by refreshing
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: 'user-id',
         email: 'test@example.com',
         role: 'REPORTER',
+        fiat: expect.any(Number),
       });
       expect(result.accessToken).toBe('test_jwt_token');
       expect(result.user.id).toBe('user-id');
+    });
+
+    it('issue #108 — should pin fiat to the ORIGINAL iat on first refresh and carry it forward', async () => {
+      const originalIat = Math.floor(Date.now() / 1000) - 10 * 86400; // 10d ago
+      // First refresh: token from login (iat only, no fiat yet)
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        iat: originalIat,
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        name: 'Test',
+        role: 'REPORTER',
+        isActive: true,
+      });
+
+      await service.refresh('first.token');
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ fiat: originalIat }),
+      );
+
+      // Second refresh: renewed token carries fiat forward unchanged (fresh
+      // iat from sign, but family start stays pinned 10 days back)
+      jest.clearAllMocks();
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        iat: Math.floor(Date.now() / 1000), // fresh iat from the renewal
+        fiat: originalIat,
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        name: 'Test',
+        role: 'REPORTER',
+        isActive: true,
+      });
+
+      await service.refresh('second.token');
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ fiat: originalIat }),
+      );
+    });
+
+    it('issue #108 — should reject a renewed token whose FAMILY age exceeds the window even with a fresh iat', async () => {
+      // This is the reset attack: a renewed token always has a fresh iat,
+      // so the cap must be computed from fiat, not iat.
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        iat: Math.floor(Date.now() / 1000) - 60, // minted 1 min ago
+        fiat: Math.floor(Date.now() / 1000) - 31 * 86400, // family is 31d old
+      });
+
+      await expect(service.refresh('renewed.jwt.token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(jwtService.sign).not.toHaveBeenCalled();
     });
 
     it('should return a new access token for an expired-but-signed token', async () => {
@@ -310,6 +405,7 @@ describe('AuthService', () => {
         sub: 'user-id',
         email: 'test@example.com',
         role: 'REPORTER',
+        iat: freshIat(),
       });
       prisma.user.findUnique.mockResolvedValue({
         id: 'user-id',
@@ -324,11 +420,41 @@ describe('AuthService', () => {
       expect(result.accessToken).toBe('test_jwt_token');
     });
 
+    it('issue #108 — should reject a token whose iat exceeds the absolute refresh window', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        iat: Math.floor(Date.now() / 1000) - 31 * 86400, // issued 31 days ago
+      });
+
+      await expect(service.refresh('ancient.jwt.token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it('issue #108 — should reject a token without iat (hand-crafted)', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        // no iat
+      });
+
+      await expect(service.refresh('no.iat.token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
     it('should throw UnauthorizedException when user is inactive (isActive=false)', async () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-id',
         email: 'test@example.com',
         role: 'REPORTER',
+        iat: freshIat(),
       });
       prisma.user.findUnique.mockResolvedValue({
         id: 'user-id',
@@ -361,6 +487,7 @@ describe('AuthService', () => {
         sub: 'deleted-user-id',
         email: 'gone@example.com',
         role: 'REPORTER',
+        iat: freshIat(),
       });
       prisma.user.findUnique.mockResolvedValue(null);
 
@@ -368,6 +495,85 @@ describe('AuthService', () => {
         UnauthorizedException,
       );
       expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+  });
+
+  // ===== issue #108 — refresh family cap with REAL jsonwebtoken =====
+  // The unit tests above mock JwtService; this describe uses the real
+  // implementation to prove the absolute window survives renewals (the
+  // reset attack the adversarial review demonstrated against the first
+  // version of this fix).
+  describe('refresh family cap (real JwtService)', () => {
+    const realJwt = new JwtService({
+      secret: 'spec-secret',
+      signOptions: { expiresIn: '7d' },
+    });
+
+    const makeService = () =>
+      new AuthService(
+        prisma,
+        realJwt,
+        registrationService as unknown as RegistrationService,
+        // 30d window so the 31-day family-age cases below stay meaningful
+        // (the production default is 90d).
+        {
+          get: (key: string) =>
+            key === 'JWT_REFRESH_MAX_AGE' ? '30d' : undefined,
+        } as unknown as ConfigService,
+      );
+
+    const activeUser = {
+      id: 'user-id',
+      email: 'test@example.com',
+      name: 'Test',
+      role: 'REPORTER',
+      isActive: true,
+    };
+
+    const signOld = (ageDays: number) =>
+      realJwt.sign({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        iat: Math.floor(Date.now() / 1000) - ageDays * 86400,
+      });
+
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue(activeUser);
+    });
+
+    it('should allow renewing a 29-day-old family across multiple refreshes without resetting the window', async () => {
+      const svc = makeService();
+      const t0 = signOld(29);
+
+      const r1 = await svc.refresh(t0);
+      const p1 = realJwt.decode(r1.accessToken);
+      expect(p1.fiat).toBe(Math.floor(Date.now() / 1000) - 29 * 86400);
+
+      // Renew the renewed token — family start must stay pinned
+      const r2 = await svc.refresh(r1.accessToken);
+      const p2 = realJwt.decode(r2.accessToken);
+      expect(p2.fiat).toBe(p1.fiat);
+      // ...while the fresh token itself is valid (fresh iat → valid exp)
+      expect(() => realJwt.verify(r2.accessToken)).not.toThrow();
+    });
+
+    it('should reject refresh once the family is older than 30 days, even for a token minted seconds ago', async () => {
+      const svc = makeService();
+      // Family at day 29: refresh OK
+      const r1 = await svc.refresh(signOld(29));
+      // Forge time forward: a token whose family is 31 days old must die
+      // even though its own iat is fresh (this is what T1/T2 look like after
+      // two more days — the family crossed the absolute window).
+      const ancient = realJwt.sign({
+        sub: 'user-id',
+        email: 'test@example.com',
+        role: 'REPORTER',
+        iat: Math.floor(Date.now() / 1000),
+        fiat: Math.floor(Date.now() / 1000) - 31 * 86400,
+      });
+      await expect(svc.refresh(ancient)).rejects.toThrow(UnauthorizedException);
+      expect(r1.accessToken).toBeTruthy();
     });
   });
 });

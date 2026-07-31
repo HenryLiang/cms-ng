@@ -105,7 +105,7 @@ cp frontend/.env.example frontend/.env.local
 
 **关键环境变量：**
 
-完整模板见 `backend/.env.example`（37 个 key，与 `backend/.env` 一一对应）。下面列出部署时**必改**的项：
+完整模板见 `backend/.env.example`。下面列出部署时**必改**的项：
 
 ```env
 # ===== 后端：必改（backend/.env） =====
@@ -118,8 +118,10 @@ JWT_SECRET="change-me-in-production"                    # 32 字节以上随机�
 PORT=3001
 
 # AI Provider（任选其一）
-AI_PROVIDER="deepseek"                                  # deepseek | kimi | openai
+AI_PROVIDER="deepseek"                                  # deepseek | gemini | kimi | openai
 DEEPSEEK_API_KEY="sk-..."                               # AI_PROVIDER=deepseek 时必填
+# GEMINI_API_KEY="..."                                 # AI_PROVIDER=gemini 时必填
+# GEMINI_MODEL="gemini-3.6-flash"
 # KIMI_API_KEY="sk-..."                                # AI_PROVIDER=kimi 时必填
 # KIMI_API_BASE="https://api.kimi.com/coding/v1"
 # KIMI_MODEL="kimi-for-coding"
@@ -393,7 +395,7 @@ cms-ng/
 
 ## AI 功能
 
-后端通过 `AI_PROVIDER` 抽象层切换（默认 `deepseek`）：
+后端通过 `AI_PROVIDER` 抽象层在 DeepSeek、Gemini、Kimi 与 OpenAI 之间切换（默认 `deepseek`）。Gemini 使用 Google 官方 OpenAI-compatible Chat Completions 端点，因此业务侧接口和工具调用流程保持不变：
 
 - **选题推荐** — 根据记者专长和近期热点生成个性化选题建议
 - **改写** — 调整文章风格或视角

@@ -89,6 +89,25 @@ describe('validateEnv', () => {
     expect(r.success).toBe(true);
   });
 
+  it('passes when AI_PROVIDER=gemini with GEMINI_API_KEY', () => {
+    const r = validateEnv({
+      ...goodBase,
+      AI_PROVIDER: 'gemini',
+      GEMINI_API_KEY: 'gemini-test',
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('fails when AI_PROVIDER=gemini but GEMINI_API_KEY is missing', () => {
+    const r = validateEnv({
+      ...goodBase,
+      AI_PROVIDER: 'gemini',
+    });
+    expect(r.success).toBe(false);
+    if (!r.success)
+      expect(r.errors.some((e) => e.includes('GEMINI_API_KEY'))).toBe(true);
+  });
+
   it('reports all errors at once (does not short-circuit)', () => {
     const r = validateEnv({ JWT_SECRET: 'short' });
     expect(r.success).toBe(false);

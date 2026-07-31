@@ -1,32 +1,16 @@
 import { ConfigService } from '@nestjs/config';
 import { DeepSeekProvider } from './providers/deepseek.provider';
+import { GeminiProvider } from './providers/gemini.provider';
 import { KimiProvider } from './providers/kimi.provider';
 import { OpenAIProvider } from './providers/openai.provider';
-import { ChatCompletionProvider } from './providers';
+import { createChatProvider as createConfiguredChatProvider } from './providers/provider.factory';
 
-/**
- * Replicate the factory logic from ai.module.ts to test it in isolation.
- * This avoids Nest DI container complexity while testing the same logic.
- */
-function createChatProvider(
-  envMap: Record<string, string | undefined>,
-): ChatCompletionProvider {
+function createChatProvider(envMap: Record<string, string | undefined>) {
   const config = {
     get: jest.fn((key: string) => envMap[key]),
   } as unknown as ConfigService;
 
-  const provider = (
-    config.get<string>('AI_PROVIDER') || 'deepseek'
-  ).toLowerCase();
-  switch (provider) {
-    case 'kimi':
-      return new KimiProvider(config);
-    case 'openai':
-      return new OpenAIProvider(config);
-    case 'deepseek':
-    default:
-      return new DeepSeekProvider(config);
-  }
+  return createConfiguredChatProvider(config);
 }
 
 describe('AIModule — Provider Factory', () => {
@@ -49,13 +33,19 @@ describe('AIModule — Provider Factory', () => {
       expect(provider.providerName).toBe('openai');
     });
 
+    it('should create GeminiProvider when AI_PROVIDER=gemini', () => {
+      const provider = createChatProvider({ AI_PROVIDER: 'gemini' });
+      expect(provider).toBeInstanceOf(GeminiProvider);
+      expect(provider.providerName).toBe('gemini');
+    });
+
     it('should default to DeepSeekProvider when AI_PROVIDER is not set', () => {
       const provider = createChatProvider({});
       expect(provider).toBeInstanceOf(DeepSeekProvider);
     });
 
     it('should fall back to DeepSeekProvider for invalid AI_PROVIDER value', () => {
-      const provider = createChatProvider({ AI_PROVIDER: 'gemini' });
+      const provider = createChatProvider({ AI_PROVIDER: 'unknown' });
       expect(provider).toBeInstanceOf(DeepSeekProvider);
     });
 
@@ -114,6 +104,19 @@ describe('AIModule — Provider Factory', () => {
     it('should use default OpenAI model when not configured', () => {
       const provider = createChatProvider({ AI_PROVIDER: 'openai' });
       expect(provider.model).toBe('gpt-4o');
+    });
+
+    it('should read Gemini model from environment', () => {
+      const provider = createChatProvider({
+        AI_PROVIDER: 'gemini',
+        GEMINI_MODEL: 'gemini-custom',
+      });
+      expect(provider.model).toBe('gemini-custom');
+    });
+
+    it('should use the stable Gemini Flash model by default', () => {
+      const provider = createChatProvider({ AI_PROVIDER: 'gemini' });
+      expect(provider.model).toBe('gemini-3.6-flash');
     });
   });
 

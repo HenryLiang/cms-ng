@@ -42,7 +42,7 @@ ARTICLE_ID=$(echo "$ART" | jq -r '.id')
 echo "  article_id=$ARTICLE_ID  status=$(echo "$ART" | jq -r '.status')"
 
 echo "== 4. AI polish (consumes tokens; only runs if a provider key is set)"
-if [ -n "${DEEPSEEK_API_KEY:-${KIMI_API_KEY:-${OPENAI_API_KEY:-}}}" ]; then
+if [ -n "${DEEPSEEK_API_KEY:-${GEMINI_API_KEY:-${KIMI_API_KEY:-${OPENAI_API_KEY:-}}}}" ]; then
   CUR=$(curl -sf "$API/articles/$ARTICLE_ID" -H "$H" | jq -r '.content')
   curl -sf -X POST "$API/articles/$ARTICLE_ID/ai-polish" -H "$H" -H "Content-Type: application/json" \
     -d "{\"text\":\"$CUR\",\"language\":\"TRADITIONAL_CHINESE_HK\"}" \
