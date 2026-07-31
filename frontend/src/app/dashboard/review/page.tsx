@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getReviewQueue, submitReview } from '@/lib/review-api';
 import { getArticle } from '@/lib/article-api';
 import { CheckCircle, XCircle, FileText, User, Clock } from 'lucide-react';
@@ -19,15 +19,22 @@ export default function ReviewPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Monotonic sequence guarding detail fetches against the load race (issue #110):
+  // a slow response for an earlier selection must not overwrite a newer one.
+  const selectSeqRef = useRef(0);
 
   async function loadQueue() {
     setLoading(true);
+    setError(null);
     try {
       const data = await getReviewQueue();
       setArticles(data);
       if (data.length > 0 && !selectedArticle) {
         handleSelect(data[0]);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载审核队列失败');
     } finally {
       setLoading(false);
     }
@@ -42,12 +49,23 @@ export default function ReviewPage() {
   async function handleSelect(article: ReviewArticle) {
     setSelectedArticle(article);
     setComment('');
+    setArticleDetail(null); // clear stale detail so the previous article doesn't flash
     setDetailLoading(true);
+    const seq = ++selectSeqRef.current;
     try {
       const detail = await getArticle(article.id);
+      // Stale guard (issue #110): a newer selection superseded this one - discard.
+      if (seq !== selectSeqRef.current) return;
       setArticleDetail(detail);
+    } catch (err) {
+      if (seq !== selectSeqRef.current) return;
+      setArticleDetail(null);
+      setError(err instanceof Error ? err.message : '加载稿件详情失败');
     } finally {
-      setDetailLoading(false);
+      // Only the latest selection owns the loading flag.
+      if (seq === selectSeqRef.current) {
+        setDetailLoading(false);
+      }
     }
   }
 
@@ -72,6 +90,19 @@ export default function ReviewPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
+      </div>
+    );
+  }
+
+  if (error && articles.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <p className="text-sm text-red-600">{error}</p>
+          <Button variant="ghost" className="mt-3" onClick={() => loadQueue()}>
+            重试
+          </Button>
+        </div>
       </div>
     );
   }
