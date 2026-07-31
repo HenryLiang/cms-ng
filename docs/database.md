@@ -51,31 +51,6 @@ cd backend && npx prisma migrate dev --name <change-name>
 cd backend && npx prisma migrate deploy && npx prisma generate
 ```
 
-## Redis（外部中间件）
-
-Redis 同样不在 compose 内，由外部实例提供（自管或云托管 Redis 皆可）。
-
-| 项目 | 值 |
-|------|-----|
-| 引擎 | Redis 5+（推荐 7.x） |
-| 协议 | RESP2 / RESP3 |
-| 连接超时 | 服务端代码内置 `lazyConnect: true` + 重试策略 |
-
-连接 URL（环境变量 `REDIS_URL`）：
-
-```
-# 标准
-redis://HOST:PORT
-
-# 带密码
-redis://:PASSWORD@HOST:PORT
-
-# 指定 DB
-redis://HOST:PORT/2
-```
-
-`RedisService` 在 `REDIS_URL` 不可达或未设置时会 fail-open（只打 warn 日志），不会让后端启动失败 — 这是设计上故意的，便于本地开发时跳过 Redis。
-
 ## Schema 来源
 
 数据库 Schema 由 Prisma 管理，单一定义源：

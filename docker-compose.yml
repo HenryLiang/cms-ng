@@ -1,4 +1,4 @@
-# 外部依赖（MySQL / Redis）不在 compose 内编排，请在宿主或独立服务器上单独部署。
+# 外部依赖（MySQL）不在 compose 内编排，请在宿主或独立服务器上单独部署。
 # 本文件仅承载本地开发用的 RSSHub 聚合代理。
 # 应用本身（frontend / backend）在 dev 环境通过 `npm run dev` 直跑，不进容器。
 

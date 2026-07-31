@@ -8,14 +8,12 @@ import {
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { TransactionStatus } from '@prisma/client';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { safeJsonParse } from '../common/json.utils';
-import { userActiveCacheKey } from '../common/user-active.util';
 import { serializeBillingTransaction } from '../common/billing-transaction.utils';
 
 // 随机密码字母表剔除易混淆字符（0/O、1/l/I），便于人工抄录
@@ -67,10 +65,7 @@ type SelectedUser = {
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private prisma: PrismaService,
-    private redis: RedisService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async findAll() {
     const users = await this.prisma.user.findMany({
@@ -172,9 +167,6 @@ export class UsersService {
       data: { isActive: dto.isActive },
       select: USER_SELECT,
     });
-
-    // 失效 active 缓存，下次请求重新从 DB 加载
-    await this.redis.del(userActiveCacheKey(id));
 
     return this.serializeUser(user);
   }

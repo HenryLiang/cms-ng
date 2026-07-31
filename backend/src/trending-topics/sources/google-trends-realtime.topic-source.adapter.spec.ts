@@ -21,7 +21,6 @@ import { BadRequestException } from '@nestjs/common';
 import { chromium } from 'playwright';
 import { GoogleTrendsRealtimeAdapter } from './google-trends-realtime.topic-source.adapter';
 import type { RssTopicSourceAdapter } from './rss-topic-source.adapter';
-import type { RedisService } from '../../redis/redis.service';
 
 // adapter 构造时若 PLAYWRIGHT_ENABLED=true 会注册 SIGTERM/SIGINT 监听器；
 // 多个 case 实例化会累积，放宽上限避免假告警。
@@ -68,14 +67,6 @@ describe('GoogleTrendsRealtimeAdapter', () => {
     return { page, context, browser };
   }
 
-  function buildRedis(getResult: string | null = null) {
-    return {
-      get: jest.fn().mockResolvedValue(getResult),
-      set: jest.fn().mockResolvedValue(undefined),
-      isAvailable: true,
-    };
-  }
-
   function buildRssAdapter() {
     return {
       fetch: jest.fn(),
@@ -88,14 +79,12 @@ describe('GoogleTrendsRealtimeAdapter', () => {
   it('toggles source visibility with PLAYWRIGHT_ENABLED', () => {
     const on = new GoogleTrendsRealtimeAdapter(
       buildConfig({ PLAYWRIGHT_ENABLED: 'true' }),
-      buildRedis() as unknown as RedisService,
       buildRssAdapter(),
     );
     expect(on.listDefinitions({})[0].visible).toBe(true);
 
     const off = new GoogleTrendsRealtimeAdapter(
       buildConfig({ PLAYWRIGHT_ENABLED: 'false' }),
-      buildRedis() as unknown as RedisService,
       buildRssAdapter(),
     );
     expect(off.listDefinitions({})[0].visible).toBe(false);
@@ -104,7 +93,6 @@ describe('GoogleTrendsRealtimeAdapter', () => {
   it('declares geo + hours parameters', () => {
     const adapter = new GoogleTrendsRealtimeAdapter(
       buildConfig(),
-      buildRedis() as unknown as RedisService,
       buildRssAdapter(),
     );
     const def = adapter.listDefinitions({})[0];
@@ -118,10 +106,8 @@ describe('GoogleTrendsRealtimeAdapter', () => {
   it('scrapes the realtime page and normalizes items with rank-based heatScore', async () => {
     const { page, browser } = buildPageChain();
     (chromium.launch as jest.Mock).mockResolvedValue(browser);
-    const redis = buildRedis();
     const adapter = new GoogleTrendsRealtimeAdapter(
       buildConfig(),
-      redis as unknown as RedisService,
       buildRssAdapter(),
     );
 
@@ -145,11 +131,8 @@ describe('GoogleTrendsRealtimeAdapter', () => {
       }),
     );
     expect(result.items[2].heatScore).toBe(50);
-    expect(redis.set).toHaveBeenCalledWith(
-      'gt:realtime:US:24',
-      expect.any(String),
-      60,
-    );
+    // Cached into the in-memory cache
+    expect((adapter as any).cache.get('gt:realtime:US:24')).not.toBeNull();
   });
 
   it('derives heatScore from deduped count, not raw anchor count', async () => {
@@ -163,7 +146,6 @@ describe('GoogleTrendsRealtimeAdapter', () => {
     (chromium.launch as jest.Mock).mockResolvedValue(browser);
     const adapter = new GoogleTrendsRealtimeAdapter(
       buildConfig(),
-      buildRedis() as unknown as RedisService,
       buildRssAdapter(),
     );
 
@@ -179,7 +161,7 @@ describe('GoogleTrendsRealtimeAdapter', () => {
     expect(result.items[2].heatScore).toBe(50);
   });
 
-  it('serves a Redis cache hit without launching Playwright', async () => {
+  it('serves a cache hit without launching Playwright', async () => {
     const { page, browser } = buildPageChain();
     (chromium.launch as jest.Mock).mockResolvedValue(browser);
     const cached = JSON.stringify([
@@ -192,12 +174,11 @@ describe('GoogleTrendsRealtimeAdapter', () => {
         articles: [],
       },
     ]);
-    const redis = buildRedis(cached);
     const adapter = new GoogleTrendsRealtimeAdapter(
       buildConfig(),
-      redis as unknown as RedisService,
       buildRssAdapter(),
     );
+    (adapter as any).cache.set('gt:realtime:US:24', cached, 60);
 
     const result = await adapter.fetch(
       'google-trends-realtime',
@@ -212,7 +193,6 @@ describe('GoogleTrendsRealtimeAdapter', () => {
   it('rejects invalid hours with BadRequestException', async () => {
     const adapter = new GoogleTrendsRealtimeAdapter(
       buildConfig(),
-      buildRedis() as unknown as RedisService,
       buildRssAdapter(),
     );
     await expect(
@@ -233,11 +213,7 @@ describe('GoogleTrendsRealtimeAdapter', () => {
       totalPages: 1,
       status: 'available',
     });
-    const adapter = new GoogleTrendsRealtimeAdapter(
-      buildConfig(),
-      buildRedis() as unknown as RedisService,
-      rss,
-    );
+    const adapter = new GoogleTrendsRealtimeAdapter(buildConfig(), rss);
 
     const result = await adapter.fetch(
       'google-trends-realtime',
@@ -260,11 +236,7 @@ describe('GoogleTrendsRealtimeAdapter', () => {
     );
     const rss = buildRssAdapter();
     (rss.fetch as jest.Mock).mockRejectedValue(new Error('rss down'));
-    const adapter = new GoogleTrendsRealtimeAdapter(
-      buildConfig(),
-      buildRedis() as unknown as RedisService,
-      rss,
-    );
+    const adapter = new GoogleTrendsRealtimeAdapter(buildConfig(), rss);
 
     const result = await adapter.fetch(
       'google-trends-realtime',
@@ -289,9 +261,9 @@ describe('GoogleTrendsRealtimeAdapter', () => {
     );
     const adapter = new GoogleTrendsRealtimeAdapter(
       buildConfig(),
-      buildRedis(cached) as unknown as RedisService,
       buildRssAdapter(),
     );
+    (adapter as any).cache.set('gt:realtime:US:24', cached, 60);
 
     const result = await adapter.fetch(
       'google-trends-realtime',

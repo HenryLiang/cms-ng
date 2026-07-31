@@ -6,7 +6,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv, formatValidationErrors } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { StoriesModule } from './stories/stories.module';
@@ -55,7 +54,6 @@ import { MediaModule } from './media/media.module';
     }),
     PrismaModule,
     StorageModule,
-    RedisModule,
     AuthModule,
     UsersModule,
     StoriesModule,

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
+import { InMemoryCache } from './sources/in-memory-cache';
 import {
   BillingService,
   InsufficientBalanceException,
@@ -87,7 +87,7 @@ export interface NormalizedTopicItem {
  * 关键设计：
  *   - 归一化到 trending-topics 通用条目形状 `{title, description, source, heatScore, tags, articles[]}`，
  *     前端 NewsSourcePanel 零改动渲染。
- *   - Redis 缓存（趋势 600s / 账号 300s / 聚合 300s）—— twitterapi.io 按次付费，缓存命中不扣费。
+ *   - 进程内内存缓存（趋势 600s / 账号 300s / 聚合 300s）—— twitterapi.io 按次付费，缓存命中不扣费。
  *   - 计费：仅缓存未命中、实际打到 twitterapi.io 时扣费；幂等键按 TTL 桶防同用户同数据窗口内重复扣费；
  *     余额不足拉取前抛 InsufficientBalanceException。BILLING_ENABLED=false 时全跳过。
  *   - 代理：Node 18-23 原生 fetch 不读 HTTP_PROXY，TWITTERAPI_IO_PROXY_ENABLED=true 时显式传 undici ProxyAgent。
@@ -102,6 +102,7 @@ export class TwitterService implements TopicSourceAdapter {
   private readonly woeids: number[];
   private readonly proxyEnabled: boolean;
   private readonly proxyUrl: string | undefined;
+  private readonly cache = new InMemoryCache();
 
   // twitterapi.io 按 WOEID 返回地域趋势榜；内置常用 label 映射，未命中回退 WOEID-{n}
   private static readonly WOEID_LABELS: Record<number, string> = {
@@ -121,7 +122,6 @@ export class TwitterService implements TopicSourceAdapter {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
     private readonly billing: BillingService,
   ) {
     this.apiKey = this.config.get<string>('TWITTERAPI_IO_API_KEY');
@@ -259,16 +259,16 @@ export class TwitterService implements TopicSourceAdapter {
   }> {
     this.requireApiKey();
     const cacheKey = `x:trends:${woeid}`;
-    const cached = await this.redis.get(cacheKey);
+    const cached = this.cache.get(cacheKey);
     let items: NormalizedTopicItem[];
     if (cached) {
       items = JSON.parse(cached) as NormalizedTopicItem[];
     } else {
-      // 缓存未命中 → 计费 + 实打 API
+      // 缓存未命中 -> 计费 + 实打 API
       await this.checkAndCharge(userId, 'trends', String(woeid), 600);
       const raw = await this.callTwitterApi(`/twitter/trends?woeid=${woeid}`);
       items = this.normalizeTrends(raw);
-      await this.redis.set(cacheKey, JSON.stringify(items), 600);
+      this.cache.set(cacheKey, JSON.stringify(items), 600);
     }
     return this.paginate(items, page, limit);
   }
@@ -287,7 +287,7 @@ export class TwitterService implements TopicSourceAdapter {
   }> {
     this.requireApiKey();
     const cacheKey = 'x:accounts:all';
-    const cached = await this.redis.get(cacheKey);
+    const cached = this.cache.get(cacheKey);
     let items: NormalizedTopicItem[];
     if (cached) {
       items = JSON.parse(cached) as NormalizedTopicItem[];
@@ -321,7 +321,7 @@ export class TwitterService implements TopicSourceAdapter {
             );
           }
           // 间隔 1.2s 拉取（避开 free-tier 5s/次的 QPS；命中缓存则免等待）
-          const cachedHit = await this.redis.get(
+          const cachedHit = this.cache.get(
             `x:acct:${a.userName.toLowerCase()}`,
           );
           if (!cachedHit && accounts.indexOf(a) < accounts.length - 1) {
@@ -329,7 +329,7 @@ export class TwitterService implements TopicSourceAdapter {
           }
         }
       }
-      await this.redis.set(cacheKey, JSON.stringify(items), 300);
+      this.cache.set(cacheKey, JSON.stringify(items), 300);
     }
     return this.paginate(items, page, limit);
   }
@@ -349,7 +349,7 @@ export class TwitterService implements TopicSourceAdapter {
     if (!handle) throw new BadRequestException('userName 不能为空');
 
     const cacheKey = `x:acct:${handle.toLowerCase()}`;
-    const cached = await this.redis.get(cacheKey);
+    const cached = this.cache.get(cacheKey);
     let items: NormalizedTopicItem[];
     if (cached) {
       items = JSON.parse(cached) as NormalizedTopicItem[];
@@ -362,7 +362,7 @@ export class TwitterService implements TopicSourceAdapter {
         `/twitter/user/last_tweets?userName=${encodeURIComponent(handle)}&includeReplies=false`,
       );
       items = this.normalizeTweets(raw, handle);
-      await this.redis.set(cacheKey, JSON.stringify(items), 300);
+      this.cache.set(cacheKey, JSON.stringify(items), 300);
     }
     // 不传 limit 则返回 API 一次返回的全部推文；传了才切片（聚合调用用）
     return typeof limit === 'number' && limit > 0

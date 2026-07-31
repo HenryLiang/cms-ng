@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WikipediaService } from './wikipedia.service';
-import { RedisService } from '../redis/redis.service';
 import { ProxyAgent } from 'undici';
 
 // Mock undici ProxyAgent（service 内动态 import）—— 与 twitter.service.spec 同模式
@@ -15,23 +14,15 @@ jest.mock('undici', () => ({
 
 describe('WikipediaService', () => {
   let service: WikipediaService;
-  let redis: { get: jest.Mock; set: jest.Mock };
   let fetchMock: jest.Mock;
 
   beforeEach(async () => {
     fetchMock = jest.fn();
     (global as never).fetch = fetchMock;
 
-    redis = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      del: jest.fn().mockResolvedValue(undefined),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WikipediaService,
-        { provide: RedisService, useValue: redis },
         {
           provide: ConfigService,
           useValue: {
@@ -84,7 +75,10 @@ describe('WikipediaService', () => {
   };
 
   it('describes and fetches the historical source through the generic interface', async () => {
-    redis.get.mockResolvedValue(JSON.stringify([]));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ events: [] }),
+    });
 
     const definitions = service.listDefinitions({});
     const result = await service.fetch(
@@ -96,7 +90,6 @@ describe('WikipediaService', () => {
     expect(definitions).toEqual([
       expect.objectContaining({ id: 'this-day', category: 'history' }),
     ]);
-    expect(redis.get).toHaveBeenCalledWith('wiki:otd:zh:zh-hk:7-3');
     expect(result).toEqual(expect.objectContaining({ status: 'available' }));
   });
 
@@ -115,7 +108,11 @@ describe('WikipediaService', () => {
 
     it('returns cached items without calling API', async () => {
       const cached = [{ title: '【2013年】cached', source: 'this-day' }];
-      redis.get.mockResolvedValue(JSON.stringify(cached));
+      (service as any).cache.set(
+        'wiki:otd:zh:zh-cn:7-3',
+        JSON.stringify(cached),
+        86400,
+      );
 
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
@@ -131,12 +128,10 @@ describe('WikipediaService', () => {
 
       const result = await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
-      // 缓存键按 lang+variant 区分
-      expect(redis.set).toHaveBeenCalledWith(
-        'wiki:otd:zh:zh-cn:7-3',
-        expect.any(String),
-        86400,
-      );
+      // 缓存键按 lang+variant 区分，已写入内存缓存
+      expect(
+        (service as any).cache.get('wiki:otd:zh:zh-cn:7-3'),
+      ).not.toBeNull();
       // 调用了 zh.wikipedia.org，并带 zh-cn Accept-Language（简体）
       expect(fetchMock).toHaveBeenCalledWith(
         'https://zh.wikipedia.org/api/rest_v1/feed/onthisday/events/7/3',
@@ -195,11 +190,9 @@ describe('WikipediaService', () => {
           headers: expect.objectContaining({ 'Accept-Language': 'zh-hk' }),
         }),
       );
-      expect(redis.set).toHaveBeenCalledWith(
-        'wiki:otd:zh:zh-hk:7-3',
-        expect.any(String),
-        86400,
-      );
+      expect(
+        (service as any).cache.get('wiki:otd:zh:zh-hk:7-3'),
+      ).not.toBeNull();
     });
 
     it('US and EU use en without Accept-Language, sharing the same cache key', async () => {
@@ -217,12 +210,10 @@ describe('WikipediaService', () => {
       );
 
       await service.fetchOnThisDay('EU', '2026-07-03', 1, 10);
-      // US 与 EU 共用 en 源 → 同一缓存键
-      expect(redis.set).toHaveBeenCalledWith(
-        'wiki:otd:en:default:7-3',
-        expect.any(String),
-        86400,
-      );
+      // US 与 EU 共用 en 源 -> 同一缓存键
+      expect(
+        (service as any).cache.get('wiki:otd:en:default:7-3'),
+      ).not.toBeNull();
     });
 
     it('paginates results', async () => {
@@ -333,7 +324,11 @@ describe('WikipediaService', () => {
     });
 
     it('treats corrupt cache value as miss: deletes key, refetches, re-caches', async () => {
-      redis.get.mockResolvedValue('{not valid json');
+      (service as any).cache.set(
+        'wiki:otd:zh:zh-cn:7-3',
+        '{not valid json',
+        86400,
+      );
       fetchMock.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ events: [] }),
@@ -341,13 +336,14 @@ describe('WikipediaService', () => {
 
       await service.fetchOnThisDay('CN', '2026-07-03', 1, 10);
 
-      expect(redis.del).toHaveBeenCalledWith('wiki:otd:zh:zh-cn:7-3');
-      expect(fetchMock).toHaveBeenCalled();
-      expect(redis.set).toHaveBeenCalledWith(
-        'wiki:otd:zh:zh-cn:7-3',
-        expect.any(String),
-        86400,
+      // 脏值已被覆盖为有效 JSON
+      expect((service as any).cache.get('wiki:otd:zh:zh-cn:7-3')).not.toBe(
+        '{not valid json',
       );
+      expect(fetchMock).toHaveBeenCalled();
+      expect(
+        (service as any).cache.get('wiki:otd:zh:zh-cn:7-3'),
+      ).not.toBeNull();
     });
 
     it('merges all 5 types with type labels (events/selected/births/deaths/holidays)', async () => {
@@ -416,7 +412,6 @@ describe('WikipediaService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           WikipediaService,
-          { provide: RedisService, useValue: redis },
           {
             provide: ConfigService,
             useValue: {

@@ -137,15 +137,11 @@ get_env_val() {
 }
 
 DB_URL=$(get_env_val "DATABASE_URL" "$BACKEND_ENV")
-REDIS_URL=$(get_env_val "REDIS_URL" "$BACKEND_ENV")
 JWT_SECRET=$(get_env_val "JWT_SECRET" "$BACKEND_ENV")
 
 if [[ -z "$DB_URL" ]]; then
   error "backend/.env 中缺少 DATABASE_URL"
   exit 1
-fi
-if [[ -z "$REDIS_URL" ]]; then
-  warn "backend/.env 中缺少 REDIS_URL，Redis 相关功能将不可用"
 fi
 if [[ -z "$JWT_SECRET" ]]; then
   error "backend/.env 中缺少 JWT_SECRET"
@@ -274,22 +270,6 @@ if [[ "$START_BACKEND" == true ]]; then
     fi
   else
     info "nc 命令不可用，跳过 MySQL 连通性检查"
-  fi
-
-  # Redis 连通性
-  if [[ -n "$REDIS_URL" ]]; then
-    REDIS_HOST=$(echo "$REDIS_URL" | grep -oE '@[^:]+' | tr -d '@')
-    REDIS_PORT=$(echo "$REDIS_URL" | grep -oE ':[0-9]+' | tail -1 | tr -d ':')
-    REDIS_PORT=${REDIS_PORT:-6379}
-
-    if command -v nc &>/dev/null; then
-      if nc -z -w3 "$REDIS_HOST" "$REDIS_PORT" 2>/dev/null; then
-        success "Redis 可达 ($REDIS_HOST:$REDIS_PORT)"
-      else
-        warn "Redis 不可达 ($REDIS_HOST:$REDIS_PORT)"
-        echo "      Redis 相关功能将降级运行 (fail-open 模式)"
-      fi
-    fi
   fi
 fi
 

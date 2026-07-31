@@ -202,7 +202,7 @@ export enum UserRole {
 
 ### 2.3 部署与运维创新
 
-- **外部中间件策略**：应用以宿主机进程运行（nginx 反代 + `node dist/src/main` / `next start`），MySQL / Redis 全部视为外部依赖，**不与具体云厂商绑定**；Docker Compose 仅编排 RSSHub 一个服务；
+- **外部中间件策略**：应用以宿主机进程运行（nginx 反代 + `node dist/src/main` / `next start`），MySQL 全部视为外部依赖，**不与具体云厂商绑定**；Docker Compose 仅编排 RSSHub 一个服务；
 - **地域感知的代理开关**：`RSS_PROXY_ENABLED` + `HTTP_PROXY` 一对环境变量即可在"大陆开发（走代理）"与"海外生产（直连）"之间切换，**业务代码零修改**；
 - **AI Provider 切换零成本**：`AI_PROVIDER=deepseek|gemini|kimi|openai` 切换后，prompt、Tool、审计、调用统计全部沿用。
 
@@ -311,8 +311,7 @@ CMS-NG 的智能化不是"加个 ChatGPT 接口"的浅层包装，而是**从选
         ┌──────────────────┼──────────────────┬─────────────────────┐
         ▼                  ▼                  ▼                     ▼
 ┌─────────────┐   ┌──────────────────┐  ┌───────────────┐  ┌──────────────┐
-│ MySQL 8     │   │ Redis (ioredis)  │  │ RSSHub        │  │ 外部 LLM     │
-│ (Prisma 6)  │   │ (缓存 + 瞬态状态, │  │ (12 路 RSS    │  │ (DeepSeek /  │
+│ MySQL 8     │   │ RSSHub           │  │ 外部 LLM      │              
 │             │   │  fail-open)      │  │  聚合代理)    │  │  Kimi /      │
 │             │   │                  │  │               │  │  OpenAI)     │
 └─────────────┘   └──────────────────┘  └───────────────┘  └──────────────┘
@@ -340,8 +339,8 @@ auto-publish ──依赖──▶ ai (generate-draft / research-kit / generate-
 
 | 环境 | 组件 | 备注 |
 |---|---|---|
-| 开发 | 前端 (3000) + 后端 (3001) + RSSHub (1200) | MySQL/Redis 用外部实例 |
-| 生产 | 前端 + 后端 (Docker) | MySQL/Redis/RSSHub 全外部，env_file 注入 |
+| 开发 | 前端 (3000) + 后端 (3001) + RSSHub (1200) | MySQL 用外部实例 |
+| 生产 | 前端 + 后端 (Docker) | MySQL/RSSHub 全外部，env_file 注入 |
 
 **生产部署脚本** `scripts/cms-ng-service.sh start --prod` 实现 7 步发布流程：
 1. 前置检查（node 可用、`backend/.env` 含必要变量）
@@ -368,7 +367,7 @@ CMS-NG 的产品哲学可以概括为三句话：
 
 > 附录：技术栈速览
 > - **前端**：Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · TipTap · Zustand · TanStack Query · Axios · Lucide Icons
-> - **后端**：NestJS 11 · Express · Prisma 6 · MySQL 8 · Redis (ioredis) · JWT (passport-jwt) · @nestjs/schedule · Nodemailer
+> - **后端**：NestJS 11 · Express · Prisma 6 · MySQL 8 · JWT (passport-jwt) · @nestjs/schedule · Nodemailer
 > - **AI**：DeepSeek (默认) / Kimi / OpenAI（OpenAI 兼容协议，Provider 抽象层）· Tavily 联网搜索 · Seedream AI 配图
 > - **工程化**：npm workspaces · Turbo · Docker Compose · 一键部署脚本
 > - **共享层**：@cms-ng/shared（前后端共享枚举与接口）

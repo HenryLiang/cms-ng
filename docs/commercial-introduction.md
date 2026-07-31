@@ -163,7 +163,7 @@ CMS-NG 采用 2026 年前沿的全栈技术选型。每一项架构决策都对�
 | 层 | 技术选型 |
 |---|---|
 | **前端** | Next.js 16（App Router）· React 19 · TypeScript · Tailwind CSS v4 · TipTap 富文本 · Zustand 状态管理 |
-| **后端** | NestJS 11 · Express · Prisma 6 ORM · MySQL 8 · Redis（ioredis）· JWT（passport-jwt）· @nestjs/schedule |
+| **后端** | NestJS 11 · Express · Prisma 6 ORM · MySQL 8 · JWT（passport-jwt）· @nestjs/schedule |
 | **AI** | DeepSeek（默认）/ Kimi / OpenAI（OpenAI 兼容协议 + Provider 抽象层）· Tavily 联网搜索 · 字节火山引擎 Seedream 配图 |
 | **工程化** | npm workspaces · Turbo 单仓编排 · Docker Compose · 一键部署脚本 |
 | **共享层** | @cms-ng/shared——前后端共享枚举与接口 |
@@ -187,7 +187,6 @@ CMS-NG 采用 2026 年前沿的全栈技术选型。每一项架构决策都对�
 
 ### 3.3 运维与可靠性
 
-- **Redis fail-open**：缓存层不可用时不崩溃，仅降级告警；
 - **Boot 时环境变量校验**：必需变量缺失即快速失败，避免运行时神秘崩溃；
 - **七步一键生产发布**：前置检查 → 构建 → 停旧 → 启动 → 迁移 → 健康检查 → admin 初始化，单条命令完成生产更新；
 - **MySQL 作为唯一真相源**：Kill Switch 等关键状态直读数据库，不依赖缓存，杜绝状态不一致；
@@ -208,4 +207,4 @@ CMS-NG 的产品哲学可以概括为三句话：
 
 ---
 
-> **技术栈速览**：Next.js 16 · React 19 · NestJS 11 · Prisma 6 · MySQL 8 · Redis · TypeScript · Tailwind CSS v4 · TipTap · Zustand · DeepSeek / Kimi / OpenAI · Tavily · Seedream · npm workspaces + Turbo
+> **技术栈速览**：Next.js 16 · React 19 · NestJS 11 · Prisma 6 · MySQL 8 · TypeScript · Tailwind CSS v4 · TipTap · Zustand · DeepSeek / Kimi / OpenAI · Tavily · Seedream · npm workspaces + Turbo

@@ -75,7 +75,7 @@ jobs:
       - run: npm run build
 
   e2e:
-    name: Backend E2E (real MySQL + Redis)
+    name: Backend E2E (real MySQL)
     runs-on: ubuntu-latest
     # e2e 是真实阻断关卡,不再 continue-on-error 掩盖 conclusion(消除绿灯幻觉)。
     # 套件为 Auth/Stories/Articles 纯 CRUD(无外部 AI 调用,确定性),红了就该红。
@@ -91,17 +91,9 @@ jobs:
         options: >-
           --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval 10s --health-timeout 5s --health-retries 5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       # AppModule 启动时的 validateEnv() 必需项;密钥为 CI 占位值,仅要求存在
       DATABASE_URL: mysql://root:root@127.0.0.1:3306/cms_ng_test
-      REDIS_URL: redis://127.0.0.1:6379
       JWT_SECRET: ci-e2e-secret-at-least-16-chars
       AI_PROVIDER: deepseek
       DEEPSEEK_API_KEY: ci-placeholder-key

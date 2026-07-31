@@ -9,7 +9,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 **01创作大脑 (CMS-NG)** — A universal AI-driven intelligent content creation platform, designed to empower new media organizations with AI transformation. A monorepo covering story discovery, article writing with AI collaboration, editorial review, and multi-platform distribution.
 
 - **Frontend**: Next.js 16 (App Router) + React 19 + Tailwind CSS v4 + TipTap rich text editor + Lucide icons
-- **Backend**: NestJS 11 + Prisma ORM + MySQL 8 + Redis (ioredis)
+- **Backend**: NestJS 11 + Prisma ORM + MySQL 8
 - **Auth**: JWT via Passport (`@nestjs/passport` + `passport-jwt`)
 - **Shared**: `@cms-ng/shared` package (`packages/shared/`) for enums and interfaces used by both frontend and backend
 - **i18n**: Content-level language support via `ContentLanguage` enum: `SIMPLIFIED_CHINESE`, `TRADITIONAL_CHINESE_HK`, `TRADITIONAL_CHINESE_CANTONESE`, `ENGLISH`
@@ -108,7 +108,6 @@ cms-ng/
 │   │   ├── trending-topics/ # Hot topic aggregation (Google Trends RSS + native RSS + RSSHub)
 │   │   ├── billing/       # Billing, transactions, Alipay/WeChat Pay integration, cost estimation
 │   │   ├── storage/       # COS (腾讯云对象存储) file uploads — CosStorageService + StorageService
-│   │   ├── redis/         # RedisService wrapper around ioredis (cache + transient state)
 │   │   ├── config/        # Manual env validation at boot (env.validation.ts)
 │   │   ├── common/        # Guards, interceptors, filters, test-helpers, json.utils, ai-operation-logger
 │   │   ├── types/         # Backend-specific type definitions
@@ -126,7 +125,7 @@ cms-ng/
 │                                 #   AutoPublishTask/Run/Article, AutoPublishScheduleConfig/TopicStrategy/
 │                                 #   ContentConfig/FilterConfig/PublishConfig/RetryConfig, BillingConfigItem,
 │                                 #   BillingTransactionRecord, BalanceInfo, CostEstimate, TopUpRecordInfo, ApiResponse<T>
-├── docker-compose.yml            # Dev: RSSHub :1200 only (MySQL/Redis are external; app runs on host in both dev and prod)
+├── docker-compose.yml            # Dev: RSSHub :1200 only (MySQL is external; app runs on host in both dev and prod)
 └── scripts/
     ├── dev-start.sh              # One-command dev environment launcher (with --backend-only etc.)
     ├── cms-ng-service.sh         # Service manager: start/stop/restart/status/logs, --prod = host-process release (nginx + node/next + rsshub)
@@ -136,7 +135,7 @@ cms-ng/
 
 ### Env Validation at Boot
 
-`backend/src/config/env.validation.ts` uses a **manual `validateEnv()` function** (a `REQUIRED_VARS` list of `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET` plus targeted hand-written checks) run via NestJS `ConfigModule.forRoot({ validate })` — **not Zod**. If any required var is missing or invalid, the app fails fast with a readable error message instead of a mysterious runtime crash. It also enforces: `JWT_SECRET` ≥ 16 chars, `DATABASE_URL` must start with `mysql://`, and `AI_PROVIDER` must be one of `deepseek`/`gemini`/`kimi`/`openai` with its matching API key present. Optional vars (SMTP, billing keys) are validated lazily at their respective modules. Note: `zod` is declared in `backend/package.json` but is neither installed nor used — a dead-dependency candidate for removal.
+`backend/src/config/env.validation.ts` uses a **manual `validateEnv()` function** (a `REQUIRED_VARS` list of `DATABASE_URL`, `JWT_SECRET` plus targeted hand-written checks) run via NestJS `ConfigModule.forRoot({ validate })` — **not Zod**. If any required var is missing or invalid, the app fails fast with a readable error message instead of a mysterious runtime crash. It also enforces: `JWT_SECRET` ≥ 16 chars, `DATABASE_URL` must start with `mysql://`, and `AI_PROVIDER` must be one of `deepseek`/`gemini`/`kimi`/`openai` with its matching API key present. Optional vars (SMTP, billing keys) are validated lazily at their respective modules. Note: `zod` is declared in `backend/package.json` but is neither installed nor used — a dead-dependency candidate for removal.
 
 ### AI Layer
 
@@ -178,7 +177,7 @@ Automated content pipeline for scheduled/triggered article publishing without hu
   - `AutoPublishPublishConfig` — Target platform/WordPress site
   - `AutoPublishRetryConfig` — Retry policy on failure
 
-**Kill switch (紧急杀戮开关)**: `POST /auto-publish/kill-switch` (admin-only, `@Roles ADMIN`) toggles a global pause on the auto-publish pipeline. Backed by the `KillSwitch` singleton table (`schema.prisma`, fixed id `auto-publish`). **MySQL is the SOLE source of truth** — `isKillSwitchActive` (`auto-publish-scheduler.service.ts`) reads the DB directly and deliberately does NOT consult Redis (per the issue #48 P0 fix; its own comment says 不读 Redis). When `enabled=true`, the scheduler skips **newly-triggered** runs (cron-fire check + `runTask` entry check); it does NOT interrupt runs already in flight — the article batch loop has no per-step kill-switch check, so a started run processes its entire batch. New runs are a silent skip (`return`, no Run record), not a fail-fast. Redis is written best-effort but is not read by the canonical path (the one retry-path Redis read checks `=== "true"` against a written `"1"` and never matches — dead code).
+**Kill switch (紧急杀戮开关)**: `POST /auto-publish/kill-switch` (admin-only, `@Roles ADMIN`) toggles a global pause on the auto-publish pipeline. Backed by the `KillSwitch` singleton table (`schema.prisma`, fixed id `auto-publish`). **MySQL is the SOLE source of truth** — `isKillSwitchActive` (`auto-publish-scheduler.service.ts`) reads the DB directly. When `enabled=true`, the scheduler skips **newly-triggered** runs (cron-fire check + `runTask` entry check); it does NOT interrupt runs already in flight — the article batch loop has no per-step kill-switch check, so a started run processes its entire batch. New runs are a silent skip (`return`, no Run record), not a fail-fast.
 
 ### Billing & Payments
 
@@ -219,7 +218,7 @@ The frontend discovers sources and their `select`/`date`/`text`/`combobox` param
 - **JSON string arrays**: Schema fields like `tags`, `platforms`, `aiGeneratedParts`, `coverImages`, `adaptedTags`, and `expertise` are stored as JSON strings (`@default("[]")`), not native arrays (zero `Json`-type fields exist in the schema). Always use `safeJsonParse<T>(value, fallback: T): T` from `backend/src/common/json.utils.ts` to parse them safely (returns fallback on null/undefined OR parse failure). `safeJsonParse` is **backend-only** — `@cms-ng/shared` does not export it; the frontend must implement its own try/catch parse.
 - **API responses**: Use the `ApiResponse<T>` generic interface from `@cms-ng/shared` for standardized responses: `{ success: boolean, data?: T, error?: { code, message }, meta?: { page?, pageSize?, total? } }` (each `meta` inner field is independently optional).
 - **Swagger/OpenAPI**: Controllers and DTOs are decorated with `@ApiTags`, `@ApiOperation`, `@ApiProperty` etc. Swagger UI is available at `/api-docs` in dev (non-production). Keep decorators in sync with actual behavior.
-- **Env validation**: `ConfigModule.forRoot` in `app.module.ts` runs the manual `validateEnv()` at boot (see "Env Validation at Boot" above — not Zod). Required vars (`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`) cause a fast-fail; optional vars (SMTP, billing, COS) are validated lazily by their modules.
+- **Env validation**: `ConfigModule.forRoot` in `app.module.ts` runs the manual `validateEnv()` at boot (see "Env Validation at Boot" above — not Zod). Required vars (`DATABASE_URL`, `JWT_SECRET`) cause a fast-fail; optional vars (SMTP, billing, COS) are validated lazily by their modules.
 
 ### Key Frontend Conventions
 
@@ -253,7 +252,6 @@ Backend base URL (dev): `http://localhost:3001`. All endpoints require a JWT Bea
 ```env
 # ===== 数据库与缓存（外部中间件） =====
 DATABASE_URL="mysql://root:root123@localhost:3306/cms_ng"   # external MySQL (any reachable host)
-REDIS_URL="redis://localhost:6379"                          # external Redis (any reachable host)
 
 # ===== 应用配置 =====
 PORT=3001
@@ -333,7 +331,7 @@ WECHAT_PAY_SERIAL_NO=
 WECHAT_PAY_PRIVATE_KEY_PATH=
 ```
 
-> **URL-encoding gotcha**: if a `DATABASE_URL`/`REDIS_URL` password contains reserved chars (`@`, `:`, `/`, etc.) it must be URL-encoded (e.g. `@` → `%40`) or the connection silently fails. A passworded Redis uses `redis://:PASS@HOST:6379`.
+> **URL-encoding gotcha**: if a `DATABASE_URL` password contains reserved chars (`@`, `:`, `/`, etc.) it must be URL-encoded (e.g. `@` → `%40`) or the connection silently fails.
 
 ### Frontend (`frontend/.env.local`)
 
@@ -345,10 +343,9 @@ Template: `frontend/.env.example` — copy with `cp frontend/.env.example fronte
 
 ### Infrastructure
 
-MySQL 8 and Redis are **external middleware** — they are no longer part of `docker-compose.yml`. Point the apps at them via env vars:
+MySQL 8 is **external middleware** — it is no longer part of `docker-compose.yml`. Point the app at it via env vars:
 
 - **MySQL 8** (external): set `DATABASE_URL` in `backend/.env`. Any reachable MySQL 8 host works — local install, `mysql8` Docker container you manage, cloud RDS, etc. Use the URL form `mysql://USER:PASS@HOST:PORT/cms_ng`.
-- **Redis** (external): set `REDIS_URL` the same way. `RedisService` fail-opens to a no-op (warn log only) if the URL is unset or unreachable, so missing Redis won't crash the backend.
 - **RSSHub** (containerized, optional): `docker compose up -d` runs the only service in `docker-compose.yml` (port `1200`). Used by `trending-topics` for RSS ingestion. Point at it via `RSS_HUB_URL` if it runs on another host.
 
 `backend/.env` is the **single source of truth** for backend config in both dev and prod. The `cms-ng-service.sh start --prod` flow runs the backend (`node dist/src/main`) and frontend (`next start`) as host processes reading `backend/.env` directly, so the same file you run locally is what runs in production (substitute real secrets, of course). Template: `backend/.env.example`. Both files are gitignored except the `.example`.
@@ -359,7 +356,7 @@ MySQL 8 and Redis are **external middleware** — they are no longer part of `do
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.
 - **Article status workflow**: `DRAFT → WRITING → AI_OPTIMIZING → PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED → ARCHIVED` (can be sent back to `REVISION` from review states). Additional states: `PIPELINE_FAILED` (auto-publish pipeline failures), `AUTO_PUBLISHED` (articles published via automation without human review). Editors and admins can approve; reporters can only submit for review.
-- **Production deploy**: Production runs as host processes fronted by nginx (reverse proxy `:80`/`:443` → `127.0.0.1:3000` frontend + `127.0.0.1:3001` backend). `scripts/cms-ng-service.sh start --prod` is the **sole release entry point** and the standard SOP: `git pull` → `diff backend/.env.example backend/.env` → `./scripts/cms-ng-service.sh start --prod` → `status --prod` verify. The script runs: preflight (`backend/.env` present with `DATABASE_URL`/`REDIS_URL`/`JWT_SECRET`) → build (shared + `nest build` + `next build`) → stop old processes → start backend (`node dist/src/main`) + frontend (`next start`) as `nohup` background processes + RSSHub container → `prisma migrate deploy` → health check → admin init. `--no-build` skips build for config-only restarts (not for code/schema/dep changes). **Migrate runs AFTER the backend starts**, via `npx prisma migrate deploy` in the backend dir (NOT `migrate dev` — only applies existing migrations). Prod PID files: `.cms-ng-backend.pid` / `.cms-ng-frontend.pid`; logs: `.cms-ng-backend.log` / `.cms-ng-frontend.log` (view via `logs --prod backend|frontend|rsshub`). nginx config at `/etc/nginx/conf.d/cms-ng.conf`. Frontend `/` returns 307 to `/dashboard`; `/login` returns 200. Backend `:3001/users` returns 401 without a JWT (healthy). nginx exposes `:80`/`:443` on `SERVER_IP`.
+- **Production deploy**: Production runs as host processes fronted by nginx (reverse proxy `:80`/`:443` → `127.0.0.1:3000` frontend + `127.0.0.1:3001` backend). `scripts/cms-ng-service.sh start --prod` is the **sole release entry point** and the standard SOP: `git pull` → `diff backend/.env.example backend/.env` → `./scripts/cms-ng-service.sh start --prod` → `status --prod` verify. The script runs: preflight (`backend/.env` present with `DATABASE_URL`/`JWT_SECRET`) → build (shared + `nest build` + `next build`) → stop old processes → start backend (`node dist/src/main`) + frontend (`next start`) as `nohup` background processes + RSSHub container → `prisma migrate deploy` → health check → admin init. `--no-build` skips build for config-only restarts (not for code/schema/dep changes). **Migrate runs AFTER the backend starts**, via `npx prisma migrate deploy` in the backend dir (NOT `migrate dev` — only applies existing migrations). Prod PID files: `.cms-ng-backend.pid` / `.cms-ng-frontend.pid`; logs: `.cms-ng-backend.log` / `.cms-ng-frontend.log` (view via `logs --prod backend|frontend|rsshub`). nginx config at `/etc/nginx/conf.d/cms-ng.conf`. Frontend `/` returns 307 to `/dashboard`; `/login` returns 200. Backend `:3001/users` returns 401 without a JWT (healthy). nginx exposes `:80`/`:443` on `SERVER_IP`.
 - **Swagger UI**: Available at `http://localhost:3001/api-docs` in dev (mounted only when `NODE_ENV !== 'production'`). Useful for exploring endpoints and testing without a frontend. Bearer auth is pre-configured — paste a JWT from `/auth/login` (no "Bearer " prefix needed).
 - **CI/CD**: No GitHub Actions / no `.github` directory — all tests run locally (`npm run test` / `npx playwright test`); production deploys are manual via `scripts/cms-ng-service.sh start --prod`, not CI. PRs are not auto-tested or gated.
 - **License**: UNLICENSED (private project).
