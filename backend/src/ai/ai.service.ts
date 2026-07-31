@@ -2212,6 +2212,8 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
       watermark: false,
     };
 
+    this.logger.log(`[callSeedream] request body: ${JSON.stringify(body)}`);
+
     const response = await axios.post<SeedreamImageResponse>(
       `${this.seedreamApiBase}/images/generations`,
       body,
@@ -2223,6 +2225,10 @@ ${customPrompt ? `额外要求：${customPrompt}` : ''}
         timeout: 120000,
         ...(this.proxyAgent ? { httpsAgent: this.proxyAgent } : {}),
       },
+    );
+
+    this.logger.log(
+      `[callSeedream] response data: ${JSON.stringify(response.data)}`,
     );
 
     return response.data;
