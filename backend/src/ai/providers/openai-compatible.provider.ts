@@ -162,7 +162,10 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
   protected async postChatCompletions(
     body: Record<string, any>,
   ): Promise<AxiosResponse<RawChatCompletionResponse>> {
-    return axios.post<RawChatCompletionResponse>(
+    this.logger.log(
+      `[postChatCompletions] ${this.providerName}/${this.model} request body: ${JSON.stringify(body)}`,
+    );
+    const response = await axios.post<RawChatCompletionResponse>(
       `${this.apiBase}/chat/completions`,
       body,
       {
@@ -173,6 +176,10 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
         timeout: 300000,
       },
     );
+    this.logger.log(
+      `[postChatCompletions] ${this.providerName}/${this.model} response data: ${JSON.stringify(response.data)}`,
+    );
+    return response;
   }
 
   /** Parse the raw API response into ChatCompletionResponse */

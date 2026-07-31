@@ -104,21 +104,26 @@ export class TavilySearchTool implements ToolExecutor {
     const topic = typeof args.topic === 'string' ? args.topic : 'general';
 
     try {
-      const response = await axios.post(
-        `${this.apiBase}/search`,
-        {
-          api_key: this.apiKey,
-          query,
-          search_depth: searchDepth,
-          max_results: maxResults,
-          include_answer: includeAnswer,
-          ...(timeRange && { time_range: timeRange }),
-          topic,
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 60000,
-        },
+      const requestBody = {
+        api_key: this.apiKey,
+        query,
+        search_depth: searchDepth,
+        max_results: maxResults,
+        include_answer: includeAnswer,
+        ...(timeRange && { time_range: timeRange }),
+        topic,
+      };
+      this.logger.log(
+        `[execute] request body: ${JSON.stringify({ ...requestBody, api_key: '<REDACTED>' })}`,
+      );
+
+      const response = await axios.post(`${this.apiBase}/search`, requestBody, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 60000,
+      });
+
+      this.logger.log(
+        `[execute] response data: ${JSON.stringify(response.data)}`,
       );
 
       return this.formatResponse(
