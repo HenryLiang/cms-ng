@@ -105,6 +105,10 @@ jobs:
       JWT_SECRET: ci-e2e-secret-at-least-16-chars
       AI_PROVIDER: deepseek
       DEEPSEEK_API_KEY: ci-placeholder-key
+      # CosStorageService 构造时 eager 校验 COS 密钥"存在"(仅校验存在,不联网),
+      # e2e 纯 CRUD 不调用 COS,给占位值让 AppModule 能 boot(同 DEEPSEEK 占位模式)
+      COS_SECRET_ID: ci-placeholder-cos-id
+      COS_SECRET_KEY: ci-placeholder-cos-key
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

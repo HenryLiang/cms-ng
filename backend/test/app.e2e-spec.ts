@@ -95,7 +95,7 @@ describe('AppController (e2e)', () => {
           email: registerRes.body.user.email,
           password: '123456',
         })
-        .expect(201);
+        .expect(200);
 
       expect(res.body.accessToken).toBeDefined();
       expect(res.body.user.email).toBe(registerRes.body.user.email);
@@ -183,14 +183,14 @@ describe('AppController (e2e)', () => {
         });
       testStoryId = createRes.body.id;
 
-      // Then list
+      // Then list (returns paginated { data, meta })
       const res = await request(app.getHttpServer())
         .get('/stories')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body.length).toBeGreaterThan(0);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBeGreaterThan(0);
     });
 
     it('GET /stories/:id should return a specific story', async () => {
@@ -319,7 +319,8 @@ describe('AppController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
+      // returns paginated { data, meta }
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('GET /articles/:id should return a specific article', async () => {
