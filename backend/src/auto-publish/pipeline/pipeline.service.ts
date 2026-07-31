@@ -29,6 +29,23 @@ import { EstimateOperationType } from '../../billing/dto/estimate-cost.dto';
 import { safeJsonParse } from '../../common/json.utils';
 import * as nodemailer from 'nodemailer';
 
+/**
+ * Thrown when the kill switch activates mid-pipeline (issue #115).
+ * Propagates without retrying, so an activated kill switch interrupts the
+ * in-progress batch at the next step boundary instead of running all articles
+ * to completion (持续扣费/发布).
+ */
+export class KillSwitchActiveError extends Error {
+  constructor(public readonly beforeStep?: string) {
+    super(
+      beforeStep
+        ? `Kill switch activated - pipeline interrupted before ${beforeStep} step`
+        : `Kill switch activated - pipeline aborted`,
+    );
+    this.name = 'KillSwitchActiveError';
+  }
+}
+
 @Injectable()
 export class PipelineService {
   private readonly logger = new Logger(PipelineService.name);
@@ -173,6 +190,18 @@ export class PipelineService {
 
     // Process each article in the batch
     for (let i = 0; i < task.batchSize; i++) {
+      // Check kill switch before starting each article - allows interrupting
+      // a batch that started before the switch was flipped (issue #115).
+      // Without this, an activated kill switch would run all batchSize
+      // articles to completion (持续扣费/发布).
+      if (await this.scheduler.isKillSwitchActive()) {
+        this.logger.warn(
+          `Kill switch activated mid-batch - stopping run ${run.id} ` +
+            `after ${i}/${task.batchSize} article(s)`,
+        );
+        break;
+      }
+
       // Create tracking record
       const articleRecord = await this.prisma.autoPublishArticle.create({
         data: {
@@ -384,9 +413,20 @@ export class PipelineService {
     retryConfig: { maxRetries: number; retryDelayMs: number },
   ): Promise<void> {
     let lastError: Error | null = null;
+    let killSwitched = false;
 
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       if (attempt > 0) {
+        // Don't retry against an active kill switch (issue #115) - abort so the
+        // batch loop's next iteration can stop the whole run.
+        if (await this.scheduler.isKillSwitchActive()) {
+          this.logger.warn(
+            `Kill switch active - aborting retries for "${ctx.topic || 'unknown'}"`,
+          );
+          lastError = new KillSwitchActiveError();
+          killSwitched = true;
+          break;
+        }
         const delay = retryConfig.retryDelayMs * Math.pow(2, attempt - 1);
         this.logger.warn(
           `Retrying pipeline for ${ctx.topic || 'unknown'} (attempt ${attempt + 1}/${retryConfig.maxRetries + 1}) after ${delay}ms`,
@@ -406,6 +446,18 @@ export class PipelineService {
       try {
         let currentCtx = ctx;
         for (const step of this.steps) {
+          // Check kill switch before each step - interrupts an in-progress
+          // article at the next step boundary (issue #115), so an activated
+          // switch doesn't keep publishing/billing the rest of this article.
+          if (await this.scheduler.isKillSwitchActive()) {
+            this.logger.warn(
+              `Kill switch active - interrupting pipeline before ${step.name} step`,
+            );
+            lastError = new KillSwitchActiveError(step.name);
+            killSwitched = true;
+            break;
+          }
+
           // Create trace entry for this step
           const traceEntry: StepTraceEntry = {
             step: step.name,
@@ -459,6 +511,8 @@ export class PipelineService {
 
           currentCtx.trace!.push(traceEntry);
         }
+
+        if (killSwitched) break; // kill switch interrupted mid-article -> FAILED marking
 
         // All steps succeeded — deduct billing
         await this.deductAutoPublishBilling(currentCtx);
