@@ -37,7 +37,7 @@ import {
   Undo,
   Redo,
 } from 'lucide-react';
-import { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
+import { forwardRef, useImperativeHandle, useEffect, useState, useRef } from 'react';
 import { MediaPicker } from './media-picker';
 
 export interface RichTextEditorRef {
@@ -54,6 +54,21 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   function RichTextEditor({ content, onChange, placeholder }, ref) {
     const [showTableMenu, setShowTableMenu] = useState(false);
     const [showMediaPicker, setShowMediaPicker] = useState(false);
+
+    // Debounce the expensive getHTML() + parent setState so each keystroke
+    // doesn't re-render the 1500-line parent page (issue #114). The latest
+    // onChange is kept in a ref because useEditor captures onUpdate once at
+    // creation and won't see a new onChange identity on re-render.
+    const onChangeRef = useRef(onChange);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Last HTML we emitted via onChange. Lets the sync effect recognize our own
+    // echo (parent sets content = emitted html) and skip a second getHTML()
+    // comparison per keystroke (the "double serialization" in issue #114).
+    const lastEmittedRef = useRef<string | null>(null);
+
+    useEffect(() => {
+      onChangeRef.current = onChange;
+    }, [onChange]);
 
     const editor = useEditor({
       extensions: [
@@ -96,14 +111,50 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
       ],
       content,
       onUpdate: ({ editor }) => {
-        onChange(editor.getHTML());
+        // Debounce: only serialize + propagate after typing pauses. getHTML() is
+        // O(doc length); running it per keystroke re-renders the whole page.
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          const html = editor.getHTML();
+          lastEmittedRef.current = html;
+          onChangeRef.current(html);
+        }, 500);
       },
     });
 
+    // Flush pending debounced onChange immediately on blur so edits aren't held
+    // back when the user tabs/clicks away (e.g., toward Save). Cleans up on unmount.
     useEffect(() => {
-      if (editor && content !== editor.getHTML()) {
+      if (!editor) return;
+      const flush = () => {
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+          const html = editor.getHTML();
+          lastEmittedRef.current = html;
+          onChangeRef.current(html);
+        }
+      };
+      editor.on('blur', flush);
+      return () => {
+        editor.off('blur', flush);
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+      };
+    }, [editor]);
+
+    useEffect(() => {
+      if (!editor) return;
+      // Our own debounced onChange echoed back as content - no sync needed.
+      if (content === lastEmittedRef.current) return;
+      // External content change (initial load / AI draft / version restore) -
+      // sync into the editor without firing onUpdate.
+      if (content !== editor.getHTML()) {
         editor.commands.setContent(content, { emitUpdate: false });
       }
+      lastEmittedRef.current = content;
     }, [content, editor]);
 
     useImperativeHandle(ref, () => ({
