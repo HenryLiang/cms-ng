@@ -90,3 +90,6 @@ login-page.png
 # 例外:data/authors 是 author-style 测试 fixture(spec 依赖 8 个 persona),需跟踪
 data/*
 !data/authors/
+
+# Plans directory (local working notes, not tracked)
+plans/
