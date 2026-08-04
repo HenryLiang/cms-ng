@@ -5,10 +5,11 @@ import {
   getMediaAssets,
   deleteMedia,
   updateMedia,
+  retagMedia,
   type MediaAsset,
   type GetMediaParams,
 } from '@/lib/media-api';
-import { MediaSource } from '@cms-ng/shared';
+import { MediaSource, MediaTagStatus } from '@cms-ng/shared';
 import { ImageUploader } from '@/components/image-uploader';
 import { Button, PageHeader, Input, Card, Badge } from '@/components/ui';
 import {
@@ -24,6 +25,9 @@ import {
   ChevronRight,
   Images,
   ImagePlus,
+  RefreshCw,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 
 const PAGE_SIZE = 24;
@@ -39,6 +43,40 @@ const SOURCE_FILTERS: { value: MediaSource | ''; label: string }[] = [
   { value: MediaSource.UPLOAD, label: '上传' },
   { value: MediaSource.AI_GENERATED, label: 'AI 生成' },
 ];
+
+/** 打标状态角标:NONE 不显示 */
+function TagStatusBadge({
+  status,
+  error,
+}: {
+  status: MediaTagStatus;
+  error?: string | null;
+}) {
+  if (status === MediaTagStatus.NONE || status === MediaTagStatus.DONE) {
+  return null;
+  }
+  if (status === MediaTagStatus.PENDING || status === MediaTagStatus.TAGGING) {
+    return (
+      <span
+        title="AI 打标中"
+        className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+      >
+        <Loader2 className="h-3 w-3 animate-spin" />
+        打标中
+      </span>
+    );
+  }
+  // FAILED
+  return (
+    <span
+      title={error ? `打标失败:${error}` : '打标失败'}
+      className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md bg-red-600/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
+    >
+      <AlertCircle className="h-3 w-3" />
+      打标失败
+    </span>
+  );
+}
 
 function formatSize(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -69,31 +107,57 @@ export default function MediaLibraryPage() {
   const [source, setSource] = useState<MediaSource | ''>('');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [tag, setTag] = useState('');
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const params: GetMediaParams = { page, pageSize: PAGE_SIZE };
       if (source) params.source = source;
       if (search) params.search = search;
+      if (tag) params.tag = tag;
       const res = await getMediaAssets(params);
       setItems(res.data);
       setTotal(res.meta.total);
       setTotalPages(res.meta.totalPages);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount/过滤变更触发,刻意不把 loadX 入 deps 避免重复请求
-  }, [page, source, search, refreshKey]);
+  }, [page, source, search, tag, refreshKey]);
 
   useEffect(() => {
     // 数据获取模式（fetch-in-effect）：React 19 set-state-in-effect 规则对此过严
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  // 打标是后端异步任务(上传/retag 后 PENDING->TAGGING->DONE,~30-40s)。
+  // 列表里有未完成打标时,静默轮询(silent 不闪 loading)直到全部完成/失败,自动停。
+  useEffect(() => {
+    const hasPending = items.some(
+      (a) =>
+        a.tagStatus === MediaTagStatus.PENDING ||
+        a.tagStatus === MediaTagStatus.TAGGING,
+    );
+    if (!hasPending) return;
+    const timer = setInterval(() => void load({ silent: true }), 5000);
+    return () => clearInterval(timer);
+  }, [items, load]);
+
+  // 轮询刷新后同步详情面板:tagStatus 变化(如 TAGGING->DONE)时更新 selected,
+  // 使打开的抽屉实时反映新 aiTags/altText,无需手动关闭重开。
+  useEffect(() => {
+    if (!selected) return;
+    const fresh = items.find((a) => a.id === selected.id);
+    if (fresh && fresh.tagStatus !== selected.tagStatus) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 条件同步:仅在 tagStatus 变化时更新,不构成循环
+      setSelected(fresh);
+    }
+  }, [items, selected]);
 
   const onUploaded = () => {
     setShowUpload(false);
@@ -106,20 +170,31 @@ export default function MediaLibraryPage() {
     setSearch(searchInput.trim());
   };
 
-  const isFiltering = Boolean(search || source);
+  const isFiltering = Boolean(search || source || tag);
 
-  // 关键词 chip：只清搜索，不动来源筛选
+  // 关键词 chip：只清搜索，不动来源/标签筛选
   const onClearSearch = () => {
     setSearch('');
     setSearchInput('');
   };
 
-  // 空态「清除筛选条件」：搜索 + 来源一起清
+  // 点击标签 chip:以该 tag 过滤列表
+  const onTagClick = (t: string) => {
+    setTag(t);
+    setPage(1);
+  };
+
+  const onClearTag = () => {
+    setTag('');
+  };
+
+  // 空态「清除筛选条件」：搜索 + 来源 + 标签一起清
   const onClearFilters = () => {
     setPage(1);
     setSource('');
     setSearch('');
     setSearchInput('');
+    setTag('');
   };
 
   const onDelete = async (id: string) => {
@@ -202,7 +277,7 @@ export default function MediaLibraryPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-              placeholder="搜索文件名/alt/prompt"
+              placeholder="搜索文件名 / 标签 / 描述"
             />
           </div>
           <Button variant="secondary" onClick={onSearch}>
@@ -217,6 +292,19 @@ export default function MediaLibraryPage() {
               className="rounded-full p-0.5 transition-colors hover:bg-brand/10"
               title="清除关键词"
               aria-label="清除关键词"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        )}
+        {tag && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand-soft-text">
+            标签：{tag}
+            <button
+              onClick={onClearTag}
+              className="rounded-full p-0.5 transition-colors hover:bg-brand/10"
+              title="清除标签"
+              aria-label="清除标签"
             >
               <X className="h-3 w-3" />
             </button>
@@ -297,6 +385,7 @@ export default function MediaLibraryPage() {
                   loading="lazy"
                 />
                 <SourceBadge source={asset.source} className="absolute left-2 top-2" />
+                <TagStatusBadge status={asset.tagStatus} error={asset.tagError} />
               </div>
               <div className="px-3 py-2.5">
                 <div className="truncate text-xs font-medium text-foreground">
@@ -311,6 +400,40 @@ export default function MediaLibraryPage() {
                   <span aria-hidden>·</span>
                   <span>{formatSize(asset.size)}</span>
                 </div>
+                {/* 标签 chip 行:人工 tags + AI aiTags 合并去重,点击过滤 */}
+                {(() => {
+                  const allTags = [
+                    ...asset.tags,
+                    ...asset.aiTags.filter((t) => !asset.tags.includes(t)),
+                  ].slice(0, 4);
+                  if (allTags.length === 0) return null;
+                  return (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {allTags.map((t) => (
+                        <span
+                          key={t}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`按标签 ${t} 筛选`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTagClick(t);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onTagClick(t);
+                            }
+                          }}
+                          className="cursor-pointer truncate rounded bg-surface-muted px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:bg-brand-soft hover:text-brand-soft-text focus:outline-none focus:ring-1 focus:ring-brand"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </button>
           ))}
@@ -356,6 +479,10 @@ export default function MediaLibraryPage() {
           onSaved={() => {
             void load();
           }}
+          onRetagged={(updated) => {
+            setSelected(updated);
+            void load();
+          }}
         />
       )}
     </div>
@@ -368,16 +495,19 @@ function MediaDetailDrawer({
   onClose,
   onDelete,
   onSaved,
+  onRetagged,
 }: {
   asset: MediaAsset;
   onClose: () => void;
   onDelete: () => void;
   onSaved: () => void;
+  onRetagged: (updated: MediaAsset) => void;
 }) {
   const [altText, setAltText] = useState(asset.altText ?? '');
   const [title, setTitle] = useState(asset.title ?? '');
   const [tagsInput, setTagsInput] = useState((asset.tags ?? []).join(', '));
   const [saving, setSaving] = useState(false);
+  const [retagging, setRetagging] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Esc 关闭抽屉（跳过 IME 组词态，避免取消拼音候选时误关）
@@ -415,7 +545,25 @@ function MediaDetailDrawer({
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const onRetag = async () => {
+    setRetagging(true);
+    try {
+      const updated = await retagMedia(asset.id);
+      onRetagged(updated);
+    } catch {
+      // 错误已由 api 拦截器 toast
+    } finally {
+      setRetagging(false);
+    }
+  };
+
   const isAI = asset.source === MediaSource.AI_GENERATED;
+  // altText AI 来源标记(启发式:有 AI 标签且 altText 非空,通常由自动打标回填)
+  const altFromAI =
+    (asset.aiTags?.length ?? 0) > 0 && Boolean(asset.altText);
+  // 仅 PENDING(排队中,即将处理)禁用 retag;TAGGING 允许触发--后端对活跃 in-flight
+  // TAGGING 返 409,对僵尸 TAGGING(>10min)允许强制重打,使卡死资产有 UI 自愈入口
+  const canRetag = asset.tagStatus !== MediaTagStatus.PENDING;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -496,6 +644,47 @@ function MediaDetailDrawer({
             )}
           </dl>
 
+          {/* AI 自动标签(只读,人工标签在下方编辑) */}
+          {(() => {
+            const aiTags = asset.aiTags ?? [];
+            if (aiTags.length === 0 && asset.tagStatus === MediaTagStatus.NONE)
+              return null;
+            return (
+              <div className="border-t border-line pt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                    AI 标签
+                  </h3>
+                  {asset.tagStatus === MediaTagStatus.FAILED && (
+                    <span className="text-[11px] text-red-600">
+                      打标失败{asset.tagError ? `:${asset.tagError}` : ''}
+                    </span>
+                  )}
+                  {asset.tagStatus === MediaTagStatus.PENDING && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-subtle">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      打标中…
+                    </span>
+                  )}
+                </div>
+                {aiTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiTags.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand-soft-text"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-subtle">暂无 AI 标签</p>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="border-t border-line pt-4">
             <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">
               编辑元信息
@@ -506,8 +695,14 @@ function MediaDetailDrawer({
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">
+                <label className="flex items-center gap-2 text-xs font-medium text-foreground">
                   Alt 替换文本（无障碍 + SEO）
+                  {altFromAI && (
+                    <span className="inline-flex items-center gap-0.5 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-normal text-brand-soft-text">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      AI 生成
+                    </span>
+                  )}
                 </label>
                 <Input value={altText} onChange={(e) => setAltText(e.target.value)} />
               </div>
@@ -529,6 +724,18 @@ function MediaDetailDrawer({
             <Trash2 className="h-4 w-4" />
             删除
           </button>
+          {/* 重新打标:调用视觉大模型重新生成 AI 标签(每次=一次付费调用) */}
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={retagging}
+            disabled={!canRetag}
+            onClick={onRetag}
+            title={canRetag ? '重新生成 AI 标签' : '打标进行中,请稍后'}
+          >
+            <RefreshCw className="h-4 w-4" />
+            重新打标
+          </Button>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="secondary" onClick={onClose}>
               取消

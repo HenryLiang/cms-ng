@@ -91,6 +91,20 @@ jobs:
         options: >-
           --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval 10s --health-timeout 5s --health-retries 5
+      # bare ES 8.11.0(无 IK 插件):e2e 验证媒体全文检索的 fail-open 降级契约——
+      # ES 可达但建索引(ik_max_word)失败时,应用仍 boot、SearchService 降级、检索回退 LIKE。
+      # 无需认证(仅 CI 本地);不含任何凭证,可安全出现在公开仓库日志。
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        options: >-
+          --health-cmd "curl -sf http://localhost:9200/_cluster/health"
+          --health-interval 10s --health-timeout 5s --health-retries 15
     env:
       # AppModule 启动时的 validateEnv() 必需项;密钥为 CI 占位值,仅要求存在
       DATABASE_URL: mysql://root:root@127.0.0.1:3306/cms_ng_test
@@ -101,6 +115,9 @@ jobs:
       # e2e 纯 CRUD 不调用 COS,给占位值让 AppModule 能 boot(同 DEEPSEEK 占位模式)
       COS_SECRET_ID: ci-placeholder-cos-id
       COS_SECRET_KEY: ci-placeholder-cos-key
+      # 启用 ES 指向 bare 容器(无 IK):验证降级路径(media-search-degrade.e2e-spec.ts)
+      ELASTICSEARCH_ENABLED: "true"
+      ELASTICSEARCH_NODE: http://localhost:9200
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

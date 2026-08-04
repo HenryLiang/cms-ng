@@ -9,10 +9,14 @@
  * surface their own errors at the module that needs them.
  */
 
+import { redactConnectionString } from '../common/redact.utils';
+
 const REQUIRED_VARS = ['DATABASE_URL', 'JWT_SECRET'] as const;
 const MIN_JWT_SECRET_LENGTH = 16;
 const VALID_AI_PROVIDERS = ['deepseek', 'gemini', 'kimi', 'openai'] as const;
 type AiProvider = (typeof VALID_AI_PROVIDERS)[number];
+// 视觉链路与文本完全隔离:deepseek 无视觉能力,不接受;未配置时打标降级关闭(不 fail-fast)
+const VALID_VISION_PROVIDERS = ['gemini', 'kimi', 'openai'] as const;
 
 export interface ValidatedEnv {
   DATABASE_URL: string;
@@ -58,8 +62,9 @@ export function validateEnv(
     env.DATABASE_URL.length > 0 &&
     !/^mysql:\/\//.test(env.DATABASE_URL)
   ) {
+    // 脱敏后展示(公开仓库 CI 日志全公开,严禁打印含凭证连接串)
     errors.push(
-      `  - DATABASE_URL: must start with mysql:// (got "${env.DATABASE_URL.slice(0, 20)}...")`,
+      `  - DATABASE_URL: must start with mysql:// (got "${redactConnectionString(env.DATABASE_URL)}")`,
     );
   }
 
@@ -85,6 +90,33 @@ export function validateEnv(
         `  - ${requiredKey}: required when AI_PROVIDER=${aiProvider}`,
       );
     }
+  }
+
+  // 视觉 provider 仅做格式校验(枚举合法);未配置或缺 key 的降级关闭由
+  // MediaTaggingService.onModuleInit 处理,不在此 fail-fast(与可选变量惯例一致)
+  const visionProvider = env.AI_VISION_PROVIDER;
+  if (
+    visionProvider !== undefined &&
+    visionProvider !== '' &&
+    !(VALID_VISION_PROVIDERS as readonly string[]).includes(visionProvider)
+  ) {
+    errors.push(
+      `  - AI_VISION_PROVIDER: must be one of [${VALID_VISION_PROVIDERS.join(', ')}] (got "${visionProvider}")`,
+    );
+  }
+
+  // Elasticsearch 仅做格式校验;未配置或不可达的降级由 SearchService.onModuleInit
+  // 处理,不在此 fail-fast,不进 REQUIRED_VARS(与可选变量惯例一致,PRD §7.1)
+  const esEnabled =
+    env.ELASTICSEARCH_ENABLED !== undefined &&
+    env.ELASTICSEARCH_ENABLED.toLowerCase() === 'true';
+  if (
+    esEnabled &&
+    (!env.ELASTICSEARCH_NODE || !/^https?:\/\//.test(env.ELASTICSEARCH_NODE))
+  ) {
+    errors.push(
+      `  - ELASTICSEARCH_NODE: must be a http(s) URL when ELASTICSEARCH_ENABLED=true (got "${redactConnectionString(env.ELASTICSEARCH_NODE ?? '')}")`,
+    );
   }
 
   if (errors.length > 0) {

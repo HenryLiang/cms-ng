@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import * as crypto from 'crypto';
@@ -141,6 +142,9 @@ export class AIService {
     @Inject(STORAGE_SERVICE) private storageService: StorageService,
     private aiLog: AIOperationLogger,
     private authorStyle: AuthorStyleService,
+    // 进程内事件总线:AI 生图登记后发 media.asset.created,MediaTaggingService
+    // 监听入队(解耦 ai->media 循环依赖)
+    private eventEmitter: EventEmitter2,
   ) {
     this.seedreamApiKey = this.config.get<string>('SEEDREAM_API_KEY') || '';
     this.seedreamApiBase =
@@ -2092,7 +2096,13 @@ priority 取值说明：
   }): Promise<void> {
     const { stored, userId, articleTitle, imagePrompt, aiOpId } = params;
     const baseName = stored.key.split('/').pop() || 'cover';
-    await this.prisma.mediaAsset.create({
+    // 打标开关:与 MediaTaggingService 同源读取(MEDIA_TAGGING_ENABLED)。
+    // 此处不直接注入 MediaTaggingService(会形成 ai->media 循环依赖),
+    // 仅置 PENDING 状态 + 发进程内事件,由 MediaTaggingService 监听入队。
+    const taggingEnabled =
+      (this.config.get<string>('MEDIA_TAGGING_ENABLED') || '').toLowerCase() ===
+      'true';
+    const asset = await this.prisma.mediaAsset.create({
       data: {
         storageKey: stored.key,
         url: stored.url,
@@ -2109,8 +2119,17 @@ priority 取值说明：
         ownerId: userId,
         libraryType: MediaLibraryType.PERSONAL,
         status: MediaStatus.ACTIVE,
+        tagStatus: taggingEnabled ? ('PENDING' as const) : ('NONE' as const),
       },
     });
+    // 失败仅 warn,不依赖 aiLog.run 吞错兜底;cron 会重扫 PENDING 超时兜底
+    try {
+      this.eventEmitter.emit('media.asset.created', { assetId: asset.id });
+    } catch (err) {
+      this.logger.warn(
+        `AI 生图登记后发射打标事件失败(asset=${asset.id}): ${(err as Error)?.message ?? err}`,
+      );
+    }
     this.logger.log(
       `[generateArticleImage] 已登记媒体库: ai-${baseName} url=${stored.url}`,
     );

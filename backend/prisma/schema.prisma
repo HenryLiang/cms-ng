@@ -148,8 +148,12 @@ model AIOperation {
   createdBy String
   user      User     @relation(fields: [createdBy], references: [id])
 
+  // 媒体打标审计关联（仅 action=media_auto_tag 时填充；不加 FK，审计表不约束资产生命周期）
+  mediaAssetId String?
+
   billingTransaction BillingTransaction?
 
+  @@index([mediaAssetId])
   @@map("ai_operations")
 }
 
@@ -508,6 +512,14 @@ enum MediaLibraryType {
   TEAM
 }
 
+enum MediaTagStatus {
+  NONE
+  PENDING
+  TAGGING
+  DONE
+  FAILED
+}
+
 model MediaAsset {
   id            String           @id @default(uuid())
   // 存储
@@ -528,7 +540,13 @@ model MediaAsset {
   altText       String?
   title         String?
   description   String?          @db.Text
-  tags          String           @default("[]") // JSON string 数组（项目惯例，用 safeJsonParse 解析）
+  tags          String           @default("[]") @db.VarChar(1000) // 人工标签（JSON string 数组，用 safeJsonParse 解析）
+  // AI 自动打标
+  aiTags        String           @default("[]") @db.VarChar(1000) // AI 标签（JSON string 数组，同惯例）
+  tagStatus     MediaTagStatus   @default(NONE)
+  taggedAt      DateTime?
+  tagError      String?          @db.VarChar(500)
+  tagRetryCount Int              @default(0)
   // 归属
   ownerId       String           // 上传者 / 生成者 userId
   owner         User             @relation(fields: [ownerId], references: [id])
@@ -543,5 +561,6 @@ model MediaAsset {
   @@index([ownerId, createdAt])
   @@index([source])
   @@index([status])
+  @@index([tagStatus, updatedAt])
   @@map("media_assets")
 }

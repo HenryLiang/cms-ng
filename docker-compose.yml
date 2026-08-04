@@ -1,5 +1,5 @@
 # 外部依赖（MySQL）不在 compose 内编排，请在宿主或独立服务器上单独部署。
-# 本文件仅承载本地开发用的 RSSHub 聚合代理。
+# 本文件承载本地开发用的两个中间件容器：RSSHub 聚合代理 + Elasticsearch（媒体标签全文检索，含 IK 分词）。
 # 应用本身（frontend / backend）在 dev 环境通过 `npm run dev` 直跑，不进容器。
 
 services:
@@ -18,3 +18,27 @@ services:
       # 路由缓存 30 分钟（默认 5 分钟）。B站 ranking 走 API 易被 -352 风控，
       # 拉长缓存让成功拉取的分区数据保留更久，减少回源被拦概率。
       CACHE_EXPIRE: 1800
+
+  # 媒体库标签全文检索（P2）。IK 中文分词镜像见 docker/elasticsearch/Dockerfile
+  elasticsearch:
+    build: ./docker/elasticsearch
+    container_name: cms-ng-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false   # 仅本机绑定前提下的 dev 配置；远程 ES 必须开 security
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m # 小内存部署机限堆
+    ports:
+      # ⚠️ 硬要求绑本机：0.0.0.0 + 无鉴权 = 公网可读写的勒索攻击目标
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health?local=true || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  es-data:

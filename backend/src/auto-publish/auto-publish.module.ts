@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { AutoPublishController } from './auto-publish.controller';
 import { AutoPublishService } from './auto-publish.service';
 import { AutoPublishSchedulerService } from './auto-publish-scheduler.service';
@@ -17,8 +16,10 @@ import { AIModule } from '../ai/ai.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { BillingModule } from '../billing/billing.module';
 
+// ScheduleModule.forRoot() 已上移至 AppModule(媒体打标 cron 也依赖调度器,
+// 统一注册一次,避免 auto-publish 模块被移除/懒加载时打标 cron 静默停火)
 @Module({
-  imports: [ScheduleModule.forRoot(), AIModule, ChannelsModule, BillingModule],
+  imports: [AIModule, ChannelsModule, BillingModule],
   controllers: [AutoPublishController],
   providers: [
     AutoPublishService,

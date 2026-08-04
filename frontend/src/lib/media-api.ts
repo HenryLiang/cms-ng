@@ -1,5 +1,5 @@
 import { api } from './api';
-import { MediaSource, MediaStatus } from '@cms-ng/shared';
+import { MediaSource, MediaStatus, MediaTagStatus } from '@cms-ng/shared';
 import type { PaginatedResponse } from './article-api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -21,6 +21,10 @@ export interface MediaAsset {
   title?: string | null;
   description?: string | null;
   tags: string[];
+  aiTags: string[];
+  tagStatus: MediaTagStatus;
+  taggedAt?: string | null;
+  tagError?: string | null;
   ownerId: string;
   libraryType: 'PERSONAL' | 'TEAM';
   teamId?: string | null;
@@ -68,6 +72,16 @@ export async function updateMedia(
 
 export async function deleteMedia(id: string): Promise<void> {
   await api.delete(`/media/${id}`);
+}
+
+/**
+ * 手动重新打标(调用视觉大模型重新生成 AI 标签)。
+ * 走 axios 实例:retag 无 multipart 需求,可获得 401 拦截与 reportApiError
+ * (uploadMedia 的 fetch 是 multipart 场景的刻意选择,此处不模仿)。
+ */
+export async function retagMedia(id: string): Promise<MediaAsset> {
+  const res = await api.post(`/media/${id}/retag`);
+  return res.data;
 }
 
 /**

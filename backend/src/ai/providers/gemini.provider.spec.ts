@@ -85,4 +85,65 @@ describe('GeminiProvider', () => {
       expect.any(Object),
     );
   });
+
+  it('透传多模态消息(image_url content part)到 HTTP body', async () => {
+    const config = {
+      get: jest.fn((key: string) =>
+        key === 'GEMINI_API_KEY' ? 'k' : undefined,
+      ),
+    } as unknown as ConfigService;
+    const provider = new GeminiProvider(config);
+
+    mockedAxios.post.mockResolvedValue({
+      data: {
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      },
+    });
+
+    const multimodalContent = [
+      { type: 'text' as const, text: 'describe' },
+      { type: 'image_url' as const, image_url: { url: 'https://bkt/img.png' } },
+    ];
+    await provider.chatCompletion({
+      messages: [{ role: 'user', content: multimodalContent }],
+    });
+
+    const body = mockedAxios.post.mock.calls[0][1];
+    expect(body.messages[0].content).toEqual(multimodalContent);
+  });
+
+  it('日志脱敏:base64 data URI 不进 request body 日志', async () => {
+    const config = {
+      get: jest.fn((key: string) =>
+        key === 'GEMINI_API_KEY' ? 'k' : undefined,
+      ),
+    } as unknown as ConfigService;
+    const provider = new GeminiProvider(config);
+    const logSpy = jest.spyOn(provider['logger'], 'log');
+
+    mockedAxios.post.mockResolvedValue({
+      data: {
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      },
+    });
+
+    const b64 = 'data:image/png;base64,' + 'A'.repeat(10000);
+    await provider.chatCompletion({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 't' },
+            { type: 'image_url', image_url: { url: b64 } },
+          ],
+        },
+      ],
+    });
+
+    const reqLog = logSpy.mock.calls.find((c) =>
+      String(c[0]).includes('request body'),
+    )?.[0] as string;
+    expect(reqLog).toContain('[base64 data');
+    expect(reqLog).not.toContain('AAAA'); // base64 载荷不泄漏
+  });
 });

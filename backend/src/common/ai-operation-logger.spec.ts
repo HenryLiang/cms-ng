@@ -270,4 +270,74 @@ describe('AIOperationLogger', () => {
       expect(data.durationMs).toBeGreaterThanOrEqual(0);
     });
   });
+
+  // ===== runOrThrow + 审计截断 (媒体打标用) =====
+  describe('runOrThrow + audit truncation', () => {
+    it('成功 -> 返回 result + tokensUsed + aiOpId', async () => {
+      const r = await logger.runOrThrow({
+        userId: 'u',
+        agentType: 'VISUAL',
+        action: 'media_auto_tag',
+        prompt: 'p',
+        model: 'm',
+        mediaAssetId: 'asset-1',
+        fn: () => Promise.resolve({ result: { tags: ['t'] }, tokensUsed: 42 }),
+      });
+      expect(r).toEqual({
+        result: { tags: ['t'] },
+        tokensUsed: 42,
+        aiOpId: 'op-123',
+      });
+      const data = prisma.aIOperation.create.mock.calls[0][0].data;
+      expect(data.mediaAssetId).toBe('asset-1');
+      expect(data.tokensUsed).toBe(42);
+    });
+
+    it('失败 -> 持久化失败行后重抛(状态机判定依赖此)', async () => {
+      const fn = jest.fn().mockRejectedValue(new Error('vision boom'));
+      await expect(
+        logger.runOrThrow({
+          userId: 'u',
+          agentType: 'VISUAL',
+          action: 'media_auto_tag',
+          prompt: 'p',
+          model: 'm',
+          fn,
+        }),
+      ).rejects.toThrow('vision boom');
+      // 失败行已落库(result 含 error)
+      const data = prisma.aIOperation.create.mock.calls[0][0].data;
+      expect(JSON.parse(data.result as string)).toEqual({
+        error: 'vision boom',
+      });
+    });
+
+    it('超长 prompt(>32KB)-> 截断后写入,不炸审计 insert', async () => {
+      const huge = 'x'.repeat(40 * 1024);
+      await logger.runOrThrow({
+        userId: 'u',
+        agentType: 'VISUAL',
+        action: 'media_auto_tag',
+        prompt: huge,
+        model: 'm',
+        fn: () => Promise.resolve({ result: 1 }),
+      });
+      const data = prisma.aIOperation.create.mock.calls[0][0].data;
+      expect(data.prompt.length).toBeLessThan(huge.length);
+      expect(data.prompt).toContain('[truncated');
+    });
+
+    it('mediaAssetId 缺省时为 undefined(不污染既有文本 AI 审计)', async () => {
+      await logger.runOrThrow({
+        userId: 'u',
+        agentType: 'STORY',
+        action: 'other',
+        prompt: 'p',
+        model: 'm',
+        fn: () => Promise.resolve({ result: 1 }),
+      });
+      const data = prisma.aIOperation.create.mock.calls[0][0].data;
+      expect(data.mediaAssetId).toBeUndefined();
+    });
+  });
 });

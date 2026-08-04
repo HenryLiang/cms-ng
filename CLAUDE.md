@@ -19,7 +19,7 @@ All root-level commands use Turbo (orchestrates workspaces: `frontend/`, `backen
 
 ```bash
 npm run dev              # Start all services (frontend :3000 + backend :3001)
-npm run dev:start        # Same as dev, via scripts/dev-start.sh (supports --backend-only, --frontend-only, --no-rsshub, --no-migrate)
+npm run dev:start        # Same as dev, via scripts/dev-start.sh (supports --backend-only, --frontend-only, --no-rsshub, --no-es, --no-migrate)
 npm run dev:backend      # Backend only (dev-start.sh --backend-only)
 npm run dev:frontend     # Frontend only (dev-start.sh --frontend-only)
 npm run build            # Build all packages (respects Turbo dependency order)
@@ -109,7 +109,8 @@ Set `AI_PROVIDER=deepseek|gemini|kimi|openai` and provide the matching API key. 
 MySQL 8 is **external middleware** — it is no longer part of `docker-compose.yml`. Point the app at it via env vars:
 
 - **MySQL 8** (external): set `DATABASE_URL` in `backend/.env`. Any reachable MySQL 8 host works — local install, `mysql8` Docker container you manage, cloud RDS, etc. Use the URL form `mysql://USER:PASS@HOST:PORT/cms_ng`.
-- **RSSHub** (containerized, optional): `docker compose up -d` runs the only service in `docker-compose.yml` (port `1200`). Used by `trending-topics` for RSS ingestion. Point at it via `RSS_HUB_URL` if it runs on another host.
+- **RSSHub** (containerized, optional): one of two services in `docker-compose.yml` (port `1200`). Used by `trending-topics` for RSS ingestion. Point at it via `RSS_HUB_URL` if it runs on another host. Start just it with `docker compose up -d rsshub`.
+- **Elasticsearch 8.11 + IK** (containerized, optional): the other `docker-compose.yml` service (`docker/elasticsearch/Dockerfile` bakes the `analysis-ik` Chinese-analyzer plugin; bound to `127.0.0.1:9200`, single-node, `xpack.security` off — **never** re-bind to `0.0.0.0`: no auth + public = ransomware target). Powers media-library full-text/tag search. Off by default — enable with `ELASTICSEARCH_ENABLED=true` + `ELASTICSEARCH_NODE` in `backend/.env`; when disabled/unreachable/IK-missing, media search fail-open degrades to MySQL `LIKE`. Backfill/mapping-evolution via `cd backend && npx ts-node scripts/reindex-media-search.ts` (`--recreate` to rebuild the index). Start just it with `docker compose up -d elasticsearch`; skip in dev via `dev-start.sh --no-es`.
 
 `backend/.env` is the **single source of truth** for backend config in both dev and prod. The `cms-ng-service.sh start --prod` flow runs the backend (`node dist/src/main`) and frontend (`next start`) as host processes reading `backend/.env` directly, so the same file you run locally is what runs in production (substitute real secrets, of course). Template: `backend/.env.example`. Both files are gitignored except the `.example`.
 

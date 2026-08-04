@@ -1,10 +1,12 @@
 import {
   Injectable,
   Inject,
+  Logger,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, MediaAsset } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -17,11 +19,21 @@ import {
   type PaginatedResponse,
 } from '../common/pagination';
 import { safeJsonParse } from '../common/json.utils';
-import { MediaSource, MediaStatus, MediaLibraryType } from '@cms-ng/shared';
+import {
+  MediaSource,
+  MediaStatus,
+  MediaLibraryType,
+  MediaTagStatus,
+} from '@cms-ng/shared';
 import { imageSize } from 'image-size';
 import { randomUUID } from 'crypto';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
+import { MediaTaggingService } from './tagging/media-tagging.service';
+import {
+  SearchService,
+  SearchUnavailableException,
+} from '../search/search.service';
 
 /** 受支持的图片 MIME -> 扩展名 */
 const MIME_TO_EXT: Record<string, string> = {
@@ -34,8 +46,11 @@ const MIME_TO_EXT: Record<string, string> = {
 const DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 const MAX_FILENAME_LENGTH = 180; // fileName 列 VARCHAR(191)，留余量
 
-/** 序列化后的媒体资源 VO：tags 由 JSON string 解析为数组 */
-export type MediaAssetVo = Omit<MediaAsset, 'tags'> & { tags: string[] };
+/** 序列化后的媒体资源 VO：tags / aiTags 由 JSON string 解析为数组 */
+export type MediaAssetVo = Omit<MediaAsset, 'tags' | 'aiTags'> & {
+  tags: string[];
+  aiTags: string[];
+};
 
 interface RawUploadedFile {
   buffer: Buffer;
@@ -46,12 +61,16 @@ interface RawUploadedFile {
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
   private readonly maxUploadBytes: number;
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly config: ConfigService,
+    private readonly events: EventEmitter2,
+    private readonly tagging: MediaTaggingService,
+    private readonly search: SearchService,
   ) {
     const configured = this.config.get<string>('MEDIA_UPLOAD_MAX_BYTES');
     const parsed = configured ? Number(configured) : NaN;
@@ -164,8 +183,14 @@ export class MediaService {
           ownerId,
           libraryType: MediaLibraryType.PERSONAL,
           status: MediaStatus.ACTIVE,
+          // 打标开关开启时置 PENDING,触发异步打标;关闭时 NONE(前端不显示角标)
+          tagStatus: this.tagging.isEnabled()
+            ? MediaTagStatus.PENDING
+            : MediaTagStatus.NONE,
         },
       });
+      // 进程内事件:MediaTaggingService 监听打标入队、SearchService 监听 ES 索引(解耦,不直接调)
+      this.emitAssetEvent('media.asset.created', asset.id);
       return this.serialize(asset);
     } catch (err) {
       // DB 入库失败：回删已上传的 COS 对象，避免孤儿（fail-open 回删失败不掩盖原错误）
@@ -208,22 +233,88 @@ export class MediaService {
     query: QueryMediaDto,
   ): Promise<PaginatedResponse<MediaAssetVo>> {
     const { page, pageSize } = parsePaginationParams(query);
+
+    // ES 全文检索态(P2):search/tag 非空且 ES 已配置时走 ES;不可用降级扩展 LIKE。
+    // 门控用 isConfigured(非 isEnabled):配置即尝试,searchMedia 内部 ensureReady
+    // 节流自愈——宕机恢复后读路径能自动感知;仍降级则抛 SearchUnavailableException 兜底 LIKE。
+    // 仅 ACTIVE 走 ES:非 ACTIVE 文档不入 ES(删除即移除),回收站等查询必须直走 LIKE。
+    const esSearch = query.search?.trim();
+    const esTag = query.tag?.trim();
+    const requestedStatus = query.status ?? MediaStatus.ACTIVE;
+    if (
+      (esSearch || esTag) &&
+      requestedStatus === MediaStatus.ACTIVE &&
+      this.search.isConfigured()
+    ) {
+      try {
+        const { ids, total } = await this.search.searchMedia({
+          ownerId: userId,
+          status: requestedStatus,
+          search: esSearch || undefined,
+          tag: esTag || undefined,
+          source: query.source,
+          page,
+          pageSize,
+        });
+        if (ids.length === 0) {
+          return buildPaginatedResponse([], total, { page, pageSize });
+        }
+        // 回表取完整 VO(ES 文档仅携带检索字段);双侧同源过滤再守 owner/status
+        const rows = await this.prisma.mediaAsset.findMany({
+          where: {
+            id: { in: ids },
+            ownerId: userId,
+            status: requestedStatus,
+          },
+        });
+        // 按 ES 命中顺序排序(相关性/createdAt desc)
+        const order = new Map(ids.map((id, i) => [id, i]));
+        rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+        return buildPaginatedResponse(
+          rows.map((r) => this.serialize(r)),
+          total,
+          { page, pageSize },
+        );
+      } catch (err) {
+        if (!(err instanceof SearchUnavailableException)) throw err;
+        this.logger.warn(`ES 检索不可用,降级 LIKE: ${err.message}`);
+        // fall through to LIKE
+      }
+    }
+
     const where: Prisma.MediaAssetWhereInput = {
       ownerId: userId,
-      status: query.status ?? MediaStatus.ACTIVE,
+      status: requestedStatus,
     };
     if (query.source) where.source = query.source;
+    // search 与 tag 各自构造 OR 组,同时存在时 AND 组合(避免互相覆盖 where.OR)
+    const andClauses: Prisma.MediaAssetWhereInput[] = [];
     if (query.search) {
-      where.OR = [
-        { fileName: { contains: query.search } },
-        { altText: { contains: query.search } },
-        { title: { contains: query.search } },
-        { prompt: { contains: query.search } },
-      ];
+      // LIKE 兜底路径(ES 未启用或降级时):覆盖 fileName/altText/title/prompt
+      // + tags/aiTags,与 ES 态语义对齐,保证降级不丢 AI 标签检索能力
+      const s = query.search;
+      andClauses.push({
+        OR: [
+          { fileName: { contains: s } },
+          { altText: { contains: s } },
+          { title: { contains: s } },
+          { prompt: { contains: s } },
+          { tags: { contains: s } },
+          { aiTags: { contains: s } },
+        ],
+      });
     }
     if (query.tag) {
-      // tags 是 JSON string 数组，用 contains 模糊匹配（转义双引号）
-      where.tags = { contains: `"${query.tag.replace(/"/g, '\\"')}"` };
+      // tag 过滤:tags 与 aiTags 两列 OR(JSON string 数组,带引号子串匹配,转义双引号)
+      const esc = `"${query.tag.replace(/"/g, '\\"')}"`;
+      andClauses.push({
+        OR: [{ tags: { contains: esc } }, { aiTags: { contains: esc } }],
+      });
+    }
+    if (andClauses.length === 1) {
+      Object.assign(where, andClauses[0]);
+    } else if (andClauses.length > 1) {
+      where.AND = andClauses;
     }
     // 只读组合用 Promise.all（与 articles/stories/users/billing 惯例一致，避免 $transaction 串行开销）
     const [total, rows] = await Promise.all([
@@ -263,6 +354,8 @@ export class MediaService {
       where: { id: asset.id },
       data,
     });
+    // ES 索引更新(P2,fail-open):SearchService 回表重建文档
+    this.emitAssetEvent('media.asset.updated', asset.id);
     return this.serialize(updated);
   }
 
@@ -273,6 +366,8 @@ export class MediaService {
       where: { id: asset.id },
       data: { status: MediaStatus.DELETED },
     });
+    // ES 索引删除(P2,fail-open):防搜出已删图
+    this.emitAssetEvent('media.asset.deleted', asset.id);
     // 删 COS 对象；失败仅 fail-open（DB 已标记 DELETED，孤儿对象由后续清理任务处理）
     try {
       await this.storage.delete(asset.storageKey);
@@ -302,7 +397,25 @@ export class MediaService {
     return {
       ...asset,
       tags: safeJsonParse<string[]>(asset.tags, []),
+      aiTags: safeJsonParse<string[]>(asset.aiTags, []),
     };
+  }
+
+  /** 手动重打标:委托 MediaTaggingService(冷却/配额/开关校验在其内) */
+  async retag(id: string, userId: string): Promise<MediaAssetVo> {
+    await this.tagging.retag(id, userId);
+    return this.serialize(await this.getOwnedOrThrow(id, userId));
+  }
+
+  /** 事件发射 fail-open:监听器抛错不应让已入库的媒体操作失败(与 ai.service.ts 对齐) */
+  private emitAssetEvent(event: string, assetId: string): void {
+    try {
+      this.events.emit(event, { assetId });
+    } catch (err) {
+      this.logger.warn(
+        `${event} 事件发射失败 ${assetId}: ${(err as Error)?.message ?? err}`,
+      );
+    }
   }
 }
 

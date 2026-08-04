@@ -40,9 +40,22 @@ export interface ToolCall {
   };
 }
 
+/**
+ * Multimodal message content part (OpenAI `image_url` format).
+ *
+ * `image_url.url` accepts either a public https URL or a base64 data URI
+ * (`data:image/png;base64,...`) — all OpenAI-compatible providers
+ * (OpenAI / Gemini-compat / Kimi) accept this shape, so the base class
+ * can pass messages through unchanged.
+ */
+export type MessageContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  /** Plain text, or multimodal content parts (text + images) */
+  content: string | MessageContentPart[];
   name?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
