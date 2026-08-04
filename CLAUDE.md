@@ -84,7 +84,7 @@ cd backend && npx prisma migrate reset                    # WARNING: drops all d
 
 The repo is a Turbo monorepo with `frontend/`, `backend/`, `packages/shared/`, `scripts/`, and `docker-compose.yml`. See the filesystem for current structure.
 
-Backend architecture and subsystem details (AI Layer, Channels, Auto-Publishing, Billing, Storage, Email, Trending Topics, plus backend conventions and env validation rules) are lazy-loaded from `backend/CLAUDE.md` when working under `backend/`.
+Backend architecture and subsystem details (AI Layer, Channels, Auto-Publishing, Billing, Storage, Email, Trending Topics, Media Library & Search, plus backend conventions and env validation rules) are lazy-loaded from `backend/CLAUDE.md` when working under `backend/`.
 
 The LLM provider seam supports `deepseek` (default), `gemini`, `kimi`, and `openai`. Gemini uses Google's OpenAI-compatible Chat Completions endpoint and the same `ChatCompletionProvider` interface as the other providers.
 
@@ -104,6 +104,9 @@ Set `AI_PROVIDER=deepseek|gemini|kimi|openai` and provide the matching API key. 
 
 > **URL-encoding gotcha**: if a `DATABASE_URL` password contains reserved chars (`@`, `:`, `/`, etc.) it must be URL-encoded (e.g. `@` → `%40`) or the connection silently fails.
 
+- **RSS proxy (mainland dev vs overseas prod)**: overseas RSS sources (Google Trends, BBC/Guardian/NYT/Economist/FT/Reuters, NHK) are gated by `RSS_PROXY_ENABLED`; set `true` + `HTTP_PROXY=http://127.0.0.1:7890` for mainland-dev, `false`/unset for overseas prod. Domestic native RSS (sina/people/chinanews) and all RSSHub sources always connect directly. Switching is config-only - no code changes.
+- **CORS**: `CORS_ORIGINS` (comma-separated) restricts allowed origins; defaults to `http://localhost:3000` in dev, set to your frontend domain(s) in prod.
+
 ### Infrastructure
 
 MySQL 8 is **external middleware** — it is no longer part of `docker-compose.yml`. Point the app at it via env vars:
@@ -118,7 +121,9 @@ MySQL 8 is **external middleware** — it is no longer part of `docker-compose.y
 
 - **Node version**: >= 20 (developed on v23.9.0). This is a prose requirement — no `engines` field is set in any `package.json`, so Node 18 won't be warned. Some packages log engine warnings but function correctly.
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
+- **Frontend state**: Zustand (`auth-store`, `toast-store`) is the only state library in use. `@tanstack/react-query` is listed in `frontend/package.json` but is **NOT used** (no `QueryClientProvider`) - data fetching is Axios (`src/lib/api.ts`) inside `useEffect`+`useState`. Don't introduce react-query without first wiring a provider. Full frontend conventions in `frontend/CLAUDE.md` (which re-exports `frontend/AGENTS.md`).
 - **Codebase memory index**: After modifying `schema.prisma` or large-scale source changes, rebuild the codebase-memory knowledge graph so node/edge data stays accurate. Run `./scripts/reindex-codebase-memory.sh` to check staleness (compares the indexed commit in `.codebase-memory/artifact.json` against HEAD); it prints rebuild guidance when needed. Rebuild via the codebase-memory MCP `index_repository(repo_path=<repo>, mode='full', persistence=true)` (MCP-only, no CLI). The `.codebase-memory/` artifact is **gitignored (local-only)** — the tool auto-reindexes to track HEAD on every MCP query, so it changes constantly and is not suited for version control; teammates rebuild locally via the script.
+- **`AGENTS.md` (root)** is a symlink to `CLAUDE.md` so non-Claude agent tools (Codex/CodeBuddy/etc., per `scripts/agent/`) auto-load the same conventions. Edit `CLAUDE.md` directly - the symlink reflects it; don't maintain separate content in `AGENTS.md`.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.
 - **Article status workflow**: `DRAFT → WRITING → {AI_OPTIMIZING →} PENDING_REVIEW → IN_REVIEW → APPROVED → PUBLISHED → ARCHIVED` (can be sent back to `REVISION` from review states). `AI_OPTIMIZING` is **optional** — reporters may submit directly from `WRITING` (or from `REVISION` after editor send-back) into `PENDING_REVIEW` without first running the AI optimization step. `DRAFT → PENDING_REVIEW` remains disallowed; an article must reach `WRITING` at least once before review. Additional states: `PIPELINE_FAILED` (auto-publish pipeline failures), `AUTO_PUBLISHED` (articles published via automation without human review). Editors and admins can approve; reporters can only submit for review.
 - **Production deploy**: Production runs as host processes fronted by nginx (reverse proxy `:80`/`:443` → `127.0.0.1:3000` frontend + `127.0.0.1:3001` backend). `scripts/cms-ng-service.sh start --prod` is the **sole release entry point** and the standard SOP: `git pull` → `diff backend/.env.example backend/.env` → `./scripts/cms-ng-service.sh start --prod` → `status --prod` verify. The script runs: preflight (`backend/.env` present with `DATABASE_URL`/`JWT_SECRET`) → build (shared + `nest build` + `next build`) → stop old processes → start backend (`node dist/src/main`) + frontend (`next start`) as `nohup` background processes + RSSHub container → `prisma migrate deploy` → health check → admin init. `--no-build` skips build for config-only restarts (not for code/schema/dep changes). **Migrate runs AFTER the backend starts**, via `npx prisma migrate deploy` in the backend dir (NOT `migrate dev` — it only applies existing migrations, won't create new ones). Prod PID files: `.cms-ng-backend.pid` / `.cms-ng-frontend.pid`; logs: `.cms-ng-backend.log` / `.cms-ng-frontend.log` (view via `logs --prod backend|frontend|rsshub`). nginx config at `/etc/nginx/conf.d/cms-ng.conf`. Frontend `/` returns 307 to `/dashboard`; `/login` returns 200. Backend `:3001/users` returns 401 without a JWT (healthy). nginx exposes `:80`/`:443` on `SERVER_IP`.
@@ -126,7 +131,9 @@ MySQL 8 is **external middleware** — it is no longer part of `docker-compose.y
 - **CI/CD**: GitHub Actions in `.github/workflows/`. `ci.yml` runs on PR/push to main — lint (`--max-warnings=0`), backend Jest, frontend Vitest, turbo build, backend e2e (MySQL service; e2e 初期 `continue-on-error`). `deploy.yml` = manual `workflow_dispatch` + `production` environment 审批 → SSH 部署 via `cms-ng-service.sh start --prod`. 分支保护要求 lint/test/build status checks; Node 由 `.nvmrc` 固定 (23.9.0)。
 - **License**: BUSL-1.1 (Business Source License) — 源码公开；生产使用需商业授权；2030-07-18 起自动转 Apache-2.0。详见根目录 `LICENSE`。
 
-Regression testing details are available as a skill: invoke `/regression-testing` when working on E2E tests.
+## Regression Tests (Playwright)
+
+Functional regression lives in `tests/regression/` (`*.spec.ts`: smoke, auth/i18n, article workflow, AI, auto-publish, channels, cross-module, RBAC, …). `playwright.config.ts` does **not** auto-start servers - it assumes dev frontend `:3000` **and** a QA backend on `:3002` are already running. A `pageWithQA` fixture rewrites every `:3001` call to `:3002` so data flows to the separate `cms_ng_qa` DB, not dev. Run: `npx playwright test`; reports at `tests/regression/results/{html,run-summary.json,artifacts/}`. The QA backend is a manual `PORT=3002` NestJS process with `DATABASE_URL` -> `cms_ng_qa`. The `/regression-testing` skill has the full walkthrough.
 
 ## Scripts
 
@@ -141,6 +148,7 @@ Beyond `dev-start.sh` and `cms-ng-service.sh`:
 `docs/` holds PRDs, architecture reviews, and DB schema notes — start there when reasoning about scope or schema rather than rediscovering from code:
 
 - `PRD-auto-publish-pipeline.md` — auto-publish system PRD
+- `PRD-media-ai-tagging-search.md`, `PRD-media-management.md` - media library + AI tagging/search PRDs
 - `01-cms-ng-overview.md`, `product-introduction.md`, `project_management.md` — product/overview context
 - `architecture-review.md`, `project_architecture_assessment.md` — architecture audits + open tech debt
 - `database.md` — DB schema overview
