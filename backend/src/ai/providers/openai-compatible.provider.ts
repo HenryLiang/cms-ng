@@ -44,6 +44,8 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
     protected readonly apiBase: string,
     readonly model: string,
     protected readonly defaultTemperature?: number,
+    /** HTTP 超时(默认 300s;后台视觉调用应显式调低,如 60s) */
+    protected readonly requestTimeoutMs: number = 300_000,
   ) {}
 
   abstract readonly providerName: string;
@@ -163,7 +165,7 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
     body: Record<string, any>,
   ): Promise<AxiosResponse<RawChatCompletionResponse>> {
     this.logger.log(
-      `[postChatCompletions] ${this.providerName}/${this.model} request body: ${JSON.stringify(body)}`,
+      `[postChatCompletions] ${this.providerName}/${this.model} request body: ${JSON.stringify(sanitizeForLog(body))}`,
     );
     const response = await axios.post<RawChatCompletionResponse>(
       `${this.apiBase}/chat/completions`,
@@ -173,11 +175,11 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        timeout: 300000,
+        timeout: this.requestTimeoutMs,
       },
     );
     this.logger.log(
-      `[postChatCompletions] ${this.providerName}/${this.model} response data: ${JSON.stringify(response.data)}`,
+      `[postChatCompletions] ${this.providerName}/${this.model} response data: ${JSON.stringify(sanitizeForLog(response.data))}`,
     );
     return response;
   }
@@ -206,4 +208,34 @@ export abstract class OpenAICompatibleProvider implements ChatCompletionProvider
   protected resolveTemperature(preferred?: number): number {
     return this.defaultTemperature ?? preferred ?? 0.7;
   }
+}
+
+const LOG_STRING_MAX = 8192;
+
+/**
+ * 日志脱敏(#147 后续):多模态消息中的 base64 图片与超长字符串绝不进日志。
+ * - `data:...;base64,...` → 占位符(请求日志在 HTTP 调用前打印,脱敏必须先于任何视觉联调)
+ * - 其他超长字符串截断到 8KB,防单条日志数十 MB;阈值提到 8192 以保留 #147
+ *   文本 AI 链路全量请求/响应日志(文章 prompt 常达数 KB,500 字截断会丢排障价值)
+ */
+function sanitizeForLog(value: unknown): unknown {
+  if (typeof value === 'string') {
+    if (value.startsWith('data:') && value.includes(';base64,')) {
+      return `[base64 data, ${value.length} chars redacted]`;
+    }
+    return value.length > LOG_STRING_MAX
+      ? `${value.slice(0, LOG_STRING_MAX)}…[truncated, ${value.length} chars total]`
+      : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeForLog);
+  }
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = sanitizeForLog(v);
+    }
+    return out;
+  }
+  return value;
 }

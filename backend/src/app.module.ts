@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv, formatValidationErrors } from './config/env.validation';
@@ -53,6 +55,11 @@ import { MediaModule } from './media/media.module';
       }),
     }),
     PrismaModule,
+    // 进程内事件总线(global:解耦 ai->media 循环依赖,AI 生图登记后发事件,
+    // MediaTaggingService 监听入队),符合 #148 无 Redis 哲学。
+    EventEmitterModule.forRoot({ global: true }),
+    // 调度器统一注册一次(媒体打标 cron + auto-publish cron 共用)
+    ScheduleModule.forRoot(),
     StorageModule,
     AuthModule,
     UsersModule,

@@ -117,6 +117,20 @@ export enum MediaLibraryType {
   TEAM = 'TEAM',
 }
 
+// ===== 媒体 AI 打标状态 =====
+export enum MediaTagStatus {
+  /** 未触发(功能关闭期间入库 / 历史资产) */
+  NONE = 'NONE',
+  /** 已入库待打标 */
+  PENDING = 'PENDING',
+  /** 打标中(僵尸态由定时任务恢复) */
+  TAGGING = 'TAGGING',
+  /** 打标完成 */
+  DONE = 'DONE',
+  /** 打标失败(可重试) */
+  FAILED = 'FAILED',
+}
+
 // ===== 用户 =====
 export interface User {
   id: string;

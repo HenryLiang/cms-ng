@@ -5,6 +5,7 @@
 #
 # 选项:
 #   --no-rsshub     跳过 RSSHub 容器启动
+#   --no-es         跳过 Elasticsearch 容器启动(媒体全文检索降级 LIKE)
 #   --no-migrate    跳过数据库迁移
 #   --backend-only  仅启动后端
 #   --frontend-only 仅启动前端
@@ -37,6 +38,7 @@ cd "$PROJECT_ROOT"
 
 # ─────────────────── 参数解析 ───────────────────
 SKIP_RSSHUB=false
+SKIP_ES=false
 SKIP_MIGRATE=false
 START_BACKEND=true
 START_FRONTEND=true
@@ -44,6 +46,7 @@ START_FRONTEND=true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-rsshub)    SKIP_RSSHUB=true; shift ;;
+    --no-es)        SKIP_ES=true; shift ;;
     --no-migrate)   SKIP_MIGRATE=true; shift ;;
     --backend-only) START_FRONTEND=false; shift ;;
     --frontend-only) START_BACKEND=false; shift ;;
@@ -52,6 +55,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "选项:"
       echo "  --no-rsshub      跳过 RSSHub 容器启动"
+      echo "  --no-es          跳过 Elasticsearch 容器启动(媒体全文检索降级 LIKE)"
       echo "  --no-migrate     跳过数据库迁移"
       echo "  --backend-only   仅启动后端服务"
       echo "  --frontend-only  仅启动前端服务"
@@ -110,13 +114,14 @@ success "Node.js $(node -v)"
 # npm
 success "npm $(npm -v)"
 
-# Docker（仅 RSSHub 需要）
-if [[ "$SKIP_RSSHUB" == false ]]; then
+# Docker（RSSHub / Elasticsearch 需要）
+if [[ "$SKIP_RSSHUB" == false ]] || [[ "$SKIP_ES" == false ]]; then
   if command -v docker &>/dev/null; then
     success "Docker $(docker --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
   else
-    warn "Docker 未安装，将跳过 RSSHub 启动"
+    warn "Docker 未安装，将跳过 RSSHub 与 Elasticsearch 启动"
     SKIP_RSSHUB=true
+    SKIP_ES=true
   fi
 fi
 
@@ -167,8 +172,8 @@ else
   fi
 fi
 
-# ═══════════════════ 3. RSSHub ═══════════════════
-step "3/7  RSSHub 聚合代理"
+# ═══════════════════ 3. 中间件容器 (RSSHub / Elasticsearch) ═══════════════════
+step "3/7  中间件容器 (RSSHub / Elasticsearch)"
 
 if [[ "$SKIP_RSSHUB" == true ]]; then
   warn "已跳过 RSSHub 启动"
@@ -192,6 +197,33 @@ else
       done
     else
       warn "RSSHub 启动失败，热点聚合功能将不可用"
+    fi
+  fi
+fi
+
+# Elasticsearch(媒体全文检索,可选;未启动/未启用时检索降级 LIKE)
+if [[ "$SKIP_ES" == true ]]; then
+  warn "已跳过 Elasticsearch 启动(媒体全文检索降级 LIKE)"
+else
+  # 检查是否已在运行
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^cms-ng-elasticsearch$"; then
+    success "Elasticsearch 已在运行 (localhost:9200)"
+  else
+    info "启动 Elasticsearch 容器(含 IK 中文分词,首次需构建镜像)..."
+    if docker compose -f "$PROJECT_ROOT/docker-compose.yml" up -d elasticsearch 2>&1; then
+      # 等待 ES 就绪(JVM + 插件启动较慢,轮询健康端点,最长 ~30s)
+      for i in {1..30}; do
+        if curl -sf http://localhost:9200/_cluster/health >/dev/null 2>&1; then
+          success "Elasticsearch 已启动 (localhost:9200)"
+          break
+        fi
+        if [[ "$i" -eq 30 ]]; then
+          warn "Elasticsearch 启动超时,媒体全文检索降级 LIKE: docker logs cms-ng-elasticsearch"
+        fi
+        sleep 1
+      done
+    else
+      warn "Elasticsearch 启动失败,媒体全文检索降级 LIKE"
     fi
   fi
 fi
@@ -371,6 +403,9 @@ if [[ "$START_BACKEND" == true ]]; then
 fi
 if [[ "$SKIP_RSSHUB" == false ]]; then
   echo -e "  ${BOLD}RSSHub${NC}   → ${CYAN}http://localhost:1200${NC}"
+fi
+if [[ "$SKIP_ES" == false ]]; then
+  echo -e "  ${BOLD}ES${NC}       → ${CYAN}http://localhost:9200${NC}  ${DIM}(媒体全文检索,需 backend/.env ELASTICSEARCH_ENABLED=true)${NC}"
 fi
 
 echo ""

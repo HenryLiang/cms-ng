@@ -7,6 +7,7 @@ import {
   ToolCall,
 } from './chat-completion.interface';
 import { OpenAICompatibleProvider } from './openai-compatible.provider';
+import type { ProviderOverrides } from './provider-overrides';
 
 /**
  * Kimi provider — OpenAI-compatible API with built-in web search support.
@@ -16,14 +17,18 @@ import { OpenAICompatibleProvider } from './openai-compatible.provider';
 export class KimiProvider extends OpenAICompatibleProvider {
   readonly providerName = 'kimi';
 
-  constructor(config: ConfigService) {
-    const model = config.get<string>('KIMI_MODEL') || 'kimi-for-coding';
+  constructor(config: ConfigService, overrides?: ProviderOverrides) {
+    const model =
+      overrides?.model || config.get<string>('KIMI_MODEL') || 'kimi-for-coding';
     const defaultTemp = model === 'kimi-k2.6' ? 1 : undefined;
     super(
       config.get<string>('KIMI_API_KEY') || '',
-      config.get<string>('KIMI_API_BASE') || 'https://api.kimi.com/coding/v1',
+      overrides?.apiBase ||
+        config.get<string>('KIMI_API_BASE') ||
+        'https://api.kimi.com/coding/v1',
       model,
       defaultTemp,
+      overrides?.requestTimeoutMs,
     );
   }
 

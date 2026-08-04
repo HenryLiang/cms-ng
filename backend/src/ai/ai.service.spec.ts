@@ -19,6 +19,7 @@ import { STORAGE_SERVICE } from '../storage/storage.service';
 import { BillingService } from '../billing/billing.service';
 import { AIOperationLogger } from '../common/ai-operation-logger';
 import { AuthorStyleService } from '../authors/author-style.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /** Shared mock for AuthorStyleService. Returns '' (no persona) so the system
  *  prompts in these tests are unchanged — author-style injection is opt-in via
@@ -27,6 +28,12 @@ const authorStyleMock = { getSystemPrompt: () => Promise.resolve('') };
 const AUTHOR_STYLE_PROVIDER = {
   provide: AuthorStyleService,
   useValue: authorStyleMock,
+};
+
+// 进程内事件总线 mock(AIService 在 AI 生图登记后发 media.asset.created)
+const EVENT_EMITTER_PROVIDER = {
+  provide: EventEmitter2,
+  useValue: { emit: jest.fn() },
 };
 
 // axios is still used by searchWikipedia (GET requests)
@@ -104,6 +111,7 @@ describe('AIService', () => {
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
         AUTHOR_STYLE_PROVIDER,
+        EVENT_EMITTER_PROVIDER,
       ],
     }).compile();
 
@@ -2563,6 +2571,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
         AUTHOR_STYLE_PROVIDER,
+        EVENT_EMITTER_PROVIDER,
       ],
     }).compile();
 
@@ -2628,6 +2637,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
         AUTHOR_STYLE_PROVIDER,
+        EVENT_EMITTER_PROVIDER,
       ],
     }).compile();
 
@@ -2694,6 +2704,7 @@ describe('AIService — performSearch branch logic', () => {
         { provide: STORAGE_SERVICE, useValue: storageMock },
         { provide: BillingService, useValue: billingMock },
         AUTHOR_STYLE_PROVIDER,
+        EVENT_EMITTER_PROVIDER,
       ],
     }).compile();
 

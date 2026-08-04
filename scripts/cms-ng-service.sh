@@ -8,11 +8,11 @@ set -e
 #   ./scripts/cms-ng-service.sh stop   [--prod]
 #   ./scripts/cms-ng-service.sh restart [--prod] [--no-build]
 #   ./scripts/cms-ng-service.sh status [--prod]
-#   ./scripts/cms-ng-service.sh logs   [--prod] [backend|frontend|rsshub]
+#   ./scripts/cms-ng-service.sh logs   [--prod] [backend|frontend|rsshub|elasticsearch]
 #
 # 模式:
 #   (默认)  开发模式 (npm run dev, turbo)
-#   --prod   生产模式 (宿主机进程: nginx 反代 + node/next 后台进程 + rsshub 容器)
+#   --prod   生产模式 (宿主机进程: nginx 反代 + node/next 后台进程 + rsshub/elasticsearch 容器)
 #
 # 生产模式选项:
 #   --no-build  跳过构建 (仅启动已有产物，用于快速重启非代码变更的场景)
@@ -21,7 +21,8 @@ set -e
 #   nginx (80/443) -> 127.0.0.1:3000 (frontend next start)
 #                 -> 127.0.0.1:3001 (backend node dist/src/main)
 #   rsshub (docker, :1200)
-#   MySQL/Redis 为外部中间件
+#   elasticsearch (docker, 127.0.0.1:9200; 仅 ELASTICSEARCH_ENABLED=true 时启动,媒体全文检索)
+#   MySQL 为外部中间件
 #
 # ============================================================
 # 标准发布流程 (每次更新代码后执行)
@@ -104,7 +105,7 @@ BACKEND_PID_FILE="$PROJECT_DIR/.cms-ng-backend.pid"
 FRONTEND_PID_FILE="$PROJECT_DIR/.cms-ng-frontend.pid"
 BACKEND_LOG_FILE="$PROJECT_DIR/.cms-ng-backend.log"
 FRONTEND_LOG_FILE="$PROJECT_DIR/.cms-ng-frontend.log"
-RSSHUB_COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"  # rsshub + elasticsearch 两个中间件容器
 BACKEND_ENV="$BACKEND_DIR/.env"
 
 # 健康检查端口
@@ -132,6 +133,57 @@ has_flag() {
     return 1
 }
 
+# backend/.env 中 ELASTICSEARCH_ENABLED=true 时返回 0。
+# 与应用侧 dotenv 语义对齐:值先截断行内注释、去首尾空白与单/双引号、小写化后再比较
+# (容忍 `ELASTICSEARCH_ENABLED = true # 注释`、`TRUE`、`"true"` 等写法),避免脚本与应用判定分叉。
+es_enabled() {
+    local raw
+    raw=$(grep -E '^[[:space:]]*ELASTICSEARCH_ENABLED[[:space:]]*=' "$BACKEND_ENV" 2>/dev/null | head -n1 | cut -d= -f2-)
+    raw=$(printf '%s' "$raw" | sed 's/[[:space:]]#.*$//' | tr -d "\"'[:space:]" | tr '[:upper:]' '[:lower:]')
+    [ "$raw" = "true" ]
+}
+
+# 安全红线:ES 无认证,9200 只能绑环回(127.0.0.1/::1);公网暴露 = 勒索软件靶标。
+# 静态校验(权威源):直接 grep compose 文件,容器未启动也能在 preflight 阶段拦截误配。
+assert_es_loopback_static() {
+    # 先剔除合法绑定 "127.0.0.1:9200:9200",残留里若还有 9200:9200(裸绑)或 0.0.0.0(公网)即拒绝
+    local stripped
+    stripped=$(sed 's/127\.0\.0\.1:9200:9200//g' "$COMPOSE_FILE" 2>/dev/null)
+    if printf '%s' "$stripped" | grep -qE '9200:9200|0\.0\.0\.0[^"]*9200'; then
+        echo "        Error: docker-compose.yml 中 ES 9200 未绑定 127.0.0.1(公网暴露,无认证 = 勒索靶标)"
+        echo "               必须写成 \"127.0.0.1:9200:9200\"。发布中止。"
+        exit 1
+    fi
+    if ! grep -qE '127\.0\.0\.1:9200:9200' "$COMPOSE_FILE" 2>/dev/null; then
+        echo "        Error: docker-compose.yml 未找到 \"127.0.0.1:9200:9200\" 映射(ES 端口配置被改动?)"
+        echo "               发布中止。"
+        exit 1
+    fi
+}
+
+# 运行时校验(白名单):inspect 实际运行容器的 9200 宿主绑定,逐一必须是环回。
+# 发现非环回绑定立即停止该容器(消除暴露)并中止发布——0.0.0.0 的 ES 绝不合法。
+assert_es_loopback_runtime() {
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^cms-ng-elasticsearch$'; then
+        return 0  # 容器未运行(首次发布),由静态校验兜底
+    fi
+    local ips bad=0 ip
+    ips=$(docker inspect -f '{{json .NetworkSettings.Ports}}' cms-ng-elasticsearch 2>/dev/null \
+          | grep -oE '"HostIp":"[^"]*"' | cut -d'"' -f4)
+    for ip in $ips; do
+        case "$ip" in
+            127.0.0.1|::1|localhost) ;;        # 环回,放行
+            *) bad=1 ;;                        # 0.0.0.0 / :: / 公网 IP -> 暴露
+        esac
+    done
+    if [ "$bad" = "1" ]; then
+        docker stop cms-ng-elasticsearch >/dev/null 2>&1 || true  # 立即消除公网暴露
+        echo "        Error: Elasticsearch 9200 实际绑定非环回 IP($ips),公网暴露 = 勒索靶标"
+        echo "               已停止暴露的 ES 容器。请在 docker-compose.yml 绑定 127.0.0.1:9200 后重发。发布中止。"
+        exit 1
+    fi
+}
+
 usage() {
     cat <<EOF
 用法: $0 {start|stop|restart|status|logs} [--prod] [--no-build]
@@ -145,7 +197,7 @@ usage() {
 
 模式:
   (默认)  开发模式 (npm run dev)
-  --prod   生产模式 (宿主机进程 + rsshub 容器)
+  --prod   生产模式 (宿主机进程 + rsshub/elasticsearch 容器)
 
 生产模式选项 (仅 start/restart --prod):
   --no-build  跳过构建 (仅启动已有产物)
@@ -156,6 +208,7 @@ usage() {
   $0 start --prod --no-build    # 生产启动 (跳过构建)
   $0 status --prod              # 生产状态 + 健康检查
   $0 logs --prod backend        # 查看 backend 日志
+  $0 logs --prod elasticsearch  # 查看 elasticsearch 日志
 EOF
     exit 1
 }
@@ -287,6 +340,20 @@ prod_preflight() {
             echo "        Playwright Chromium OK ($browsers_path)"
         fi
     fi
+
+    # Elasticsearch(媒体全文检索,可选)。仅当 ELASTICSEARCH_ENABLED=true 时检查。
+    if es_enabled; then
+        # 安全红线双保险:静态 grep compose(权威源,容器未起也拦截)+ 运行时 inspect 实际绑定
+        assert_es_loopback_static
+        assert_es_loopback_runtime
+        # 可达性(非致命):容器尚未启动(首次发布)或宕机时检索降级 LIKE
+        if curl -sf http://localhost:9200/_cluster/health >/dev/null 2>&1; then
+            echo "        Elasticsearch OK (localhost:9200)"
+        else
+            echo "        Warn: ELASTICSEARCH_ENABLED=true 但 localhost:9200 暂不可达"
+            echo "               检索将降级 LIKE;容器随本次发布启动(start_apps)后可恢复"
+        fi
+    fi
 }
 
 prod_build() {
@@ -382,7 +449,15 @@ prod_start_apps() {
 
     echo "        启动 RSSHub 容器..."
     cd "$PROJECT_DIR"
-    docker compose -f "$RSSHUB_COMPOSE_FILE" up -d >/dev/null 2>&1 || echo "        Warning: RSSHub 启动失败 (非致命)"
+    docker compose -f "$COMPOSE_FILE" up -d rsshub >/dev/null 2>&1 || echo "        Warning: RSSHub 启动失败 (非致命)"
+
+    # Elasticsearch 仅当启用时启动(避免功能关闭白跑 512m 容器;首次需构建含 IK 的镜像)
+    if es_enabled; then
+        echo "        启动 Elasticsearch 容器(首次构建镜像较慢)..."
+        docker compose -f "$COMPOSE_FILE" up -d elasticsearch >/dev/null 2>&1 || echo "        Warning: Elasticsearch 启动失败 (非致命,检索降级 LIKE)"
+        # 启动后复检实际端口绑定(闭合 preflight 静态校验与运行时之间的 TOCTOU 窗口)
+        assert_es_loopback_runtime
+    fi
 }
 
 prod_migrate() {
@@ -419,6 +494,17 @@ prod_health() {
         echo "        Backend  (:${PROD_BACKEND_PORT}): ✓ 可访问 (HTTP $be_status)"
     else
         echo "        Backend  (:${PROD_BACKEND_PORT}): ✗ 未响应 (HTTP $be_status)"
+    fi
+
+    # Elasticsearch(仅启用时;未响应非致命,检索降级 LIKE)
+    if es_enabled; then
+        local es_status
+        es_status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9200/_cluster/health" 2>/dev/null || echo "000")
+        if [ "$es_status" = "200" ]; then
+            echo "        Elasticsearch (:9200): ✓ 可访问"
+        else
+            echo "        Elasticsearch (:9200): ✗ 未响应 (HTTP $es_status) — 检索降级 LIKE (非致命)"
+        fi
     fi
 }
 
@@ -512,7 +598,7 @@ stop_prod() {
     pkill -f "next start" 2>/dev/null || true
     pkill -f "next-server" 2>/dev/null || true
 
-    echo "        应用进程已停止 (rsshub 容器保留)"
+    echo "        应用进程已停止 (rsshub/elasticsearch 容器保留)"
 }
 
 restart_prod() {
@@ -546,6 +632,11 @@ status_prod() {
     fi
 
     echo "        rsshub:   $(docker ps --filter name=cms-ng-rsshub --format '{{.Status}}' 2>/dev/null || echo '未运行')"
+    if es_enabled; then
+        echo "        elasticsearch: $(docker ps --filter name=cms-ng-elasticsearch --format '{{.Status}}' 2>/dev/null || echo '未运行')"
+    else
+        echo "        elasticsearch: 已禁用 (ELASTICSEARCH_ENABLED!=true)"
+    fi
 
     echo ""
     echo "        健康检查:"
@@ -578,15 +669,19 @@ logs_prod() {
             ;;
         rsshub)
             echo "[logs] rsshub 日志 (Ctrl+C 退出):"
-            docker compose -f "$RSSHUB_COMPOSE_FILE" logs -f rsshub
+            docker compose -f "$COMPOSE_FILE" logs -f rsshub
+            ;;
+        elasticsearch|es)
+            echo "[logs] elasticsearch 日志 (Ctrl+C 退出):"
+            docker compose -f "$COMPOSE_FILE" logs -f elasticsearch
             ;;
         "")
             echo "[logs] backend 日志 ($BACKEND_LOG_FILE) (Ctrl+C 退出):"
-            echo "        (指定 backend|frontend|rsshub 查看其他)"
+            echo "        (指定 backend|frontend|rsshub|elasticsearch 查看其他)"
             tail -f "$BACKEND_LOG_FILE"
             ;;
         *)
-            echo "        未知服务: $service (可选: backend | frontend | rsshub)"
+            echo "        未知服务: $service (可选: backend | frontend | rsshub | elasticsearch)"
             exit 1
             ;;
     esac

@@ -1,16 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MediaService } from './media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import { STORAGE_SERVICE } from '../storage/storage.service';
+import { MediaTaggingService } from './tagging/media-tagging.service';
+import {
+  SearchService,
+  SearchUnavailableException,
+} from '../search/search.service';
 import { MediaSource, MediaStatus, MediaLibraryType } from '@cms-ng/shared';
 
 describe('MediaService', () => {
   let service: MediaService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let storage: { put: jest.Mock; delete: jest.Mock; copy: jest.Mock };
+  let search: { isConfigured: jest.Mock; searchMedia: jest.Mock };
+  let events: { emit: jest.Mock };
   const config = { get: jest.fn() };
 
   const mockAsset = (override?: Record<string, unknown>) => ({
@@ -66,6 +74,12 @@ describe('MediaService', () => {
         ),
     };
     config.get.mockImplementation(() => undefined);
+    // 默认 ES 未配置:走 LIKE 路径;具体 ES 用例在各测试内覆写 isConfigured/searchMedia
+    search = {
+      isConfigured: jest.fn().mockReturnValue(false),
+      searchMedia: jest.fn(),
+    };
+    events = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -73,6 +87,12 @@ describe('MediaService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: STORAGE_SERVICE, useValue: storage },
         { provide: ConfigService, useValue: config },
+        { provide: EventEmitter2, useValue: events },
+        {
+          provide: MediaTaggingService,
+          useValue: { isEnabled: () => false, retag: jest.fn() },
+        },
+        { provide: SearchService, useValue: search },
       ],
     }).compile();
     service = module.get<MediaService>(MediaService);
@@ -140,6 +160,10 @@ describe('MediaService', () => {
       );
       expect(prisma.mediaAsset.create).toHaveBeenCalled();
       expect(result[0].tags).toEqual(['新闻']); // JSON string 解析为数组
+      // P2:入库后发射 created 事件(SearchService ES 索引 + 打标入队)
+      expect(events.emit).toHaveBeenCalledWith('media.asset.created', {
+        assetId: 'asset-1',
+      });
     });
 
     it('trusts magic number over client mimetype (jpg buffer labeled png)', async () => {
@@ -190,6 +214,127 @@ describe('MediaService', () => {
         }),
       );
     });
+
+    describe('ES 全文检索路径(P2)', () => {
+      it('ES 启用 + search:按 ES ids 回表取 VO + 保序,用 ES total,不走 LIKE count', async () => {
+        search.isConfigured.mockReturnValue(true);
+        search.searchMedia.mockResolvedValue({ ids: ['a2', 'a1'], total: 7 });
+        // 回表乱序返回,验证按 ES 顺序重排
+        prisma.mediaAsset.findMany.mockResolvedValue([
+          mockAsset({ id: 'a1' }),
+          mockAsset({ id: 'a2' }),
+        ]);
+        const res = await service.findAll('u1', {
+          page: 1,
+          pageSize: 20,
+          search: '花海',
+        });
+        expect(search.searchMedia).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ownerId: 'u1',
+            status: MediaStatus.ACTIVE,
+            search: '花海',
+            page: 1,
+            pageSize: 20,
+          }),
+        );
+        // 回表仍双侧同源过滤 owner/status
+        expect(prisma.mediaAsset.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              id: { in: ['a2', 'a1'] },
+              ownerId: 'u1',
+              status: MediaStatus.ACTIVE,
+            }),
+          }),
+        );
+        expect(prisma.mediaAsset.count).not.toHaveBeenCalled(); // ES 路径不算 LIKE count
+        expect(res.meta.total).toBe(7); // 用 ES 侧 total
+        expect(res.data.map((d) => d.id)).toEqual(['a2', 'a1']); // 保 ES 序
+      });
+
+      it('ES 命中为空 -> 直接返回空页(用 ES total),不回表', async () => {
+        search.isConfigured.mockReturnValue(true);
+        search.searchMedia.mockResolvedValue({ ids: [], total: 0 });
+        const res = await service.findAll('u1', {
+          page: 1,
+          pageSize: 20,
+          search: '不存在',
+        });
+        expect(prisma.mediaAsset.findMany).not.toHaveBeenCalled();
+        expect(prisma.mediaAsset.count).not.toHaveBeenCalled();
+        expect(res.data).toEqual([]);
+        expect(res.meta.total).toBe(0);
+      });
+
+      it('ES 抛 SearchUnavailableException -> 降级 LIKE 路径', async () => {
+        search.isConfigured.mockReturnValue(true);
+        search.searchMedia.mockRejectedValue(
+          new SearchUnavailableException('ES degraded'),
+        );
+        prisma.mediaAsset.count.mockResolvedValue(1);
+        prisma.mediaAsset.findMany.mockResolvedValue([mockAsset()]);
+        const res = await service.findAll('u1', {
+          page: 1,
+          pageSize: 20,
+          search: '花海',
+        });
+        // 降级:走 LIKE,LIKE 覆盖 tags/aiTags 列
+        expect(prisma.mediaAsset.count).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ ownerId: 'u1' }),
+          }),
+        );
+        expect(res.meta.total).toBe(1);
+      });
+
+      it('ES 抛非 SearchUnavailable 错误 -> 不吞,继续上抛', async () => {
+        search.isConfigured.mockReturnValue(true);
+        search.searchMedia.mockRejectedValue(new Error('unexpected boom'));
+        await expect(
+          service.findAll('u1', { page: 1, pageSize: 20, search: '花海' }),
+        ).rejects.toThrow('unexpected boom');
+      });
+
+      it('ES 未配置(isConfigured false)+ search -> LIKE,不调 searchMedia', async () => {
+        search.isConfigured.mockReturnValue(false);
+        prisma.mediaAsset.count.mockResolvedValue(0);
+        prisma.mediaAsset.findMany.mockResolvedValue([]);
+        await service.findAll('u1', { page: 1, pageSize: 20, search: '花海' });
+        expect(search.searchMedia).not.toHaveBeenCalled();
+        expect(prisma.mediaAsset.count).toHaveBeenCalled();
+      });
+
+      it('无 search/tag -> 即使 ES 启用也不走 ES(纯列表)', async () => {
+        search.isConfigured.mockReturnValue(true);
+        prisma.mediaAsset.count.mockResolvedValue(0);
+        prisma.mediaAsset.findMany.mockResolvedValue([]);
+        await service.findAll('u1', { page: 1, pageSize: 20 });
+        expect(search.searchMedia).not.toHaveBeenCalled();
+      });
+
+      it('status=DELETED(回收站)+ search -> 直走 LIKE,不调 ES(非 ACTIVE 文档不入 ES)', async () => {
+        search.isConfigured.mockReturnValue(true);
+        prisma.mediaAsset.count.mockResolvedValue(1);
+        prisma.mediaAsset.findMany.mockResolvedValue([
+          mockAsset({ status: MediaStatus.DELETED }),
+        ]);
+        const res = await service.findAll('u1', {
+          page: 1,
+          pageSize: 20,
+          search: '花海',
+          status: MediaStatus.DELETED,
+        });
+        // C6:非 ACTIVE 查询必须绕过 ES 直走 LIKE,否则回收站永远查空(ES 只存 ACTIVE)
+        expect(search.searchMedia).not.toHaveBeenCalled();
+        expect(prisma.mediaAsset.count).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ status: MediaStatus.DELETED }),
+          }),
+        );
+        expect(res.meta.total).toBe(1);
+      });
+    });
   });
 
   describe('findOne', () => {
@@ -235,6 +380,10 @@ describe('MediaService', () => {
         }),
       );
       expect(res.tags).toEqual(['a', 'b']);
+      // P2:更新后发射 updated 事件(SearchService 重建 ES 文档)
+      expect(events.emit).toHaveBeenCalledWith('media.asset.updated', {
+        assetId: 'asset-1',
+      });
     });
 
     it('throws NotFound when not owned', async () => {
@@ -261,6 +410,10 @@ describe('MediaService', () => {
         'cms-ng/media/u1/202607/abc.png',
       );
       expect(res).toEqual({ success: true });
+      // P2:软删后发射 deleted 事件(SearchService 从 ES 删除,防搜出已删图)
+      expect(events.emit).toHaveBeenCalledWith('media.asset.deleted', {
+        assetId: 'asset-1',
+      });
     });
 
     it('does not throw when COS delete fails (fail-open)', async () => {

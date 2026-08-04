@@ -1,4 +1,11 @@
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { MediaSource, MediaStatus } from '@cms-ng/shared';
@@ -23,11 +30,13 @@ export class QueryMediaDto {
     required: false,
   })
   @IsString()
+  @MaxLength(200) // 上限防超长串灌入 ES multi_match / LIKE 拖慢查询
   @IsOptional()
   search?: string;
 
   @ApiProperty({ description: '标签过滤（单个标签名）', required: false })
   @IsString()
+  @MaxLength(200)
   @IsOptional()
   tag?: string;
 

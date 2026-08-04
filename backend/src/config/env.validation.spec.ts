@@ -123,4 +123,34 @@ describe('validateEnv', () => {
     expect(out).toContain('BAR: also bad');
     expect(out).toContain('backend/.env');
   });
+
+  // S3:校验错误信息严禁回显含凭证的连接串(公开仓库 CI 日志全公开 = P0 泄露面)
+  it('DATABASE_URL 格式错误时,错误信息对 userinfo 脱敏(不回显密码)', () => {
+    const r = validateEnv({
+      ...goodBase,
+      // 非 mysql:// 触发格式错误;同时携带含 @ 的密码,验证脱敏
+      DATABASE_URL: 'postgres://root:s3cr3tP@ss@host:3306/db',
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const joined = r.errors.join(' ');
+      expect(joined).not.toContain('s3cr3tP@ss');
+      expect(joined).not.toContain('s3cr3tP');
+      expect(joined).toContain('***@');
+    }
+  });
+
+  it('ELASTICSEARCH_NODE 格式错误时,错误信息对 userinfo 脱敏', () => {
+    const r = validateEnv({
+      ...goodBase,
+      ELASTICSEARCH_ENABLED: 'true',
+      ELASTICSEARCH_NODE: 'tcp://elastic:p@ss@es:9200',
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const joined = r.errors.join(' ');
+      expect(joined).not.toContain('p@ss');
+      expect(joined).toContain('***@');
+    }
+  });
 });

@@ -5,6 +5,8 @@ import { AgentType } from '@prisma/client';
 export interface AIOperationLogOptions<T> {
   userId: string;
   articleId?: string;
+  /** 媒体打标等场景:关联的 MediaAsset.id(仅 action=media_auto_tag 时填充) */
+  mediaAssetId?: string;
   agentType: string;
   action: string;
   prompt: string;
@@ -100,8 +102,45 @@ export class AIOperationLogger {
     }
   }
 
+  /**
+   * Variant for state-machine callers (e.g. media auto-tagging): identical
+   * audit bookkeeping to {@link run}, but failures are RE-THROWN after the
+   * failure row is persisted, and success returns the audit metadata the
+   * caller needs (aiOpId for billing idempotency, tokensUsed for metering).
+   *
+   * Why: `run()` never throws and always returns `fallback`, which makes it
+   * impossible for a caller to drive a DONE/FAILED state machine without
+   * sentinel conventions. Callers must still perform their own DB writes /
+   * billing / side effects AFTER this resolves — never inside onSuccess
+   * (hook errors are swallowed).
+   */
+  async runOrThrow<T>(
+    opts: Omit<AIOperationLogOptions<T>, 'fallback' | 'onSuccess'>,
+  ): Promise<{ result: T; tokensUsed?: number; aiOpId: string }> {
+    const startTime = Date.now();
+    try {
+      const { result, tokensUsed } = await opts.fn();
+      const aiOp = await this.persistSuccess(
+        opts,
+        result,
+        tokensUsed,
+        Date.now() - startTime,
+      );
+      return { result, tokensUsed, aiOpId: aiOp.id };
+    } catch (error) {
+      this.logger.error(
+        `${opts.action} failed:`,
+        (error as Error)?.message ?? String(error),
+      );
+      await this.persistFailure(opts, error, Date.now() - startTime);
+      throw error;
+    }
+  }
+
   private async persistSuccess<T>(
-    opts: AIOperationLogOptions<T>,
+    opts:
+      | AIOperationLogOptions<T>
+      | Omit<AIOperationLogOptions<T>, 'fallback' | 'onSuccess'>,
     result: T,
     tokensUsed: number | undefined,
     durationMs: number,
@@ -113,19 +152,22 @@ export class AIOperationLogger {
         // a string-typed parameter.
         agentType: opts.agentType as AgentType,
         action: opts.action,
-        prompt: opts.prompt,
-        result: JSON.stringify(result),
+        prompt: truncateForAudit(opts.prompt),
+        result: truncateForAudit(JSON.stringify(result)),
         model: opts.model,
         tokensUsed,
         durationMs,
         articleId: opts.articleId,
+        mediaAssetId: opts.mediaAssetId,
         createdBy: opts.userId,
       },
     });
   }
 
   private async persistFailure<T>(
-    opts: AIOperationLogOptions<T>,
+    opts:
+      | AIOperationLogOptions<T>
+      | Omit<AIOperationLogOptions<T>, 'fallback' | 'onSuccess'>,
     error: unknown,
     durationMs: number,
   ) {
@@ -133,15 +175,31 @@ export class AIOperationLogger {
       data: {
         agentType: opts.agentType as AgentType,
         action: opts.action,
-        prompt: opts.prompt,
-        result: JSON.stringify({
-          error: (error as Error)?.message ?? String(error),
-        }),
+        prompt: truncateForAudit(opts.prompt),
+        result: truncateForAudit(
+          JSON.stringify({
+            error: (error as Error)?.message ?? String(error),
+          }),
+        ),
         model: opts.model,
         durationMs,
         articleId: opts.articleId,
+        mediaAssetId: opts.mediaAssetId,
         createdBy: opts.userId,
       },
     });
   }
+}
+
+/**
+ * 审计字段兜底截断(AIOperation.prompt/result 为 @db.Text,64KB 上限)。
+ * 调用方本不应把大体量内容(如 base64 图片)放进 prompt —— 这是与调用方
+ * 无关的最后防线,防 insert 失败把审计链路本身炸掉。
+ */
+const AUDIT_FIELD_MAX = 32 * 1024;
+
+function truncateForAudit(text: string): string {
+  return text.length > AUDIT_FIELD_MAX
+    ? `${text.slice(0, AUDIT_FIELD_MAX)}…[truncated, ${text.length} chars total]`
+    : text;
 }

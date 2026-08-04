@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -80,6 +81,14 @@ export class MediaController {
     @Body() dto: UpdateMediaDto,
   ) {
     return this.mediaService.update(id, userId, dto);
+  }
+
+  @Post(':id/retag')
+  @ApiOperation({ summary: '手动重新打标（调用视觉大模型重新生成 AI 标签）' })
+  // 每次调用 = 一次付费 vision 调用,端点级收紧限流(单资产冷却/每日配额在 service 内)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  retag(@Param('id') id: string, @CurrentUser('userId') userId: string) {
+    return this.mediaService.retag(id, userId);
   }
 
   @Delete(':id')
