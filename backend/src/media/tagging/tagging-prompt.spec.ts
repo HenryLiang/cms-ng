@@ -1,10 +1,43 @@
 import {
+  buildTaggingMessagesV2,
   normalizeTags,
   normalizeAltText,
+  normalizeTitle,
   parseTaggingResult,
 } from './tagging-prompt';
 
 describe('tagging-prompt 归一化与内容级过滤', () => {
+  it('在现有多模态请求中同时要求 title，不新增独立请求', () => {
+    const messages = buildTaggingMessagesV2('https://example.com/image.png');
+    expect(messages).toHaveLength(2);
+    expect(messages[0].content).toContain('"title"');
+    expect(messages[1].content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'text',
+          text: expect.stringContaining('标题'),
+        }),
+      ]),
+    );
+  });
+
+  it('AI 生图沿用原有标签与 altText 请求，不增加 title', () => {
+    const messages = buildTaggingMessagesV2(
+      'https://example.com/image.png',
+      '生图 prompt: test',
+      false,
+    );
+    expect(messages[0].content).not.toContain('"title"');
+    expect(messages[1].content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'text',
+          text: expect.not.stringContaining('标题'),
+        }),
+      ]),
+    );
+  });
+
   describe('normalizeTags', () => {
     it('剔除非字符串与空串', () => {
       expect(
@@ -72,11 +105,23 @@ describe('tagging-prompt 归一化与内容级过滤', () => {
     });
   });
 
+  describe('normalizeTitle', () => {
+    it('只接受 10 个 Unicode 文字数字，不修补不合规标题', () => {
+      expect(normalizeTitle('  雨中城市  ')).toBe('雨中城市');
+      expect(normalizeTitle('雨中/城市！')).toBeNull();
+      expect(normalizeTitle('一二三四五六七八九十十一')).toBeNull();
+      expect(normalizeTitle('///')).toBeNull();
+    });
+  });
+
   describe('parseTaggingResult', () => {
-    it('合法 JSON -> 解析', () => {
-      const r = parseTaggingResult('{"tags":["a"],"altText":"b"}');
+    it('合法 JSON -> 同时解析标签、altText 与图片标题', () => {
+      const r = parseTaggingResult(
+        '{"tags":["a"],"altText":"b","title":"雨中城市"}',
+      );
       expect(r.tags).toEqual(['a']);
       expect(r.altText).toBe('b');
+      expect(r.title).toBe('雨中城市');
     });
 
     it('非法 JSON -> 抛错(由 worker 转 FAILED)', () => {

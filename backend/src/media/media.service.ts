@@ -26,6 +26,7 @@ import {
   MediaTagStatus,
 } from '@cms-ng/shared';
 import { imageSize } from 'image-size';
+import sharp from 'sharp';
 import { randomUUID } from 'crypto';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
@@ -45,6 +46,8 @@ const MIME_TO_EXT: Record<string, string> = {
 
 const DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 const MAX_FILENAME_LENGTH = 180; // fileName 列 VARCHAR(191)，留余量
+const PREVIEW_MAX_EDGE = 1200;
+const PREVIEW_WEBP_QUALITY = 80;
 
 /** 序列化后的媒体资源 VO：tags / aiTags 由 JSON string 解析为数组 */
 export type MediaAssetVo = Omit<MediaAsset, 'tags' | 'aiTags'> & {
@@ -167,13 +170,33 @@ export class MediaService {
   ): Promise<MediaAssetVo> {
     const key = this.buildKey(ownerId, v.ext);
     const { url } = await this.storage.put(key, v.buffer, v.mimeType);
+    let previewStorageKey: string | null = null;
+    let previewUrl: string | null = null;
+    if (v.mimeType !== 'image/gif') {
+      try {
+        const previewBuffer = await this.createPreview(v.buffer);
+        previewStorageKey = this.buildPreviewKey(key);
+        const storedPreview = await this.storage.put(
+          previewStorageKey,
+          previewBuffer,
+          'image/webp',
+        );
+        previewUrl = storedPreview.url;
+      } catch (err) {
+        previewStorageKey = null;
+        this.logger.warn(
+          `WebP 预览图生成或上传失败,回退原图: ${(err as Error)?.message ?? err}`,
+        );
+      }
+    }
     try {
       const { width, height } = this.readDimensions(v.buffer);
       const asset = await this.prisma.mediaAsset.create({
         data: {
           storageKey: key,
           url,
-          thumbnailUrl: this.storage.thumbnailUrl(url),
+          previewStorageKey,
+          thumbnailUrl: previewUrl,
           fileName: v.fileName,
           mimeType: v.mimeType,
           size: v.size,
@@ -193,18 +216,35 @@ export class MediaService {
       this.emitAssetEvent('media.asset.created', asset.id);
       return this.serialize(asset);
     } catch (err) {
-      // DB 入库失败：回删已上传的 COS 对象，避免孤儿（fail-open 回删失败不掩盖原错误）
-      try {
-        await this.storage.delete(key);
-      } catch {
-        // intentional
-      }
+      // DB 入库失败：回删原图与预览对象，避免孤儿（回删失败不掩盖原错误）
+      await Promise.allSettled(
+        [key, previewStorageKey]
+          .filter((objectKey): objectKey is string => Boolean(objectKey))
+          .map((objectKey) => this.storage.delete(objectKey)),
+      );
       throw err;
     }
   }
 
   private buildKey(ownerId: string, ext: string): string {
     return `cms-ng/media/${ownerId}/${this.currentYYYYMM()}/${randomUUID()}.${ext}`;
+  }
+
+  private buildPreviewKey(originalKey: string): string {
+    return originalKey.replace(/\.[^.]+$/, '.preview.webp');
+  }
+
+  private createPreview(buffer: Buffer): Promise<Buffer> {
+    return sharp(buffer)
+      .rotate()
+      .resize({
+        width: PREVIEW_MAX_EDGE,
+        height: PREVIEW_MAX_EDGE,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: PREVIEW_WEBP_QUALITY })
+      .toBuffer();
   }
 
   private currentYYYYMM(): string {
@@ -368,12 +408,12 @@ export class MediaService {
     });
     // ES 索引删除(P2,fail-open):防搜出已删图
     this.emitAssetEvent('media.asset.deleted', asset.id);
-    // 删 COS 对象；失败仅 fail-open（DB 已标记 DELETED，孤儿对象由后续清理任务处理）
-    try {
-      await this.storage.delete(asset.storageKey);
-    } catch {
-      // intentional: 不阻塞软删流程
-    }
+    // 删原图与预览对象；失败仅 fail-open（孤儿对象由后续清理任务处理）
+    await Promise.allSettled(
+      [asset.storageKey, asset.previewStorageKey]
+        .filter((objectKey): objectKey is string => Boolean(objectKey))
+        .map((objectKey) => this.storage.delete(objectKey)),
+    );
     return { success: true };
   }
 

@@ -8,6 +8,7 @@ export interface MediaAsset {
   id: string;
   storageKey: string;
   url: string;
+  previewStorageKey?: string | null;
   thumbnailUrl?: string | null;
   fileName: string;
   mimeType: string;
