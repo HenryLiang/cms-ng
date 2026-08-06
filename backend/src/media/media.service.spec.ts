@@ -12,6 +12,7 @@ import {
   SearchUnavailableException,
 } from '../search/search.service';
 import { MediaSource, MediaStatus, MediaLibraryType } from '@cms-ng/shared';
+import sharp from 'sharp';
 
 describe('MediaService', () => {
   let service: MediaService;
@@ -25,6 +26,7 @@ describe('MediaService', () => {
     id: 'asset-1',
     storageKey: 'cms-ng/media/u1/202607/abc.png',
     url: 'https://bkt.cos.ap-shanghai.myqcloud.com/cms-ng/media/u1/202607/abc.png',
+    previewStorageKey: null,
     thumbnailUrl:
       'https://bkt.cos.ap-shanghai.myqcloud.com/cms-ng/media/u1/202607/abc.png?imageMogr2/thumbnail/300x300/strip',
     fileName: 'test.png',
@@ -57,6 +59,12 @@ describe('MediaService', () => {
     Buffer.from([
       0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
     ]);
+  const gifBuf = () => Buffer.from('GIF89a\x01\x00\x01\x00\x00\x00', 'binary');
+  const validPngBuf = () =>
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVR4nGP4z8DwH4QBEfcD/ePF9e8AAAAASUVORK5CYII=',
+      'base64',
+    );
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
@@ -164,6 +172,163 @@ describe('MediaService', () => {
       expect(events.emit).toHaveBeenCalledWith('media.asset.created', {
         assetId: 'asset-1',
       });
+    });
+
+    it('常规图片上传时保存原图与独立的 WebP 预览图', async () => {
+      prisma.mediaAsset.create.mockResolvedValue(
+        mockAsset({
+          previewStorageKey: 'cms-ng/media/u1/202607/abc.preview.webp',
+          thumbnailUrl: 'https://bkt.cos/abc.preview.webp',
+        }),
+      );
+      storage.put
+        .mockResolvedValueOnce({
+          url: 'https://bkt.cos/abc.png',
+          key: 'cms-ng/media/u1/202607/abc.png',
+        })
+        .mockResolvedValueOnce({
+          url: 'https://bkt.cos/abc.preview.webp',
+          key: 'cms-ng/media/u1/202607/abc.preview.webp',
+        });
+
+      await service.upload(
+        [
+          {
+            buffer: validPngBuf(),
+            originalname: 'test.png',
+            mimetype: 'image/png',
+            size: validPngBuf().length,
+          },
+        ],
+        'u1',
+      );
+
+      expect(storage.put).toHaveBeenCalledTimes(2);
+      const previewCall = storage.put.mock.calls[1];
+      expect(previewCall[0]).toMatch(/\.preview\.webp$/);
+      expect(previewCall[1].subarray(0, 4).toString('ascii')).toBe('RIFF');
+      expect(previewCall[1].subarray(8, 12).toString('ascii')).toBe('WEBP');
+      expect(previewCall[2]).toBe('image/webp');
+      expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            previewStorageKey: expect.stringMatching(/\.preview\.webp$/),
+            thumbnailUrl: 'https://bkt.cos/abc.preview.webp',
+          }),
+        }),
+      );
+    });
+
+    it('WebP 预览长边限制为 1200px 且不改变宽高比', async () => {
+      const largePng = await sharp({
+        create: {
+          width: 1600,
+          height: 800,
+          channels: 4,
+          background: { r: 12, g: 34, b: 56, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer();
+      prisma.mediaAsset.create.mockResolvedValue(mockAsset());
+
+      await service.upload(
+        [
+          {
+            buffer: largePng,
+            originalname: 'large.png',
+            mimetype: 'image/png',
+            size: largePng.length,
+          },
+        ],
+        'u1',
+      );
+
+      const previewBuffer = storage.put.mock.calls[1][1] as Buffer;
+      const previewMetadata = await sharp(previewBuffer).metadata();
+      expect(previewMetadata).toMatchObject({
+        format: 'webp',
+        width: 1200,
+        height: 600,
+      });
+    });
+
+    it('GIF 只保存原图，预览字段为空', async () => {
+      prisma.mediaAsset.create.mockResolvedValue(
+        mockAsset({ mimeType: 'image/gif', fileName: 'animated.gif' }),
+      );
+      await service.upload(
+        [
+          {
+            buffer: gifBuf(),
+            originalname: 'animated.gif',
+            mimetype: 'image/gif',
+            size: gifBuf().length,
+          },
+        ],
+        'u1',
+      );
+
+      expect(storage.put).toHaveBeenCalledTimes(1);
+      expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            previewStorageKey: null,
+            thumbnailUrl: null,
+          }),
+        }),
+      );
+    });
+
+    it('SVG 仍按现有上传规则拒绝', async () => {
+      const svg = Buffer.from('<svg></svg>');
+      await expect(
+        service.upload(
+          [
+            {
+              buffer: svg,
+              originalname: 'vector.svg',
+              mimetype: 'image/svg+xml',
+              size: svg.length,
+            },
+          ],
+          'u1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('预览生成或上传失败时上传仍成功并回退原图', async () => {
+      prisma.mediaAsset.create.mockResolvedValue(
+        mockAsset({ previewStorageKey: null, thumbnailUrl: null }),
+      );
+      storage.put
+        .mockResolvedValueOnce({
+          url: 'https://bkt.cos/original.png',
+          key: 'original.png',
+        })
+        .mockRejectedValueOnce(new Error('preview upload failed'));
+
+      await expect(
+        service.upload(
+          [
+            {
+              buffer: validPngBuf(),
+              originalname: 'test.png',
+              mimetype: 'image/png',
+              size: validPngBuf().length,
+            },
+          ],
+          'u1',
+        ),
+      ).resolves.toHaveLength(1);
+      expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            previewStorageKey: null,
+            thumbnailUrl: null,
+          }),
+        }),
+      );
     });
 
     it('trusts magic number over client mimetype (jpg buffer labeled png)', async () => {
@@ -398,7 +563,11 @@ describe('MediaService', () => {
 
   describe('remove', () => {
     it('soft-deletes and removes COS object', async () => {
-      prisma.mediaAsset.findUnique.mockResolvedValue(mockAsset());
+      prisma.mediaAsset.findUnique.mockResolvedValue(
+        mockAsset({
+          previewStorageKey: 'cms-ng/media/u1/202607/abc.preview.webp',
+        }),
+      );
       prisma.mediaAsset.update.mockResolvedValue(
         mockAsset({ status: MediaStatus.DELETED }),
       );
@@ -408,6 +577,9 @@ describe('MediaService', () => {
       );
       expect(storage.delete).toHaveBeenCalledWith(
         'cms-ng/media/u1/202607/abc.png',
+      );
+      expect(storage.delete).toHaveBeenCalledWith(
+        'cms-ng/media/u1/202607/abc.preview.webp',
       );
       expect(res).toEqual({ success: true });
       // P2:软删后发射 deleted 事件(SearchService 从 ES 删除,防搜出已删图)

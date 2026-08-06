@@ -193,11 +193,13 @@ export const geoResultSchema = z.object({
 });
 
 // ===== Site 9: 媒体图片自动打标 (media auto-tagging) =====
-// Vision LLM 输出契约:tags 数组 + altText。nullish 容忍与其它 site 一致,
+// Vision LLM 输出契约:tags 数组 + altText；上传图片额外返回可选 title。
+// nullish 容忍与其它 site 一致,
 // 下游 normalizeTags / 内容级过滤在 tagging-prompt.ts 兜底。
 export const imageTaggingResultSchema = z.object({
   tags: z.array(z.string().nullish()).nullish(),
   altText: z.string().nullish(),
+  title: z.string().nullish(),
 });
 
 export type ImageTaggingResult = z.infer<typeof imageTaggingResultSchema>;

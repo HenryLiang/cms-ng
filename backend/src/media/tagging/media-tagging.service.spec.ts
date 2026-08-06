@@ -8,7 +8,7 @@ import { BillingService } from '../../billing/billing.service';
 import { AIOperationLogger } from '../../common/ai-operation-logger';
 import { CHAT_VISION_PROVIDER } from '../../ai/providers';
 import type { ChatCompletionProvider } from '../../ai/providers';
-import { MediaTagStatus, MediaStatus } from '@cms-ng/shared';
+import { MediaSource, MediaTagStatus, MediaStatus } from '@cms-ng/shared';
 
 /**
  * MediaTaggingService 单测:状态机、CAS claim、内存去重、开关四行为、
@@ -39,11 +39,15 @@ describe('MediaTaggingService', () => {
     status: MediaStatus.ACTIVE,
     source: 'UPLOAD',
     url: 'https://bkt.cos/img.png',
+    fileName: 'original.png',
+    mimeType: 'image/png',
     prompt: null,
     altText: null,
+    title: null,
     tagStatus: MediaTagStatus.PENDING,
     tagRetryCount: 0,
     tagError: null,
+    createdAt: new Date('2026-08-06T06:23:45.000Z'),
     updatedAt: new Date(Date.now() - 20 * 60 * 1000),
   };
 
@@ -97,7 +101,11 @@ describe('MediaTaggingService', () => {
     };
     aiLog = {
       runOrThrow: jest.fn().mockResolvedValue({
-        result: { tags: ['花海', '春天'], altText: '一片花海' },
+        result: {
+          tags: ['花海', '春天'],
+          altText: '一片花海',
+          title: '春日花海',
+        },
         tokensUsed: 500,
         aiOpId: 'op1',
       }),
@@ -159,6 +167,8 @@ describe('MediaTaggingService', () => {
       });
       expect(writeCall![0].data.aiTags).toBe(JSON.stringify(['花海', '春天']));
       expect(writeCall![0].data.altText).toBe('一片花海');
+      expect(writeCall![0].data.title).toBe('春日花海');
+      expect(writeCall![0].data.fileName).toMatch(/^\d{14}_春日花海\.png$/);
       expect(writeCall![0].data.tagStatus).toBe(MediaTagStatus.DONE);
       expect(billing.deduct).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -183,6 +193,46 @@ describe('MediaTaggingService', () => {
         (c) => c[0]?.data?.tagStatus === MediaTagStatus.DONE,
       );
       expect(writeCall![0].data.altText).toBe('人工alt');
+    });
+
+    it('标题无有效文字时完成标签回写但保留原文件名', async () => {
+      aiLog.runOrThrow.mockResolvedValue({
+        result: { tags: ['花海'], altText: '一片花海', title: '///' },
+        tokensUsed: 500,
+        aiOpId: 'op1',
+      });
+      service.enqueue('a1');
+      await flushMicrotasks();
+      const writeCall = prisma.mediaAsset.updateMany.mock.calls.find(
+        (c) => c[0]?.data?.tagStatus === MediaTagStatus.DONE,
+      );
+      expect(writeCall![0].data.aiTags).toBe(JSON.stringify(['花海']));
+      expect(writeCall![0].data.fileName).toBeUndefined();
+      expect(writeCall![0].data.title).toBeUndefined();
+    });
+
+    it('AI 生图参与同一打标契约，但不改已有文件名', async () => {
+      prisma.mediaAsset.findUnique.mockResolvedValue({
+        ...baseAsset,
+        source: MediaSource.AI_GENERATED,
+        fileName: 'ai-existing.png',
+      });
+      service.enqueue('a1');
+      await flushMicrotasks();
+      const writeCall = prisma.mediaAsset.updateMany.mock.calls.find(
+        (c) => c[0]?.data?.tagStatus === MediaTagStatus.DONE,
+      );
+      expect(writeCall![0].data.title).toBeUndefined();
+      expect(writeCall![0].data.fileName).toBeUndefined();
+    });
+
+    it('上传图片名使用 createdAt 的 Asia/Shanghai 秒级时间戳', async () => {
+      service.enqueue('a1');
+      await flushMicrotasks();
+      const writeCall = prisma.mediaAsset.updateMany.mock.calls.find(
+        (c) => c[0]?.data?.tagStatus === MediaTagStatus.DONE,
+      );
+      expect(writeCall![0].data.fileName).toBe('20260806142345_春日花海.png');
     });
 
     it('打标期间被软删(status 非 ACTIVE)-> 回写 count=0,跳过回写与计费', async () => {
@@ -221,6 +271,7 @@ describe('MediaTaggingService', () => {
       );
       expect(failCall).toBeDefined();
       expect(failCall![0].data.tagError).toBe('vision timeout');
+      expect(failCall![0].data.fileName).toBeUndefined();
     });
 
     it('usage 缺失 -> 按预估兜底扣费(堵免单盲区)', async () => {

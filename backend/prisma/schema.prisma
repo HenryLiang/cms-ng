@@ -525,7 +525,8 @@ model MediaAsset {
   // 存储
   storageKey    String           // COS key（相对 bucket 根，不含前导 /）
   url           String           // 公网访问 URL（含 CDN）
-  thumbnailUrl  String?          // 缩略图 URL（COS imageMogr2 拼参生成，零额外存储）
+  previewStorageKey String?      // 上传图片的 WebP 预览对象 key；GIF/历史/AI 生图可为空
+  thumbnailUrl  String?          // 列表/搜索使用的预览 URL；为空时前端回退原图
   // 文件元数据
   fileName      String           // 展示用文件名（上传原文件名 / AI 生成命名）
   mimeType      String           // image/jpeg | image/png | image/webp | image/gif

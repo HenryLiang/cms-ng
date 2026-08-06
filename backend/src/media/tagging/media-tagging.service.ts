@@ -22,6 +22,7 @@ import { AgentType } from '@prisma/client';
 import {
   MediaTagStatus,
   MediaStatus,
+  MediaSource,
   TransactionType,
   BillingCategory,
 } from '@cms-ng/shared';
@@ -30,6 +31,7 @@ import {
   parseTaggingResult,
   normalizeTags,
   normalizeAltText,
+  normalizeTitle,
 } from './tagging-prompt';
 
 /** 单次打标的并发上限(进程内 worker,#148 哲学:不引队列中间件) */
@@ -44,6 +46,42 @@ const STALE_MS = 10 * 60 * 1000;
 const MAX_RETRY = 3;
 /** 退避基数:cron 第 n 次重试需距上次 updatedAt >= BASE * 2^(n-1) */
 const RETRY_BACKOFF_MS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
+const BUSINESS_TIME_ZONE = 'Asia/Shanghai';
+
+function buildAiFileName(
+  originalFileName: string,
+  mimeType: string,
+  title: string,
+  now = new Date(),
+): string {
+  const originalExtension = originalFileName.match(/\.[A-Za-z0-9]{1,10}$/)?.[0];
+  const extension =
+    originalExtension ??
+    ({
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+    }[mimeType] ||
+      '');
+  const dateParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+    .formatToParts(now)
+    .reduce<Record<string, string>>((parts, part) => {
+      if (part.type !== 'literal') parts[part.type] = part.value;
+      return parts;
+    }, {});
+  const timestamp = `${dateParts.year}${dateParts.month}${dateParts.day}${dateParts.hour}${dateParts.minute}${dateParts.second}`;
+  return `${timestamp}_${title}${extension}`;
+}
 
 /** 用于审计 prompt 的图片引用(绝不承载 base64 字节,见 PRD §5.3) */
 function imageRefForAudit(url: string): string {
@@ -327,7 +365,13 @@ export class MediaTaggingService implements OnModuleInit {
         throw new Error('INSUFFICIENT_BALANCE');
       }
 
-      const messages = buildTaggingMessagesV2(imageUrl, contextText);
+      const isUploadedAsset =
+        (asset.source as MediaSource) === MediaSource.UPLOAD;
+      const messages = buildTaggingMessagesV2(
+        imageUrl,
+        contextText,
+        isUploadedAsset,
+      );
       const { result, tokensUsed, aiOpId } = await this.aiLog.runOrThrow({
         userId: asset.ownerId,
         agentType: AgentType.VISUAL,
@@ -349,6 +393,16 @@ export class MediaTaggingService implements OnModuleInit {
 
       const tags = normalizeTags(result.tags);
       const altText = normalizeAltText(result.altText);
+      const title = isUploadedAsset ? normalizeTitle(result.title) : null;
+      const aiFileName =
+        title && asset.createdAt
+          ? buildAiFileName(
+              asset.fileName,
+              asset.mimeType,
+              title,
+              asset.createdAt,
+            )
+          : null;
 
       // 回写:CAS 守 status=ACTIVE(打标期间被软删则跳过,防已删图复活)
       // + tagStatus=TAGGING(陈旧 processOne 无法覆盖新一轮 DONE,对称 claim 的 CAS,M2)。
@@ -362,6 +416,8 @@ export class MediaTaggingService implements OnModuleInit {
         data: {
           aiTags: JSON.stringify(tags),
           altText: asset.altText ? asset.altText : altText,
+          ...(title ? { title: asset.title ? asset.title : title } : {}),
+          ...(aiFileName ? { fileName: aiFileName } : {}),
           tagStatus: MediaTagStatus.DONE,
           taggedAt: new Date(),
           tagError: null,
