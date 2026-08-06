@@ -333,6 +333,9 @@ prod_preflight() {
 }
 
 prod_prisma_check_and_generate() {
+    # 注意:本步骤只做预检(报告 schema 与 client 是否一致),不在此生成 client。
+    # 实际生成在 prod_build 的 npm ci 之后执行--npm ci 会重置 node_modules,
+    # 在此生成会被冲掉,所以生成时机必须在 npm ci 之后、nest build 之前。
     if has_flag "--no-build" "$@"; then
         echo "[2/8] 跳过 Prisma Client 检查 (--no-build)"
         return
@@ -343,7 +346,7 @@ prod_prisma_check_and_generate() {
         return
     fi
 
-    echo "[2/8] 检查 Prisma Client 是否需要重新生成..."
+    echo "[2/8] 检查 Prisma Client 是否需要在 build 阶段重新生成..."
 
     local current_hash=""
     if command -v sha256sum &> /dev/null; then
@@ -357,28 +360,17 @@ prod_prisma_check_and_generate() {
         client_missing=true
     fi
 
-    local needs_generate=false
     if [ "$client_missing" = true ]; then
-        echo "        Prisma Client 未生成，需要生成"
-        needs_generate=true
+        echo "        Prisma Client 未生成，将在 build 阶段 (npm ci 后) 生成"
     elif [ -f "$PRISMA_CLIENT_HASH_FILE" ]; then
         local saved_hash=$(cat "$PRISMA_CLIENT_HASH_FILE" 2>/dev/null | tr -d '[:space:]')
         if [ "$current_hash" != "$saved_hash" ]; then
-            echo "        schema.prisma 已变更，需要重新生成 Prisma Client"
-            needs_generate=true
+            echo "        schema.prisma 已变更，将在 build 阶段 (npm ci 后) 重新生成"
         else
-            echo "        Prisma Client 已是最新"
+            echo "        Prisma Client hash 一致 (build 阶段 npm ci 后仍会重新生成以保证一致)"
         fi
     else
-        echo "        未找到 Prisma Client hash 记录，需要重新生成"
-        needs_generate=true
-    fi
-
-    if [ "$needs_generate" = true ]; then
-        cd "$BACKEND_DIR"
-        npx prisma generate
-        echo "$current_hash" > "$PRISMA_CLIENT_HASH_FILE"
-        echo "        Prisma Client 生成完成"
+        echo "        未找到 Prisma Client hash 记录，将在 build 阶段 (npm ci 后) 生成"
     fi
 }
 
@@ -397,6 +389,22 @@ prod_build() {
         echo "        ✗ npm ci 失败,日志末尾:"
         tail -n 20 /tmp/cms-ng-build.log
         exit 1
+    fi
+
+    # npm ci 会重置 node_modules,把之前 prisma generate 的产物冲掉,
+    # 必须在 npm ci 之后、nest build 之前重新生成 Prisma Client,
+    # 否则 schema 与 client 类型不一致导致 backend 编译失败。
+    echo "        生成 Prisma Client (npm ci 后)..."
+    (cd "$BACKEND_DIR" && npx prisma generate >/tmp/cms-ng-build.log 2>&1) || {
+        echo "        ✗ prisma generate 失败,日志末尾:"
+        tail -n 20 /tmp/cms-ng-build.log
+        exit 1
+    }
+    # 记录 schema hash,供下次发布预检比对
+    if command -v sha256sum &> /dev/null; then
+        sha256sum "$PRISMA_SCHEMA" | awk '{print $1}' > "$PRISMA_CLIENT_HASH_FILE"
+    elif command -v shasum &> /dev/null; then
+        shasum -a 256 "$PRISMA_SCHEMA" | awk '{print $1}' > "$PRISMA_CLIENT_HASH_FILE"
     fi
 
     echo "        构建 shared..."
