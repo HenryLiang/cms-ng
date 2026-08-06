@@ -8,11 +8,11 @@ set -e
 #   ./scripts/cms-ng-service.sh stop   [--prod]
 #   ./scripts/cms-ng-service.sh restart [--prod] [--no-build]
 #   ./scripts/cms-ng-service.sh status [--prod]
-#   ./scripts/cms-ng-service.sh logs   [--prod] [backend|frontend|rsshub|elasticsearch]
+#   ./scripts/cms-ng-service.sh logs   [--prod] [backend|frontend|rsshub]
 #
 # 模式:
 #   (默认)  开发模式 (npm run dev, turbo)
-#   --prod   生产模式 (宿主机进程: nginx 反代 + node/next 后台进程 + rsshub/elasticsearch 容器)
+#   --prod   生产模式 (宿主机进程: nginx 反代 + node/next 后台进程 + rsshub 容器)
 #
 # 生产模式选项:
 #   --no-build  跳过构建 (仅启动已有产物，用于快速重启非代码变更的场景)
@@ -21,7 +21,7 @@ set -e
 #   nginx (80/443) -> 127.0.0.1:3000 (frontend next start)
 #                 -> 127.0.0.1:3001 (backend node dist/src/main)
 #   rsshub (docker, :1200)
-#   elasticsearch (docker, 127.0.0.1:9200; 仅 ELASTICSEARCH_ENABLED=true 时启动,媒体全文检索)
+#   elasticsearch (外部;直连 backend/.env 中 ELASTICSEARCH_NODE,仅 ELASTICSEARCH_ENABLED=true 时使用,媒体全文检索)
 #   MySQL 为外部中间件
 #
 # ============================================================
@@ -40,7 +40,8 @@ set -e
 #
 #   4. 执行完整发布:
 #        ./scripts/cms-ng-service.sh start --prod
-#      脚本自动完成: 前置检查 -> 构建 -> 停旧 -> 迁移 -> 启动 -> 健康检查 -> admin
+#      脚本自动完成: 前置检查 -> Prisma Client 检查/生成 -> 构建 -> 停旧 -> 启动 -> 迁移 -> 健康检查 -> admin
+#      如 schema.prisma 发生变更，会自动重新生成 Prisma Client，避免 build 阶段因类型缺失而失败。
 #
 #   5. 验证:
 #        ./scripts/cms-ng-service.sh status --prod
@@ -105,8 +106,10 @@ BACKEND_PID_FILE="$PROJECT_DIR/.cms-ng-backend.pid"
 FRONTEND_PID_FILE="$PROJECT_DIR/.cms-ng-frontend.pid"
 BACKEND_LOG_FILE="$PROJECT_DIR/.cms-ng-backend.log"
 FRONTEND_LOG_FILE="$PROJECT_DIR/.cms-ng-frontend.log"
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"  # rsshub + elasticsearch 两个中间件容器
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"  # rsshub 中间件容器 (ES 已改为外部连接)
 BACKEND_ENV="$BACKEND_DIR/.env"
+PRISMA_SCHEMA="$BACKEND_DIR/prisma/schema.prisma"
+PRISMA_CLIENT_HASH_FILE="$PROJECT_DIR/node_modules/.prisma-client-schema-hash"
 
 # 健康检查端口
 PROD_FRONTEND_PORT=3000
@@ -143,44 +146,17 @@ es_enabled() {
     [ "$raw" = "true" ]
 }
 
-# 安全红线:ES 无认证,9200 只能绑环回(127.0.0.1/::1);公网暴露 = 勒索软件靶标。
-# 静态校验(权威源):直接 grep compose 文件,容器未启动也能在 preflight 阶段拦截误配。
-assert_es_loopback_static() {
-    # 先剔除合法绑定 "127.0.0.1:9200:9200",残留里若还有 9200:9200(裸绑)或 0.0.0.0(公网)即拒绝
-    local stripped
-    stripped=$(sed 's/127\.0\.0\.1:9200:9200//g' "$COMPOSE_FILE" 2>/dev/null)
-    if printf '%s' "$stripped" | grep -qE '9200:9200|0\.0\.0\.0[^"]*9200'; then
-        echo "        Error: docker-compose.yml 中 ES 9200 未绑定 127.0.0.1(公网暴露,无认证 = 勒索靶标)"
-        echo "               必须写成 \"127.0.0.1:9200:9200\"。发布中止。"
-        exit 1
-    fi
-    if ! grep -qE '127\.0\.0\.1:9200:9200' "$COMPOSE_FILE" 2>/dev/null; then
-        echo "        Error: docker-compose.yml 未找到 \"127.0.0.1:9200:9200\" 映射(ES 端口配置被改动?)"
-        echo "               发布中止。"
-        exit 1
-    fi
-}
-
-# 运行时校验(白名单):inspect 实际运行容器的 9200 宿主绑定,逐一必须是环回。
-# 发现非环回绑定立即停止该容器(消除暴露)并中止发布——0.0.0.0 的 ES 绝不合法。
-assert_es_loopback_runtime() {
-    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^cms-ng-elasticsearch$'; then
-        return 0  # 容器未运行(首次发布),由静态校验兜底
-    fi
-    local ips bad=0 ip
-    ips=$(docker inspect -f '{{json .NetworkSettings.Ports}}' cms-ng-elasticsearch 2>/dev/null \
-          | grep -oE '"HostIp":"[^"]*"' | cut -d'"' -f4)
-    for ip in $ips; do
-        case "$ip" in
-            127.0.0.1|::1|localhost) ;;        # 环回,放行
-            *) bad=1 ;;                        # 0.0.0.0 / :: / 公网 IP -> 暴露
-        esac
-    done
-    if [ "$bad" = "1" ]; then
-        docker stop cms-ng-elasticsearch >/dev/null 2>&1 || true  # 立即消除公网暴露
-        echo "        Error: Elasticsearch 9200 实际绑定非环回 IP($ips),公网暴露 = 勒索靶标"
-        echo "               已停止暴露的 ES 容器。请在 docker-compose.yml 绑定 127.0.0.1:9200 后重发。发布中止。"
-        exit 1
+# 读取 backend/.env 中 ELASTICSEARCH_NODE 的值(去掉行内注释/引号/空白)。
+# 生产环境不再启动本地 ES 容器,直接连接 .env 配置的 ES 地址(可为远端/云端/本地均可)。
+# 未配置时回退到 http://localhost:9200(与 search.service.ts 默认值一致)。
+es_node() {
+    local raw
+    raw=$(grep -E '^[[:space:]]*ELASTICSEARCH_NODE[[:space:]]*=' "$BACKEND_ENV" 2>/dev/null | head -n1 | cut -d= -f2-)
+    raw=$(printf '%s' "$raw" | sed 's/[[:space:]]#.*$//' | tr -d "\"'[:space:]" )
+    if [ -z "$raw" ]; then
+        echo "http://localhost:9200"
+    else
+        echo "$raw"
     fi
 }
 
@@ -197,7 +173,7 @@ usage() {
 
 模式:
   (默认)  开发模式 (npm run dev)
-  --prod   生产模式 (宿主机进程 + rsshub/elasticsearch 容器)
+  --prod   生产模式 (宿主机进程 + rsshub 容器; ES 为外部连接)
 
 生产模式选项 (仅 start/restart --prod):
   --no-build  跳过构建 (仅启动已有产物)
@@ -208,7 +184,7 @@ usage() {
   $0 start --prod --no-build    # 生产启动 (跳过构建)
   $0 status --prod              # 生产状态 + 健康检查
   $0 logs --prod backend        # 查看 backend 日志
-  $0 logs --prod elasticsearch  # 查看 elasticsearch 日志
+  $0 logs --prod rsshub         # 查看 rsshub 日志
 EOF
     exit 1
 }
@@ -301,7 +277,7 @@ logs_dev() {
 # ============================================================
 
 prod_preflight() {
-    echo "[1/7] 前置检查..."
+    echo "[1/8] 前置检查..."
 
     if [ ! -f "$BACKEND_ENV" ]; then
         echo "        Error: $BACKEND_ENV 不存在"
@@ -342,27 +318,77 @@ prod_preflight() {
     fi
 
     # Elasticsearch(媒体全文检索,可选)。仅当 ELASTICSEARCH_ENABLED=true 时检查。
+    # 生产环境直连 .env 中 ELASTICSEARCH_NODE 配置的 ES(远端/云端/本地均可),不再启动本地容器。
     if es_enabled; then
-        # 安全红线双保险:静态 grep compose(权威源,容器未起也拦截)+ 运行时 inspect 实际绑定
-        assert_es_loopback_static
-        assert_es_loopback_runtime
-        # 可达性(非致命):容器尚未启动(首次发布)或宕机时检索降级 LIKE
-        if curl -sf http://localhost:9200/_cluster/health >/dev/null 2>&1; then
-            echo "        Elasticsearch OK (localhost:9200)"
+        local node
+        node=$(es_node)
+        # 可达性(非致命):ES 不可达时检索降级 LIKE
+        if curl -sf "${node}/_cluster/health" >/dev/null 2>&1; then
+            echo "        Elasticsearch OK ($node)"
         else
-            echo "        Warn: ELASTICSEARCH_ENABLED=true 但 localhost:9200 暂不可达"
-            echo "               检索将降级 LIKE;容器随本次发布启动(start_apps)后可恢复"
+            echo "        Warn: ELASTICSEARCH_ENABLED=true 但 $node 暂不可达"
+            echo "               检索将降级 LIKE;请检查 ELASTICSEARCH_NODE / 网络连通性"
         fi
+    fi
+}
+
+prod_prisma_check_and_generate() {
+    if has_flag "--no-build" "$@"; then
+        echo "[2/8] 跳过 Prisma Client 检查 (--no-build)"
+        return
+    fi
+
+    if [ ! -f "$PRISMA_SCHEMA" ]; then
+        echo "[2/8] 跳过 Prisma Client 检查 (未找到 $PRISMA_SCHEMA)"
+        return
+    fi
+
+    echo "[2/8] 检查 Prisma Client 是否需要重新生成..."
+
+    local current_hash=""
+    if command -v sha256sum &> /dev/null; then
+        current_hash=$(sha256sum "$PRISMA_SCHEMA" | awk '{print $1}')
+    elif command -v shasum &> /dev/null; then
+        current_hash=$(shasum -a 256 "$PRISMA_SCHEMA" | awk '{print $1}')
+    fi
+
+    local client_missing=false
+    if [ ! -d "$PROJECT_DIR/node_modules/.prisma/client" ]; then
+        client_missing=true
+    fi
+
+    local needs_generate=false
+    if [ "$client_missing" = true ]; then
+        echo "        Prisma Client 未生成，需要生成"
+        needs_generate=true
+    elif [ -f "$PRISMA_CLIENT_HASH_FILE" ]; then
+        local saved_hash=$(cat "$PRISMA_CLIENT_HASH_FILE" 2>/dev/null | tr -d '[:space:]')
+        if [ "$current_hash" != "$saved_hash" ]; then
+            echo "        schema.prisma 已变更，需要重新生成 Prisma Client"
+            needs_generate=true
+        else
+            echo "        Prisma Client 已是最新"
+        fi
+    else
+        echo "        未找到 Prisma Client hash 记录，需要重新生成"
+        needs_generate=true
+    fi
+
+    if [ "$needs_generate" = true ]; then
+        cd "$BACKEND_DIR"
+        npx prisma generate
+        echo "$current_hash" > "$PRISMA_CLIENT_HASH_FILE"
+        echo "        Prisma Client 生成完成"
     fi
 }
 
 prod_build() {
     if has_flag "--no-build" "$@"; then
-        echo "[2/7] 跳过构建 (--no-build)"
+        echo "[3/8] 跳过构建 (--no-build)"
         return
     fi
 
-    echo "[2/7] 构建 (可能需要 3-10 分钟)..."
+    echo "[3/8] 构建 (可能需要 3-10 分钟)..."
 
     # 部署机不会自己装依赖:新代码引入的新包(如 helmet/@nestjs/throttler)
     # 不在旧 node_modules 里,缺了会在启动时才崩。每次发布先按 lockfile 同步。
@@ -398,7 +424,7 @@ prod_build() {
 }
 
 prod_stop_apps() {
-    echo "[3/7] 停止旧应用进程..."
+    echo "[4/8] 停止旧应用进程..."
 
     # backend
     if [ -f "$BACKEND_PID_FILE" ]; then
@@ -433,7 +459,7 @@ prod_stop_apps() {
 }
 
 prod_start_apps() {
-    echo "[5/7] 启动应用..."
+    echo "[6/8] 启动应用..."
 
     cd "$BACKEND_DIR"
     # NODE_ENV=production: Swagger 不挂载、helmet CSP 生效(main.ts 依赖此判断)。
@@ -451,17 +477,15 @@ prod_start_apps() {
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" up -d rsshub >/dev/null 2>&1 || echo "        Warning: RSSHub 启动失败 (非致命)"
 
-    # Elasticsearch 仅当启用时启动(避免功能关闭白跑 512m 容器;首次需构建含 IK 的镜像)
+    # Elasticsearch:生产环境不再启动本地容器,直连 backend/.env 中 ELASTICSEARCH_NODE
+    # 配置的 ES(远端/云端/自建均可)。这里只打印连接目标便于排查,不做容器操作。
     if es_enabled; then
-        echo "        启动 Elasticsearch 容器(首次构建镜像较慢)..."
-        docker compose -f "$COMPOSE_FILE" up -d elasticsearch >/dev/null 2>&1 || echo "        Warning: Elasticsearch 启动失败 (非致命,检索降级 LIKE)"
-        # 启动后复检实际端口绑定(闭合 preflight 静态校验与运行时之间的 TOCTOU 窗口)
-        assert_es_loopback_runtime
+        echo "        Elasticsearch: 直连 $(es_node) (ELASTICSEARCH_ENABLED=true)"
     fi
 }
 
 prod_migrate() {
-    echo "[4/7] 数据库迁移 (prisma migrate deploy)..."
+    echo "[5/8] 数据库迁移 (prisma migrate deploy)..."
 
     # 迁移在启动应用之前执行: prisma migrate deploy 直连 DATABASE_URL，
     # 不依赖 backend 进程就绪。失败必须 exit 1 中断发布，
@@ -477,7 +501,7 @@ prod_migrate() {
 }
 
 prod_health() {
-    echo "[6/7] 健康验证..."
+    echo "[7/8] 健康验证..."
     sleep 3
 
     local fe_status be_status
@@ -496,20 +520,22 @@ prod_health() {
         echo "        Backend  (:${PROD_BACKEND_PORT}): ✗ 未响应 (HTTP $be_status)"
     fi
 
-    # Elasticsearch(仅启用时;未响应非致命,检索降级 LIKE)
+    # Elasticsearch(仅启用时;未响应非致命,检索降级 LIKE)。直连 .env 配置的 ES 地址。
     if es_enabled; then
         local es_status
-        es_status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9200/_cluster/health" 2>/dev/null || echo "000")
+        local node
+        node=$(es_node)
+        es_status=$(curl -s -o /dev/null -w "%{http_code}" "${node}/_cluster/health" 2>/dev/null || echo "000")
         if [ "$es_status" = "200" ]; then
-            echo "        Elasticsearch (:9200): ✓ 可访问"
+            echo "        Elasticsearch ($node): ✓ 可访问"
         else
-            echo "        Elasticsearch (:9200): ✗ 未响应 (HTTP $es_status) — 检索降级 LIKE (非致命)"
+            echo "        Elasticsearch ($node): ✗ 未响应 (HTTP $es_status) - 检索降级 LIKE (非致命)"
         fi
     fi
 }
 
 prod_init_admin() {
-    echo "[7/7] 初始化 admin 账号..."
+    echo "[8/8] 初始化 admin 账号..."
 
     # 安全基线(issue #105 后续):公开注册接口永远只创建 REPORTER,admin 必须由
     # 本机脚本直写 DB(backend/scripts/create-admin.ts)。仅在显式提供
@@ -553,6 +579,7 @@ start_prod() {
     unset ADMIN_BOOTSTRAP_EMAIL ADMIN_BOOTSTRAP_PASSWORD
 
     prod_preflight
+    prod_prisma_check_and_generate "$@"
     prod_build "$@"
     prod_stop_apps
     prod_migrate
@@ -598,7 +625,7 @@ stop_prod() {
     pkill -f "next start" 2>/dev/null || true
     pkill -f "next-server" 2>/dev/null || true
 
-    echo "        应用进程已停止 (rsshub/elasticsearch 容器保留)"
+    echo "        应用进程已停止 (rsshub 容器保留)"
 }
 
 restart_prod() {
@@ -633,7 +660,15 @@ status_prod() {
 
     echo "        rsshub:   $(docker ps --filter name=cms-ng-rsshub --format '{{.Status}}' 2>/dev/null || echo '未运行')"
     if es_enabled; then
-        echo "        elasticsearch: $(docker ps --filter name=cms-ng-elasticsearch --format '{{.Status}}' 2>/dev/null || echo '未运行')"
+        local node
+        node=$(es_node)
+        local es_status
+        es_status=$(curl -s -o /dev/null -w "%{http_code}" "${node}/_cluster/health" 2>/dev/null || echo "000")
+        if [ "$es_status" = "200" ]; then
+            echo "        elasticsearch: ✓ 可访问 ($node)"
+        else
+            echo "        elasticsearch: ✗ 未响应 ($node, HTTP $es_status) - 检索降级 LIKE"
+        fi
     else
         echo "        elasticsearch: 已禁用 (ELASTICSEARCH_ENABLED!=true)"
     fi
@@ -671,17 +706,13 @@ logs_prod() {
             echo "[logs] rsshub 日志 (Ctrl+C 退出):"
             docker compose -f "$COMPOSE_FILE" logs -f rsshub
             ;;
-        elasticsearch|es)
-            echo "[logs] elasticsearch 日志 (Ctrl+C 退出):"
-            docker compose -f "$COMPOSE_FILE" logs -f elasticsearch
-            ;;
         "")
             echo "[logs] backend 日志 ($BACKEND_LOG_FILE) (Ctrl+C 退出):"
-            echo "        (指定 backend|frontend|rsshub|elasticsearch 查看其他)"
+            echo "        (指定 backend|frontend|rsshub 查看其他)"
             tail -f "$BACKEND_LOG_FILE"
             ;;
         *)
-            echo "        未知服务: $service (可选: backend | frontend | rsshub | elasticsearch)"
+            echo "        未知服务: $service (可选: backend | frontend | rsshub)"
             exit 1
             ;;
     esac
