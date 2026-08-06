@@ -244,19 +244,15 @@ if [[ "$START_BACKEND" == true ]]; then
 
   # 数据库迁移（可选）
   if [[ "$SKIP_MIGRATE" == false ]]; then
-    info "检查数据库迁移状态..."
-    MIGRATE_OUTPUT=$(npx prisma migrate status 2>&1) || true
-    if echo "$MIGRATE_OUTPUT" | grep -q "Database schema is up to date"; then
-      success "数据库 Schema 已是最新"
-    elif echo "$MIGRATE_OUTPUT" | grep -qE "(drift|not applied)"; then
-      info "应用数据库迁移..."
-      if npx prisma migrate deploy 2>&1 | tail -2; then
-        success "数据库迁移完成"
-      else
-        warn "数据库迁移失败，请手动检查: npx prisma migrate status"
-      fi
+    info "检查并应用数据库迁移..."
+    # migrate deploy 是幂等操作：有待执行迁移时自动应用，没有时安全退出。
+    # 失败必须中止启动，避免新代码继续运行在旧 Schema 上。
+    if npx prisma migrate deploy 2>&1; then
+      success "数据库迁移检查完成"
     else
-      warn "无法获取迁移状态，跳过自动迁移"
+      error "数据库迁移失败，开发服务启动已中止"
+      echo "      请检查 DATABASE_URL、数据库连通性及迁移 SQL，修复后重新运行启动脚本"
+      exit 1
     fi
   else
     warn "已跳过数据库迁移"
