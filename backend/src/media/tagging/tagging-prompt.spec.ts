@@ -11,6 +11,8 @@ describe('tagging-prompt 归一化与内容级过滤', () => {
     const messages = buildTaggingMessagesV2('https://example.com/image.png');
     expect(messages).toHaveLength(2);
     expect(messages[0].content).toContain('"title"');
+    expect(messages[0].content).toContain('准确识别图中的主要人物');
+    expect(messages[0].content).toContain('严禁空泛、无意义词');
     expect(messages[1].content).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
