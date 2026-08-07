@@ -17,6 +17,8 @@ const VALID_AI_PROVIDERS = ['deepseek', 'gemini', 'kimi', 'openai'] as const;
 type AiProvider = (typeof VALID_AI_PROVIDERS)[number];
 // 视觉链路与文本完全隔离:deepseek 无视觉能力,不接受;未配置时打标降级关闭(不 fail-fast)
 const VALID_VISION_PROVIDERS = ['gemini', 'kimi', 'openai'] as const;
+// 文生视频 provider 与文本/视觉均隔离;未配置时功能降级关闭(不 fail-fast)
+const VALID_VIDEO_GEN_PROVIDERS = ['volcengine', 'minimax'] as const;
 
 export interface ValidatedEnv {
   DATABASE_URL: string;
@@ -102,6 +104,19 @@ export function validateEnv(
   ) {
     errors.push(
       `  - AI_VISION_PROVIDER: must be one of [${VALID_VISION_PROVIDERS.join(', ')}] (got "${visionProvider}")`,
+    );
+  }
+
+  // 视频生成 provider 仅做格式校验(枚举合法);未配置或缺 key 的降级关闭由
+  // VideoJobService 构造器处理,不在此 fail-fast(与可选变量惯例一致)
+  const videoProvider = env.VIDEO_CLIP_PROVIDER;
+  if (
+    videoProvider !== undefined &&
+    videoProvider !== '' &&
+    !(VALID_VIDEO_GEN_PROVIDERS as readonly string[]).includes(videoProvider)
+  ) {
+    errors.push(
+      `  - VIDEO_CLIP_PROVIDER: must be one of [${VALID_VIDEO_GEN_PROVIDERS.join(', ')}] (got "${videoProvider}")`,
     );
   }
 

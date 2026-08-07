@@ -20,6 +20,7 @@ import { StorageModule } from './storage/storage.module';
 import { BillingModule } from './billing/billing.module';
 import { AuthorStyleModule } from './authors/author-style.module';
 import { MediaModule } from './media/media.module';
+import { VideoModule } from './video/video.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { MediaModule } from './media/media.module';
     BillingModule,
     AuthorStyleModule,
     MediaModule,
+    VideoModule,
   ],
   controllers: [AppController],
   providers: [

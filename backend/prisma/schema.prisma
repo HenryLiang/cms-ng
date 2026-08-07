@@ -34,6 +34,7 @@ model User {
   billingTransactions BillingTransaction[]
   balanceAlert        BalanceAlert?
   mediaAssets         MediaAsset[]
+  videoGenerationJobs VideoGenerationJob[]
 
   @@map("users")
 }
@@ -352,6 +353,7 @@ enum TransactionType {
   TOP_UP
   AI_LLM
   AI_IMAGE
+  AI_VIDEO
   PUBLISH
   AUTO_PUBLISH
   DATA_FETCH
@@ -529,10 +531,11 @@ model MediaAsset {
   thumbnailUrl  String?          // 列表/搜索使用的预览 URL；为空时前端回退原图
   // 文件元数据
   fileName      String           // 展示用文件名（上传原文件名 / AI 生成命名）
-  mimeType      String           // image/jpeg | image/png | image/webp | image/gif
+  mimeType      String           // image/jpeg | image/png | image/webp | image/gif | video/mp4
   size          Int              // 字节数
   width         Int?             // 像素
   height        Int?             // 像素
+  duration      Int?             // 视频时长(秒);图片为 null
   // 来源
   source        MediaSource      @default(UPLOAD)
   sourceRef     String?          // AI: 关联 aiOperationId；UPLOAD: null
@@ -564,4 +567,59 @@ model MediaAsset {
   @@index([status])
   @@index([tagStatus, updatedAt])
   @@map("media_assets")
+}
+
+// ===== 文生视频(PRD: docs/PRD-text-to-video.md) =====
+// 过程逻辑与文章/auto-publish 完全解耦:articleId/resultAssetId 均为普通溯源字段,不设外键。
+
+enum VideoGenerationMode {
+  TEXT_TO_CLIP
+  ARTICLE_TO_VIDEO
+}
+
+enum VideoJobStatus {
+  PENDING
+  SCRIPTING
+  STORYBOARDING
+  ASSETS_GENERATING
+  VOICE_SYNTHESIZING
+  COMPOSING
+  UPLOADING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model VideoGenerationJob {
+  id             String              @id @default(uuid())
+  mode           VideoGenerationMode @default(TEXT_TO_CLIP)
+  status         VideoJobStatus      @default(PENDING)
+  failedStep     String?             @db.VarChar(50)
+  // 输入
+  prompt         String              @db.Text
+  articleId      String?             // L2 来源文章,仅溯源引用(无外键);L1 为空
+  // provider 选择(任务级可追溯)
+  provider       String              @db.VarChar(20) // 'volcengine' | 'minimax'
+  providerTaskId String?             @db.VarChar(100) // provider 侧异步任务 ID
+  // 生成参数
+  durationSec    Int?
+  resolution     String?             @db.VarChar(10) // '768P' | '1080P'
+  aspectRatio    String?             @db.VarChar(10) // '16:9' | '9:16' | '1:1'
+  // 成本
+  costEstimate   Float?
+  costActual     Float?
+  // 产出
+  resultAssetId  String?             // 成片 MediaAsset.id,仅溯源引用(无外键)
+  error          String?             @db.Text
+  retryCount     Int                 @default(0)
+  // 归属
+  userId         String
+  user           User                @relation(fields: [userId], references: [id])
+  // 时间
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
+  @@map("video_generation_jobs")
 }
