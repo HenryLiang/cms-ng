@@ -266,7 +266,7 @@ VIDEO_TTS_PROVIDER=minimax
 已实现 L2(稿件一键成片)闭环:`PENDING → SCRIPTING → STORYBOARDING → ASSETS_GENERATING → VOICE_SYNTHESIZING → COMPOSING → UPLOADING → SUCCEEDED`,全程断点恢复(checkpoint 落在 `storyboard` JSON 的 `scenes[].asset/voice` 上,仅变化时写库避免扰动超时判定)。与方案的有意偏差/新结论:
 
 1. **合成为进程内 spawn 的 ffmpeg**,而非 §7 的独立 worker `scripts/video-render/`:`render/ffmpeg-compose.ts` 是纯函数式 helper(只依赖 jobDir 本地文件,不感知状态机/DB),未来拆 worker 时整体平移即可;jobDir 契约(`os.tmpdir()/cms-ng-video/{jobId}`)保留
-2. **火山 TTS 不在 Ark 上**:PoC 实测 `POST {ARK}/audio/speech` 返回 404。豆包语音是独立产品线:`POST https://openspeech.bytedance.com/api/v1/tts`,凭证头 `X-Api-App-Key`/`X-Api-Access-Key`/`X-Api-Resource-Id: volc.service_type.10029`,成功码 `code=3000`,base64 音频在 `data`,时长在 `addition.duration`(ms 字符串);**HTTP 非流式 V1 无词级时间戳** → 该 provider 字幕按 §8 退化为整句一 cue(MiniMax `t2a_v2` 的 `subtitle_file` JSONL 已按文档实现词级时间戳解析,未实测)
+2. **火山 TTS 不在 Ark 上**:PoC 实测 `POST {ARK}/audio/speech` 返回 404;该 Ark 账号 `/models` 129 个模型无任何语音类;Ark key 作 `X-Api-Key` 打 openspeech 返回 401 `Invalid X-Api-Key` —— **两套凭证体系确凿不可复用**。已按官方文档(docs/6561/1598757)实现 **V3 HTTP 单向流式** `POST /api/v3/tts/unidirectional`:认证支持新版单 key(`X-Api-Key`=`VOLC_TTS_API_KEY`,推荐)与旧版双凭证(`X-Api-App-Id`+`X-Api-Access-Key`);`X-Api-Resource-Id: seed-tts-2.0`(TTS 2.0 大模型);`enable_subtitle:true` → `TTSSubtitle` 事件返回**字/词级时间戳**(秒,相对 session,基于原文)→ 字幕逐词烧录无需降级;音频为 352/TTSResponse 事件的 base64 分片拼接
 3. **字幕烧录双降级链**:词级时间戳 → 整句 cue;ASS 烧录 → `mov_text` 软字幕轨。本地 homebrew ffmpeg 8.0.1 无 libass/drawtext,`supportsAssBurn()` 运行时探测决定烧录或软字幕轨
 4. **Ken Burns 正确形态**:图片镜用单帧输入 + 2x 超采样 scale/crop + `zoompan d=总帧数` + `trim`;`-loop 1` 长输入 × zoompan d 会帧数失控(2s 意图产出 121s)
 5. **TTS 可选**:凭证不全时 factory 返回 null,`VOICE_SYNTHESIZING` 整步跳过,`ttsProvider='none'`,成片仅字幕;镜长回退 `durationHintSec`

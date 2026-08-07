@@ -19,7 +19,7 @@ export interface TtsResult {
   /** 音频二进制(mp3)—— 调用方负责转存 COS,不在 provider 内做(存储是底层共用能力) */
   audio: Buffer;
   durationMs: number;
-  /** minimax 必有;volcengine 取决于接口能力(未返回则字幕按句均摊降级) */
+  /** minimax(subtitle_file)与 volcengine V3(enable_subtitle)均返回词级时间戳 */
   wordTimestamps?: WordTimestamp[];
 }
 
