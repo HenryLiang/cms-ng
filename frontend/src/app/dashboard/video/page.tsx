@@ -1,7 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Clapperboard, Loader2, RefreshCw, Sparkles, XCircle } from 'lucide-react';
+import {
+  Clapperboard,
+  Film,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  XCircle,
+} from 'lucide-react';
 import { VideoJobStatus } from '@cms-ng/shared';
 import { Badge, Button, Card, PageHeader } from '@/components/ui';
 import type { StatusTone } from '@/lib/article-status';
@@ -46,6 +53,18 @@ const PROVIDER_LABEL: Record<string, string> = {
 };
 
 const POLL_INTERVAL_MS = 5000;
+
+const SELECT_CLASS =
+  'h-9 rounded-lg border border-line bg-surface px-3 text-sm text-foreground ' +
+  'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30';
+
+function MetaChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="tnum rounded-md bg-surface-muted px-1.5 py-0.5 text-[11px] font-medium text-muted">
+      {children}
+    </span>
+  );
+}
 
 export default function VideoStudioPage() {
   const toast = useToastStore((s) => s.show);
@@ -149,19 +168,21 @@ export default function VideoStudioPage() {
 
   if (!capabilityLoaded) {
     return (
-      <div className="flex h-40 items-center justify-center text-muted">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div className="flex h-40 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
       </div>
     );
   }
 
   if (!capability?.enabled) {
     return (
-      <div>
+      <div className="mx-auto max-w-5xl">
         <PageHeader title="视频创作" subtitle="AI 文生视频" />
-        <Card className="p-10 text-center">
-          <Clapperboard className="mx-auto h-10 w-10 text-subtle" />
-          <p className="mt-4 text-sm font-medium text-foreground">文生视频功能未启用</p>
+        <Card className="flex flex-col items-center px-5 py-16 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
+            <Clapperboard className="h-5 w-5 text-subtle" />
+          </div>
+          <p className="text-sm font-medium text-foreground">文生视频功能未启用</p>
           <p className="mt-1 text-xs text-muted">
             请联系管理员配置 VIDEO_GENERATION_ENABLED 与 VIDEO_CLIP_PROVIDER(火山引擎 / MiniMax)
           </p>
@@ -171,15 +192,24 @@ export default function VideoStudioPage() {
   }
 
   return (
-    <div>
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="视频创作"
         subtitle={`文生视频 · 当前引擎:${PROVIDER_LABEL[capability.provider ?? ''] ?? capability.provider}`}
       />
 
       {/* 新建任务 */}
-      <Card className="mb-6 p-5">
-        <form onSubmit={onSubmit} className="space-y-4">
+      <Card className="mb-6 overflow-hidden">
+        <div className="flex items-center gap-2.5 border-b border-line bg-surface-muted/50 px-5 py-3.5">
+          <div className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm">
+            <Clapperboard className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">新建视频任务</h2>
+            <p className="text-xs text-muted">描述画面,AI 生成短视频片段并自动存入媒体库</p>
+          </div>
+        </div>
+        <form onSubmit={onSubmit} className="space-y-4 p-5">
           <div>
             <label htmlFor="video-prompt" className="mb-1.5 block text-xs font-medium text-muted">
               画面描述
@@ -194,14 +224,14 @@ export default function VideoStudioPage() {
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
             />
           </div>
-          <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
             <div>
               <label htmlFor="video-duration" className="mb-1.5 block text-xs font-medium text-muted">时长</label>
               <select
                 id="video-duration"
                 value={durationSec}
                 onChange={(e) => setDurationSec(Number(e.target.value))}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+                className={SELECT_CLASS}
               >
                 <option value={6}>6 秒</option>
                 <option value={10}>10 秒</option>
@@ -213,7 +243,7 @@ export default function VideoStudioPage() {
                 id="video-resolution"
                 value={resolution}
                 onChange={(e) => setResolution(e.target.value as '768P' | '1080P')}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+                className={SELECT_CLASS}
               >
                 <option value="768P">768P</option>
                 <option value="1080P">1080P</option>
@@ -225,15 +255,15 @@ export default function VideoStudioPage() {
                 id="video-ratio"
                 value={aspectRatio}
                 onChange={(e) => setAspectRatio(e.target.value as '16:9' | '9:16' | '1:1')}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+                className={SELECT_CLASS}
               >
                 <option value="9:16">竖屏 9:16</option>
                 <option value="16:9">横屏 16:9</option>
                 <option value="1:1">方形 1:1</option>
               </select>
             </div>
-            <Button type="submit" disabled={submitting || !prompt.trim()}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!prompt.trim()}>
+              {!submitting && <Sparkles className="h-4 w-4" />}
               生成视频
             </Button>
           </div>
@@ -242,83 +272,103 @@ export default function VideoStudioPage() {
 
       {/* 任务列表 */}
       {loading ? (
-        <div className="flex h-32 items-center justify-center text-muted">
-          <Loader2 className="h-5 w-5 animate-spin" />
+        <div className="flex h-32 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
         </div>
       ) : jobs.length === 0 ? (
-        <Card className="p-10 text-center">
-          <Clapperboard className="mx-auto h-10 w-10 text-subtle" />
-          <p className="mt-4 text-sm text-muted">还没有视频任务,从上方输入画面描述开始</p>
+        <Card className="flex flex-col items-center px-5 py-16 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
+            <Film className="h-5 w-5 text-subtle" />
+          </div>
+          <p className="text-sm font-medium text-foreground">还没有视频任务</p>
+          <p className="mt-1 text-xs text-muted">从上方输入画面描述,生成第一个视频片段</p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          <p className="text-xs text-subtle">共 {total} 个任务{hasActive ? ',进行中任务每 5 秒自动刷新' : ''}</p>
-          {jobs.map((job) => {
-            const meta = STATUS_META[job.status] ?? { label: job.status, tone: 'neutral' as StatusTone };
-            const isActive = ACTIVE_STATUSES.includes(job.status);
-            return (
-              <Card key={job.id} className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge tone={meta.tone}>
-                        {isActive && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                        {meta.label}
-                      </Badge>
-                      <span className="text-[11px] text-subtle tnum">
-                        {job.durationSec ?? '-'}s · {job.resolution ?? '-'} · {job.aspectRatio ?? '-'}
-                      </span>
-                      {job.costEstimate != null && (
-                        <span className="text-[11px] text-subtle tnum">预估 ¥{job.costEstimate}</span>
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">任务列表</h2>
+              <span className="tnum rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
+                {total}
+              </span>
+            </div>
+            {hasActive && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                进行中 · 每 5 秒自动刷新
+              </span>
+            )}
+          </div>
+          <div className="space-y-3">
+            {jobs.map((job) => {
+              const meta = STATUS_META[job.status] ?? { label: job.status, tone: 'neutral' as StatusTone };
+              const isActive = ACTIVE_STATUSES.includes(job.status);
+              return (
+                <Card key={job.id} className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone={meta.tone}>
+                          {isActive && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                          {meta.label}
+                        </Badge>
+                        <MetaChip>{job.durationSec ?? '-'}s</MetaChip>
+                        <MetaChip>{job.resolution ?? '-'}</MetaChip>
+                        <MetaChip>{job.aspectRatio ?? '-'}</MetaChip>
+                        {job.costEstimate != null && (
+                          <MetaChip>预估 ¥{job.costEstimate}</MetaChip>
+                        )}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm text-foreground">{job.prompt}</p>
+                      {job.status === VideoJobStatus.FAILED && job.error && (
+                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                          {job.error}
+                        </div>
+                      )}
+                      <p className="tnum mt-2 text-[11px] text-subtle">
+                        {new Date(job.createdAt).toLocaleString('zh-CN')}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {isActive && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={actingId === job.id}
+                          onClick={() => void onCancel(job.id)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          取消
+                        </Button>
+                      )}
+                      {job.status === VideoJobStatus.FAILED && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={actingId === job.id}
+                          onClick={() => void onRetry(job.id)}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${actingId === job.id ? 'animate-spin' : ''}`} />
+                          重试
+                        </Button>
                       )}
                     </div>
-                    <p className="mt-2 line-clamp-2 text-sm text-foreground">{job.prompt}</p>
-                    {job.status === VideoJobStatus.FAILED && job.error && (
-                      <p className="mt-1.5 text-xs text-red-500">{job.error}</p>
-                    )}
-                    <p className="mt-1.5 text-[11px] text-subtle tnum">
-                      {new Date(job.createdAt).toLocaleString('zh-CN')}
-                    </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {isActive && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={actingId === job.id}
-                        onClick={() => void onCancel(job.id)}
-                      >
-                        <XCircle className="h-4 w-4" />
-                        取消
-                      </Button>
-                    )}
-                    {job.status === VideoJobStatus.FAILED && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={actingId === job.id}
-                        onClick={() => void onRetry(job.id)}
-                      >
-                        <RefreshCw className={`h-4 w-4 ${actingId === job.id ? 'animate-spin' : ''}`} />
-                        重试
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {job.status === VideoJobStatus.SUCCEEDED && job.resultUrl && (
-                  <div className="mt-3 overflow-hidden rounded-lg bg-black ring-1 ring-line">
-                    <video
-                      src={job.resultUrl}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="max-h-96 w-full"
-                    />
-                  </div>
-                )}
-              </Card>
-            );
-          })}
+                  {job.status === VideoJobStatus.SUCCEEDED && job.resultUrl && (
+                    <div className="mt-3 flex justify-center overflow-hidden rounded-lg bg-black ring-1 ring-line">
+                      <video
+                        src={job.resultUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="max-h-[420px] w-auto max-w-full"
+                      />
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
