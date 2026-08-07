@@ -250,12 +250,28 @@ describe('VideoJobService', () => {
       expect(prisma.videoGenerationJob.updateMany).not.toHaveBeenCalled();
     });
 
-    it('缺 providerTaskId(崩溃窗口)→ 回退 PENDING 重新提交', async () => {
+    it('缺 providerTaskId 但在宽限期内(submit 进行中)→ 跳过,防重复提交', async () => {
       build();
       prisma.videoGenerationJob.findUnique.mockResolvedValue({
         ...JOB,
         status: 'ASSETS_GENERATING',
         providerTaskId: null,
+        updatedAt: new Date(), // submitStage 刚抢占,provider.submit 网络窗口内
+      });
+
+      await service.pollStage('job-1');
+
+      expect(prisma.videoGenerationJob.updateMany).not.toHaveBeenCalled();
+      expect(prisma.videoGenerationJob.update).not.toHaveBeenCalled();
+    });
+
+    it('缺 providerTaskId 且超过宽限期(真崩溃)→ 回退 PENDING 重新提交', async () => {
+      build();
+      prisma.videoGenerationJob.findUnique.mockResolvedValue({
+        ...JOB,
+        status: 'ASSETS_GENERATING',
+        providerTaskId: null,
+        updatedAt: new Date(Date.now() - 3 * 60 * 1000),
       });
       prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
 

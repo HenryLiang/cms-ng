@@ -26,7 +26,7 @@ describe('VolcengineSeedanceProvider', () => {
     provider = new VolcengineSeedanceProvider(config);
   });
 
-  it('submit 将生成参数以 -- 后缀内嵌 prompt 并返回 taskId', async () => {
+  it('submit 将生成参数以 -- 后缀内嵌 prompt(时长收敛到 5/10 档)并返回 taskId', async () => {
     mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-123' } });
 
     const handle = await provider.submit({
@@ -42,7 +42,7 @@ describe('VolcengineSeedanceProvider', () => {
       'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
     );
     expect((body as any).content[0].text).toBe(
-      '一只柴犬在樱花树下奔跑 --ratio 9:16 --dur 6 --res 1080p',
+      '一只柴犬在樱花树下奔跑 --ratio 9:16 --dur 5 --res 1080p',
     );
   });
 

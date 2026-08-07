@@ -124,11 +124,20 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   private buildPromptText(req: VideoGenSubmitRequest): string {
     const parts = [req.prompt.trim()];
     if (req.aspectRatio) parts.push(`--ratio ${req.aspectRatio}`);
-    if (req.durationSec) parts.push(`--dur ${req.durationSec}`);
+    if (req.durationSec)
+      parts.push(`--dur ${this.normalizeDuration(req.durationSec)}`);
     if (req.resolution) {
       parts.push(`--res ${req.resolution === '1080P' ? '1080p' : '768p'}`);
     }
     return parts.join(' ');
+  }
+
+  /**
+   * Seedance 各版本支持的时长档位不同(1.0: 5/10s;1.5+: 更宽),
+   * 统一收敛到 [5, 10] 最近档,避免非法参数被 provider 拒绝(实测 6s 在 1.0-pro 不可用)
+   */
+  private normalizeDuration(durationSec: number): number {
+    return durationSec <= 7 ? 5 : 10;
   }
 
   private headers(): Record<string, string> {

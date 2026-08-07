@@ -34,6 +34,12 @@ import {
 const GENERATE_TIMEOUT_MS = 30 * 60 * 1000;
 /** 上传阶段僵尸(进程崩溃)超过该时长转 FAILED,可手动重试 */
 const UPLOAD_STALE_MS = 10 * 60 * 1000;
+/**
+ * 孤儿宽限:submitStage 抢占(PENDING→ASSETS_GENERATING)到 providerTaskId 写回之间
+ * 是秒级网络窗口,期间并发轮询若立即"孤儿回退"会重复提交 provider(实测发生,双扣费);
+ * 超过该时长仍无 providerTaskId 才判定为真崩溃,回退 PENDING 重新提交
+ */
+const ORPHAN_GRACE_MS = 2 * 60 * 1000;
 const MAX_RETRY_COUNT = 3;
 const VIDEO_DOWNLOAD_TIMEOUT_MS = 180_000;
 const VIDEO_MAX_BYTES = 300 * 1024 * 1024;
@@ -257,8 +263,15 @@ export class VideoJobService {
     });
     if (!job || job.status !== 'ASSETS_GENERATING') return;
     if (!job.providerTaskId) {
+      // 宽限期内视为 submitStage 提交进行中(provider.submit 是秒级网络调用),
+      // 直接跳过 —— 否则与提交窗口竞争会造成重复提交 provider、双扣费
+      if (Date.now() - job.updatedAt.getTime() < ORPHAN_GRACE_MS) {
+        return;
+      }
       // 崩溃于 submit 成功但写 providerTaskId 之前 —— 无法找回,重新提交
-      this.logger.warn(`任务 ${jobId} 缺 providerTaskId,回退 PENDING 重新提交`);
+      this.logger.warn(
+        `任务 ${jobId} 缺 providerTaskId 且超过宽限期,回退 PENDING 重新提交`,
+      );
       await this.prisma.videoGenerationJob.updateMany({
         where: { id: jobId, status: 'ASSETS_GENERATING' },
         data: { status: 'PENDING' },
