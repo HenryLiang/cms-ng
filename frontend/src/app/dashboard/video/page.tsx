@@ -1,24 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Clapperboard,
+  FileText,
   Film,
   Loader2,
   RefreshCw,
   Sparkles,
   XCircle,
 } from 'lucide-react';
-import { VideoJobStatus } from '@cms-ng/shared';
+import { VideoGenerationMode, VideoJobStatus } from '@cms-ng/shared';
 import { Badge, Button, Card, PageHeader } from '@/components/ui';
 import type { StatusTone } from '@/lib/article-status';
 import { reportApiError } from '@/lib/api-error-toast';
+import { getArticles, type Article } from '@/lib/article-api';
 import {
   createVideoJob,
   getVideoCapability,
   listVideoJobs,
   retryVideoJob,
   cancelVideoJob,
+  parseStoryboardVo,
   type VideoCapability,
   type VideoGenerationJobVo,
 } from '@/lib/video-api';
@@ -66,17 +70,83 @@ function MetaChip({ children }: { children: React.ReactNode }) {
   );
 }
 
+const SCENE_STATUS_META: Record<string, { label: string; className: string }> = {
+  pending: { label: '待生成', className: 'bg-surface-muted text-muted' },
+  submitted: { label: '生成中', className: 'bg-blue-50 text-blue-600' },
+  done: { label: '素材就绪', className: 'bg-emerald-50 text-emerald-600' },
+  failed: { label: '失败', className: 'bg-red-50 text-red-600' },
+};
+
+/** L2(稿件成片)任务的脚本/分镜进度明细 */
+function L2JobDetail({ job }: { job: VideoGenerationJobVo }) {
+  const storyboard = parseStoryboardVo(job.storyboard);
+  return (
+    <details className="mt-3 rounded-lg border border-line bg-surface-muted/40 px-3 py-2">
+      <summary className="cursor-pointer select-none text-xs font-medium text-muted">
+        脚本与分镜{storyboard ? `(${storyboard.scenes.length} 镜)` : ''}
+        {job.ttsProvider === 'none' && ' · 无配音'}
+      </summary>
+      {job.script && (
+        <div className="mt-2">
+          <p className="text-[11px] font-medium text-subtle">口播脚本</p>
+          <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+            {job.script}
+          </p>
+        </div>
+      )}
+      {storyboard && (
+        <ol className="mt-2 space-y-1.5 border-t border-line pt-2">
+          {storyboard.scenes.map((s) => {
+            const chip = s.asset ? SCENE_STATUS_META[s.asset.status] : null;
+            return (
+              <li key={s.index} className="flex items-start gap-2 text-xs">
+                <span className="tnum mt-0.5 shrink-0 text-subtle">{s.index + 1}.</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground">{s.narration}</p>
+                  <p className="mt-0.5 line-clamp-1 text-subtle">
+                    {s.visual.type === 'video' ? '视频片段' : '图片'} · {s.visual.prompt}
+                  </p>
+                </div>
+                <span className="flex shrink-0 items-center gap-1">
+                  {s.voice && (
+                    <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">
+                      已配音
+                    </span>
+                  )}
+                  {chip && (
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${chip.className}`}>
+                      {chip.label}
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </details>
+  );
+}
+
 export default function VideoStudioPage() {
   const toast = useToastStore((s) => s.show);
+  const searchParams = useSearchParams();
   const [capability, setCapability] = useState<VideoCapability | null>(null);
   const [capabilityLoaded, setCapabilityLoaded] = useState(false);
   const [jobs, setJobs] = useState<VideoGenerationJobVo[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<VideoGenerationMode>(
+    searchParams.get('mode') === 'article'
+      ? VideoGenerationMode.ARTICLE_TO_VIDEO
+      : VideoGenerationMode.TEXT_TO_CLIP,
+  );
   const [prompt, setPrompt] = useState('');
   const [durationSec, setDurationSec] = useState(6);
   const [resolution, setResolution] = useState<'768P' | '1080P'>('768P');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [articleId, setArticleId] = useState(searchParams.get('articleId') ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -101,8 +171,21 @@ export default function VideoStudioPage() {
   useEffect(() => {
     getVideoCapability()
       .then(setCapability)
-      .catch(() => setCapability({ enabled: false, provider: null, defaults: { durationSec: 6, resolution: '768P', aspectRatio: '9:16' } }))
+      .catch(() =>
+        setCapability({
+          enabled: false,
+          provider: null,
+          defaults: { durationSec: 6, resolution: '768P', aspectRatio: '9:16' },
+          l2: false,
+          tts: false,
+          render: false,
+        }),
+      )
       .finally(() => setCapabilityLoaded(true));
+    // 稿件成片候选稿件列表(取最近 50 篇,权限由后端创建时校验)
+    getArticles({ page: 1, pageSize: 50 })
+      .then((res) => setArticles(res.data))
+      .catch(() => setArticles([]));
     // 数据获取模式(fetch-in-effect):React 19 set-state-in-effect 规则对此过严
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
@@ -126,12 +209,24 @@ export default function VideoStudioPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!prompt.trim() || submitting) return;
+    if (submitting) return;
+    if (mode === VideoGenerationMode.TEXT_TO_CLIP && !prompt.trim()) return;
+    if (mode === VideoGenerationMode.ARTICLE_TO_VIDEO && !articleId) return;
     setSubmitting(true);
     try {
-      await createVideoJob({ prompt: prompt.trim(), durationSec, resolution, aspectRatio });
+      await createVideoJob(
+        mode === VideoGenerationMode.ARTICLE_TO_VIDEO
+          ? { mode, articleId, aspectRatio }
+          : { prompt: prompt.trim(), durationSec, resolution, aspectRatio },
+      );
       setPrompt('');
-      toast({ type: 'success', message: '视频任务已创建,生成需要几分钟' });
+      toast({
+        type: 'success',
+        message:
+          mode === VideoGenerationMode.ARTICLE_TO_VIDEO
+            ? '成片任务已创建:脚本 → 分镜 → 素材 → 合成,全程需要几分钟'
+            : '视频任务已创建,生成需要几分钟',
+      });
       await refresh();
     } catch (err) {
       reportApiError(err);
@@ -206,68 +301,145 @@ export default function VideoStudioPage() {
           </div>
           <div>
             <h2 className="text-sm font-semibold text-foreground">新建视频任务</h2>
-            <p className="text-xs text-muted">描述画面,AI 生成短视频片段并自动存入媒体库</p>
+            <p className="text-xs text-muted">文生片段生成短视频;稿件成片将整篇稿件自动合成为带配音字幕的成片</p>
           </div>
         </div>
-        <form onSubmit={onSubmit} className="space-y-4 p-5">
-          <div>
-            <label htmlFor="video-prompt" className="mb-1.5 block text-xs font-medium text-muted">
-              画面描述
-            </label>
-            <textarea
-              id="video-prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="例:一只柴犬在樱花树下奔跑,慢镜头,电影感"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
-            />
-          </div>
-          <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+
+        {/* 模式切换 */}
+        <div className="flex gap-1 border-b border-line px-5 pt-3">
+          <button
+            type="button"
+            onClick={() => setMode(VideoGenerationMode.TEXT_TO_CLIP)}
+            className={`rounded-t-lg px-3 py-2 text-sm font-medium transition ${
+              mode === VideoGenerationMode.TEXT_TO_CLIP
+                ? 'border-b-2 border-brand text-brand'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            文生片段
+          </button>
+          <button
+            type="button"
+            onClick={() => capability.l2 && setMode(VideoGenerationMode.ARTICLE_TO_VIDEO)}
+            disabled={!capability.l2}
+            title={capability.l2 ? undefined : '稿件成片未启用:需要 VIDEO_RENDER_ENABLED=true 且配置图片生成服务'}
+            className={`rounded-t-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              mode === VideoGenerationMode.ARTICLE_TO_VIDEO
+                ? 'border-b-2 border-brand text-brand'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            稿件一键成片
+          </button>
+        </div>
+
+        {mode === VideoGenerationMode.TEXT_TO_CLIP ? (
+          <form onSubmit={onSubmit} className="space-y-4 p-5">
             <div>
-              <label htmlFor="video-duration" className="mb-1.5 block text-xs font-medium text-muted">时长</label>
-              <select
-                id="video-duration"
-                value={durationSec}
-                onChange={(e) => setDurationSec(Number(e.target.value))}
-                className={SELECT_CLASS}
-              >
-                <option value={6}>6 秒</option>
-                <option value={10}>10 秒</option>
-              </select>
+              <label htmlFor="video-prompt" className="mb-1.5 block text-xs font-medium text-muted">
+                画面描述
+              </label>
+              <textarea
+                id="video-prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder="例:一只柴犬在樱花树下奔跑,慢镜头,电影感"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
+              />
             </div>
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+              <div>
+                <label htmlFor="video-duration" className="mb-1.5 block text-xs font-medium text-muted">时长</label>
+                <select
+                  id="video-duration"
+                  value={durationSec}
+                  onChange={(e) => setDurationSec(Number(e.target.value))}
+                  className={SELECT_CLASS}
+                >
+                  <option value={6}>6 秒</option>
+                  <option value={10}>10 秒</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="video-resolution" className="mb-1.5 block text-xs font-medium text-muted">分辨率</label>
+                <select
+                  id="video-resolution"
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value as '768P' | '1080P')}
+                  className={SELECT_CLASS}
+                >
+                  <option value="768P">768P</option>
+                  <option value="1080P">1080P</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="video-ratio" className="mb-1.5 block text-xs font-medium text-muted">画幅</label>
+                <select
+                  id="video-ratio"
+                  value={aspectRatio}
+                  onChange={(e) => setAspectRatio(e.target.value as '16:9' | '9:16' | '1:1')}
+                  className={SELECT_CLASS}
+                >
+                  <option value="9:16">竖屏 9:16</option>
+                  <option value="16:9">横屏 16:9</option>
+                  <option value="1:1">方形 1:1</option>
+                </select>
+              </div>
+              <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!prompt.trim()}>
+                {!submitting && <Sparkles className="h-4 w-4" />}
+                生成视频
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-4 p-5">
             <div>
-              <label htmlFor="video-resolution" className="mb-1.5 block text-xs font-medium text-muted">分辨率</label>
+              <label htmlFor="video-article" className="mb-1.5 block text-xs font-medium text-muted">
+                选择稿件
+              </label>
               <select
-                id="video-resolution"
-                value={resolution}
-                onChange={(e) => setResolution(e.target.value as '768P' | '1080P')}
-                className={SELECT_CLASS}
+                id="video-article"
+                value={articleId}
+                onChange={(e) => setArticleId(e.target.value)}
+                className={`${SELECT_CLASS} w-full`}
               >
-                <option value="768P">768P</option>
-                <option value="1080P">1080P</option>
+                <option value="">请选择要成片的稿件…</option>
+                {articles.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.title}
+                  </option>
+                ))}
               </select>
+              <p className="mt-1.5 text-xs text-subtle">
+                AI 将自动完成:口播脚本 → 分镜设计 → 逐镜素材(图片/视频片段)→ 配音字幕 → 合成入库
+              </p>
             </div>
-            <div>
-              <label htmlFor="video-ratio" className="mb-1.5 block text-xs font-medium text-muted">画幅</label>
-              <select
-                id="video-ratio"
-                value={aspectRatio}
-                onChange={(e) => setAspectRatio(e.target.value as '16:9' | '9:16' | '1:1')}
-                className={SELECT_CLASS}
-              >
-                <option value="9:16">竖屏 9:16</option>
-                <option value="16:9">横屏 16:9</option>
-                <option value="1:1">方形 1:1</option>
-              </select>
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+              <div>
+                <label htmlFor="video-ratio-l2" className="mb-1.5 block text-xs font-medium text-muted">画幅</label>
+                <select
+                  id="video-ratio-l2"
+                  value={aspectRatio}
+                  onChange={(e) => setAspectRatio(e.target.value as '16:9' | '9:16' | '1:1')}
+                  className={SELECT_CLASS}
+                >
+                  <option value="9:16">竖屏 9:16</option>
+                  <option value="16:9">横屏 16:9</option>
+                  <option value="1:1">方形 1:1</option>
+                </select>
+              </div>
+              {!capability.tts && (
+                <p className="text-xs text-amber-600">未配置语音服务,本次成片将无配音(仅字幕)</p>
+              )}
+              <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!articleId}>
+                {!submitting && <FileText className="h-4 w-4" />}
+                一键成片
+              </Button>
             </div>
-            <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!prompt.trim()}>
-              {!submitting && <Sparkles className="h-4 w-4" />}
-              生成视频
-            </Button>
-          </div>
-        </form>
+          </form>
+        )}
       </Card>
 
       {/* 任务列表 */}
@@ -312,8 +484,14 @@ export default function VideoStudioPage() {
                           {isActive && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                           {meta.label}
                         </Badge>
-                        <MetaChip>{job.durationSec ?? '-'}s</MetaChip>
-                        <MetaChip>{job.resolution ?? '-'}</MetaChip>
+                        {job.mode === VideoGenerationMode.ARTICLE_TO_VIDEO ? (
+                          <MetaChip>稿件成片</MetaChip>
+                        ) : (
+                          <>
+                            <MetaChip>{job.durationSec ?? '-'}s</MetaChip>
+                            <MetaChip>{job.resolution ?? '-'}</MetaChip>
+                          </>
+                        )}
                         <MetaChip>{job.aspectRatio ?? '-'}</MetaChip>
                         {job.costEstimate != null && (
                           <MetaChip>预估 ¥{job.costEstimate}</MetaChip>
@@ -328,6 +506,8 @@ export default function VideoStudioPage() {
                       <p className="tnum mt-2 text-[11px] text-subtle">
                         {new Date(job.createdAt).toLocaleString('zh-CN')}
                       </p>
+                      {job.mode === VideoGenerationMode.ARTICLE_TO_VIDEO &&
+                        (job.script || job.storyboard) && <L2JobDetail job={job} />}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {isActive && (

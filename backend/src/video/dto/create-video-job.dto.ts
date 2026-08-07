@@ -1,8 +1,7 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -12,11 +11,29 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateVideoJobDto {
-  @ApiProperty({ description: '文生视频 prompt(画面描述)' })
+  @ApiPropertyOptional({
+    description:
+      '任务模式:TEXT_TO_CLIP(L1 文生片段)| ARTICLE_TO_VIDEO(L2 稿件成片)',
+    enum: ['TEXT_TO_CLIP', 'ARTICLE_TO_VIDEO'],
+    default: 'TEXT_TO_CLIP',
+  })
+  @IsOptional()
+  @IsIn(['TEXT_TO_CLIP', 'ARTICLE_TO_VIDEO'])
+  mode?: 'TEXT_TO_CLIP' | 'ARTICLE_TO_VIDEO';
+
+  @ApiPropertyOptional({
+    description:
+      '画面描述(L1 必填;L2 可选,作为成片风格附加指引)。与 articleId 的交叉必填校验在 service 层',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(2000)
-  prompt!: string;
+  prompt?: string;
+
+  @ApiPropertyOptional({ description: '来源文章 ID(L2 必填,仅溯源引用)' })
+  @IsOptional()
+  @IsString()
+  articleId?: string;
 
   @ApiPropertyOptional({
     description: '生成 provider,缺省用服务端 VIDEO_CLIP_PROVIDER 配置',

@@ -20,12 +20,15 @@ export class VideoJobController {
   }
 
   @Post('jobs')
-  @ApiOperation({ summary: '创建文生视频任务(L1:prompt → 视频片段)' })
+  @ApiOperation({
+    summary: '创建视频任务(L1:prompt→片段;L2:articleId→稿件成片)',
+  })
   create(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
     @Body() dto: CreateVideoJobDto,
   ) {
-    return this.jobs.create(userId, dto);
+    return this.jobs.create(userId, dto, role);
   }
 
   @Get('jobs')

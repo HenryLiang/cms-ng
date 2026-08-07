@@ -68,6 +68,7 @@ import {
   TrendingUp,
   Image as ImageIcon,
   Bot,
+  Clapperboard,
   Upload,
 } from 'lucide-react';
 
@@ -1195,6 +1196,13 @@ export default function ArticleEditorPage() {
                   )}
                   AI 生成配图
                 </button>
+                <Link
+                  href={`/dashboard/video?mode=article&articleId=${article.id}`}
+                  className="flex w-full items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-100"
+                >
+                  <Clapperboard className="h-4 w-4" />
+                  AI 一键成片
+                </Link>
                 <button
                   onClick={() => handleSave('DRAFT')}
                   className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground hover:bg-surface-muted"

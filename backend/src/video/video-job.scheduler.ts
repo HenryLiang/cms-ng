@@ -3,8 +3,9 @@ import { Cron } from '@nestjs/schedule';
 import { VideoJobService } from './video-job.service';
 
 /**
- * 视频任务兜底定时任务:推进滞留的 PENDING/ASSETS_GENERATING 任务,
- * 清理上传阶段僵尸(进程崩溃)。功能关闭时 service 内部整体跳过。
+ * 视频任务兜底定时任务:推进各进行中状态的任务(L1 提交/轮询;L2 脚本→分镜→
+ * 素材→配音→合成逐状态续跑),清理上传/合成阶段僵尸(进程崩溃)。
+ * 功能关闭时 service 内部整体跳过。
  */
 @Injectable()
 export class VideoJobScheduler {

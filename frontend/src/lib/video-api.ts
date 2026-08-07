@@ -21,6 +21,12 @@ export interface VideoCapability {
     resolution: string;
     aspectRatio: string;
   };
+  /** L2(稿件一键成片)可用:渲染开关 + 图片 provider 均就绪 */
+  l2: boolean;
+  /** TTS 已配置;false 时 L2 成片降级为无配音 */
+  tts: boolean;
+  /** 本地 FFmpeg 渲染开关 */
+  render: boolean;
 }
 
 /** 后端 list 返回形态:{ items, meta } */
@@ -29,13 +35,54 @@ export interface VideoJobListResponse {
   meta: { page: number; pageSize: number; total: number };
 }
 
-/** 后端 VO:在 shared VideoGenerationJob 基础上带成片播放 URL */
+/** 后端 VO:在 shared VideoGenerationJob 基础上带成片播放 URL + L2 管线产物 */
 export interface VideoGenerationJobVo extends VideoGenerationJob {
   resultUrl: string | null;
+  /** L2 口播脚本(原始文本) */
+  script?: string | null;
+  /** L2 分镜 JSON 字符串(见 StoryboardVo) */
+  storyboard?: string | null;
+  /** 实际配音 provider;'none' 表示无配音降级 */
+  ttsProvider?: string | null;
+}
+
+/** L2 分镜(与后端 pipeline/storyboard.types.ts 契约一致,仅展示所需字段) */
+export interface StoryboardSceneVo {
+  index: number;
+  narration: string;
+  visual: { type: 'video' | 'image'; prompt: string; durationHintSec: number };
+  asset?: {
+    status: 'pending' | 'submitted' | 'done' | 'failed';
+    url?: string;
+    error?: string;
+  };
+  voice?: { audioUrl: string; durationMs: number };
+}
+
+export interface StoryboardVo {
+  title: string;
+  aspectRatio: string;
+  scenes: StoryboardSceneVo[];
+}
+
+/** 分镜 JSON 安全解析(契约不符/未生成时返回 null) */
+export function parseStoryboardVo(raw?: string | null): StoryboardVo | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as StoryboardVo;
+    if (!parsed || !Array.isArray(parsed.scenes)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export interface CreateVideoJobParams {
-  prompt: string;
+  /** TEXT_TO_CLIP 必填;ARTICLE_TO_VIDEO 由后端取稿件标题 */
+  prompt?: string;
+  mode?: VideoGenerationMode;
+  /** ARTICLE_TO_VIDEO 必填 */
+  articleId?: string;
   durationSec?: number;
   resolution?: '768P' | '1080P';
   aspectRatio?: '16:9' | '9:16' | '1:1';

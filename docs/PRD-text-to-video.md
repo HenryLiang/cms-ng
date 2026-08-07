@@ -260,3 +260,21 @@ VIDEO_TTS_PROVIDER=minimax
 3. **迁移为手写 SQL**:开发机当时连不上 dev MySQL,`20260807120000_add_video_generation/migration.sql` 按既有迁移 DDL 风格手写;有库后应先 `prisma migrate diff` 校验等价性再 `migrate deploy`
 4. **数据模型遵循仓库零 Json 字段惯例**:`storyboard`/`providers` 等 P1 字段届时用 `String @db.Text` + `safeJsonParse`,不用 Prisma `Json` 类型;P0 表先只落 `provider` 单字段
 5. 视频资产**不发** `media.asset.created` 事件(会误触发图片视觉打标队列);ES 索引由 video 模块直接调 `SearchService.indexAsset`(fail-open)
+
+## 15. P1 实现记录(2026-08-07,分支 feat/text-to-video)
+
+已实现 L2(稿件一键成片)闭环:`PENDING → SCRIPTING → STORYBOARDING → ASSETS_GENERATING → VOICE_SYNTHESIZING → COMPOSING → UPLOADING → SUCCEEDED`,全程断点恢复(checkpoint 落在 `storyboard` JSON 的 `scenes[].asset/voice` 上,仅变化时写库避免扰动超时判定)。与方案的有意偏差/新结论:
+
+1. **合成为进程内 spawn 的 ffmpeg**,而非 §7 的独立 worker `scripts/video-render/`:`render/ffmpeg-compose.ts` 是纯函数式 helper(只依赖 jobDir 本地文件,不感知状态机/DB),未来拆 worker 时整体平移即可;jobDir 契约(`os.tmpdir()/cms-ng-video/{jobId}`)保留
+2. **火山 TTS 不在 Ark 上**:PoC 实测 `POST {ARK}/audio/speech` 返回 404。豆包语音是独立产品线:`POST https://openspeech.bytedance.com/api/v1/tts`,凭证头 `X-Api-App-Key`/`X-Api-Access-Key`/`X-Api-Resource-Id: volc.service_type.10029`,成功码 `code=3000`,base64 音频在 `data`,时长在 `addition.duration`(ms 字符串);**HTTP 非流式 V1 无词级时间戳** → 该 provider 字幕按 §8 退化为整句一 cue(MiniMax `t2a_v2` 的 `subtitle_file` JSONL 已按文档实现词级时间戳解析,未实测)
+3. **字幕烧录双降级链**:词级时间戳 → 整句 cue;ASS 烧录 → `mov_text` 软字幕轨。本地 homebrew ffmpeg 8.0.1 无 libass/drawtext,`supportsAssBurn()` 运行时探测决定烧录或软字幕轨
+4. **Ken Burns 正确形态**:图片镜用单帧输入 + 2x 超采样 scale/crop + `zoompan d=总帧数` + `trim`;`-loop 1` 长输入 × zoompan d 会帧数失控(2s 意图产出 121s)
+5. **TTS 可选**:凭证不全时 factory 返回 null,`VOICE_SYNTHESIZING` 整步跳过,`ttsProvider='none'`,成片仅字幕;镜长回退 `durationHintSec`
+6. **权限**:仅稿件作者本人或 EDITOR/ADMIN 可发起稿件成片(创建时 503);稿件内容通过 Prisma 数据级读取(stripHtml,截 8000 字),不 import 文章模块任何类 —— 过程逻辑解耦红线保持
+7. **计费**:新定价项 `ai_video_per_compose`(默认 ¥8/次,seed-billing-config.ts 已加),幂等键 `video-compose:{jobId}`;扣费仅在成片登记入库成功后发生
+8. **迁移 `20260807160000_add_video_p1_checkpoints` 同 P0 手写 SQL**(`script`/`storyboard` TEXT + `ttsProvider` VarChar(20)),已 `migrate dev` 应用至 dev 库
+9. **超时参数**:`ASSETS_GENERATING` 30min(覆盖逐镜视频片段生成),`UPLOADING` 僵尸清扫 20min(覆盖 L2 合成+上传),submit 孤儿保护窗 2min(P0 双提竞态修复)
+10. **跨 tick 重入竞态(e2e 实测抓到)**:cron 每分钟一扫,而 LLM/生图单步常超过 1 分钟 —— 首个真实 L2 任务出现相邻两 tick 重入同一任务,日志可见 8 次 seedream 请求(4 镜任务,重复脚本→分镜→素材,双倍费用)。修复:`VideoJobService.advance()` 加进程内 in-flight Set 互斥(单进程部署主防线),DB 条件 updateMany 抢占保留为多进程兜底;修复后同样任务整链恰好每镜 1 次生图请求。回归测试:并发 advance 时脚本 LLM 仅调用 1 次
+10. **前端**:视频创作页加"文生片段 / 稿件一键成片"双 tab(`?mode=article&articleId=` 预选中);文章编辑器"快速操作"加"AI 一键成片"入口(纯导航,编辑器零 API 耦合);任务卡片展示分镜明细(脚本全文 + 逐镜素材/配音状态);capability 返回 `l2/tts/render` 供入口 gating,TTS 缺失时创建表单提示"无配音"
+
+**e2e 验证(2026-08-07,真实火山引擎,无配音降级模式)**:两个真实 L2 任务全链路 SUCCEEDED —— 稿件(滨江步道新闻)→ deepseek 口播脚本 → 4 镜分镜 → Seedream 图片 ×3 + Seedance 视频片段 ×1 → ffmpeg 合成 → COS → 媒体库登记(`sourceRef=videoJob:<id>`)。成片 ffprobe:22s、1080×1920 H.264 + AAC + mov_text 软字幕轨(本地 ffmpeg 无 libass,按设计降级)。**TTS 支路未实测**:火山语音凭证(VOLC_TTS_APP_ID/ACCESS_TOKEN)待开通,到位后补真实配音 e2e;MiniMax 图片/TTS 两个 provider 按官方文档实现但未实测(无凭证)

@@ -15,7 +15,10 @@ import {
 // 计费参数类型来自 shared 枚举(DeductParams 契约),与 Prisma 枚举值同构但名义类型不同
 import { BillingCategory, TransactionType } from '@cms-ng/shared';
 import axios from 'axios';
+import { CHAT_PROVIDER } from '../ai/providers';
+import type { ChatCompletionProvider } from '../ai/providers';
 import { BillingService } from '../billing/billing.service';
+import { safeJsonParse } from '../common/json.utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
 import { STORAGE_SERVICE } from '../storage/storage.service';
@@ -24,6 +27,21 @@ import {
   CreateVideoJobDto,
   QueryVideoJobDto,
 } from './dto/create-video-job.dto';
+import { AssetsStep } from './pipeline/assets.step';
+import { ComposeStep } from './pipeline/compose.step';
+import { VideoPipelineDeps } from './pipeline/pipeline-deps';
+import { ScriptStep } from './pipeline/script.step';
+import { StoryboardStep } from './pipeline/storyboard.step';
+import { Storyboard } from './pipeline/storyboard.types';
+import { VoiceStep } from './pipeline/voice.step';
+import {
+  IMAGE_GEN_PROVIDER,
+  ImageGenProvider,
+} from './providers/image-gen/image-gen-provider.interface';
+import {
+  TTS_PROVIDER,
+  TtsProvider,
+} from './providers/tts/tts-provider.interface';
 import {
   VIDEO_GEN_PROVIDER,
   VideoGenProvider,
@@ -32,17 +50,37 @@ import {
 
 /** 轮询中的任务超过该时长视为生成超时,转 FAILED */
 const GENERATE_TIMEOUT_MS = 30 * 60 * 1000;
-/** 上传阶段僵尸(进程崩溃)超过该时长转 FAILED,可手动重试 */
-const UPLOAD_STALE_MS = 10 * 60 * 1000;
 /**
  * 孤儿宽限:submitStage 抢占(PENDING→ASSETS_GENERATING)到 providerTaskId 写回之间
  * 是秒级网络窗口,期间并发轮询若立即"孤儿回退"会重复提交 provider(实测发生,双扣费);
  * 超过该时长仍无 providerTaskId 才判定为真崩溃,回退 PENDING 重新提交
  */
 const ORPHAN_GRACE_MS = 2 * 60 * 1000;
+/** 上传/合成阶段僵尸(进程崩溃)超过该时长转 FAILED,可手动重试(L2 含 ffmpeg 合成,窗口放宽) */
+const UPLOAD_STALE_MS = 20 * 60 * 1000;
 const MAX_RETRY_COUNT = 3;
 const VIDEO_DOWNLOAD_TIMEOUT_MS = 180_000;
 const VIDEO_MAX_BYTES = 300 * 1024 * 1024;
+
+/** L2(稿件成片)失败步骤 → 重试时回到的状态 */
+const L2_RETRY_STATE: Record<string, VideoJobStatus> = {
+  script: 'SCRIPTING',
+  storyboard: 'STORYBOARDING',
+  assets: 'ASSETS_GENERATING',
+  voice: 'VOICE_SYNTHESIZING',
+  compose: 'COMPOSING',
+  upload: 'COMPOSING', // 合成目录已清理,重试从合成重来(原料均可从 COS 重下)
+};
+
+const L2_ACTIVE_STATUSES: VideoJobStatus[] = [
+  'PENDING',
+  'SCRIPTING',
+  'STORYBOARDING',
+  'ASSETS_GENERATING',
+  'VOICE_SYNTHESIZING',
+  'COMPOSING',
+  'UPLOADING',
+];
 
 export interface VideoJobVo extends VideoGenerationJob {
   /** 成片播放 URL(resultAssetId 溯源解析;未完成/未入库为 null) */
@@ -53,14 +91,25 @@ export interface VideoJobVo extends VideoGenerationJob {
  * 文生视频任务服务(PRD: docs/PRD-text-to-video.md)。
  *
  * 解耦红线:本服务不 import 文章/auto-publish 的任何过程逻辑;
- * 底层能力(COS、MediaAsset 登记、计费、ES 索引)经注入共用。
+ * 底层能力(LLM seam、COS、MediaAsset 登记、计费、ES 索引)经注入共用。
  * 状态机推进 = 创建时立即 kick + cron 兜底双通道,所有转移用
  * 条件 updateMany 抢占,保证两通道并发安全。
+ *
+ * L1(TEXT_TO_CLIP):PENDING→ASSETS_GENERATING→UPLOADING→SUCCEEDED
+ * L2(ARTICLE_TO_VIDEO):PENDING→SCRIPTING→STORYBOARDING→ASSETS_GENERATING
+ *   →VOICE_SYNTHESIZING→COMPOSING→UPLOADING→SUCCEEDED
  */
 @Injectable()
 export class VideoJobService {
   private readonly logger = new Logger(VideoJobService.name);
   private readonly enabled: boolean;
+  private readonly renderEnabled: boolean;
+  /**
+   * 进程内推进互斥:L2 的 LLM/生图/合成步骤经常超过 cron 周期(1min),
+   * 不挡则相邻两 tick 重入同一任务 → 重复脚本/分镜/素材调用(双倍费用)。
+   * DB 条件 updateMany 抢占保留为多进程部署的第二层兜底。
+   */
+  private readonly advancing = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -70,12 +119,21 @@ export class VideoJobService {
     private readonly search: SearchService,
     @Inject(VIDEO_GEN_PROVIDER)
     private readonly provider: VideoGenProvider | null,
+    @Inject(CHAT_PROVIDER)
+    private readonly chat: ChatCompletionProvider,
+    @Inject(IMAGE_GEN_PROVIDER)
+    private readonly imageGen: ImageGenProvider | null,
+    @Inject(TTS_PROVIDER)
+    private readonly tts: TtsProvider | null,
   ) {
     const flag =
       (
         this.config.get<string>('VIDEO_GENERATION_ENABLED') || ''
       ).toLowerCase() === 'true';
     this.enabled = flag && this.provider != null;
+    this.renderEnabled =
+      (this.config.get<string>('VIDEO_RENDER_ENABLED') || '').toLowerCase() ===
+      'true';
     if (flag && !this.provider) {
       this.logger.warn(
         'VIDEO_GENERATION_ENABLED=true 但 VIDEO_CLIP_PROVIDER 未配置或缺 API key,文生视频降级关闭',
@@ -96,45 +154,101 @@ export class VideoJobService {
         resolution: '768P',
         aspectRatio: '9:16',
       },
+      // L2(稿件一键成片)能力分解:渲染开关 + 图片 provider 必备;TTS 缺失时降级无配音
+      l2: this.enabled && this.renderEnabled && this.imageGen != null,
+      tts: this.tts != null,
+      render: this.renderEnabled,
+    };
+  }
+
+  private pipelineDeps(): VideoPipelineDeps {
+    return {
+      prisma: this.prisma,
+      config: this.config,
+      chat: this.chat,
+      videoGen: this.provider,
+      imageGen: this.imageGen,
+      tts: this.tts,
+      storage: this.storage,
     };
   }
 
   // ===== 创建 =====
-  async create(userId: string, dto: CreateVideoJobDto): Promise<VideoJobVo> {
+  async create(
+    userId: string,
+    dto: CreateVideoJobDto,
+    role?: string,
+  ): Promise<VideoJobVo> {
     if (!this.enabled || !this.provider) {
       throw new ServiceUnavailableException(
         '文生视频功能未启用或未配置生成 provider',
       );
     }
-    // P0:provider 为服务端级单选配置;dto.provider 仅在校验一致时接受,
-    // 多 provider 并存(任务级路由)属 P1 范围
+    // P0/P1:provider 为服务端级单选配置;dto.provider 仅在校验一致时接受,
+    // 多 provider 并存(任务级路由)属后续范围
     if (dto.provider && dto.provider !== (this.provider.name as string)) {
       throw new ServiceUnavailableException(
         `当前仅启用 provider=${this.provider.name},不支持指定 ${dto.provider}`,
       );
     }
-    const req: VideoGenSubmitRequest = {
-      prompt: dto.prompt,
-      durationSec: dto.durationSec ?? 6,
-      resolution: dto.resolution ?? '768P',
-      aspectRatio: dto.aspectRatio ?? '9:16',
-    };
+
+    const isL2 = dto.mode === 'ARTICLE_TO_VIDEO';
+    let costEstimate: number;
+    if (isL2) {
+      if (!this.renderEnabled) {
+        throw new ServiceUnavailableException(
+          '稿件成片需要渲染能力(VIDEO_RENDER_ENABLED),当前未启用',
+        );
+      }
+      if (!this.imageGen) {
+        throw new ServiceUnavailableException('图片生成 provider 未配置');
+      }
+      if (!dto.articleId) {
+        throw new ServiceUnavailableException('稿件成片任务缺少 articleId');
+      }
+      // 跨字段/归属校验在 service 层(class-validator 不做跨字段比较)
+      const article = await this.prisma.article.findUnique({
+        where: { id: dto.articleId },
+        select: { authorId: true, title: true },
+      });
+      if (!article) {
+        throw new NotFoundException('来源文章不存在');
+      }
+      const privileged = role === 'EDITOR' || role === 'ADMIN';
+      if (article.authorId !== userId && !privileged) {
+        throw new ServiceUnavailableException('只能用自己的文章生成视频');
+      }
+      costEstimate = await this.estimateL2Cost();
+    } else {
+      if (!dto.prompt?.trim()) {
+        throw new ServiceUnavailableException('文生片段任务缺少画面描述');
+      }
+      const req: VideoGenSubmitRequest = {
+        prompt: dto.prompt,
+        durationSec: dto.durationSec ?? 6,
+        resolution: dto.resolution ?? '768P',
+        aspectRatio: dto.aspectRatio ?? '9:16',
+      };
+      costEstimate = this.provider.estimateCost(req);
+    }
+
     const job = await this.prisma.videoGenerationJob.create({
       data: {
         userId,
-        mode: 'TEXT_TO_CLIP',
-        prompt: dto.prompt,
+        mode: isL2 ? 'ARTICLE_TO_VIDEO' : 'TEXT_TO_CLIP',
+        prompt: dto.prompt?.trim() ?? '',
+        articleId: isL2 ? dto.articleId : null,
         provider: this.provider.name,
-        durationSec: req.durationSec,
-        resolution: req.resolution,
-        aspectRatio: req.aspectRatio,
-        costEstimate: this.provider.estimateCost(req),
+        durationSec: dto.durationSec ?? null,
+        resolution: dto.resolution ?? '768P',
+        aspectRatio: dto.aspectRatio ?? '9:16',
+        costEstimate,
       },
     });
     // 立即 kick 一次(不等 cron);失败由 scheduler 兜底
-    void this.submitStage(job.id).catch((err) =>
+    void this.advance(job.id).catch((err) =>
       this.logger.warn(
-        `任务 ${job.id} 首次提交异常(转 cron 兜底): ${(err as Error)?.message ?? err}`,
+        `任务 ${job.id} 首次推进异常(转 cron 兜底): ${(err as Error)?.message ?? err}`,
       ),
     );
     return this.toVo(job, null);
@@ -185,24 +299,27 @@ export class VideoJobService {
         `已达最大重试次数(${MAX_RETRY_COUNT})`,
       );
     }
-    // 上传阶段失败且 provider 任务仍在时效内(MiniMax 9h)→ 回到轮询态复用原任务,
-    // 避免重复生成扣费;其余情况重新提交生成
-    const resumePolling =
-      job.failedStep === 'upload' && job.providerTaskId != null;
+    let nextStatus: VideoJobStatus;
+    if (job.mode === 'ARTICLE_TO_VIDEO') {
+      nextStatus = L2_RETRY_STATE[job.failedStep ?? ''] ?? 'SCRIPTING';
+    } else {
+      // 上传阶段失败且 provider 任务仍在时效内(MiniMax 9h)→ 回到轮询态复用原任务,
+      // 避免重复生成扣费;其余情况重新提交生成
+      nextStatus =
+        job.failedStep === 'upload' && job.providerTaskId != null
+          ? 'ASSETS_GENERATING'
+          : 'PENDING';
+    }
     const updated = await this.prisma.videoGenerationJob.update({
       where: { id },
       data: {
-        status: resumePolling ? 'ASSETS_GENERATING' : 'PENDING',
+        status: nextStatus,
         failedStep: null,
         error: null,
         retryCount: { increment: 1 },
       },
     });
-    if (resumePolling) {
-      void this.pollStage(id).catch(() => undefined);
-    } else {
-      void this.submitStage(id).catch(() => undefined);
-    }
+    void this.advance(id).catch(() => undefined);
     return this.toVo(updated, null);
   }
 
@@ -212,7 +329,7 @@ export class VideoJobService {
     const claimed = await this.prisma.videoGenerationJob.updateMany({
       where: {
         id,
-        status: { in: ['PENDING', 'ASSETS_GENERATING'] },
+        status: { in: [...L2_ACTIVE_STATUSES] },
       },
       data: { status: 'CANCELLED' },
     });
@@ -224,7 +341,30 @@ export class VideoJobService {
 
   // ===== 状态机推进(供 kick 与 cron 两通道调用;条件抢占保证幂等) =====
 
-  /** PENDING → ASSETS_GENERATING:提交 provider 异步任务 */
+  /** 统一入口:按任务模式路由 L1/L2;进程内互斥防长步骤跨 tick 重入 */
+  async advance(jobId: string): Promise<void> {
+    if (this.advancing.has(jobId)) return;
+    this.advancing.add(jobId);
+    try {
+      const job = await this.prisma.videoGenerationJob.findUnique({
+        where: { id: jobId },
+      });
+      if (!job) return;
+      if (job.mode === 'ARTICLE_TO_VIDEO') {
+        await this.advanceL2(job);
+        return;
+      }
+      if (job.status === 'PENDING') {
+        await this.submitStage(jobId);
+      } else if (job.status === 'ASSETS_GENERATING') {
+        await this.pollStage(jobId);
+      }
+    } finally {
+      this.advancing.delete(jobId);
+    }
+  }
+
+  /** PENDING → ASSETS_GENERATING:提交 provider 异步任务(L1)。public 供单测直达 */
   async submitStage(jobId: string): Promise<void> {
     if (!this.provider) return;
     const claimed = await this.prisma.videoGenerationJob.updateMany({
@@ -255,7 +395,7 @@ export class VideoJobService {
     }
   }
 
-  /** ASSETS_GENERATING 轮询:succeeded → 抢占转 UPLOADING 并下载转存 */
+  /** ASSETS_GENERATING 轮询(L1):succeeded → 抢占转 UPLOADING 并下载转存。public 供单测直达 */
   async pollStage(jobId: string): Promise<void> {
     if (!this.provider) return;
     const job = await this.prisma.videoGenerationJob.findUnique({
@@ -335,7 +475,143 @@ export class VideoJobService {
     }
   }
 
-  /** UPLOADING:下载临时 URL → COS → 登记媒体库 → 计费 → SUCCEEDED */
+  /**
+   * L2 编排:脚本 → 分镜 → 素材(逐镜 checkpoint,多 tick)→ 配音 → 合成 → 上传。
+   * 除素材步外每步幂等(崩溃后按状态重入续跑);素材步进度落 storyboard checkpoint。
+   */
+  private async advanceL2(job: VideoGenerationJob): Promise<void> {
+    const deps = this.pipelineDeps();
+    let current = job;
+    try {
+      if (current.status === 'PENDING') {
+        const claimed = await this.prisma.videoGenerationJob.updateMany({
+          where: { id: job.id, status: 'PENDING' },
+          data: { status: 'SCRIPTING' },
+        });
+        if (!claimed.count) return;
+        current = { ...current, status: 'SCRIPTING' };
+      }
+      if (current.status === 'SCRIPTING') {
+        const script = await new ScriptStep(deps).run(current);
+        current = await this.prisma.videoGenerationJob.update({
+          where: { id: job.id },
+          data: { script, status: 'STORYBOARDING' },
+        });
+      }
+      if (current.status === 'STORYBOARDING') {
+        if (!current.script) throw new Error('缺口播脚本 checkpoint');
+        const storyboard = await new StoryboardStep(deps).run(
+          current,
+          current.script,
+        );
+        current = await this.prisma.videoGenerationJob.update({
+          where: { id: job.id },
+          data: {
+            storyboard: JSON.stringify(storyboard),
+            status: 'ASSETS_GENERATING',
+          },
+        });
+      }
+      if (current.status === 'ASSETS_GENERATING') {
+        if (Date.now() - current.updatedAt.getTime() > GENERATE_TIMEOUT_MS) {
+          await this.fail(job.id, 'assets', new Error('素材生成超时(30 分钟)'));
+          return;
+        }
+        const storyboard = this.parseStoryboardCheckpoint(current);
+        const before = JSON.stringify(storyboard.scenes.map((s) => s.asset));
+        const done = await new AssetsStep(deps).run(current, storyboard);
+        const changed =
+          JSON.stringify(storyboard.scenes.map((s) => s.asset)) !== before;
+        if (!done) {
+          // 有进展才写库(写库会触碰 updatedAt,影响超时判定)
+          if (changed) {
+            await this.prisma.videoGenerationJob.update({
+              where: { id: job.id },
+              data: { storyboard: JSON.stringify(storyboard) },
+            });
+          }
+          return;
+        }
+        current = await this.prisma.videoGenerationJob.update({
+          where: { id: job.id },
+          data: {
+            storyboard: JSON.stringify(storyboard),
+            status: 'VOICE_SYNTHESIZING',
+          },
+        });
+      }
+      if (current.status === 'VOICE_SYNTHESIZING') {
+        const storyboard = this.parseStoryboardCheckpoint(current);
+        await new VoiceStep(deps).run(current, storyboard);
+        current = await this.prisma.videoGenerationJob.update({
+          where: { id: job.id },
+          data: {
+            storyboard: JSON.stringify(storyboard),
+            ttsProvider: this.tts?.name ?? 'none',
+            status: 'COMPOSING',
+          },
+        });
+      }
+      if (current.status === 'COMPOSING') {
+        // 合成是分钟级 CPU 任务:先抢占转 UPLOADING 防 cron 重入,
+        // 僵尸窗口(20min)覆盖 合成+上传 全程
+        const claimed = await this.prisma.videoGenerationJob.updateMany({
+          where: { id: job.id, status: 'COMPOSING' },
+          data: { status: 'UPLOADING' },
+        });
+        if (!claimed.count) return;
+        const storyboard = this.parseStoryboardCheckpoint(current);
+        await this.composeAndUpload(job.id, storyboard, deps);
+        return;
+      }
+    } catch (err) {
+      const step =
+        current.status === 'SCRIPTING'
+          ? 'script'
+          : current.status === 'STORYBOARDING'
+            ? 'storyboard'
+            : current.status === 'ASSETS_GENERATING'
+              ? 'assets'
+              : current.status === 'VOICE_SYNTHESIZING'
+                ? 'voice'
+                : 'compose';
+      await this.fail(job.id, step, err);
+    }
+  }
+
+  /** L2 终段:ffmpeg 合成 → COS → 登记媒体库 → 计费 → SUCCEEDED */
+  private async composeAndUpload(
+    jobId: string,
+    storyboard: Storyboard,
+    deps: VideoPipelineDeps,
+  ): Promise<void> {
+    const job = await this.prisma.videoGenerationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job) return;
+    const compose = new ComposeStep(deps);
+    try {
+      const result = await compose.run(job, storyboard);
+      await compose.cleanup(jobId);
+      await this.registerResult(job, result.buffer, {
+        width: this.ratioDims(storyboard.aspectRatio).w,
+        height: this.ratioDims(storyboard.aspectRatio).h,
+        durationSec: Math.round(result.durationSec),
+        fileName: `article-video-${jobId.slice(0, 8)}.mp4`,
+        title: storyboard.title.slice(0, 50),
+        billingConfigKey: 'ai_video_per_compose',
+        billingDescription: `AI 稿件成片(${storyboard.scenes.length} 镜)`,
+        billingDefaultPrice: 8.0,
+        idempotencyKey: `video-compose:${job.id}`,
+      });
+    } catch (err) {
+      await compose.cleanup(jobId);
+      // 区分 compose/upload 失败仅影响重试落点,统一记 compose(L2 重试均回 COMPOSING)
+      await this.fail(jobId, 'compose', err);
+    }
+  }
+
+  /** UPLOADING(L1):下载临时 URL → COS → 登记媒体库 → 计费 → SUCCEEDED */
   private async uploadStage(
     jobId: string,
     result: {
@@ -351,82 +627,105 @@ export class VideoJobService {
     if (!job) return;
     try {
       const buffer = await this.download(result.videoUrl);
-      const key = `video/${jobId}.mp4`;
-      const stored = await this.storage.put(key, buffer, 'video/mp4');
-
-      const asset = await this.prisma.mediaAsset.create({
-        data: {
-          storageKey: stored.key,
-          url: stored.url,
-          fileName: `ai-video-${jobId.slice(0, 8)}.mp4`,
-          mimeType: 'video/mp4',
-          size: buffer.length,
-          width: result.width ?? null,
-          height: result.height ?? null,
-          duration: result.durationSec ?? job.durationSec ?? null,
-          source: MediaSource.AI_GENERATED,
-          // 溯源到视频任务而非 AIOperation(视频链路独立于 ai 模块)
-          sourceRef: `videoJob:${jobId}`,
-          prompt: job.prompt,
-          title: job.prompt.slice(0, 50),
-          ownerId: job.userId,
-          // 视频不走视觉打标(图片专用),保持 NONE 不触发 tagging 队列
-          tagStatus: 'NONE',
-        },
+      await this.registerResult(job, buffer, {
+        width: result.width ?? null,
+        height: result.height ?? null,
+        durationSec: result.durationSec ?? job.durationSec ?? null,
+        fileName: `ai-video-${jobId.slice(0, 8)}.mp4`,
+        title: job.prompt.slice(0, 50),
+        billingConfigKey: 'ai_video_per_clip',
+        billingDescription: 'AI 视频片段生成',
+        billingDefaultPrice: 2.0,
+        idempotencyKey: `video:${job.id}`,
       });
-
-      await this.prisma.videoGenerationJob.update({
-        where: { id: jobId },
-        data: { status: 'SUCCEEDED', resultAssetId: asset.id },
-      });
-      await this.deductBilling(job);
-      // ES 索引 fail-open(warn-only),与媒体库上传路径行为一致;
-      // 不发 media.asset.created 事件 —— 那会触发图片打标队列
-      try {
-        await this.search.indexAsset(asset.id);
-      } catch (err) {
-        this.logger.warn(
-          `视频资产 ES 索引失败 ${asset.id}: ${(err as Error)?.message ?? err}`,
-        );
-      }
-      this.logger.log(
-        `任务 ${jobId} 完成: asset=${asset.id} url=${stored.url}`,
-      );
     } catch (err) {
       await this.fail(jobId, 'upload', err);
     }
   }
 
+  /** 成片登记共用段:COS → MediaAsset → SUCCEEDED → 计费 → ES 索引(fail-open) */
+  private async registerResult(
+    job: VideoGenerationJob,
+    buffer: Buffer,
+    opts: {
+      width: number | null;
+      height: number | null;
+      durationSec: number | null;
+      fileName: string;
+      title: string;
+      billingConfigKey: string;
+      billingDescription: string;
+      billingDefaultPrice: number;
+      idempotencyKey: string;
+    },
+  ): Promise<void> {
+    const key = `video/${job.id}.mp4`;
+    const stored = await this.storage.put(key, buffer, 'video/mp4');
+    const asset = await this.prisma.mediaAsset.create({
+      data: {
+        storageKey: stored.key,
+        url: stored.url,
+        fileName: opts.fileName,
+        mimeType: 'video/mp4',
+        size: buffer.length,
+        width: opts.width,
+        height: opts.height,
+        duration: opts.durationSec,
+        source: MediaSource.AI_GENERATED,
+        // 溯源到视频任务而非 AIOperation(视频链路独立于 ai 模块)
+        sourceRef: `videoJob:${job.id}`,
+        prompt: job.prompt,
+        title: opts.title,
+        ownerId: job.userId,
+        // 视频不走视觉打标(图片专用),保持 NONE 不触发 tagging 队列
+        tagStatus: 'NONE',
+      },
+    });
+    await this.prisma.videoGenerationJob.update({
+      where: { id: job.id },
+      data: { status: 'SUCCEEDED', resultAssetId: asset.id },
+    });
+    await this.deductBilling(job, opts);
+    // ES 索引 fail-open(warn-only),与媒体库上传路径行为一致;
+    // 不发 media.asset.created 事件 —— 那会触发图片打标队列
+    try {
+      await this.search.indexAsset(asset.id);
+    } catch (err) {
+      this.logger.warn(
+        `视频资产 ES 索引失败 ${asset.id}: ${(err as Error)?.message ?? err}`,
+      );
+    }
+    this.logger.log(`任务 ${job.id} 完成: asset=${asset.id} url=${stored.url}`);
+  }
+
   /** cron 兜底:推进滞留任务 + 清理僵尸(由 VideoJobScheduler 调用) */
   async sweep(): Promise<void> {
     if (!this.enabled) return;
-    const pending = await this.prisma.videoGenerationJob.findMany({
-      where: { status: 'PENDING' },
-      orderBy: { createdAt: 'asc' },
-      take: 5,
-    });
-    for (const job of pending) {
-      await this.submitStage(job.id).catch((err) =>
-        this.logger.warn(
-          `兜底提交 ${job.id} 失败: ${(err as Error)?.message ?? err}`,
-        ),
-      );
-    }
-
-    const generating = await this.prisma.videoGenerationJob.findMany({
-      where: { status: 'ASSETS_GENERATING' },
+    const active = await this.prisma.videoGenerationJob.findMany({
+      where: {
+        status: {
+          in: [
+            'PENDING',
+            'SCRIPTING',
+            'STORYBOARDING',
+            'ASSETS_GENERATING',
+            'VOICE_SYNTHESIZING',
+            'COMPOSING',
+          ],
+        },
+      },
       orderBy: { updatedAt: 'asc' },
       take: 10,
     });
-    for (const job of generating) {
-      await this.pollStage(job.id).catch((err) =>
+    for (const job of active) {
+      await this.advance(job.id).catch((err) =>
         this.logger.warn(
-          `兜底轮询 ${job.id} 失败: ${(err as Error)?.message ?? err}`,
+          `兜底推进 ${job.id} 失败: ${(err as Error)?.message ?? err}`,
         ),
       );
     }
 
-    // 上传阶段僵尸(进程崩溃于下载/转存中)→ 置 FAILED,用户重试时回轮询态复用 provider 结果
+    // 上传/合成阶段僵尸(进程崩溃于下载/转存/渲染中)→ 置 FAILED,用户重试
     const staleUploads = await this.prisma.videoGenerationJob.updateMany({
       where: {
         status: 'UPLOADING',
@@ -435,12 +734,38 @@ export class VideoJobService {
       data: {
         status: 'FAILED',
         failedStep: 'upload',
-        error: '上传转存中断(进程重启),请重试',
+        error: '上传/合成中断(进程重启),请重试',
       },
     });
     if (staleUploads.count) {
       this.logger.warn(`清理上传僵尸任务 ${staleUploads.count} 个`);
     }
+  }
+
+  private parseStoryboardCheckpoint(job: VideoGenerationJob): Storyboard {
+    const sb = safeJsonParse<Storyboard | null>(job.storyboard, null);
+    if (!sb || !Array.isArray(sb.scenes)) {
+      throw new Error('缺分镜 checkpoint');
+    }
+    return sb;
+  }
+
+  private ratioDims(ratio: string): { w: number; h: number } {
+    switch (ratio) {
+      case '16:9':
+        return { w: 1920, h: 1080 };
+      case '1:1':
+        return { w: 1080, h: 1080 };
+      default:
+        return { w: 1080, h: 1920 };
+    }
+  }
+
+  private async estimateL2Cost(): Promise<number> {
+    const cfg = await this.billing
+      .getConfig('ai_video_per_compose')
+      .catch(() => null);
+    return cfg?.unitPrice ?? 8.0;
   }
 
   private async fail(jobId: string, step: string, err: unknown): Promise<void> {
@@ -456,23 +781,31 @@ export class VideoJobService {
     });
   }
 
-  private async deductBilling(job: VideoGenerationJob): Promise<void> {
+  private async deductBilling(
+    job: VideoGenerationJob,
+    opts: {
+      billingConfigKey: string;
+      billingDescription: string;
+      billingDefaultPrice: number;
+      idempotencyKey: string;
+    },
+  ): Promise<void> {
     if (!this.billing.isEnabled()) return;
     try {
       const cfg = await this.billing
-        .getConfig('ai_video_per_clip')
+        .getConfig(opts.billingConfigKey)
         .catch(() => null);
-      const unitPrice = cfg?.unitPrice ?? 2.0;
+      const unitPrice = cfg?.unitPrice ?? opts.billingDefaultPrice;
       if (unitPrice <= 0) return;
       await this.billing.deduct({
         userId: job.userId,
         type: TransactionType.AI_VIDEO,
         category: BillingCategory.AI,
         amount: unitPrice,
-        description: 'AI 视频片段生成',
+        description: opts.billingDescription,
         quantity: 1,
         unitPrice,
-        idempotencyKey: `video:${job.id}`,
+        idempotencyKey: opts.idempotencyKey,
       });
       await this.prisma.videoGenerationJob.update({
         where: { id: job.id },

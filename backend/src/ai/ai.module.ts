@@ -43,6 +43,13 @@ const visionProviderFactory = {
     TavilySearchTool,
     AIOperationLogger,
   ],
-  exports: [AIService, AIToolsService, AIOperationLogger, CHAT_VISION_PROVIDER],
+  // CHAT_PROVIDER 为底层 LLM seam,供视频管道等模块注入共用(不含任何 AI 过程逻辑)
+  exports: [
+    AIService,
+    AIToolsService,
+    AIOperationLogger,
+    CHAT_PROVIDER,
+    CHAT_VISION_PROVIDER,
+  ],
 })
 export class AIModule {}

@@ -3,6 +3,10 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { createMock } from '../common/test-helpers';
 import { VideoJobService } from './video-job.service';
 import { VideoGenProvider } from './providers/video-gen/video-gen-provider.interface';
+import { ImageGenProvider } from './providers/image-gen/image-gen-provider.interface';
+import { TtsProvider } from './providers/tts/tts-provider.interface';
+import { ComposeStep } from './pipeline/compose.step';
+import type { ChatCompletionProvider } from '../ai/providers';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { BillingService } from '../billing/billing.service';
 import type { SearchService } from '../search/search.service';
@@ -30,9 +34,31 @@ const JOB = {
   error: null as string | null,
   retryCount: 0,
   articleId: null,
+  script: null as string | null,
+  storyboard: null as string | null,
+  ttsProvider: null as string | null,
   createdAt: new Date('2026-08-07T00:00:00Z'),
   updatedAt: new Date('2026-08-07T00:00:00Z'),
 };
+
+/** L2 测试用的合法分镜(2 镜图片) */
+const STORYBOARD_LLM_JSON = JSON.stringify({
+  title: '测试成片',
+  scenes: [
+    {
+      narration: '第一段口播文本,长度足够通过契约校验。',
+      visual: {
+        type: 'image',
+        prompt: '城市天际线日出,电影感',
+        durationHintSec: 5,
+      },
+    },
+    {
+      narration: '第二段口播文本,同样满足最低字数要求。',
+      visual: { type: 'image', prompt: '咖啡杯特写,暖光', durationHintSec: 5 },
+    },
+  ],
+});
 
 describe('VideoJobService', () => {
   let prisma: {
@@ -45,6 +71,7 @@ describe('VideoJobService', () => {
       count: jest.Mock;
     };
     mediaAsset: { create: jest.Mock; findMany: jest.Mock };
+    article: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
   let billing: {
@@ -55,9 +82,18 @@ describe('VideoJobService', () => {
   let storage: { put: jest.Mock };
   let search: { indexAsset: jest.Mock };
   let provider: jest.Mocked<VideoGenProvider>;
+  let chat: { chatCompletion: jest.Mock };
+  let imageGen: jest.Mocked<ImageGenProvider> | null;
+  let tts: jest.Mocked<TtsProvider> | null;
   let service: VideoJobService;
 
-  function build(opts?: { enabled?: string; withProvider?: boolean }) {
+  function build(opts?: {
+    enabled?: string;
+    withProvider?: boolean;
+    render?: string;
+    withImageGen?: boolean;
+    withTts?: boolean;
+  }) {
     prisma = {
       videoGenerationJob: {
         create: jest.fn(),
@@ -68,6 +104,7 @@ describe('VideoJobService', () => {
         count: jest.fn(),
       },
       mediaAsset: { create: jest.fn(), findMany: jest.fn() },
+      article: { findUnique: jest.fn() },
       $transaction: jest.fn(),
     };
     billing = {
@@ -88,12 +125,45 @@ describe('VideoJobService', () => {
       poll: jest.fn(),
       estimateCost: jest.fn().mockReturnValue(3),
     } as unknown as jest.Mocked<VideoGenProvider>;
+    chat = {
+      chatCompletion: jest
+        .fn()
+        // 第一次调用=脚本,第二次=分镜(顺序契约;各测试可按需覆盖)
+        .mockResolvedValueOnce({
+          content:
+            '这是一段六十秒左右的口播脚本,字数足以通过脚本契约校验的最低长度要求,用于单元测试。',
+        })
+        .mockResolvedValue({ content: STORYBOARD_LLM_JSON }),
+    };
+    imageGen =
+      opts?.withImageGen === false
+        ? null
+        : ({
+            name: 'minimax',
+            generate: jest
+              .fn()
+              .mockResolvedValue({ imageUrl: 'https://tmp/img.jpg' }),
+          } as unknown as jest.Mocked<ImageGenProvider>);
+    tts =
+      opts?.withTts === true
+        ? ({
+            name: 'minimax',
+            synthesize: jest.fn().mockResolvedValue({
+              audio: Buffer.from('mp3'),
+              durationMs: 3000,
+              wordTimestamps: [
+                { text: '你好', beginMs: 0, endMs: 500 },
+                { text: '世界', beginMs: 500, endMs: 1000 },
+              ],
+            }),
+          } as unknown as jest.Mocked<TtsProvider>)
+        : null;
     const config = createMock<ConfigService>({
-      get: jest.fn((key: string) =>
-        key === 'VIDEO_GENERATION_ENABLED'
-          ? (opts?.enabled ?? 'true')
-          : undefined,
-      ),
+      get: jest.fn((key: string) => {
+        if (key === 'VIDEO_GENERATION_ENABLED') return opts?.enabled ?? 'true';
+        if (key === 'VIDEO_RENDER_ENABLED') return opts?.render ?? 'true';
+        return undefined;
+      }),
     } as unknown as ConfigService);
     service = new VideoJobService(
       prisma as unknown as PrismaService,
@@ -102,6 +172,9 @@ describe('VideoJobService', () => {
       storage as unknown as StorageService,
       search as unknown as SearchService,
       opts?.withProvider === false ? null : provider,
+      chat as unknown as ChatCompletionProvider,
+      imageGen,
+      tts,
     );
   }
 
@@ -474,6 +547,378 @@ describe('VideoJobService', () => {
       build({ enabled: 'false' });
       await service.sweep();
       expect(prisma.videoGenerationJob.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('L2 稿件一键成片', () => {
+    const L2_JOB = {
+      ...JOB,
+      mode: 'ARTICLE_TO_VIDEO',
+      articleId: 'article-1',
+      prompt: '',
+      providerTaskId: null,
+      // 进行态夹具:updatedAt 必须新鲜,否则素材步 30min 超时闸门会抢先触发
+      updatedAt: new Date(),
+    };
+
+    describe('create 校验', () => {
+      it('缺 articleId → 503', async () => {
+        build();
+        await expect(
+          service.create('user-1', { mode: 'ARTICLE_TO_VIDEO' }),
+        ).rejects.toThrow(/articleId/);
+      });
+
+      it('渲染未启用 → 503', async () => {
+        build({ render: 'false' });
+        await expect(
+          service.create('user-1', {
+            mode: 'ARTICLE_TO_VIDEO',
+            articleId: 'a',
+          }),
+        ).rejects.toThrow(/VIDEO_RENDER_ENABLED/);
+      });
+
+      it('图片 provider 未配置 → 503', async () => {
+        build({ withImageGen: false });
+        await expect(
+          service.create('user-1', {
+            mode: 'ARTICLE_TO_VIDEO',
+            articleId: 'a',
+          }),
+        ).rejects.toThrow(/图片生成 provider/);
+      });
+
+      it('他人文章且非编辑/管理员 → 503', async () => {
+        build();
+        prisma.article.findUnique.mockResolvedValue({
+          authorId: 'other-user',
+          title: 't',
+        });
+        await expect(
+          service.create('user-1', {
+            mode: 'ARTICLE_TO_VIDEO',
+            articleId: 'article-1',
+          }),
+        ).rejects.toThrow(/自己的文章/);
+      });
+
+      it('本人文章 → 落库 PENDING 并 kick 推进', async () => {
+        build();
+        prisma.article.findUnique.mockResolvedValue({
+          authorId: 'user-1',
+          title: 't',
+        });
+        prisma.videoGenerationJob.create.mockResolvedValue({ ...L2_JOB });
+        prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 0 });
+
+        const vo = await service.create(
+          'user-1',
+          { mode: 'ARTICLE_TO_VIDEO', articleId: 'article-1' },
+          'REPORTER',
+        );
+
+        expect(prisma.videoGenerationJob.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              mode: 'ARTICLE_TO_VIDEO',
+              articleId: 'article-1',
+            }),
+          }),
+        );
+        expect(vo.status).toBe('PENDING');
+      });
+    });
+
+    describe('advanceL2 状态机', () => {
+      function setupChain(opts?: { storyboardContent?: string }) {
+        build();
+        // 脚本 step 后 update 返回 STORYBOARDING;分镜后返回 ASSETS_GENERATING...
+        // update 按 data.status 回显,模拟真实持久化
+        prisma.videoGenerationJob.update.mockImplementation(
+          (args: { data: Record<string, unknown> }) =>
+            Promise.resolve({ ...L2_JOB, ...args.data }),
+        );
+        prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+        if (opts?.storyboardContent !== undefined) {
+          chat.chatCompletion.mockReset();
+          chat.chatCompletion
+            .mockResolvedValueOnce({
+              content:
+                '这是一段用于测试的口播脚本,长度足以通过脚本契约的最低字数校验要求。',
+            })
+            .mockResolvedValue({ content: opts.storyboardContent });
+        }
+        // 脚本 step 读文章(正文需 ≥50 字)
+        prisma.article.findUnique.mockResolvedValue({
+          title: '测试文章',
+          content: `<p>${'正文内容。'.repeat(20)}</p>`,
+        });
+        // 素材下载转存
+        mockedAxios.get.mockResolvedValue({ data: new ArrayBuffer(8) });
+        prisma.mediaAsset.create.mockResolvedValue({
+          id: 'asset-1',
+          url: 'https://cos/final.mp4',
+        });
+      }
+
+      it('全链路:PENDING→…→SUCCEEDED(无 TTS 降级无配音)', async () => {
+        setupChain();
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        const composeSpy = jest
+          .spyOn(ComposeStep.prototype, 'run')
+          .mockResolvedValue({
+            outputPath: '/tmp/x.mp4',
+            buffer: Buffer.from('mp4'),
+            durationSec: 10.2,
+            subtitleMode: 'soft',
+          });
+        jest
+          .spyOn(ComposeStep.prototype, 'cleanup')
+          .mockResolvedValue(undefined);
+
+        await service.advance('job-1');
+
+        const statuses = prisma.videoGenerationJob.update.mock.calls.map(
+          (c: [{ data: { status?: string } }]) => c[0].data.status,
+        );
+        expect(statuses).toEqual(
+          expect.arrayContaining([
+            'STORYBOARDING',
+            'ASSETS_GENERATING',
+            'COMPOSING',
+            'SUCCEEDED',
+          ]),
+        );
+        // 无 TTS:落 ttsProvider=none
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ ttsProvider: 'none' }),
+          }),
+        );
+        // 成片登记 + 成片计费键
+        expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              mimeType: 'video/mp4',
+              sourceRef: 'videoJob:job-1',
+              duration: 10,
+            }),
+          }),
+        );
+        expect(billing.getConfig).toHaveBeenCalledWith('ai_video_per_compose');
+        expect(billing.deduct).toHaveBeenCalledWith(
+          expect.objectContaining({ idempotencyKey: 'video-compose:job-1' }),
+        );
+        composeSpy.mockRestore();
+      });
+
+      it('并发 advance 重入被进程内互斥挡下(长步骤跨 cron tick 不重复调用 LLM)', async () => {
+        setupChain();
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        // 脚本 LLM 挂起,保证第二次 advance 到达时第一次仍在 SCRIPTING 步骤
+        let releaseScript!: (v: { content: string }) => void;
+        chat.chatCompletion.mockReset();
+        chat.chatCompletion
+          .mockImplementationOnce(
+            () =>
+              new Promise((resolve) => {
+                releaseScript = resolve;
+              }),
+          )
+          .mockResolvedValue({ content: STORYBOARD_LLM_JSON });
+
+        const first = service.advance('job-1');
+        await new Promise((r) => setImmediate(r)); // 让第一次推进进入脚本步骤
+        await service.advance('job-1'); // 模拟下一 cron tick:应立即返回
+
+        releaseScript({
+          content:
+            '这是一段用于测试的口播脚本,长度足以通过脚本契约的最低字数校验要求。',
+        });
+        await first;
+        expect(chat.chatCompletion).toHaveBeenCalledTimes(2); // 脚本×1 + 分镜×1(无重入双倍)
+      });
+
+      it('分镜契约连续失败 → FAILED(failedStep=storyboard)', async () => {
+        setupChain({ storyboardContent: '不是 JSON' });
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+
+        await service.advance('job-1');
+
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              status: 'FAILED',
+              failedStep: 'storyboard',
+            }),
+          }),
+        );
+      });
+
+      it('素材镜图片失败(含降级失败)→ FAILED(failedStep=assets)', async () => {
+        setupChain({
+          storyboardContent: JSON.stringify({
+            title: 't',
+            scenes: [
+              {
+                narration: '视频镜口播,长度足够通过校验的文本。',
+                visual: { type: 'video_clip', prompt: 'p', durationHintSec: 5 },
+              },
+              {
+                narration: '图片镜口播,长度足够通过校验的文本。',
+                visual: { type: 'image', prompt: 'p2', durationHintSec: 5 },
+              },
+            ],
+          }),
+        });
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        // 视频提交失败 → 降级图卡片 → 图也失败
+        provider.submit.mockRejectedValue(new Error('quota'));
+        (imageGen as jest.Mocked<ImageGenProvider>).generate.mockRejectedValue(
+          new Error('image quota'),
+        );
+
+        await service.advance('job-1');
+
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              status: 'FAILED',
+              failedStep: 'assets',
+            }),
+          }),
+        );
+      });
+
+      it('视频镜失败降级图卡片后继续(不阻塞整条任务)', async () => {
+        setupChain({
+          storyboardContent: JSON.stringify({
+            title: 't',
+            scenes: [
+              {
+                narration: '视频镜口播,长度足够通过校验的文本。',
+                visual: { type: 'video_clip', prompt: 'p', durationHintSec: 5 },
+              },
+              {
+                narration: '图片镜口播,长度足够通过校验的文本。',
+                visual: { type: 'image', prompt: 'p2', durationHintSec: 5 },
+              },
+            ],
+          }),
+        });
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        provider.submit.mockRejectedValue(new Error('quota'));
+        const composeSpy = jest
+          .spyOn(ComposeStep.prototype, 'run')
+          .mockResolvedValue({
+            outputPath: '/tmp/x.mp4',
+            buffer: Buffer.from('mp4'),
+            durationSec: 9,
+            subtitleMode: 'none',
+          });
+        jest
+          .spyOn(ComposeStep.prototype, 'cleanup')
+          .mockResolvedValue(undefined);
+
+        await service.advance('job-1');
+
+        // 降级成功:分镜 checkpoint 里该镜已改写为 image 且素材就绪
+        const storyboardWrites = prisma.videoGenerationJob.update.mock.calls
+          .map((c: [{ data: { storyboard?: string } }]) => c[0].data.storyboard)
+          .filter(Boolean);
+        const finalSb = JSON.parse(
+          storyboardWrites[storyboardWrites.length - 1] as string,
+        ) as {
+          scenes: Array<{
+            visual: { type: string };
+            asset?: { status: string };
+          }>;
+        };
+        expect(finalSb.scenes[0].visual.type).toBe('image');
+        expect(finalSb.scenes[0].asset?.status).toBe('done');
+        expect(composeSpy).toHaveBeenCalled();
+        composeSpy.mockRestore();
+      });
+
+      it('TTS 可用时配音并落词级时间戳', async () => {
+        build({ withTts: true });
+        prisma.article.findUnique.mockResolvedValue({
+          title: '测试文章',
+          content: `<p>${'正文内容。'.repeat(20)}</p>`,
+        });
+        prisma.videoGenerationJob.update.mockImplementation(
+          (args: { data: Record<string, unknown> }) =>
+            Promise.resolve({ ...L2_JOB, ...args.data }),
+        );
+        prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+        mockedAxios.get.mockResolvedValue({ data: new ArrayBuffer(8) });
+        prisma.mediaAsset.create.mockResolvedValue({ id: 'a', url: 'u' });
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        const composeSpy = jest
+          .spyOn(ComposeStep.prototype, 'run')
+          .mockResolvedValue({
+            outputPath: '/tmp/x.mp4',
+            buffer: Buffer.from('mp4'),
+            durationSec: 9,
+            subtitleMode: 'burned',
+          });
+        jest
+          .spyOn(ComposeStep.prototype, 'cleanup')
+          .mockResolvedValue(undefined);
+
+        await service.advance('job-1');
+
+        expect(
+          (tts as jest.Mocked<TtsProvider>).synthesize,
+        ).toHaveBeenCalledTimes(2);
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ ttsProvider: 'minimax' }),
+          }),
+        );
+        composeSpy.mockRestore();
+      });
+    });
+
+    describe('L2 重试落点', () => {
+      it('failedStep=voice → 回 VOICE_SYNTHESIZING 续跑', async () => {
+        build();
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({
+          ...L2_JOB,
+          status: 'FAILED',
+          failedStep: 'voice',
+          retryCount: 1,
+        });
+        prisma.videoGenerationJob.update.mockResolvedValue({ ...L2_JOB });
+
+        await service.retry('user-1', 'job-1');
+
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'VOICE_SYNTHESIZING' }),
+          }),
+        );
+      });
+
+      it('failedStep=upload(L2)→ 回 COMPOSING 重新合成', async () => {
+        build();
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({
+          ...L2_JOB,
+          status: 'FAILED',
+          failedStep: 'upload',
+          retryCount: 1,
+        });
+        prisma.videoGenerationJob.update.mockResolvedValue({ ...L2_JOB });
+
+        await service.retry('user-1', 'job-1');
+
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'COMPOSING' }),
+          }),
+        );
+      });
     });
   });
 });
