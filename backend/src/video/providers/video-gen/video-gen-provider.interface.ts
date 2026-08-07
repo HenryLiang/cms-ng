@@ -14,7 +14,8 @@ export interface VideoGenSubmitRequest {
   /** 图生视频首帧(P0 文生视频不用,P1 预留) */
   firstFrameUrl?: string;
   durationSec?: number;
-  resolution?: '768P' | '1080P';
+  /** 480P 仅 Seedance 2.x 原生支持;其他 provider/版本映射到就近档(768p/720p) */
+  resolution?: '480P' | '768P' | '1080P';
   aspectRatio?: '16:9' | '9:16' | '1:1';
   /**
    * 原生音频(Seedance 1.5+/2.x 支持):true 时同一次生成产出有声视频

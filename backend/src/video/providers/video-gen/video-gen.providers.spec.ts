@@ -113,25 +113,66 @@ describe('VolcengineSeedanceProvider(2.x 系,如 2.0-mini)', () => {
     expect((body as any).generate_audio).toBe(true);
   });
 
-  it('未请求音频时不带 generate_audio;768P 映射 720p;时长 4~15 自由档', async () => {
+  it('未请求音频时不带 generate_audio;2.x 生成参数走顶层 body(768P→720p,时长 4~15 自由档)', async () => {
     mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
 
     await provider.submit({
       prompt: 'x',
       durationSec: 6,
       resolution: '768P',
+      aspectRatio: '9:16',
     });
     let [, body] = mockedAxios.post.mock.calls[0];
     expect((body as any).generate_audio).toBeUndefined();
-    expect((body as any).content[0].text).toBe('x --dur 6 --res 720p');
+    // 2.x:ratio/duration/resolution 顶层参数;prompt 不再内嵌 -- 后缀(--res 会被静默忽略)
+    expect((body as any).content[0].text).toBe('x');
+    expect((body as any).ratio).toBe('9:16');
+    expect((body as any).duration).toBe(6);
+    expect((body as any).resolution).toBe('720p');
 
     // 越界钳制:20s → 15;2s → 4
     await provider.submit({ prompt: 'x', durationSec: 20 });
     [, body] = mockedAxios.post.mock.calls[1];
-    expect((body as any).content[0].text).toContain('--dur 15');
+    expect((body as any).duration).toBe(15);
     await provider.submit({ prompt: 'x', durationSec: 2 });
     [, body] = mockedAxios.post.mock.calls[2];
-    expect((body as any).content[0].text).toContain('--dur 4');
+    expect((body as any).duration).toBe(4);
+  });
+
+  it('2.0-mini 分辨率档位:480P→480p;1080P 无档降级 720p', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
+
+    await provider.submit({ prompt: 'x', resolution: '480P' });
+    let [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).resolution).toBe('480p');
+
+    // 2.0-mini 仅 480p/720p 两档,1080P 请求降级而不是原样透传被拒
+    await provider.submit({ prompt: 'x', resolution: '1080P' });
+    [, body] = mockedAxios.post.mock.calls[1];
+    expect((body as any).resolution).toBe('720p');
+  });
+
+  it('2.0 完整版保留 1080p 档;1.0 系 480P 回退 768p(后缀内嵌)', async () => {
+    const full = new VolcengineSeedanceProvider(
+      configWith({
+        ARK_API_KEY: 'ark-key',
+        SEEDANCE_MODEL: 'doubao-seedance-2-0-260615',
+      }),
+    );
+    mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
+    await full.submit({ prompt: 'x', resolution: '1080P' });
+    expect((mockedAxios.post.mock.calls[0][1] as any).resolution).toBe('1080p');
+
+    const legacy = new VolcengineSeedanceProvider(
+      configWith({
+        ARK_API_KEY: 'ark-key',
+        SEEDANCE_MODEL: 'doubao-seedance-1-0-pro-250528',
+      }),
+    );
+    await legacy.submit({ prompt: 'x', resolution: '480P' });
+    expect(
+      (mockedAxios.post.mock.calls[1][1] as any).content[0].text,
+    ).toContain('--res 768p');
   });
 
   it('1.0 系不支持原生音频:忽略 generateAudio 请求', async () => {
@@ -194,6 +235,18 @@ describe('MinimaxHailuoProvider', () => {
     // L2 分镜 hint 上限 15:收敛到 10 而不是原样透传被 API 拒绝
     await provider.submit({ prompt: 'x', durationSec: 12 });
     expect((mockedAxios.post.mock.calls[2][1] as any).duration).toBe(10);
+  });
+
+  it('480P 无档映射 768P;1080P 透传', async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: { task_id: 't', base_resp: { status_code: 0 } },
+    });
+
+    await provider.submit({ prompt: 'x', resolution: '480P' });
+    expect((mockedAxios.post.mock.calls[0][1] as any).resolution).toBe('768P');
+
+    await provider.submit({ prompt: 'x', resolution: '1080P' });
+    expect((mockedAxios.post.mock.calls[1][1] as any).resolution).toBe('1080P');
   });
 
   it('base_resp.status_code 非 0 时抛错', async () => {

@@ -42,6 +42,8 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   private readonly model: string;
   /** 2.x 系(2.0/2.0-fast/2.0-mini/2.5):时长 4~15s 自由档,分辨率 480p/720p/1080p */
   private readonly isV2: boolean;
+  /** 2.0-mini 轻量档:仅 480p/720p 两档(无 1080p),1080P 请求降级 720p */
+  private readonly isV2Mini: boolean;
   private readonly requestTimeoutMs = 60_000;
 
   constructor(config: ConfigService) {
@@ -52,6 +54,7 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
     this.model =
       config.get<string>('SEEDANCE_MODEL') || 'doubao-seedance-1-5-pro-251215';
     this.isV2 = /seedance-2-/.test(this.model);
+    this.isV2Mini = /seedance-2-\d+-mini/.test(this.model);
   }
 
   /** Seedance 1.5+/2.x 支持 generate_audio(1.0 系不支持) */
@@ -77,8 +80,21 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
     const generateAudio = Boolean(
       req.generateAudio && this.supportsNativeAudio,
     );
+    // 2.x 的 ratio/duration/resolution 是顶层 body 参数(官方文档);
+    // prompt 内嵌 -- 后缀是 1.x 约定,2.x 下 --res 会被静默忽略(实测退化默认 720p)
+    const v2Params: Record<string, unknown> = this.isV2
+      ? {
+          ...(req.aspectRatio ? { ratio: req.aspectRatio } : {}),
+          ...(req.durationSec
+            ? { duration: this.normalizeDuration(req.durationSec) }
+            : {}),
+          ...(req.resolution
+            ? { resolution: this.resolutionParam(req.resolution) }
+            : {}),
+        }
+      : {};
     this.logger.log(
-      `[submit] seedance request: ${JSON.stringify(sanitizeForLog({ model: this.model, generate_audio: generateAudio, content }))}`,
+      `[submit] seedance request: ${JSON.stringify(sanitizeForLog({ model: this.model, generate_audio: generateAudio, ...v2Params, content }))}`,
     );
     const { data } = await axios.post<ArkTaskCreateResponse>(
       `${this.apiBase}/contents/generations/tasks`,
@@ -86,6 +102,7 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
         model: this.model,
         content,
         ...(generateAudio ? { generate_audio: true } : {}),
+        ...v2Params,
       },
       {
         headers: this.headers(),
@@ -136,8 +153,9 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
     return Number((seconds * perSecond).toFixed(2));
   }
 
-  /** 生成参数内嵌 prompt 文本(Ark 内容生成任务约定:`--ratio 9:16 --dur 5`) */
+  /** 1.x 约定:生成参数内嵌 prompt 文本(`--ratio 9:16 --dur 5`);2.x 走顶层 body 参数 */
   private buildPromptText(req: VideoGenSubmitRequest): string {
+    if (this.isV2) return req.prompt.trim();
     const parts = [req.prompt.trim()];
     if (req.aspectRatio) parts.push(`--ratio ${req.aspectRatio}`);
     if (req.durationSec)
@@ -148,10 +166,17 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
     return parts.join(' ');
   }
 
-  /** 2.x 无 768p 档(480p/720p/1080p),768P 请求映射到 720p */
-  private resolutionParam(resolution: '768P' | '1080P'): string {
-    if (resolution === '1080P') return '1080p';
-    return this.isV2 ? '720p' : '768p';
+  /**
+   * 分辨率档位按版本映射:2.x 全系 480p/720p,2.0/2.0-fast/2.5 另有 1080p;
+   * 2.0-mini 仅 480p/720p(1080P 降级 720p);1.x 无 480p/720p(回退 768p/1080p)。
+   */
+  private resolutionParam(resolution: '480P' | '768P' | '1080P'): string {
+    if (!this.isV2) {
+      return resolution === '1080P' ? '1080p' : '768p';
+    }
+    if (resolution === '480P') return '480p';
+    if (resolution === '1080P') return this.isV2Mini ? '720p' : '1080p';
+    return '720p'; // 768P → 2.x 无 768p 档,映射 720p
   }
 
   /**

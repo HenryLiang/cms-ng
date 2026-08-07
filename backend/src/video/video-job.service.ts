@@ -230,6 +230,7 @@ export class VideoJobService {
         durationSec: dto.durationSec ?? 6,
         resolution: dto.resolution ?? '768P',
         aspectRatio: dto.aspectRatio ?? '9:16',
+        generateAudio: dto.generateAudio,
       };
       costEstimate = this.provider.estimateCost(req);
     }
@@ -244,6 +245,7 @@ export class VideoJobService {
         durationSec: dto.durationSec ?? null,
         resolution: dto.resolution ?? '768P',
         aspectRatio: dto.aspectRatio ?? '9:16',
+        generateAudio: isL2 ? null : (dto.generateAudio ?? null),
         costEstimate,
       },
     });
@@ -382,8 +384,9 @@ export class VideoJobService {
       const handle = await this.provider.submit({
         prompt: job.prompt,
         durationSec: job.durationSec ?? undefined,
-        resolution: (job.resolution as '768P' | '1080P') ?? undefined,
+        resolution: (job.resolution as '480P' | '768P' | '1080P') ?? undefined,
         aspectRatio: (job.aspectRatio as '16:9' | '9:16' | '1:1') ?? undefined,
+        generateAudio: job.generateAudio ?? undefined,
       });
       await this.prisma.videoGenerationJob.update({
         where: { id: jobId },

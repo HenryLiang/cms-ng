@@ -27,6 +27,7 @@ const JOB = {
   durationSec: 6,
   resolution: '768P',
   aspectRatio: '9:16',
+  generateAudio: null as boolean | null,
   costEstimate: 3,
   costActual: null,
   resultAssetId: null,
@@ -241,6 +242,24 @@ describe('VideoJobService', () => {
       prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 0 });
       await service.submitStage('job-1');
       expect(provider.submit).not.toHaveBeenCalled();
+    });
+
+    it('generateAudio/480P 任务参数原样透传给 provider(L1 原生音频)', async () => {
+      build();
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+      prisma.videoGenerationJob.findUnique.mockResolvedValue({
+        ...JOB,
+        resolution: '480P',
+        generateAudio: true,
+      });
+      prisma.videoGenerationJob.update.mockResolvedValue({});
+      provider.submit.mockResolvedValue({ taskId: 't-1' });
+
+      await service.submitStage('job-1');
+
+      expect(provider.submit).toHaveBeenCalledWith(
+        expect.objectContaining({ resolution: '480P', generateAudio: true }),
+      );
     });
 
     it('提交异常 → FAILED(failedStep=submit)', async () => {

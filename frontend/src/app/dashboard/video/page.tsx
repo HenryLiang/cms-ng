@@ -144,7 +144,8 @@ export default function VideoStudioPage() {
   );
   const [prompt, setPrompt] = useState('');
   const [durationSec, setDurationSec] = useState(6);
-  const [resolution, setResolution] = useState<'768P' | '1080P'>('768P');
+  const [resolution, setResolution] = useState<'480P' | '768P' | '1080P'>('768P');
+  const [generateAudio, setGenerateAudio] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
   const [articles, setArticles] = useState<Article[]>([]);
   const [articleId, setArticleId] = useState(searchParams.get('articleId') ?? '');
@@ -219,7 +220,13 @@ export default function VideoStudioPage() {
       await createVideoJob(
         mode === VideoGenerationMode.ARTICLE_TO_VIDEO
           ? { mode, articleId, aspectRatio }
-          : { prompt: prompt.trim(), durationSec, resolution, aspectRatio },
+          : {
+              prompt: prompt.trim(),
+              durationSec,
+              resolution,
+              aspectRatio,
+              generateAudio: generateAudio || undefined,
+            },
       );
       setPrompt('');
       toast({
@@ -369,9 +376,10 @@ export default function VideoStudioPage() {
                 <select
                   id="video-resolution"
                   value={resolution}
-                  onChange={(e) => setResolution(e.target.value as '768P' | '1080P')}
+                  onChange={(e) => setResolution(e.target.value as '480P' | '768P' | '1080P')}
                   className={SELECT_CLASS}
                 >
+                  <option value="480P">480P(2.x)</option>
                   <option value="768P">768P</option>
                   <option value="1080P">1080P</option>
                 </select>
@@ -389,6 +397,17 @@ export default function VideoStudioPage() {
                   <option value="1:1">方形 1:1</option>
                 </select>
               </div>
+              {capability?.nativeAudio && (
+                <label className="flex cursor-pointer items-center gap-1.5 pb-2 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    checked={generateAudio}
+                    onChange={(e) => setGenerateAudio(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-brand"
+                  />
+                  原生音频(Seedance 有声生成)
+                </label>
+              )}
               <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!prompt.trim()}>
                 {!submitting && <Sparkles className="h-4 w-4" />}
                 生成视频

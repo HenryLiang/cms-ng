@@ -82,7 +82,9 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
     };
     if (req.durationSec)
       body.duration = this.normalizeDuration(req.durationSec);
-    if (req.resolution) body.resolution = req.resolution;
+    // Hailuo 2.3 仅 768P/1080P 两档;480P 请求映射到就近的 768P
+    if (req.resolution)
+      body.resolution = req.resolution === '1080P' ? '1080P' : '768P';
     if (req.firstFrameUrl) body.first_frame_image = req.firstFrameUrl;
     this.logger.log(
       `[submit] hailuo request: ${JSON.stringify(sanitizeForLog(body))}`,

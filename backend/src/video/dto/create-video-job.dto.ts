@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -44,7 +45,8 @@ export class CreateVideoJobDto {
   provider?: string;
 
   @ApiPropertyOptional({
-    description: '时长(秒),provider 支持 6/10',
+    description:
+      '时长(秒),Seedance 2.x 支持 4~15 自由档;1.0 系归一 5/10,MiniMax 归一 6/10',
     default: 6,
   })
   @IsOptional()
@@ -54,15 +56,29 @@ export class CreateVideoJobDto {
   @Max(15)
   durationSec?: number;
 
-  @ApiPropertyOptional({ enum: ['768P', '1080P'], default: '768P' })
+  @ApiPropertyOptional({
+    enum: ['480P', '768P', '1080P'],
+    default: '768P',
+    description:
+      '480P/720P 为 Seedance 2.x 档(2.0-mini 仅这两档,1080P 降级 720p);MiniMax 无 480P 档映射 768P',
+  })
   @IsOptional()
-  @IsIn(['768P', '1080P'])
-  resolution?: '768P' | '1080P';
+  @IsIn(['480P', '768P', '1080P'])
+  resolution?: '480P' | '768P' | '1080P';
 
   @ApiPropertyOptional({ enum: ['16:9', '9:16', '1:1'], default: '9:16' })
   @IsOptional()
   @IsIn(['16:9', '9:16', '1:1'])
   aspectRatio?: '16:9' | '9:16' | '1:1';
+
+  @ApiPropertyOptional({
+    description:
+      '原生音频(仅 L1;Seedance 1.5+/2.x 支持,生成有声视频:对白/音效/配乐)。provider 不支持时静默忽略',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  generateAudio?: boolean;
 }
 
 export class QueryVideoJobDto {
