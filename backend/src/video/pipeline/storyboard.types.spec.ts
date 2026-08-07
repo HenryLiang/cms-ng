@@ -114,6 +114,39 @@ describe('parseStoryboard 分镜契约', () => {
     expect(sb.scenes[0].visual.durationHintSec).toBe(6);
     expect(sb.aspectRatio).toBe('9:16');
   });
+
+  it('nativeAudio 模式:image/未知类型契约归一为 video_clip(旁白不静默丢失)', () => {
+    const sb = parseStoryboard(
+      {
+        scenes: [
+          VALID.scenes[0], // image
+          {
+            narration: '口播',
+            visual: { type: 'hologram', prompt: 'p', durationHintSec: 5 },
+          },
+        ],
+      },
+      { aspectRatio: '9:16', nativeAudio: true },
+    );
+    expect(sb.scenes[0].visual.type).toBe('video_clip');
+    expect(sb.scenes[1].visual.type).toBe('video_clip');
+
+    // 非原生模式保持原归一:image 不动,未知 → image
+    const normal = parseStoryboard(
+      {
+        scenes: [
+          VALID.scenes[0],
+          {
+            narration: '口播',
+            visual: { type: 'hologram', prompt: 'p', durationHintSec: 5 },
+          },
+        ],
+      },
+      { aspectRatio: '9:16' },
+    );
+    expect(normal.scenes[0].visual.type).toBe('image');
+    expect(normal.scenes[1].visual.type).toBe('image');
+  });
 });
 
 describe('sceneDurationSec', () => {

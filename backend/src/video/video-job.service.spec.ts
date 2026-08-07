@@ -740,6 +740,82 @@ describe('VideoJobService', () => {
         expect(chat.chatCompletion).toHaveBeenCalledTimes(2); // 脚本×1 + 分镜×1(无重入双倍)
       });
 
+      it('原生音频模式:分镜要求全部视频镜,submit 带 generateAudio + 旁白注入', async () => {
+        setupChain({
+          storyboardContent: JSON.stringify({
+            title: 't',
+            scenes: [
+              {
+                narration: '第一镜口播文本,长度足够通过契约校验。',
+                visual: {
+                  type: 'video_clip',
+                  prompt: '步道晨景',
+                  durationHintSec: 5,
+                },
+              },
+              {
+                narration: '第二镜口播文本,同样满足最低字数要求。',
+                visual: {
+                  type: 'video_clip',
+                  prompt: '江景傍晚',
+                  durationHintSec: 5,
+                },
+              },
+            ],
+          }),
+        });
+        (provider as { supportsNativeAudio?: boolean }).supportsNativeAudio =
+          true;
+        provider.submit.mockResolvedValue({ taskId: 'pv-1' });
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+
+        await service.advance('job-1');
+
+        // 分镜 system prompt 切换为全视频镜规则
+        const storyboardCall = chat.chatCompletion.mock.calls[1]?.[0];
+        expect(storyboardCall.messages[0].content).toContain(
+          '全部用 "video_clip"',
+        );
+        // 视频镜提交:generateAudio + 旁白注入 prompt
+        expect(provider.submit).toHaveBeenCalledTimes(2);
+        expect(provider.submit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            generateAudio: true,
+            prompt: expect.stringContaining('画外音旁白'),
+          }),
+        );
+        expect(provider.submit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            prompt: expect.stringContaining('第一镜口播文本'),
+          }),
+        );
+      });
+
+      it('原生音频模式:无 TTS 且片段支持原生音频时 ttsProvider 落 native', async () => {
+        setupChain();
+        (provider as { supportsNativeAudio?: boolean }).supportsNativeAudio =
+          true;
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        jest.spyOn(ComposeStep.prototype, 'run').mockResolvedValue({
+          outputPath: '/tmp/x.mp4',
+          buffer: Buffer.from('mp4'),
+          durationSec: 10,
+          subtitleMode: 'none',
+        });
+        jest
+          .spyOn(ComposeStep.prototype, 'cleanup')
+          .mockResolvedValue(undefined);
+
+        await service.advance('job-1');
+
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ ttsProvider: 'native' }),
+          }),
+        );
+        jest.restoreAllMocks();
+      });
+
       it('分镜契约连续失败 → FAILED(failedStep=storyboard)', async () => {
         setupChain({ storyboardContent: '不是 JSON' });
         prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
@@ -838,6 +914,82 @@ describe('VideoJobService', () => {
         expect(finalSb.scenes[0].visual.type).toBe('image');
         expect(finalSb.scenes[0].asset?.status).toBe('done');
         expect(composeSpy).toHaveBeenCalled();
+        composeSpy.mockRestore();
+      });
+
+      it('原生音频模式:视频镜失败降级图片 → 该镜静音(钉住已知行为),任务仍完成且 ttsProvider=native', async () => {
+        setupChain({
+          storyboardContent: JSON.stringify({
+            title: 't',
+            scenes: [
+              {
+                narration: '第一镜口播文本,长度足够通过契约校验。',
+                visual: {
+                  type: 'video_clip',
+                  prompt: '步道晨景',
+                  durationHintSec: 5,
+                },
+              },
+              {
+                narration: '第二镜口播文本,同样满足最低字数要求。',
+                visual: {
+                  type: 'video_clip',
+                  prompt: '江景傍晚',
+                  durationHintSec: 5,
+                },
+              },
+            ],
+          }),
+        });
+        (provider as { supportsNativeAudio?: boolean }).supportsNativeAudio =
+          true;
+        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
+        // 两镜视频提交都失败 → 双双降级图卡片(该镜失去原生旁白 = 静音)
+        provider.submit.mockRejectedValue(new Error('ModelNotOpen'));
+        const composeSpy = jest
+          .spyOn(ComposeStep.prototype, 'run')
+          .mockResolvedValue({
+            outputPath: '/tmp/x.mp4',
+            buffer: Buffer.from('mp4'),
+            durationSec: 10,
+            subtitleMode: 'soft',
+          });
+        jest
+          .spyOn(ComposeStep.prototype, 'cleanup')
+          .mockResolvedValue(undefined);
+
+        await service.advance('job-1');
+
+        // 任务不阻塞:全链路完成
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'SUCCEEDED' }),
+          }),
+        );
+        // 配音通道仍记 native(原生模式意图),降级镜静音是已知降级代价
+        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ ttsProvider: 'native' }),
+          }),
+        );
+        // 钉住:降级镜改写为 image、无任何 voice(成片该镜无声,字幕仍在)
+        const storyboardWrites = prisma.videoGenerationJob.update.mock.calls
+          .map((c: [{ data: { storyboard?: string } }]) => c[0].data.storyboard)
+          .filter(Boolean);
+        const finalSb = JSON.parse(
+          storyboardWrites[storyboardWrites.length - 1] as string,
+        ) as {
+          scenes: Array<{
+            visual: { type: string };
+            voice?: unknown;
+            asset?: { status: string };
+          }>;
+        };
+        for (const scene of finalSb.scenes) {
+          expect(scene.visual.type).toBe('image');
+          expect(scene.asset?.status).toBe('done');
+          expect(scene.voice).toBeUndefined();
+        }
         composeSpy.mockRestore();
       });
 

@@ -16,6 +16,11 @@ export interface VideoGenSubmitRequest {
   durationSec?: number;
   resolution?: '768P' | '1080P';
   aspectRatio?: '16:9' | '9:16' | '1:1';
+  /**
+   * 原生音频(Seedance 1.5+/2.x 支持):true 时同一次生成产出有声视频
+   * (对白/音效/配乐,音素级口型同步)。provider 不支持时静默忽略。
+   */
+  generateAudio?: boolean;
 }
 
 export interface VideoGenTaskHandle {
@@ -40,6 +45,11 @@ export interface VideoGenPollResult {
 
 export interface VideoGenProvider {
   readonly name: VideoGenProviderName;
+  /**
+   * 是否支持原生音频生成(generate_audio)。L2 据此决策:
+   * 无 TTS 且片段 provider 支持原生音频时,视频镜用原生配音替代 TTS 旁白。
+   */
+  readonly supportsNativeAudio?: boolean;
   submit(req: VideoGenSubmitRequest): Promise<VideoGenTaskHandle>;
   poll(taskId: string): Promise<VideoGenPollResult>;
   /** 单条片段估算成本(人民币元,用于任务发起前展示;实际扣费以计费配置为准) */

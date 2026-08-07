@@ -6,6 +6,7 @@ import * as path from 'path';
 import {
   buildAss,
   composeVideo,
+  hasAudioStream,
   probeDurationSec,
   supportsAssBurn,
 } from './ffmpeg-compose';
@@ -176,5 +177,61 @@ describeFfmpeg('composeVideo(真实 ffmpeg)', () => {
     const bogus = path.join(jobDir, 'bogus.bin');
     await fs.writeFile(bogus, 'not a media file');
     await expect(probeDurationSec(bogus)).resolves.toBeNull();
+  });
+
+  it('hasAudioStream:区分有/无音频流的素材(原生音频复用判定)', async () => {
+    await expect(hasAudioStream(path.join(jobDir, 'voice.mp3'))).resolves.toBe(
+      true,
+    );
+    await expect(hasAudioStream(path.join(jobDir, 'clip.mp4'))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('视频镜复用原生音轨(audioPath=assetPath)→ 输出音频非静音', async () => {
+    // 造一个自带音轨的视频素材(模拟 Seedance 有声生成产物)
+    const clipWithAudio = path.join(jobDir, 'clip-audio.mp4');
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc=duration=1:size=320x240:rate=15',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=1',
+      '-pix_fmt',
+      'yuv420p',
+      '-shortest',
+      clipWithAudio,
+    ]);
+    const outputPath = path.join(jobDir, 'out-native.mp4');
+    await composeVideo({
+      jobDir,
+      aspectRatio: '9:16',
+      outputPath,
+      scenes: [
+        {
+          assetPath: clipWithAudio,
+          assetKind: 'video',
+          audioPath: clipWithAudio, // 原生音轨复用(ComposeStep 的产出形态)
+          durationSec: 1,
+        },
+      ],
+    });
+    // volumedetect:原生音轨被带入 → 输出非静音(静音轨 mean_volume ≈ -91dB)
+    const { stderr } = await execFileAsync('ffmpeg', [
+      '-i',
+      outputPath,
+      '-af',
+      'volumedetect',
+      '-f',
+      'null',
+      '-',
+    ]).catch((e: { stderr?: string }) => ({ stderr: e.stderr ?? '' }));
+    const mean = /mean_volume:\s*(-?[\d.]+) dB/.exec(stderr ?? '');
+    expect(mean).not.toBeNull();
+    expect(Number(mean?.[1])).toBeGreaterThan(-60);
   });
 });

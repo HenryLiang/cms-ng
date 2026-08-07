@@ -91,6 +91,67 @@ describe('VolcengineSeedanceProvider', () => {
   });
 });
 
+describe('VolcengineSeedanceProvider(2.x 系,如 2.0-mini)', () => {
+  const config = configWith({
+    ARK_API_KEY: 'ark-key',
+    SEEDANCE_MODEL: 'doubao-seedance-2-0-mini-260615',
+  });
+  let provider: VolcengineSeedanceProvider;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    provider = new VolcengineSeedanceProvider(config);
+  });
+
+  it('supportsNativeAudio=true;generateAudio → 顶层 generate_audio 参数', async () => {
+    expect(provider.supportsNativeAudio).toBe(true);
+    mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
+
+    await provider.submit({ prompt: '滨江步道', generateAudio: true });
+
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).generate_audio).toBe(true);
+  });
+
+  it('未请求音频时不带 generate_audio;768P 映射 720p;时长 4~15 自由档', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
+
+    await provider.submit({
+      prompt: 'x',
+      durationSec: 6,
+      resolution: '768P',
+    });
+    let [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).generate_audio).toBeUndefined();
+    expect((body as any).content[0].text).toBe('x --dur 6 --res 720p');
+
+    // 越界钳制:20s → 15;2s → 4
+    await provider.submit({ prompt: 'x', durationSec: 20 });
+    [, body] = mockedAxios.post.mock.calls[1];
+    expect((body as any).content[0].text).toContain('--dur 15');
+    await provider.submit({ prompt: 'x', durationSec: 2 });
+    [, body] = mockedAxios.post.mock.calls[2];
+    expect((body as any).content[0].text).toContain('--dur 4');
+  });
+
+  it('1.0 系不支持原生音频:忽略 generateAudio 请求', async () => {
+    const legacy = new VolcengineSeedanceProvider(
+      configWith({
+        ARK_API_KEY: 'ark-key',
+        SEEDANCE_MODEL: 'doubao-seedance-1-0-pro-250528',
+      }),
+    );
+    expect(legacy.supportsNativeAudio).toBe(false);
+    mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
+
+    await legacy.submit({ prompt: 'x', durationSec: 6, generateAudio: true });
+
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).generate_audio).toBeUndefined();
+    expect((body as any).content[0].text).toContain('--dur 5'); // 1.0 归一 5/10 档
+  });
+});
+
 describe('MinimaxHailuoProvider', () => {
   const config = configWith({
     MINIMAX_API_KEY: 'mm-key',
@@ -117,6 +178,22 @@ describe('MinimaxHailuoProvider', () => {
     const [url, body] = mockedAxios.post.mock.calls[0];
     expect(url).toBe('https://api.minimax.io/v1/video_generation');
     expect((body as any).prompt_optimizer).toBe(false);
+  });
+
+  it('时长收敛到 Hailuo 仅支持的 6|10 档(≤8→6,>8→10)', async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: { task_id: 't', base_resp: { status_code: 0 } },
+    });
+
+    await provider.submit({ prompt: 'x', durationSec: 4 });
+    expect((mockedAxios.post.mock.calls[0][1] as any).duration).toBe(6);
+
+    await provider.submit({ prompt: 'x', durationSec: 8 });
+    expect((mockedAxios.post.mock.calls[1][1] as any).duration).toBe(6);
+
+    // L2 分镜 hint 上限 15:收敛到 10 而不是原样透传被 API 拒绝
+    await provider.submit({ prompt: 'x', durationSec: 12 });
+    expect((mockedAxios.post.mock.calls[2][1] as any).duration).toBe(10);
   });
 
   it('base_resp.status_code 非 0 时抛错', async () => {

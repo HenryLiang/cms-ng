@@ -82,10 +82,14 @@ const MAX_DURATION_HINT = 15;
 /**
  * 校验并归一化 LLM 分镜输出。非法即抛错(调用方重试/置失败),不做静默修复:
  * LLM 输出契约失败属于 prompt 问题,静默修复会掩盖系统性偏差(QA 视角)。
+ *
+ * 例外:opts.nativeAudio(原生音频模式)下 image 镜契约归一为 video_clip ——
+ * 图片镜没有原生配音,会让旁白在成片中段静默丢失;这与未知 type→image 的
+ * 归一同级,是确定性规则而非自由改写(调用方记录被归一的镜数)。
  */
 export function parseStoryboard(
   raw: unknown,
-  opts: { aspectRatio: string },
+  opts: { aspectRatio: string; nativeAudio?: boolean },
 ): Storyboard {
   if (typeof raw !== 'object' || raw === null) {
     throw new Error('分镜输出不是 JSON 对象');
@@ -108,9 +112,13 @@ export function parseStoryboard(
   const scenes: StoryboardScene[] = obj.scenes.map((s, i) => {
     const narration = typeof s.narration === 'string' ? s.narration.trim() : '';
     if (!narration) throw new Error(`第 ${i + 1} 镜缺口播文本`);
-    const type = VISUAL_TYPES.includes(s.visual?.type as StoryboardVisualType)
+    let type = VISUAL_TYPES.includes(s.visual?.type as StoryboardVisualType)
       ? (s.visual?.type as StoryboardVisualType)
       : 'image';
+    // 原生音频模式:图片镜无原生配音(旁白会静默),契约归一为视频镜
+    if (opts.nativeAudio && type === 'image') {
+      type = 'video_clip';
+    }
     if (type === 'media_asset' && !s.visual?.mediaAssetId) {
       throw new Error(`第 ${i + 1} 镜声明 media_asset 但缺 mediaAssetId`);
     }

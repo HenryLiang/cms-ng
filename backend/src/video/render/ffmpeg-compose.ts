@@ -85,6 +85,29 @@ export async function probeDurationSec(
   }
 }
 
+/** 探测文件是否含音频流(原生音频视频镜据此复用其音轨);探测失败按无音频处理 */
+export async function hasAudioStream(
+  filePath: string,
+  ffprobeBin = 'ffprobe',
+): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync(ffprobeBin, [
+      '-v',
+      'error',
+      '-select_streams',
+      'a',
+      '-show_entries',
+      'stream=index',
+      '-of',
+      'csv=p=0',
+      filePath,
+    ]);
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** 环境能力探测:是否支持 ass 烧录(无 libass 的 ffmpeg 构建降级软字幕轨) */
 export async function supportsAssBurn(ffmpegBin = 'ffmpeg'): Promise<boolean> {
   try {

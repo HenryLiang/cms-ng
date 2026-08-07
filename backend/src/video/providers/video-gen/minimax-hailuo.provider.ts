@@ -51,6 +51,8 @@ interface MinimaxFileResponse {
 @Injectable()
 export class MinimaxHailuoProvider implements VideoGenProvider {
   readonly name = VideoGenProviderName.MINIMAX;
+  /** Hailuo 2.3 无原生音频;L2 配音走 MiniMax TTS(t2a_v2) */
+  readonly supportsNativeAudio = false;
   private readonly logger = new Logger(MinimaxHailuoProvider.name);
   private readonly apiKey: string;
   private readonly apiBase: string;
@@ -78,7 +80,8 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
       // 关闭 prompt 自动优化:分镜 prompt 由我们自己的 LLM 步骤生成,保持原样可控
       prompt_optimizer: false,
     };
-    if (req.durationSec) body.duration = req.durationSec;
+    if (req.durationSec)
+      body.duration = this.normalizeDuration(req.durationSec);
     if (req.resolution) body.resolution = req.resolution;
     if (req.firstFrameUrl) body.first_frame_image = req.firstFrameUrl;
     this.logger.log(
@@ -169,6 +172,11 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
         `MiniMax ${op} 失败: status_code=${code} msg=${data.base_resp?.status_msg ?? ''}`,
       );
     }
+  }
+
+  /** Hailuo 2.3 仅接受 6|10 秒档;其他时长收敛最近档(≤8→6,>8→10),避免 API 拒绝 */
+  private normalizeDuration(durationSec: number): number {
+    return durationSec <= 8 ? 6 : 10;
   }
 
   /** 国内站(api.minimaxi.com)要求 GroupId 作为 query 参数;国际站留空即可 */

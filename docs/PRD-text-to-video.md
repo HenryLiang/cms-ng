@@ -278,3 +278,21 @@ VIDEO_TTS_PROVIDER=minimax
 10. **前端**:视频创作页加"文生片段 / 稿件一键成片"双 tab(`?mode=article&articleId=` 预选中);文章编辑器"快速操作"加"AI 一键成片"入口(纯导航,编辑器零 API 耦合);任务卡片展示分镜明细(脚本全文 + 逐镜素材/配音状态);capability 返回 `l2/tts/render` 供入口 gating,TTS 缺失时创建表单提示"无配音"
 
 **e2e 验证(2026-08-07,真实火山引擎,无配音降级模式)**:两个真实 L2 任务全链路 SUCCEEDED —— 稿件(滨江步道新闻)→ deepseek 口播脚本 → 4 镜分镜 → Seedream 图片 ×3 + Seedance 视频片段 ×1 → ffmpeg 合成 → COS → 媒体库登记(`sourceRef=videoJob:<id>`)。成片 ffprobe:22s、1080×1920 H.264 + AAC + mov_text 软字幕轨(本地 ffmpeg 无 libass,按设计降级)。**TTS 支路未实测**:火山语音凭证(VOLC_TTS_APP_ID/ACCESS_TOKEN)待开通,到位后补真实配音 e2e;MiniMax 图片/TTS 两个 provider 按官方文档实现但未实测(无凭证)
+
+## 16. 原生音频替代 TTS(2026-08-07,Seedance 2.x `generate_audio`)
+
+用户决策:配音不走独立 TTS,改用 **Seedance 2.x 原生音频**(`generate_audio:true`,视频/音频同一次生成,支持中文对白/旁白、音素级口型同步)。实现要点:
+
+1. **provider seam**:`VideoGenProvider.supportsNativeAudio`(按模型名判定:`seedance-1-5`/`seedance-2-` 支持,1.0 系不支持);`VideoGenSubmitRequest.generateAudio` → 请求体顶层 `generate_audio:true`(仅支持时落参,1.0 系静默忽略)。模型版本感知的参数映射:2.x 时长 4~15s 自由档(1.0 系仍归一 5/10)、2.x 无 768p 档 → 768P 映射 720p
+2. **L2 原生音频模式** = 无 TTS 且片段 provider 支持原生音频:分镜 prompt 要求全部 `video_clip`(图片镜静默会破坏旁白连续性);素材提交时旁白确定性注入 prompt(追加 `画面配中文画外音旁白:「<narration>」`,不依赖 LLM 在分镜阶段遵守);`VOICE_SYNTHESIZING` 整步跳过,`ttsProvider='native'`(区分 TTS 缺失的 `'none'` 纯静默降级)
+3. **合成层**:无独立配音的视频镜用 ffprobe 探测素材音轨,有则 `audioPath=assetPath` 复用原生音轨(同一文件两次作输入,ffmpeg 允许);镜长取素材真实探测时长(避免 tpad 冻帧截断原生音频)。字幕在原生音频模式无词级时间戳 → 每镜整句 cue(既有降级路径,时间轴用真实镜长)
+4. **优先级**:TTS 配置在 → 独立 TTS 旁白仍是权威配音(视频镜不再请求原生音频,避免双配音);TTS 缺席 + 原生音频可用 → native;两者皆无 → none(纯字幕)
+5. **模型激活是硬前提(实测)**:Ark `/models` 列出 ≠ 已开通。该账号 2.x 全系(2.5/2.0/2.0-fast/2.0-mini)提交任务返回 404 `ModelNotOpen`(需在 Ark 控制台"模型开通"页激活,按量付费);1.5-pro 返回 `InvalidEndpointOrModel`(未开通);仅 1.0-pro/1.0-pro-fast 已激活(无音频能力)。未激活时 L2 视频镜 404 → 逐镜降级图片 → 成片静默(降级链工作正常,但失去配音)
+6. **降级链实测(2026-08-07)**:2.0-mini 未激活时真实任务 SUCCEEDED —— 分镜 LLM 遵守全 video_clip 规则,3 镜提交全部 404 → 逐镜 fallback 图片 → 18s 静默成片(字幕正常)。待 2.x 激活后重跑带原生配音的 e2e
+7. L1 文生片段行为不变(不请求原生音频);`.env.example` 默认模型改 `doubao-seedance-2-0-mini-260615`
+8. **对抗式评审修复(2026-08-07,6 项确认发现全修)**:
+   - [major] MiniMax 时长归一收入 provider 内部(仅接受 6|10 档,≤8→6 / >8→10)——素材 step 的全局钳制放宽到 [2,15] 是为 Seedance 2.x,不能直接透传给 Hailuo(顺带修复既存 4/5/7/8/9 原样透传)
+   - [minor] 合成层原生音轨复用/实测时长分支按 nativeAudio 模式门控 —— 无 TTS 的 MiniMax/1.0 任务与 media_asset 有声素材恢复既有"静音轨+时长 hint"行为,不意外混入原声
+   - [minor] 原生音频模式"全 video_clip"从 prompt 软约束升级为契约归一(`parseStoryboard` `nativeAudio:true` 时 image/未知类型 → video_clip,step 记 warn 镜数);prompt 同步收紧:narration 20~50 字、durationHintSec 5~12(须容纳旁白朗读时长)
+   - [minor] **1.5-pro + 无 TTS 存量部署行为变化(发布注记)**:升级后自动进入原生音频模式 —— 配音从"无"变"有"(体验提升),但单镜成本画像变化(有声生成单价高于静默,且长旁白可能被压入 ≤10s 片段);想保持旧行为需配置 TTS 或切回 1.0 系模型
+   - [major×2/测试] 补两条钉住测试:原生音频模式视频镜全失败 → 降级图片镜静音(任务仍 SUCCEEDED、ttsProvider=native)的已知行为;新建 `compose.step.spec.ts` 直测 prepareScene 四分支(原生复用/无声素材/非原生门控/voice 优先)

@@ -23,8 +23,10 @@ export interface VideoCapability {
   };
   /** L2(稿件一键成片)可用:渲染开关 + 图片 provider 均就绪 */
   l2: boolean;
-  /** TTS 已配置;false 时 L2 成片降级为无配音 */
+  /** TTS 已配置;false 时 L2 成片降级为无配音(或原生音频) */
   tts: boolean;
+  /** 片段模型支持原生音频(Seedance 1.5+/2.x);无 TTS 时用作配音通道 */
+  nativeAudio: boolean;
   /** 本地 FFmpeg 渲染开关 */
   render: boolean;
 }
@@ -42,7 +44,7 @@ export interface VideoGenerationJobVo extends VideoGenerationJob {
   script?: string | null;
   /** L2 分镜 JSON 字符串(见 StoryboardVo) */
   storyboard?: string | null;
-  /** 实际配音 provider;'none' 表示无配音降级 */
+  /** 实际配音 provider;'none' 无配音降级;'native' 视频模型原生音频 */
   ttsProvider?: string | null;
 }
 

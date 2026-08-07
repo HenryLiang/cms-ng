@@ -157,6 +157,8 @@ export class VideoJobService {
       // L2(稿件一键成片)能力分解:渲染开关 + 图片 provider 必备;TTS 缺失时降级无配音
       l2: this.enabled && this.renderEnabled && this.imageGen != null,
       tts: this.tts != null,
+      // 无 TTS 时的替代配音通道:片段模型原生音频(Seedance 1.5+/2.x)
+      nativeAudio: this.provider?.supportsNativeAudio === true,
       render: this.renderEnabled,
     };
   }
@@ -547,7 +549,10 @@ export class VideoJobService {
           where: { id: job.id },
           data: {
             storyboard: JSON.stringify(storyboard),
-            ttsProvider: this.tts?.name ?? 'none',
+            // native = 无 TTS,由视频模型原生音频配音(Seedance 1.5+/2.x)
+            ttsProvider:
+              this.tts?.name ??
+              (this.provider?.supportsNativeAudio ? 'native' : 'none'),
             status: 'COMPOSING',
           },
         });

@@ -40,6 +40,8 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   private readonly apiKey: string;
   private readonly apiBase: string;
   private readonly model: string;
+  /** 2.x 系(2.0/2.0-fast/2.0-mini/2.5):时长 4~15s 自由档,分辨率 480p/720p/1080p */
+  private readonly isV2: boolean;
   private readonly requestTimeoutMs = 60_000;
 
   constructor(config: ConfigService) {
@@ -49,6 +51,12 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
       'https://ark.cn-beijing.volces.com/api/v3';
     this.model =
       config.get<string>('SEEDANCE_MODEL') || 'doubao-seedance-1-5-pro-251215';
+    this.isV2 = /seedance-2-/.test(this.model);
+  }
+
+  /** Seedance 1.5+/2.x 支持 generate_audio(1.0 系不支持) */
+  get supportsNativeAudio(): boolean {
+    return /seedance-(1-5|2-)/.test(this.model);
   }
 
   isConfigured(): boolean {
@@ -65,12 +73,20 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
         role: 'first_frame',
       });
     }
+    // 原生音频:顶层 generate_audio 参数(仅 1.5+/2.x;1.0 系忽略该请求)
+    const generateAudio = Boolean(
+      req.generateAudio && this.supportsNativeAudio,
+    );
     this.logger.log(
-      `[submit] seedance request: ${JSON.stringify(sanitizeForLog({ model: this.model, content }))}`,
+      `[submit] seedance request: ${JSON.stringify(sanitizeForLog({ model: this.model, generate_audio: generateAudio, content }))}`,
     );
     const { data } = await axios.post<ArkTaskCreateResponse>(
       `${this.apiBase}/contents/generations/tasks`,
-      { model: this.model, content },
+      {
+        model: this.model,
+        content,
+        ...(generateAudio ? { generate_audio: true } : {}),
+      },
       {
         headers: this.headers(),
         timeout: this.requestTimeoutMs,
@@ -127,16 +143,26 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
     if (req.durationSec)
       parts.push(`--dur ${this.normalizeDuration(req.durationSec)}`);
     if (req.resolution) {
-      parts.push(`--res ${req.resolution === '1080P' ? '1080p' : '768p'}`);
+      parts.push(`--res ${this.resolutionParam(req.resolution)}`);
     }
     return parts.join(' ');
   }
 
+  /** 2.x 无 768p 档(480p/720p/1080p),768P 请求映射到 720p */
+  private resolutionParam(resolution: '768P' | '1080P'): string {
+    if (resolution === '1080P') return '1080p';
+    return this.isV2 ? '720p' : '768p';
+  }
+
   /**
-   * Seedance 各版本支持的时长档位不同(1.0: 5/10s;1.5+: 更宽),
-   * 统一收敛到 [5, 10] 最近档,避免非法参数被 provider 拒绝(实测 6s 在 1.0-pro 不可用)
+   * Seedance 各版本支持的时长档位不同:
+   * 1.0 系仅 5/10s(实测 6s 被 1.0-pro 拒绝)→ 收敛最近档;
+   * 2.x 系支持 4~15s 自由档 → 取整并钳制到 [4,15]。
    */
   private normalizeDuration(durationSec: number): number {
+    if (this.isV2) {
+      return Math.min(15, Math.max(4, Math.round(durationSec)));
+    }
     return durationSec <= 7 ? 5 : 10;
   }
 

@@ -16,6 +16,7 @@ import {
   buildAss,
   composeVideo,
   downloadToFile,
+  hasAudioStream,
   probeDurationSec,
 } from '../render/ffmpeg-compose';
 
@@ -33,6 +34,15 @@ export class ComposeStep {
   private readonly logger = new Logger(ComposeStep.name);
 
   constructor(private readonly deps: VideoPipelineDeps) {}
+
+  /**
+   * 原生音频模式:无 TTS 且片段 provider 支持原生音频(与 AssetsStep 同一判定)。
+   * 仅该模式下视频镜才复用素材原生音轨 —— 无 TTS 的 MiniMax/1.0 任务与
+   * media_asset 有声素材按既有行为走静音轨/时长 hint。
+   */
+  private get nativeAudio(): boolean {
+    return !this.deps.tts && this.deps.videoGen?.supportsNativeAudio === true;
+  }
 
   isEnabled(): boolean {
     return (
@@ -102,14 +112,23 @@ export class ComposeStep {
     );
     await downloadToFile(scene.asset.url, assetPath);
 
+    const ffprobeBin = this.deps.config.get<string>('FFPROBE_BIN') || undefined;
     let audioPath: string | undefined;
     let durationSec: number;
     if (scene.voice?.audioUrl) {
       audioPath = path.join(jobDir, `voice-${scene.index}.mp3`);
       await downloadToFile(scene.voice.audioUrl, audioPath);
       // 以真实音频时长为准(checkpoint 里的 durationMs 可能是估算值)
-      const probed = await probeDurationSec(audioPath);
+      const probed = await probeDurationSec(audioPath, ffprobeBin);
       durationSec = probed ?? sceneDurationSec(scene);
+    } else if (isVideo && this.nativeAudio) {
+      // 原生音频模式的视频镜:复用素材原生音轨(有声生成),
+      // 时长取真实探测值,避免冻帧补齐截断原生音频
+      const assetDuration = await probeDurationSec(assetPath, ffprobeBin);
+      durationSec = assetDuration ?? sceneDurationSec(scene);
+      if (await hasAudioStream(assetPath, ffprobeBin)) {
+        audioPath = assetPath;
+      }
     } else {
       durationSec = sceneDurationSec(scene);
     }
