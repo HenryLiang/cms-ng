@@ -606,6 +606,8 @@ model VideoGenerationJob {
   resolution     String?             @db.VarChar(10) // '480P' | '768P' | '1080P'
   aspectRatio    String?             @db.VarChar(10) // '16:9' | '9:16' | '1:1'
   generateAudio  Boolean?            // L1 原生音频开关(Seedance 1.5+/2.x);null/false 静默
+  // L1 可选提交参数(PRD §18):{ references:[{role,url}], seed?, draft?, returnLastFrame? } JSON 字符串
+  submitOptions  String?             @db.Text
   // P1(L2 稿件一键成片)checkpoint:JSON 字符串(仓库零 Json 字段惯例,用 safeJsonParse 解析)
   script         String?             @db.Text // 口播脚本(LLM 产出)
   storyboard     String?             @db.Text // 分镜 JSON(含每镜素材/配音/字幕 checkpoint)
@@ -615,6 +617,7 @@ model VideoGenerationJob {
   costActual     Float?
   // 产出
   resultAssetId  String?             // 成片 MediaAsset.id,仅溯源引用(无外键)
+  lastFrameAssetId String?           // returnLastFrame 尾帧图 MediaAsset.id(续拍链),无外键
   error          String?             @db.Text
   retryCount     Int                 @default(0)
   // 归属

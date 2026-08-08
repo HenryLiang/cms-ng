@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   Logger,
@@ -41,7 +42,25 @@ import {
   VIDEO_GEN_PROVIDER,
   VideoGenProvider,
   VideoGenSubmitRequest,
+  VideoReference,
 } from './providers/video-gen/video-gen-provider.interface';
+
+/** L1 可选提交参数(落 submitOptions 列,PRD §18) */
+interface VideoSubmitOptions {
+  references?: VideoReference[];
+  seed?: number;
+  draft?: boolean;
+  returnLastFrame?: boolean;
+}
+
+/** 参考物数量上限(Seedance 2.x 官方约束):首/尾帧各 1,图片合计 9,视频 3,音频 3 */
+const REFERENCE_LIMITS = {
+  first_frame: 1,
+  last_frame: 1,
+  reference_image: 9, // 帧/参考互斥下独立可达 9;与非互斥 provider 组合时另有图片合计 ≤9 兜底
+  reference_video: 3,
+  reference_audio: 3,
+} as const;
 
 /** 轮询中的任务超过该时长视为生成超时,转 FAILED */
 const GENERATE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -80,6 +99,8 @@ const L2_ACTIVE_STATUSES: VideoJobStatus[] = [
 export interface VideoJobVo extends VideoGenerationJob {
   /** 成片播放 URL(resultAssetId 溯源解析;未完成/未入库为 null) */
   resultUrl: string | null;
+  /** 尾帧图 URL(lastFrameAssetId 溯源解析;未请求尾帧为 null) */
+  lastFrameUrl: string | null;
 }
 
 /**
@@ -152,8 +173,30 @@ export class VideoJobService {
       l2: this.enabled && this.renderEnabled && this.imageGen != null,
       // 配音通道 = 片段模型原生音频(Seedance 1.5+/2.x);false 时 L2 成片无配音(纯字幕)
       nativeAudio: this.provider?.supportsNativeAudio === true,
+      // L1 可选参数能力位(PRD §18):参考物角色/限额/互斥约束 + seed/draft/尾帧,前端据此 gating 表单
+      references: {
+        roles: this.paramCaps.referenceRoles,
+        limits: REFERENCE_LIMITS,
+        frameReferenceExclusive:
+          this.paramCaps.frameReferenceExclusive === true,
+      },
+      seed: this.paramCaps.seed,
+      draft: this.paramCaps.draft,
+      returnLastFrame: this.paramCaps.returnLastFrame,
       render: this.renderEnabled,
     };
+  }
+
+  /** provider 可选参数能力位(缺省 = 仅首帧,无可选参数) */
+  private get paramCaps() {
+    return (
+      this.provider?.paramCapabilities ?? {
+        referenceRoles: ['first_frame' as const],
+        seed: false,
+        draft: false,
+        returnLastFrame: false,
+      }
+    );
   }
 
   private pipelineDeps(): VideoPipelineDeps {
@@ -187,6 +230,7 @@ export class VideoJobService {
     }
 
     const isL2 = dto.mode === 'ARTICLE_TO_VIDEO';
+    const submitOptions = this.validateSubmitOptions(dto, isL2);
     let costEstimate: number;
     if (isL2) {
       if (!this.renderEnabled) {
@@ -223,6 +267,7 @@ export class VideoJobService {
         resolution: dto.resolution ?? '768P',
         aspectRatio: dto.aspectRatio ?? '9:16',
         generateAudio: dto.generateAudio,
+        ...submitOptions,
       };
       costEstimate = this.provider.estimateCost(req);
     }
@@ -238,6 +283,10 @@ export class VideoJobService {
         resolution: dto.resolution ?? '768P',
         aspectRatio: dto.aspectRatio ?? '9:16',
         generateAudio: isL2 ? null : (dto.generateAudio ?? null),
+        submitOptions:
+          !isL2 && Object.keys(submitOptions).length
+            ? JSON.stringify(submitOptions)
+            : null,
         costEstimate,
       },
     });
@@ -248,6 +297,93 @@ export class VideoJobService {
       ),
     );
     return this.toVo(job, null);
+  }
+
+  /**
+   * L1 可选提交参数校验(PRD §18):
+   * - 仅 L1;L2 传了直接 400(范围决策:L2 参考物另行设计)
+   * - 角色 ⊆ provider 能力位;数量上限按 Seedance 官方约束;
+   *   参考音频不可单独存在(官方:须至少 1 图或 1 视频)
+   * 返回归一化后的 options(空对象 = 无可选参数)。
+   */
+  private validateSubmitOptions(
+    dto: CreateVideoJobDto,
+    isL2: boolean,
+  ): VideoSubmitOptions {
+    const references: VideoReference[] | undefined = dto.references?.map(
+      (r) => ({ role: r.role, url: r.url }),
+    );
+    const hasAny =
+      (references?.length ?? 0) > 0 ||
+      dto.seed != null ||
+      dto.draft === true ||
+      dto.returnLastFrame === true;
+    if (!hasAny) return {};
+    if (isL2) {
+      throw new BadRequestException(
+        '参考素材/seed/draft/尾帧参数仅支持 L1 文生片段',
+      );
+    }
+    const caps = this.paramCaps;
+    if (dto.seed != null && !caps.seed) {
+      throw new BadRequestException(`当前 provider 不支持 seed 参数`);
+    }
+    if (dto.draft && !caps.draft) {
+      throw new BadRequestException(`当前 provider 不支持 draft 草稿模式`);
+    }
+    if (dto.returnLastFrame && !caps.returnLastFrame) {
+      throw new BadRequestException(`当前 provider 不支持返回尾帧`);
+    }
+    if (references?.length) {
+      for (const ref of references) {
+        if (!caps.referenceRoles.includes(ref.role)) {
+          throw new BadRequestException(
+            `当前 provider 不支持参考角色 ${ref.role}(支持: ${caps.referenceRoles.join('/') || '无'})`,
+          );
+        }
+      }
+      const count = (role: VideoReference['role']) =>
+        references.filter((r) => r.role === role).length;
+      const frameCount = count('first_frame') + count('last_frame');
+      const refMediaCount =
+        count('reference_image') +
+        count('reference_video') +
+        count('reference_audio');
+      // 互斥(2026-08-08 Ark 400 实测,PRD §18):帧角色与参考角色是两种生成模式
+      if (caps.frameReferenceExclusive && frameCount > 0 && refMediaCount > 0) {
+        throw new BadRequestException(
+          '首帧/尾帧与参考图/参考视频/参考音频不能混合使用(首尾帧补间与多模态参考是两种生成模式)',
+        );
+      }
+      const images =
+        count('first_frame') + count('last_frame') + count('reference_image');
+      if (count('first_frame') > REFERENCE_LIMITS.first_frame)
+        throw new BadRequestException('首帧参考最多 1 个');
+      if (count('last_frame') > REFERENCE_LIMITS.last_frame)
+        throw new BadRequestException('尾帧参考最多 1 个');
+      if (count('reference_image') > REFERENCE_LIMITS.reference_image)
+        throw new BadRequestException('参考图最多 9 个');
+      if (images > 9) throw new BadRequestException('图片参考合计最多 9 个');
+      if (count('reference_video') > REFERENCE_LIMITS.reference_video)
+        throw new BadRequestException('参考视频最多 3 个');
+      if (count('reference_audio') > REFERENCE_LIMITS.reference_audio)
+        throw new BadRequestException('参考音频最多 3 个');
+      if (
+        count('reference_audio') > 0 &&
+        images === 0 &&
+        count('reference_video') === 0
+      ) {
+        throw new BadRequestException(
+          '参考音频不能单独存在,须至少搭配 1 个图片或视频参考',
+        );
+      }
+    }
+    return {
+      ...(references?.length ? { references } : {}),
+      ...(dto.seed != null ? { seed: dto.seed } : {}),
+      ...(dto.draft ? { draft: true } : {}),
+      ...(dto.returnLastFrame ? { returnLastFrame: true } : {}),
+    };
   }
 
   // ===== 查询 =====
@@ -372,6 +508,10 @@ export class VideoJobService {
       where: { id: jobId },
     });
     if (!job) return;
+    const submitOptions = safeJsonParse<VideoSubmitOptions>(
+      job.submitOptions,
+      {},
+    );
     try {
       const handle = await this.provider.submit({
         prompt: job.prompt,
@@ -379,6 +519,7 @@ export class VideoJobService {
         resolution: (job.resolution as '480P' | '768P' | '1080P') ?? undefined,
         aspectRatio: (job.aspectRatio as '16:9' | '9:16' | '1:1') ?? undefined,
         generateAudio: job.generateAudio ?? undefined,
+        ...submitOptions,
       });
       await this.prisma.videoGenerationJob.update({
         where: { id: jobId },
@@ -463,6 +604,7 @@ export class VideoJobService {
         if (!claimed.count) return;
         await this.uploadStage(jobId, {
           videoUrl: result.videoUrl,
+          lastFrameUrl: result.lastFrameUrl,
           width: result.width,
           height: result.height,
           durationSec: result.durationSec,
@@ -613,6 +755,7 @@ export class VideoJobService {
     jobId: string,
     result: {
       videoUrl: string;
+      lastFrameUrl?: string;
       width?: number;
       height?: number;
       durationSec?: number;
@@ -637,7 +780,59 @@ export class VideoJobService {
       });
     } catch (err) {
       await this.fail(jobId, 'upload', err);
+      return;
     }
+    // 尾帧图(returnLastFrame 续拍链):主片已成功,尾帧失败仅告警不置任务失败
+    if (result.lastFrameUrl) {
+      try {
+        await this.registerLastFrame(job, result.lastFrameUrl);
+      } catch (err) {
+        this.logger.warn(
+          `任务 ${jobId} 尾帧入库失败(主片已成功): ${(err as Error)?.message ?? err}`,
+        );
+      }
+    }
+  }
+
+  /** 尾帧图下载转存并入媒体库(sourceRef 加 :last-frame 后缀溯源) */
+  private async registerLastFrame(
+    job: VideoGenerationJob,
+    lastFrameUrl: string,
+  ): Promise<void> {
+    const buffer = await this.download(lastFrameUrl);
+    const stored = await this.storage.put(
+      `video/${job.id}-last-frame.jpg`,
+      buffer,
+      'image/jpeg',
+    );
+    const asset = await this.prisma.mediaAsset.create({
+      data: {
+        storageKey: stored.key,
+        url: stored.url,
+        fileName: `ai-video-${job.id.slice(0, 8)}-last-frame.jpg`,
+        mimeType: 'image/jpeg',
+        size: buffer.length,
+        source: MediaSource.AI_GENERATED,
+        sourceRef: `videoJob:${job.id}:last-frame`,
+        prompt: job.prompt,
+        title: `${job.prompt.slice(0, 40)}(尾帧)`,
+        ownerId: job.userId,
+        // 尾帧是视频衍生品,不进图片打标队列(与视频资产同口径)
+        tagStatus: 'NONE',
+      },
+    });
+    await this.prisma.videoGenerationJob.update({
+      where: { id: job.id },
+      data: { lastFrameAssetId: asset.id },
+    });
+    try {
+      await this.search.indexAsset(asset.id);
+    } catch (err) {
+      this.logger.warn(
+        `尾帧资产 ES 索引失败 ${asset.id}: ${(err as Error)?.message ?? err}`,
+      );
+    }
+    this.logger.log(`任务 ${job.id} 尾帧入库: asset=${asset.id}`);
   }
 
   /** 成片登记共用段:COS → MediaAsset → SUCCEEDED → 计费 → ES 索引(fail-open) */
@@ -841,7 +1036,7 @@ export class VideoJobService {
     jobs: VideoGenerationJob[],
   ): Promise<VideoJobVo[]> {
     const assetIds = jobs
-      .map((j) => j.resultAssetId)
+      .flatMap((j) => [j.resultAssetId, j.lastFrameAssetId])
       .filter((x): x is string => Boolean(x));
     const assets = assetIds.length
       ? await this.prisma.mediaAsset.findMany({
@@ -854,11 +1049,16 @@ export class VideoJobService {
       this.toVo(
         j,
         j.resultAssetId ? (urlById.get(j.resultAssetId) ?? null) : null,
+        j.lastFrameAssetId ? (urlById.get(j.lastFrameAssetId) ?? null) : null,
       ),
     );
   }
 
-  private toVo(job: VideoGenerationJob, resultUrl: string | null): VideoJobVo {
-    return { ...job, resultUrl };
+  private toVo(
+    job: VideoGenerationJob,
+    resultUrl: string | null,
+    lastFrameUrl: string | null = null,
+  ): VideoJobVo {
+    return { ...job, resultUrl, lastFrameUrl };
   }
 }

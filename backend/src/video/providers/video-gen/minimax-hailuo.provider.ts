@@ -4,6 +4,7 @@ import { VideoGenProviderName } from '@cms-ng/shared';
 import axios from 'axios';
 import { sanitizeForLog } from '../../../common/sanitize.utils';
 import {
+  VideoGenParamCapabilities,
   VideoGenPollResult,
   VideoGenProvider,
   VideoGenSubmitRequest,
@@ -53,6 +54,13 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
   readonly name = VideoGenProviderName.MINIMAX;
   /** Hailuo 2.3 无原生音频;L2 走该 provider 时成片无配音(纯字幕降级) */
   readonly supportsNativeAudio = false;
+  /** Hailuo 仅 first_frame_image;其余参考角色/seed/draft/尾帧均不支持 */
+  readonly paramCapabilities: VideoGenParamCapabilities = {
+    referenceRoles: ['first_frame'],
+    seed: false,
+    draft: false,
+    returnLastFrame: false,
+  };
   private readonly logger = new Logger(MinimaxHailuoProvider.name);
   private readonly apiKey: string;
   private readonly apiBase: string;
@@ -74,6 +82,18 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
   }
 
   async submit(req: VideoGenSubmitRequest): Promise<VideoGenTaskHandle> {
+    // 兜底防御:service 层已按 paramCapabilities 校验,直达调用仍拒不支持的角色
+    const unsupported = (req.references ?? []).filter(
+      (r) => r.role !== 'first_frame',
+    );
+    if (unsupported.length) {
+      throw new Error(
+        `MiniMax Hailuo 仅支持首帧参考,不支持: ${unsupported.map((r) => r.role).join(',')}`,
+      );
+    }
+    const firstFrame =
+      req.references?.find((r) => r.role === 'first_frame')?.url ??
+      req.firstFrameUrl;
     const body: Record<string, unknown> = {
       model: this.model,
       prompt: req.prompt,
@@ -85,7 +105,7 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
     // Hailuo 2.3 仅 768P/1080P 两档;480P 请求映射到就近的 768P
     if (req.resolution)
       body.resolution = req.resolution === '1080P' ? '1080P' : '768P';
-    if (req.firstFrameUrl) body.first_frame_image = req.firstFrameUrl;
+    if (firstFrame) body.first_frame_image = firstFrame;
     this.logger.log(
       `[submit] hailuo request: ${JSON.stringify(sanitizeForLog(body))}`,
     );

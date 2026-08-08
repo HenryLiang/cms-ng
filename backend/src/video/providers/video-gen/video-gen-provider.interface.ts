@@ -9,6 +9,23 @@ import { VideoGenProviderName } from '@cms-ng/shared';
  * 调用方必须立即下载转存 COS。
  */
 
+/**
+ * 多模态参考物角色(Seedance 2.x content 数组 role;PRD §18)。
+ * first_frame/last_frame:首尾帧补间;reference_image/video/audio:多模态参考。
+ */
+export type VideoReferenceRole =
+  | 'first_frame'
+  | 'last_frame'
+  | 'reference_image'
+  | 'reference_video'
+  | 'reference_audio';
+
+export interface VideoReference {
+  role: VideoReferenceRole;
+  /** 公网可直达 URL(媒体库 COS 地址或外部 https) */
+  url: string;
+}
+
 export interface VideoGenSubmitRequest {
   prompt: string;
   /** 图生视频首帧(P0 文生视频不用,P1 预留) */
@@ -22,6 +39,18 @@ export interface VideoGenSubmitRequest {
    * (对白/音效/配乐,音素级口型同步)。provider 不支持时静默忽略。
    */
   generateAudio?: boolean;
+  /**
+   * 多模态参考物(仅 L1;Seedance 2.x 全角色,1.x 仅 first_frame,
+   * MiniMax 仅 first_frame_image)。数量/组合约束在 service 层校验。
+   * firstFrameUrl 与 references 中的 first_frame 等价,references 优先。
+   */
+  references?: VideoReference[];
+  /** 随机种子(Seedance 2.x):相同 seed 可复现结果 */
+  seed?: number;
+  /** 草稿模式(Seedance 2.x):更快更便宜质量更低,用于打样 */
+  draft?: boolean;
+  /** 返回尾帧图 URL(Seedance 2.x):续拍链(上段尾帧=下段首帧) */
+  returnLastFrame?: boolean;
 }
 
 export interface VideoGenTaskHandle {
@@ -38,10 +67,27 @@ export interface VideoGenPollResult {
   state: VideoGenTaskState;
   /** succeeded 时必填:provider 侧临时下载 URL(有时效,需立即转存) */
   videoUrl?: string;
+  /** returnLastFrame=true 且成功时:尾帧图临时 URL(同样需立即转存) */
+  lastFrameUrl?: string;
   width?: number;
   height?: number;
   durationSec?: number;
   error?: string;
+}
+
+/** provider 可选参数能力位(service 层据此做提交前校验,frontend 据此 gating) */
+export interface VideoGenParamCapabilities {
+  /** 支持的多模态参考角色子集 */
+  referenceRoles: VideoReferenceRole[];
+  seed: boolean;
+  draft: boolean;
+  returnLastFrame: boolean;
+  /**
+   * 帧角色(first_frame/last_frame)与参考角色(reference_image/video/audio)互斥
+   * (2026-08-08 Ark 400 实测:"first/last frame content cannot be mixed with
+   * reference media content" —— 首尾帧补间与多模态参考是两种生成模式)
+   */
+  frameReferenceExclusive?: boolean;
 }
 
 export interface VideoGenProvider {
@@ -51,6 +97,8 @@ export interface VideoGenProvider {
    * 支持原生音频时视频镜用原生配音;不支持则成片无配音(纯字幕降级)。
    */
   readonly supportsNativeAudio?: boolean;
+  /** 可选参数能力位;缺省视为仅 first_frame、无 seed/draft/尾帧 */
+  readonly paramCapabilities?: VideoGenParamCapabilities;
   submit(req: VideoGenSubmitRequest): Promise<VideoGenTaskHandle>;
   poll(taskId: string): Promise<VideoGenPollResult>;
   /** 单条片段估算成本(人民币元,用于任务发起前展示;实际扣费以计费配置为准) */

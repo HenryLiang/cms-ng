@@ -352,3 +352,241 @@ describe('createVideoGenProvider 工厂', () => {
     ).toBeInstanceOf(MinimaxHailuoProvider);
   });
 });
+
+describe('VolcengineSeedanceProvider 多模态参考物(PRD §18)', () => {
+  const v2 = () =>
+    new VolcengineSeedanceProvider(
+      configWith({
+        ARK_API_KEY: 'ark-key',
+        SEEDANCE_MODEL: 'doubao-seedance-2-0-mini-260615',
+      }),
+    );
+  const v1 = () =>
+    new VolcengineSeedanceProvider(
+      configWith({
+        ARK_API_KEY: 'ark-key',
+        SEEDANCE_MODEL: 'doubao-seedance-1-5-pro-251215',
+      }),
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-ref' } });
+  });
+
+  it('2.x paramCapabilities:全 5 角色 + seed/尾帧 + 帧参考互斥;mini 全模式禁 draft(实测);1.x 仅 first_frame', () => {
+    // v2() 用 2.0-mini:draft 在 t2v/i2v/flf2v/r2v 全部被 Ark 400(2026-08-08 实测)
+    expect(v2().paramCapabilities).toEqual({
+      referenceRoles: [
+        'first_frame',
+        'last_frame',
+        'reference_image',
+        'reference_video',
+        'reference_audio',
+      ],
+      seed: true,
+      draft: false,
+      returnLastFrame: true,
+      frameReferenceExclusive: true,
+    });
+    // 非 mini 2.x:draft 按官方文档置 true(本账号无 pro 模型,未实测)
+    expect(
+      new VolcengineSeedanceProvider(
+        configWith({
+          ARK_API_KEY: 'ark-key',
+          SEEDANCE_MODEL: 'doubao-seedance-2-0-pro-260615',
+        }),
+      ).paramCapabilities,
+    ).toMatchObject({
+      draft: true,
+      frameReferenceExclusive: true,
+    });
+    expect(v1().paramCapabilities).toEqual({
+      referenceRoles: ['first_frame'],
+      seed: false,
+      draft: false,
+      returnLastFrame: false,
+    });
+  });
+
+  it('submit/poll 被 Ark 400 拒绝时透出 error.message(而非只有状态码)', async () => {
+    const arkReject = {
+      message: 'Request failed with status code 400',
+      response: {
+        status: 400,
+        data: {
+          error: {
+            code: 'InvalidParameter',
+            message:
+              'first/last frame content cannot be mixed with reference media content',
+          },
+        },
+      },
+    };
+    mockedAxios.post.mockRejectedValueOnce(arkReject);
+    await expect(v2().submit({ prompt: 'x' })).rejects.toThrow(
+      /cannot be mixed with reference media/,
+    );
+    mockedAxios.get.mockRejectedValueOnce(arkReject);
+    await expect(v2().poll('t')).rejects.toThrow(/cannot be mixed/);
+    // 非 Ark 形态错误(无 response.data.error)原样抛出
+    const boom = new Error('socket hangup');
+    mockedAxios.post.mockRejectedValueOnce(boom);
+    await expect(v2().submit({ prompt: 'x' })).rejects.toBe(boom);
+  });
+
+  it('2.x:五种参考角色 → content 数组带 role 的类型化素材项', async () => {
+    await v2().submit({
+      prompt: '果茶广告',
+      references: [
+        { role: 'first_frame', url: 'https://cos/first.jpg' },
+        { role: 'last_frame', url: 'https://cos/last.jpg' },
+        { role: 'reference_image', url: 'https://cos/product.jpg' },
+        { role: 'reference_video', url: 'https://cos/motion.mp4' },
+        { role: 'reference_audio', url: 'https://cos/bgm.mp3' },
+      ],
+    });
+
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).content).toEqual([
+      { type: 'text', text: '果茶广告' },
+      {
+        type: 'image_url',
+        image_url: { url: 'https://cos/first.jpg' },
+        role: 'first_frame',
+      },
+      {
+        type: 'image_url',
+        image_url: { url: 'https://cos/last.jpg' },
+        role: 'last_frame',
+      },
+      {
+        type: 'image_url',
+        image_url: { url: 'https://cos/product.jpg' },
+        role: 'reference_image',
+      },
+      {
+        type: 'video_url',
+        video_url: { url: 'https://cos/motion.mp4' },
+        role: 'reference_video',
+      },
+      {
+        type: 'audio_url',
+        audio_url: { url: 'https://cos/bgm.mp3' },
+        role: 'reference_audio',
+      },
+    ]);
+  });
+
+  it('2.x:firstFrameUrl 与 references.first_frame 等价,references 优先', async () => {
+    await v2().submit({
+      prompt: 'x',
+      firstFrameUrl: 'https://cos/legacy.jpg',
+      references: [{ role: 'first_frame', url: 'https://cos/new.jpg' }],
+    });
+    let items = (mockedAxios.post.mock.calls[0][1] as any).content.filter(
+      (c: any) => c.role === 'first_frame',
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].image_url.url).toBe('https://cos/new.jpg');
+
+    // 仅 firstFrameUrl(存量调用方)同样落 first_frame 角色
+    await v2().submit({ prompt: 'x', firstFrameUrl: 'https://cos/legacy.jpg' });
+    items = (mockedAxios.post.mock.calls[1][1] as any).content.filter(
+      (c: any) => c.role === 'first_frame',
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].image_url.url).toBe('https://cos/legacy.jpg');
+  });
+
+  it('2.x:seed/draft/returnLastFrame → 顶层 seed/draft/return_last_frame', async () => {
+    await v2().submit({
+      prompt: 'x',
+      seed: 42,
+      draft: true,
+      returnLastFrame: true,
+    });
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).seed).toBe(42);
+    expect((body as any).draft).toBe(true);
+    expect((body as any).return_last_frame).toBe(true);
+  });
+
+  it('2.x:poll succeeded 携带 last_frame_url 时透出 lastFrameUrl', async () => {
+    const p = v2();
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        status: 'succeeded',
+        content: {
+          video_url: 'https://v/x.mp4',
+          last_frame_url: 'https://v/x-last.jpg',
+        },
+      },
+    });
+    const ok = await p.poll('t');
+    expect(ok.videoUrl).toBe('https://v/x.mp4');
+    expect(ok.lastFrameUrl).toBe('https://v/x-last.jpg');
+  });
+
+  it('1.x:首帧为裸 image_url(无 role),其余角色跳过,seed/draft 不落参', async () => {
+    await v1().submit({
+      prompt: 'x',
+      durationSec: 6,
+      seed: 42,
+      draft: true,
+      returnLastFrame: true,
+      references: [
+        { role: 'first_frame', url: 'https://cos/first.jpg' },
+        { role: 'reference_video', url: 'https://cos/motion.mp4' },
+        { role: 'reference_audio', url: 'https://cos/bgm.mp3' },
+      ],
+    });
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).content).toEqual([
+      { type: 'text', text: 'x --dur 5' },
+      { type: 'image_url', image_url: { url: 'https://cos/first.jpg' } },
+    ]);
+    expect((body as any).seed).toBeUndefined();
+    expect((body as any).draft).toBeUndefined();
+    expect((body as any).return_last_frame).toBeUndefined();
+  });
+});
+
+describe('MinimaxHailuoProvider 多模态参考物', () => {
+  const provider = () =>
+    new MinimaxHailuoProvider(configWith({ MINIMAX_API_KEY: 'mm-key' }));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedAxios.post.mockResolvedValue({ data: { task_id: 'mm-1' } });
+  });
+
+  it('paramCapabilities:仅 first_frame,无可选参数', () => {
+    expect(provider().paramCapabilities).toEqual({
+      referenceRoles: ['first_frame'],
+      seed: false,
+      draft: false,
+      returnLastFrame: false,
+    });
+  });
+
+  it('references.first_frame → first_frame_image;references 优先于 firstFrameUrl', async () => {
+    await provider().submit({
+      prompt: 'x',
+      firstFrameUrl: 'https://cos/legacy.jpg',
+      references: [{ role: 'first_frame', url: 'https://cos/new.jpg' }],
+    });
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect((body as any).first_frame_image).toBe('https://cos/new.jpg');
+  });
+
+  it('非首帧参考角色 → 明确抛错(兜底防御,正常由 service 层拦截)', async () => {
+    await expect(
+      provider().submit({
+        prompt: 'x',
+        references: [{ role: 'reference_video', url: 'https://cos/m.mp4' }],
+      }),
+    ).rejects.toThrow(/仅支持首帧参考/);
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+});

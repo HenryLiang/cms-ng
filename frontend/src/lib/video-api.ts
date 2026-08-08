@@ -25,8 +25,32 @@ export interface VideoCapability {
   l2: boolean;
   /** 片段模型支持原生音频(Seedance 1.5+/2.x)= 唯一配音通道;false 时 L2 成片无配音(纯字幕) */
   nativeAudio: boolean;
+  /** L1 多模态参考物能力(PRD §18):可用角色 + 数量上限 + 互斥约束 */
+  references: {
+    roles: VideoReferenceRole[];
+    limits: Record<VideoReferenceRole, number>;
+    /** 帧角色(首/尾帧)与参考角色(图/视频/音频)互斥(Seedance 2.x 实测) */
+    frameReferenceExclusive: boolean;
+  };
+  /** L1 可选参数:seed 复现 / draft 打样 / 尾帧续拍链 */
+  seed: boolean;
+  draft: boolean;
+  returnLastFrame: boolean;
   /** 本地 FFmpeg 渲染开关 */
   render: boolean;
+}
+
+/** 多模态参考物角色(与后端 VideoGenProvider 契约一致) */
+export type VideoReferenceRole =
+  | 'first_frame'
+  | 'last_frame'
+  | 'reference_image'
+  | 'reference_video'
+  | 'reference_audio';
+
+export interface VideoReference {
+  role: VideoReferenceRole;
+  url: string;
 }
 
 /** 后端 list 返回形态:{ items, meta } */
@@ -38,6 +62,10 @@ export interface VideoJobListResponse {
 /** 后端 VO:在 shared VideoGenerationJob 基础上带成片播放 URL + L2 管线产物 */
 export interface VideoGenerationJobVo extends VideoGenerationJob {
   resultUrl: string | null;
+  /** returnLastFrame 任务的尾帧图 URL(续拍链素材,已入媒体库) */
+  lastFrameUrl: string | null;
+  /** L1 提交的可选参数 JSON 字符串(references/seed/draft/returnLastFrame) */
+  submitOptions?: string | null;
   /** L2 口播脚本(原始文本) */
   script?: string | null;
   /** L2 分镜 JSON 字符串(见 StoryboardVo) */
@@ -88,6 +116,14 @@ export interface CreateVideoJobParams {
   aspectRatio?: '16:9' | '9:16' | '1:1';
   /** L1 原生音频(Seedance 1.5+/2.x):生成有声视频;provider 不支持时静默忽略 */
   generateAudio?: boolean;
+  /** L1 多模态参考素材(角色可用性/数量上限见 capability.references) */
+  references?: VideoReference[];
+  /** L1 随机种子(Seedance 2.x):相同 seed 复现 */
+  seed?: number;
+  /** L1 草稿模式(Seedance 2.x):更快更便宜,用于打样 */
+  draft?: boolean;
+  /** L1 返回尾帧图入媒体库(Seedance 2.x):续拍链 */
+  returnLastFrame?: boolean;
 }
 
 export async function getVideoCapability(): Promise<VideoCapability> {

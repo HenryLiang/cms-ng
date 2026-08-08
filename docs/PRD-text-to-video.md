@@ -317,8 +317,51 @@ VIDEO_CLIP_PROVIDER=volcengine
 
 ### 17.3 未实现需求清单(修正后)
 
-1. 多模态参考物 seam(`reference_video`/`reference_audio`/`first_frame`/`last_frame` 角色,§16.8 已知限制)
+1. ~~多模态参考物 seam(`reference_video`/`reference_audio`/`first_frame`/`last_frame` 角色,§16.8 已知限制)~~ **已实现(§18,L1)**
 2. MiniMax 图片/视频 provider 真实联调(代码就绪,无凭证未实测)
 3. L1 时长自由档前端暴露(后端已支持 2.x 4~15s)
 4. Playwright 视频域回归覆盖
 5. 生产部署:`migrate deploy` + 宿主机 ffmpeg + `VIDEO_RENDER_ENABLED=true`
+6. L2 分镜级参考物(每镜挂 mediaAssetId/参考图)—— L1 seam 已就绪,L2 契约扩展另行设计
+
+## 18. L1 多模态参考物 + 可选参数(2026-08-08,Seedance 2.x content 角色)
+
+用户决策(经参数清单确认):接入**全部 5 个参考角色** + `seed`/`draft`/`return_last_frame` 三个顶层参数;范围**仅 L1**(L2 分镜级参考物另行设计)。
+
+### 18.1 参数事实源(三重核实)
+
+- **官方文档**(docs.volcengine.com 82379/1520757,2026-08-07 更新)经镜像站交叉确认:content 数组项 `type: text|image_url|video_url|audio_url` + `role: first_frame|last_frame|reference_image|reference_video|reference_audio`
+- **ark-cli 官方参考**(volcengine/ark-cli):role 前缀 → wire `content[].role`;顶层 flag 全表(seed/watermark/generate-audio/camera-fixed/return-last-frame/draft/priority/service-tier/callback-url/frames/tools=web_search)
+- **本账号 `/models` 实测元数据**(ground truth):`doubao-seedance-2-0-mini-260615` `input_modalities=[text,image,video,audio]` —— 2.0-mini **全角色支持**,无需另开 r2v 变体(2.0 全系统一多模态;1.5-pro 仅 [text,image])
+
+### 18.2 约束(官方限额,service 层提交前校验,400 拒)
+
+| 角色 | 上限 | 素材要求 |
+|---|---|---|
+| first_frame / last_frame | 各 ≤1 | jpeg/png/webp,300~6000px,≤30MB |
+| reference_image | 图片合计 ≤9(含首/尾帧) | 同上 |
+| reference_video | ≤3 | 2~15s/个,≤50MB |
+| reference_audio | ≤3 | mp3/wav,2~15s(合计 ≤15s),≤15MB;**不能单独存在,须至少 1 图或 1 视频** |
+
+### 18.3 实现要点
+
+1. **seam**:`VideoGenSubmitRequest.references[{role,url}]` + `seed`/`draft`/`returnLastFrame`;provider 能力位 `paramCapabilities: { referenceRoles, seed, draft, returnLastFrame, frameReferenceExclusive }` —— Seedance 2.x 全角色 + 帧/参考互斥(**mini 例外:draft 全模式禁用,实测**),1.x 仅 first_frame(裸 image_url 无 role),MiniMax 仅 first_frame(→ `first_frame_image`,其余角色兜底抛错)
+2. **持久化**:`VideoGenerationJob.submitOptions`(TEXT,JSON 字符串:`{references,seed,draft,returnLastFrame}`),submitStage 解析透传;损坏 JSON fail-open 按空 options 提交。迁移 `20260808_video_job_submit_options`(同时加 `lastFrameAssetId`)
+3. **校验时序**:DTO 层(@ValidateNested+@Type 嵌套、https:// URL 形态、15 条总数上限 = 图 9+视频 3+音频 3)→ service 层(L2 拒、角色 ⊆ 能力位、数量上限、音频不单独、帧/参考互斥、seed/draft/尾帧能力位)→ provider 兜底
+4. **尾帧续拍链**:`return_last_frame=true` → poll 取 `content.last_frame_url` → 下载转存 COS 入媒体库(`sourceRef=videoJob:<id>:last-frame`,不打标)→ 回写 `lastFrameAssetId`;VO 增 `lastFrameUrl`,任务卡片展示尾帧缩略图。尾帧失败仅告警不置任务失败(主片已成功)
+5. **前端**:L1 表单参考物编辑器(角色下拉按 capability gating + **帧/参考互斥时按已选行动态过滤可选项** + URL 输入 + 媒体库选择器);`MediaPicker` 扩展 `mimePrefix`(媒体列表新增 `mimePrefix` 查询参数,ES/LIKE 双路径同源过滤;仅图片大类保留内嵌上传);seed 输入 + 打样/尾帧复选按能力位显隐
+6. **MiniMax 行为**:仅首帧;传其它角色 400(provider 能力位先行拦截)。Hailuo 无 seed/draft/尾帧参数,前端表单自动隐藏
+
+### 18.4 e2e 实测结论(2026-08-08,本账号 2.0-mini,真实 Ark 任务)
+
+真机跑通两条模式链路(创建 → submitOptions 落库 → Ark 提交 → 轮询 → 转存 COS → 媒体库登记):
+
+| 实测项 | 结果 | 证据 |
+|---|---|---|
+| **flf2v**(首+尾帧)+ seed + return_last_frame | ✅ SUCCEEDED | job `93939d6d`;Ark 回显 `seed:42`(**seed 生效**);`content.last_frame_url` 产出 → 尾帧入库(`sourceRef=videoJob:<id>:last-frame`,tagStatus=NONE);成片 496×864 5s h264 + **AAC 有声**(mean -21.2dB) |
+| **r2v**(参考图+参考视频+参考音频)+ seed + return_last_frame | ✅ SUCCEEDED | job `f61db539`;Ark 回显 `seed:42`;尾帧同链路入库;成片 496×864 5s + AAC 有声(-22.3dB) |
+| **帧角色 × 参考角色混合** | ❌ 平台级互斥 | Ark 400:"first/last frame content cannot be mixed with reference media content"(first_frame 混参考图同样拒)→ 能力位 `frameReferenceExclusive`,service 提前 400 + 前端选项过滤 |
+| **draft 打样 @ 2.0-mini** | ❌ **全模式禁用** | t2v/i2v/flf2v/r2v 四种模式全部 400("draft is not supported for model doubao-seedance-2-0-mini in &lt;mode&gt;")→ mini 能力位 `draft:false`(前端打样复选直接隐藏);非 mini 2.x 按文档置 true(本账号无 pro,未实测) |
+| **Ark 错误透出** | ✅ 已修 | axios 400 原本只剩 "status code 400";现 provider 提取 `response.data.error.message`,任务 error 字段直接可见 Ark 原始原因(e2e 第一轮失败即靠此定位) |
+
+**经验**:① Seedance 2.x 的 content 角色实际是**两种互斥生成模式**——帧补间(t2v/i2v/flf2v)与多模态参考(r2v),不是自由组合;② 模型能力以**实测为准**,文档/marketing 参数表不代表单模型可用性(mini 禁 draft 任何文档均未写明);③ `ValidationPipe whitelist:true` 会静默丢弃未声明 DTO 字段,联调时先确认 submitOptions 落库再怀疑对端。

@@ -1,5 +1,6 @@
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -39,6 +40,15 @@ export class QueryMediaDto {
   @MaxLength(200)
   @IsOptional()
   tag?: string;
+
+  @ApiProperty({
+    enum: ['image', 'video', 'audio'],
+    description: 'MIME 大类过滤(image/video/audio,前缀匹配 mimeType)',
+    required: false,
+  })
+  @IsIn(['image', 'video', 'audio'])
+  @IsOptional()
+  mimePrefix?: 'image' | 'video' | 'audio';
 
   @ApiProperty({ default: 1, minimum: 1, required: false })
   @Type(() => Number)

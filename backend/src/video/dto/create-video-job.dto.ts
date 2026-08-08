@@ -1,15 +1,54 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
   IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+/** 多模态参考物(仅 L1;角色可用性按 provider 能力位在 service 层校验) */
+export class VideoReferenceDto {
+  @ApiProperty({
+    description:
+      '参考角色:first_frame 首帧 | last_frame 尾帧 | reference_image 参考图 | reference_video 参考视频 | reference_audio 参考音频',
+    enum: [
+      'first_frame',
+      'last_frame',
+      'reference_image',
+      'reference_video',
+      'reference_audio',
+    ],
+  })
+  @IsIn([
+    'first_frame',
+    'last_frame',
+    'reference_image',
+    'reference_video',
+    'reference_audio',
+  ])
+  role!:
+    | 'first_frame'
+    | 'last_frame'
+    | 'reference_image'
+    | 'reference_video'
+    | 'reference_audio';
+
+  @ApiProperty({
+    description: '公网可直达 https URL(媒体库 COS 地址或外部链接)',
+  })
+  @IsString()
+  @MaxLength(2048)
+  @Matches(/^https:\/\//, { message: '参考素材 URL 必须是 https:// 链接' })
+  url!: string;
+}
 
 export class CreateVideoJobDto {
   @ApiPropertyOptional({
@@ -79,6 +118,47 @@ export class CreateVideoJobDto {
   @IsOptional()
   @IsBoolean()
   generateAudio?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      '多模态参考素材(仅 L1;Seedance 2.x 支持全部角色,其他模型/provider 仅 first_frame)。' +
+      '约束:总数 ≤15,首/尾帧各 ≤1,图片合计 ≤9,视频 ≤3,音频 ≤3 且不能单独存在(须至少 1 图或 1 视频);' +
+      '帧角色(首/尾帧)与参考角色(图/视频/音频)互斥不可混用',
+    type: [VideoReferenceDto],
+  })
+  @IsOptional()
+  @ArrayMaxSize(15) // 上限 = 图片 9 + 视频 3 + 音频 3(合法组合的理论最大值)
+  @ValidateNested({ each: true })
+  @Type(() => VideoReferenceDto)
+  references?: VideoReferenceDto[];
+
+  @ApiPropertyOptional({
+    description: '随机种子(仅 L1;Seedance 2.x):相同 seed 可复现结果',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  seed?: number;
+
+  @ApiPropertyOptional({
+    description:
+      '草稿模式(仅 L1;Seedance 2.x 非 mini 档):更快更便宜质量更低,用于打样。2.0-mini 全模式不支持(实测)',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  draft?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      '返回尾帧图(仅 L1;Seedance 2.x):成功后尾帧入库媒体库,用于续拍链(上段尾帧=下段首帧)',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  returnLastFrame?: boolean;
 }
 
 export class QueryVideoJobDto {

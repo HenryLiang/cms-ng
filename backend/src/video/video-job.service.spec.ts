@@ -27,9 +27,11 @@ const JOB = {
   resolution: '768P',
   aspectRatio: '9:16',
   generateAudio: null as boolean | null,
+  submitOptions: null as string | null,
   costEstimate: 3,
   costActual: null,
   resultAssetId: null,
+  lastFrameAssetId: null as string | null,
   failedStep: null as string | null,
   error: null as string | null,
   retryCount: 0,
@@ -215,6 +217,246 @@ describe('VideoJobService', () => {
       await expect(
         service.create('user-1', { prompt: 'x', provider: 'volcengine' }),
       ).rejects.toThrow(/仅启用 provider=minimax/);
+    });
+  });
+
+  describe('L1 可选提交参数:参考物/seed/draft/尾帧(PRD §18)', () => {
+    // 与 Seedance 2.x(非 mini)能力位一致(含 2026-08-08 实测的帧/参考互斥约束;
+    // mini 另禁 draft,由通用的 caps.draft=false 路径覆盖)
+    const V2_CAPS = {
+      referenceRoles: [
+        'first_frame',
+        'last_frame',
+        'reference_image',
+        'reference_video',
+        'reference_audio',
+      ],
+      seed: true,
+      draft: true,
+      returnLastFrame: true,
+      frameReferenceExclusive: true,
+    } as const;
+
+    it('capability 暴露 provider 能力位(参考角色/限额/互斥约束/可选参数)', () => {
+      build();
+      (provider as { paramCapabilities?: unknown }).paramCapabilities = V2_CAPS;
+      const caps = service.capability();
+      expect(caps.references.roles).toEqual(V2_CAPS.referenceRoles);
+      expect(caps.references.limits).toMatchObject({
+        reference_video: 3,
+        reference_audio: 3,
+      });
+      expect(caps.references.frameReferenceExclusive).toBe(true);
+      expect(caps).toMatchObject({
+        seed: true,
+        draft: true,
+        returnLastFrame: true,
+      });
+    });
+
+    it('capability:provider 无能力位时缺省仅 first_frame、无可选参数、无互斥约束', () => {
+      build();
+      const caps = service.capability();
+      expect(caps.references.roles).toEqual(['first_frame']);
+      expect(caps.references.frameReferenceExclusive).toBe(false);
+      expect(caps).toMatchObject({
+        seed: false,
+        draft: false,
+        returnLastFrame: false,
+      });
+    });
+
+    it('L2 携带参考物/可选参数 → 400(仅 L1 支持)', async () => {
+      build();
+      await expect(
+        service.create('user-1', {
+          mode: 'ARTICLE_TO_VIDEO',
+          articleId: 'art-1',
+          references: [{ role: 'first_frame', url: 'https://cos/f.jpg' }],
+        }),
+      ).rejects.toThrow(/仅支持 L1/);
+      expect(prisma.videoGenerationJob.create).not.toHaveBeenCalled();
+    });
+
+    it('角色超出 provider 能力位 → 400(缺省仅 first_frame)', async () => {
+      build();
+      await expect(
+        service.create('user-1', {
+          prompt: 'x',
+          references: [{ role: 'reference_video', url: 'https://cos/m.mp4' }],
+        }),
+      ).rejects.toThrow(/不支持参考角色 reference_video/);
+    });
+
+    it('数量上限:首帧 >1 / 参考图 >9 / 参考音频 >3 → 400', async () => {
+      build();
+      (provider as { paramCapabilities?: unknown }).paramCapabilities = V2_CAPS;
+      await expect(
+        service.create('user-1', {
+          prompt: 'x',
+          references: [
+            { role: 'first_frame', url: 'https://cos/a.jpg' },
+            { role: 'first_frame', url: 'https://cos/b.jpg' },
+          ],
+        }),
+      ).rejects.toThrow(/首帧参考最多 1 个/);
+      await expect(
+        service.create('user-1', {
+          prompt: 'x',
+          references: [...Array(10)].map((_, i) => ({
+            role: 'reference_image' as const,
+            url: `https://cos/${i}.jpg`,
+          })),
+        }),
+      ).rejects.toThrow(/参考图最多 9 个/);
+      await expect(
+        service.create('user-1', {
+          prompt: 'x',
+          references: [
+            { role: 'reference_image', url: 'https://cos/a.jpg' },
+            ...[1, 2, 3, 4].map((i) => ({
+              role: 'reference_audio' as const,
+              url: `https://cos/${i}.mp3`,
+            })),
+          ],
+        }),
+      ).rejects.toThrow(/参考音频最多 3 个/);
+    });
+
+    it('参考音频单独存在(无图/视频搭配)→ 400', async () => {
+      build();
+      (provider as { paramCapabilities?: unknown }).paramCapabilities = V2_CAPS;
+      await expect(
+        service.create('user-1', {
+          prompt: 'x',
+          references: [{ role: 'reference_audio', url: 'https://cos/bgm.mp3' }],
+        }),
+      ).rejects.toThrow(/不能单独存在/);
+    });
+
+    it('provider 不支持 seed/draft/尾帧时传了 → 400', async () => {
+      build(); // 缺省能力位全 false
+      await expect(
+        service.create('user-1', { prompt: 'x', seed: 42 }),
+      ).rejects.toThrow(/不支持 seed/);
+      await expect(
+        service.create('user-1', { prompt: 'x', draft: true }),
+      ).rejects.toThrow(/不支持 draft/);
+      await expect(
+        service.create('user-1', { prompt: 'x', returnLastFrame: true }),
+      ).rejects.toThrow(/不支持返回尾帧/);
+    });
+
+    it('帧角色与参考角色互斥(Ark 实测 400)→ service 提前 400', async () => {
+      build();
+      (provider as { paramCapabilities?: unknown }).paramCapabilities = V2_CAPS;
+      await expect(
+        service.create('user-1', {
+          prompt: 'x',
+          references: [
+            { role: 'first_frame', url: 'https://cos/f.jpg' },
+            { role: 'reference_image', url: 'https://cos/r.jpg' },
+          ],
+        }),
+      ).rejects.toThrow(/不能混合使用/);
+      expect(prisma.videoGenerationJob.create).not.toHaveBeenCalled();
+    });
+
+    it('合法全量参数 → submitOptions 落库 JSON,并参与成本估算', async () => {
+      build();
+      (provider as { paramCapabilities?: unknown }).paramCapabilities = V2_CAPS;
+      prisma.videoGenerationJob.create.mockResolvedValue({ ...JOB });
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.create('user-1', {
+        prompt: '果茶广告',
+        seed: 42,
+        draft: true,
+        returnLastFrame: true,
+        references: [
+          { role: 'reference_image', url: 'https://cos/product.jpg' },
+          { role: 'reference_video', url: 'https://cos/ref.mp4' },
+          { role: 'reference_audio', url: 'https://cos/bgm.mp3' },
+        ],
+      });
+
+      expect(prisma.videoGenerationJob.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            submitOptions: JSON.stringify({
+              references: [
+                { role: 'reference_image', url: 'https://cos/product.jpg' },
+                { role: 'reference_video', url: 'https://cos/ref.mp4' },
+                { role: 'reference_audio', url: 'https://cos/bgm.mp3' },
+              ],
+              seed: 42,
+              draft: true,
+              returnLastFrame: true,
+            }),
+          }),
+        }),
+      );
+      expect(provider.estimateCost).toHaveBeenCalledWith(
+        expect.objectContaining({ seed: 42, draft: true }),
+      );
+    });
+
+    it('无可选参数 → submitOptions 落 null', async () => {
+      build();
+      prisma.videoGenerationJob.create.mockResolvedValue({ ...JOB });
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.create('user-1', { prompt: 'x' });
+
+      expect(prisma.videoGenerationJob.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ submitOptions: null }),
+        }),
+      );
+    });
+
+    it('submitStage 解析 submitOptions 并透传 provider', async () => {
+      build();
+      (provider as { paramCapabilities?: unknown }).paramCapabilities = V2_CAPS;
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+      prisma.videoGenerationJob.findUnique.mockResolvedValue({
+        ...JOB,
+        submitOptions: JSON.stringify({
+          references: [{ role: 'last_frame', url: 'https://cos/last.jpg' }],
+          seed: 7,
+          returnLastFrame: true,
+        }),
+      });
+      prisma.videoGenerationJob.update.mockResolvedValue({});
+      provider.submit.mockResolvedValue({ taskId: 't-1' });
+
+      await service.submitStage('job-1');
+
+      expect(provider.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          references: [{ role: 'last_frame', url: 'https://cos/last.jpg' }],
+          seed: 7,
+          returnLastFrame: true,
+        }),
+      );
+    });
+
+    it('submitOptions 损坏 JSON → 按空 options 提交(fail-open)', async () => {
+      build();
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+      prisma.videoGenerationJob.findUnique.mockResolvedValue({
+        ...JOB,
+        submitOptions: '{broken',
+      });
+      prisma.videoGenerationJob.update.mockResolvedValue({});
+      provider.submit.mockResolvedValue({ taskId: 't-1' });
+
+      await service.submitStage('job-1');
+
+      expect(provider.submit).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: JOB.prompt }),
+      );
+      expect(provider.submit.mock.calls[0][0].references).toBeUndefined();
     });
   });
 
@@ -443,6 +685,52 @@ describe('VideoJobService', () => {
           }),
         }),
       );
+    });
+
+    it('returnLastFrame:尾帧图入媒体库并回写 lastFrameAssetId;尾帧失败不影响主片', async () => {
+      build();
+      const videoAsset = { id: 'asset-1', url: 'https://cos/x.mp4' };
+      const frameAsset = { id: 'asset-2', url: 'https://cos/x-last.jpg' };
+      prisma.videoGenerationJob.findUnique.mockResolvedValue({
+        ...JOB,
+        status: 'ASSETS_GENERATING',
+        providerTaskId: 'mm-task-1',
+        updatedAt: new Date(),
+      });
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+      prisma.videoGenerationJob.update.mockResolvedValue({});
+      prisma.mediaAsset.create
+        .mockResolvedValueOnce(videoAsset)
+        .mockResolvedValueOnce(frameAsset);
+      provider.poll.mockResolvedValue({
+        state: 'succeeded',
+        videoUrl: 'https://cdn/temp.mp4',
+        lastFrameUrl: 'https://cdn/temp-last.jpg',
+      });
+      mockedAxios.get.mockResolvedValue({ data: new ArrayBuffer(8) });
+
+      await service.pollStage('job-1');
+
+      expect(storage.put).toHaveBeenCalledWith(
+        'video/job-1-last-frame.jpg',
+        expect.any(Buffer),
+        'image/jpeg',
+      );
+      expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            mimeType: 'image/jpeg',
+            sourceRef: 'videoJob:job-1:last-frame',
+            tagStatus: 'NONE',
+          }),
+        }),
+      );
+      expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ lastFrameAssetId: 'asset-2' }),
+        }),
+      );
+      expect(search.indexAsset).toHaveBeenCalledWith('asset-2');
     });
   });
 

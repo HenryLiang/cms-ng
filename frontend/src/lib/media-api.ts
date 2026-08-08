@@ -41,6 +41,8 @@ export interface GetMediaParams {
   status?: MediaStatus;
   search?: string;
   tag?: string;
+  /** MIME 大类过滤(image/video/audio 前缀匹配);视频域参考物选择器用 */
+  mimePrefix?: 'image' | 'video' | 'audio';
   page?: number;
   pageSize?: number;
 }

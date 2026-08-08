@@ -6,13 +6,17 @@ import {
   Clapperboard,
   FileText,
   Film,
+  Library,
   Loader2,
+  Plus,
   RefreshCw,
   Sparkles,
+  Trash2,
   XCircle,
 } from 'lucide-react';
 import { VideoGenerationMode, VideoJobStatus } from '@cms-ng/shared';
 import { Badge, Button, Card, PageHeader } from '@/components/ui';
+import { MediaPicker } from '@/components/media-picker';
 import type { StatusTone } from '@/lib/article-status';
 import { reportApiError } from '@/lib/api-error-toast';
 import { getArticles, type Article } from '@/lib/article-api';
@@ -25,6 +29,8 @@ import {
   parseStoryboardVo,
   type VideoCapability,
   type VideoGenerationJobVo,
+  type VideoReference,
+  type VideoReferenceRole,
 } from '@/lib/video-api';
 import { useToastStore } from '@/store/toast-store';
 
@@ -54,6 +60,30 @@ const ACTIVE_STATUSES: VideoJobStatus[] = [
 const PROVIDER_LABEL: Record<string, string> = {
   volcengine: '火山引擎 Seedance',
   minimax: 'MiniMax Hailuo',
+};
+
+/** 参考物角色中文标签(可用角色由 capability.references.roles gating) */
+const REFERENCE_ROLE_LABEL: Record<VideoReferenceRole, string> = {
+  first_frame: '首帧',
+  last_frame: '尾帧',
+  reference_image: '参考图',
+  reference_video: '参考视频',
+  reference_audio: '参考音频',
+};
+
+/** 帧角色(与 reference_* 参考角色互斥,Ark 实测两种生成模式不可混合) */
+const FRAME_ROLES: VideoReferenceRole[] = ['first_frame', 'last_frame'];
+
+/** 角色 → 媒体库选择器的 MIME 大类 */
+const REFERENCE_ROLE_MIME: Record<
+  VideoReferenceRole,
+  'image' | 'video' | 'audio'
+> = {
+  first_frame: 'image',
+  last_frame: 'image',
+  reference_image: 'image',
+  reference_video: 'video',
+  reference_audio: 'audio',
 };
 
 const POLL_INTERVAL_MS = 5000;
@@ -141,6 +171,12 @@ export default function VideoStudioPage() {
   const [durationSec, setDurationSec] = useState(6);
   const [resolution, setResolution] = useState<'480P' | '768P' | '1080P'>('768P');
   const [generateAudio, setGenerateAudio] = useState(false);
+  const [references, setReferences] = useState<VideoReference[]>([]);
+  const [seedInput, setSeedInput] = useState('');
+  const [draft, setDraft] = useState(false);
+  const [returnLastFrame, setReturnLastFrame] = useState(false);
+  /** 媒体库选择器当前服务的参考物行号;null=关闭 */
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
   const [articles, setArticles] = useState<Article[]>([]);
   const [articleId, setArticleId] = useState(searchParams.get('articleId') ?? '');
@@ -175,6 +211,20 @@ export default function VideoStudioPage() {
           defaults: { durationSec: 6, resolution: '768P', aspectRatio: '9:16' },
           l2: false,
           nativeAudio: false,
+          references: {
+            roles: [],
+            limits: {
+              first_frame: 1,
+              last_frame: 1,
+              reference_image: 9,
+              reference_video: 3,
+              reference_audio: 3,
+            },
+            frameReferenceExclusive: false,
+          },
+          seed: false,
+          draft: false,
+          returnLastFrame: false,
           render: false,
         }),
       )
@@ -211,6 +261,8 @@ export default function VideoStudioPage() {
     if (mode === VideoGenerationMode.ARTICLE_TO_VIDEO && !articleId) return;
     setSubmitting(true);
     try {
+      const refs = references.filter((r) => r.url.trim());
+      const seed = seedInput.trim() ? Number(seedInput.trim()) : undefined;
       await createVideoJob(
         mode === VideoGenerationMode.ARTICLE_TO_VIDEO
           ? { mode, articleId, aspectRatio }
@@ -220,9 +272,17 @@ export default function VideoStudioPage() {
               resolution,
               aspectRatio,
               generateAudio: generateAudio || undefined,
+              references: refs.length ? refs : undefined,
+              seed: Number.isInteger(seed) ? seed : undefined,
+              draft: draft || undefined,
+              returnLastFrame: returnLastFrame || undefined,
             },
       );
       setPrompt('');
+      setReferences([]);
+      setSeedInput('');
+      setDraft(false);
+      setReturnLastFrame(false);
       toast({
         type: 'success',
         message:
@@ -263,6 +323,40 @@ export default function VideoStudioPage() {
       setActingId(null);
     }
   }
+
+  /** 参考物行操作(仅 L1;角色可选项由 capability gating) */
+  const refRoles = capability?.references.roles ?? [];
+  const frameExclusive = capability?.references.frameReferenceExclusive === true;
+  /**
+   * 帧/参考互斥(Ark 实测):已选行含帧角色时其他行只能选帧角色,反之亦然。
+   * rowIndex 传 -1 表示"新增行"(按全部已选行计算)。
+   */
+  const allowedRolesFor = (
+    rows: VideoReference[],
+    rowIndex: number,
+  ): VideoReferenceRole[] => {
+    if (!frameExclusive) return refRoles;
+    const others = rows.filter((_, i) => i !== rowIndex).map((r) => r.role);
+    const hasFrame = others.some((r) => FRAME_ROLES.includes(r));
+    const hasRefMedia = others.some((r) => !FRAME_ROLES.includes(r));
+    if (hasFrame) return refRoles.filter((r) => FRAME_ROLES.includes(r));
+    if (hasRefMedia) return refRoles.filter((r) => !FRAME_ROLES.includes(r));
+    return refRoles;
+  };
+  const addReference = () => {
+    const allowed = allowedRolesFor(references, -1);
+    const defaultRole = allowed.includes('first_frame')
+      ? 'first_frame'
+      : allowed[0];
+    if (!defaultRole) return;
+    setReferences((rows) => [...rows, { role: defaultRole, url: '' }]);
+  };
+  const updateReference = (i: number, patch: Partial<VideoReference>) =>
+    setReferences((rows) =>
+      rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)),
+    );
+  const removeReference = (i: number) =>
+    setReferences((rows) => rows.filter((_, idx) => idx !== i));
 
   if (!capabilityLoaded) {
     return (
@@ -407,6 +501,126 @@ export default function VideoStudioPage() {
                 生成视频
               </Button>
             </div>
+
+            {/* 多模态参考素材(Seedance 2.x;PRD §18) */}
+            {refRoles.length > 0 && (
+              <div className="rounded-lg border border-line bg-surface-muted/40 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted">
+                    参考素材(可选)
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={addReference}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    添加
+                  </Button>
+                </div>
+                {references.length === 0 ? (
+                  <p className="text-[11px] text-subtle">
+                    {frameExclusive
+                      ? '首帧/尾帧定妆、参考图保持主体一致、参考视频沿用运镜、参考音频作配乐;音频须搭配图或视频;帧(首/尾帧)与参考(图/视频/音频)两种模式不可混用'
+                      : '首帧/尾帧定妆、参考图保持主体一致、参考视频沿用运镜、参考音频作配乐;音频须搭配图或视频'}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {references.map((ref, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <select
+                          aria-label={`参考角色 ${i + 1}`}
+                          value={ref.role}
+                          onChange={(e) =>
+                            updateReference(i, {
+                              role: e.target.value as VideoReferenceRole,
+                            })
+                          }
+                          className={`${SELECT_CLASS} shrink-0`}
+                        >
+                          {allowedRolesFor(references, i).map((role) => (
+                            <option key={role} value={role}>
+                              {REFERENCE_ROLE_LABEL[role]}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          aria-label={`参考素材 URL ${i + 1}`}
+                          value={ref.url}
+                          onChange={(e) =>
+                            updateReference(i, { url: e.target.value })
+                          }
+                          placeholder="https://…(媒体库 COS 地址或外链)"
+                          className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          title="从媒体库选择"
+                          onClick={() => setPickerIndex(i)}
+                        >
+                          <Library className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          title="移除"
+                          onClick={() => removeReference(i)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 可选参数:seed 复现 / draft 打样 / 尾帧续拍链 */}
+            {(capability?.seed || capability?.draft || capability?.returnLastFrame) && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                {capability?.seed && (
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="video-seed" className="text-xs text-muted">
+                      种子
+                    </label>
+                    <input
+                      id="video-seed"
+                      value={seedInput}
+                      onChange={(e) => setSeedInput(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="可空"
+                      className="h-8 w-24 rounded-lg border border-line bg-surface px-2 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    />
+                  </div>
+                )}
+                {capability?.draft && (
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+                    <input
+                      type="checkbox"
+                      checked={draft}
+                      onChange={(e) => setDraft(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-brand"
+                    />
+                    打样模式(更快更便宜,质量低)
+                  </label>
+                )}
+                {capability?.returnLastFrame && (
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+                    <input
+                      type="checkbox"
+                      checked={returnLastFrame}
+                      onChange={(e) => setReturnLastFrame(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-brand"
+                    />
+                    返回尾帧(续拍链)
+                  </label>
+                )}
+              </div>
+            )}
           </form>
         ) : (
           <form onSubmit={onSubmit} className="space-y-4 p-5">
@@ -562,12 +776,42 @@ export default function VideoStudioPage() {
                       />
                     </div>
                   )}
+                  {job.lastFrameUrl && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={job.lastFrameUrl}
+                        alt="尾帧"
+                        className="h-14 w-auto rounded-md ring-1 ring-line"
+                      />
+                      <p className="text-[11px] text-subtle">
+                        尾帧已入媒体库,可作为下一段的首帧(续拍链)
+                      </p>
+                    </div>
+                  )}
                 </Card>
               );
             })}
           </div>
         </div>
       )}
+      <MediaPicker
+        open={pickerIndex !== null}
+        onClose={() => setPickerIndex(null)}
+        mimePrefix={
+          pickerIndex !== null
+            ? REFERENCE_ROLE_MIME[references[pickerIndex]?.role ?? 'reference_image']
+            : 'image'
+        }
+        title={
+          pickerIndex !== null
+            ? `选择${REFERENCE_ROLE_LABEL[references[pickerIndex]?.role ?? 'reference_image']}素材`
+            : undefined
+        }
+        onPick={(asset) => {
+          if (pickerIndex !== null) updateReference(pickerIndex, { url: asset.url });
+        }}
+      />
     </div>
   );
 }

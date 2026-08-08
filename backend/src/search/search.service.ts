@@ -183,6 +183,8 @@ export class SearchService implements OnModuleInit {
       { term: { status: params.status } },
     ];
     if (params.source) filter.push({ term: { source: params.source } });
+    if (params.mimePrefix)
+      filter.push({ prefix: { mimeType: `${params.mimePrefix}/` } });
     if (params.search) {
       must.push({
         multi_match: {

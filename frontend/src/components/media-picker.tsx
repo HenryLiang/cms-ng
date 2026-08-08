@@ -16,12 +16,17 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Film,
 } from 'lucide-react';
 
 interface MediaPickerProps {
   open: boolean;
   onClose: () => void;
   onPick: (asset: MediaAsset) => void;
+  /** MIME 大类过滤;缺省 image(既有图片场景行为不变) */
+  mimePrefix?: 'image' | 'video' | 'audio';
+  /** 自定义标题,缺省按 mimePrefix 推断 */
+  title?: string;
 }
 
 const PAGE_SIZE = 24;
@@ -32,11 +37,20 @@ const SOURCE_FILTERS: { value: MediaSource | ''; label: string }[] = [
   { value: MediaSource.AI_GENERATED, label: 'AI 生成' },
 ];
 
+const MIME_LABEL = { image: '图片', video: '视频', audio: '音频' } as const;
+
 /**
  * 媒体选择器：Modal 内浏览媒体库、回车搜索、内嵌上传、翻页，选中后回调。
- * 用于文章封面选择、TipTap 正文插图等场景。
+ * 用于文章封面选择、TipTap 正文插图、视频参考素材(mimePrefix=video)等场景。
+ * 仅图片大类支持内嵌上传(后端上传白名单仅图片)。
  */
-export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
+export function MediaPicker({
+  open,
+  onClose,
+  onPick,
+  mimePrefix = 'image',
+  title,
+}: MediaPickerProps) {
   const [items, setItems] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -52,7 +66,7 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
     const reqId = ++reqIdRef.current;
     setLoading(true);
     try {
-      const params: GetMediaParams = { page, pageSize: PAGE_SIZE };
+      const params: GetMediaParams = { page, pageSize: PAGE_SIZE, mimePrefix };
       if (source) params.source = source;
       if (search) params.search = search;
       const res = await getMediaAssets(params);
@@ -63,7 +77,7 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
     } finally {
       if (reqId === reqIdRef.current) setLoading(false);
     }
-  }, [source, search, page]);
+  }, [source, search, page, mimePrefix]);
 
   // open 切为 true 时重置筛选与选中（搜索/翻页时不清选中）
   useEffect(() => {
@@ -107,7 +121,9 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
       <div className="relative flex h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-surface shadow-pop">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-sm font-semibold text-foreground">选择图片</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            {title ?? `选择${MIME_LABEL[mimePrefix]}`}
+          </h2>
           <button onClick={onClose} className="text-subtle hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
@@ -146,14 +162,16 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
           <Button variant="secondary" size="sm" onClick={onSearch}>
             搜索
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowUpload((v) => !v)}
-          >
-            <Upload className="h-3.5 w-3.5" />
-            上传
-          </Button>
+          {mimePrefix === 'image' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowUpload((v) => !v)}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              上传
+            </Button>
+          )}
         </div>
 
         {/* Body */}
@@ -174,7 +192,9 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-sm text-subtle">
-              暂无图片，点击「上传」添加
+              {mimePrefix === 'image'
+                ? '暂无图片，点击「上传」添加'
+                : `媒体库暂无${MIME_LABEL[mimePrefix]}素材，可改用手填 URL`}
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
@@ -189,13 +209,24 @@ export function MediaPicker({ open, onClose, onPick }: MediaPickerProps) {
                   }`}
                 >
                   <div className="aspect-square">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={asset.thumbnailUrl ?? asset.url}
-                      alt={asset.altText ?? asset.fileName}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
+                    {asset.mimeType.startsWith('image/') ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={asset.thumbnailUrl ?? asset.url}
+                        alt={asset.altText ?? asset.fileName}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-subtle">
+                        <Film className="h-8 w-8" />
+                        {asset.duration != null && (
+                          <span className="text-[10px]">
+                            {asset.duration.toFixed(1)}s
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {selectedId === asset.id && (
                     <div className="absolute right-1 top-1 rounded-full bg-brand p-0.5">
