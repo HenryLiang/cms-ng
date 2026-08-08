@@ -93,13 +93,36 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    systemFeatureSwitch: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      upsert: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+    },
+    systemFeatureAudit: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      count: jest.fn(),
+    },
     $connect: jest.fn(),
     $disconnect: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    $executeRaw: jest.fn().mockResolvedValue(0),
     // $transaction([promise, promise]) -> Promise.all；findAll 依赖此行为
     $transaction: jest.fn((args: unknown) =>
       Array.isArray(args) ? Promise.all(args as Promise<unknown>[]) : args,
     ),
   } as unknown as jest.Mocked<PrismaService>;
+
+  mock.$transaction = jest.fn((args: unknown) => {
+    if (typeof args === 'function') {
+      return (args as (tx: PrismaService) => unknown)(mock);
+    }
+    return Array.isArray(args) ? Promise.all(args as Promise<unknown>[]) : args;
+  }) as never;
 
   return mock;
 }

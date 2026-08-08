@@ -1,17 +1,17 @@
 /**
- * Admin bootstrap script (issue #105 follow-up).
+ * Super-admin bootstrap script (issue #105 follow-up).
  *
  * Creates or repairs a privileged account directly via Prisma — there is
  * intentionally NO self-serve role-elevation API (public registration always
- * yields REPORTER), so provisioning an ADMIN must happen out-of-band on the
+ * yields REPORTER), so provisioning a SUPER_ADMIN must happen out-of-band on the
  * host with DB access.
  *
  * Usage:
  *   ADMIN_EMAIL=ops@example.com ADMIN_PASSWORD='s3cret!' npx ts-node scripts/create-admin.ts
  *
  * Behavior:
- *   - email does not exist  → create user with role=ADMIN
- *   - email exists          → reset password + ensure role=ADMIN + isActive=true
+ *   - email does not exist  → create user with role=SUPER_ADMIN
+ *   - email exists          → reset password + ensure role=SUPER_ADMIN + isActive=true
  *     (this is the supported recovery path when all admins are locked out)
  *
  * Required env: DATABASE_URL (Prisma), ADMIN_EMAIL, ADMIN_PASSWORD.
@@ -43,12 +43,12 @@ async function main() {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.upsert({
       where: { email },
-      create: { email, name, passwordHash, role: UserRole.ADMIN },
-      update: { passwordHash, role: UserRole.ADMIN, isActive: true },
+      create: { email, name, passwordHash, role: UserRole.SUPER_ADMIN },
+      update: { passwordHash, role: UserRole.SUPER_ADMIN, isActive: true },
       select: { id: true, email: true, role: true, isActive: true },
     });
     console.log(
-      `Admin 账号已就绪: ${user.email} (role=${user.role}, active=${user.isActive})`,
+      `超级管理员账号已就绪: ${user.email} (role=${user.role}, active=${user.isActive})`,
     );
   } finally {
     await prisma.$disconnect();
@@ -56,6 +56,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('admin 初始化失败:', e instanceof Error ? e.message : e);
+  console.error('超级管理员初始化失败:', e instanceof Error ? e.message : e);
   process.exit(1);
 });

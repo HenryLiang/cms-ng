@@ -17,12 +17,14 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryRunDto } from './dto/query-run.dto';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@cms-ng/shared';
+import { SystemFeature, UserRole } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('auto-publish')
 @ApiBearerAuth('bearer')
 @Controller('auto-publish')
 @Roles(UserRole.ADMIN, UserRole.EDITOR)
+@RequiresSystemFeature(SystemFeature.AUTO_PUBLISH)
 export class AutoPublishController {
   constructor(private readonly service: AutoPublishService) {}
 

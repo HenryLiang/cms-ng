@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
-import { UserRole } from '@cms-ng/shared';
+import { hasRequiredRole, UserRole } from '@cms-ng/shared';
 
 const ROLE_ROUTE_MAP: Record<string, UserRole[]> = {
   '/dashboard/review': [UserRole.EDITOR, UserRole.ADMIN],
@@ -20,10 +20,13 @@ export function useRoleGuard() {
   useEffect(() => {
     if (isLoading || !hasHydrated || !isAuthenticated) return;
 
-    const requiredRoles = ROLE_ROUTE_MAP[pathname];
+    const route = Object.keys(ROLE_ROUTE_MAP).find(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
+    const requiredRoles = route ? ROLE_ROUTE_MAP[route] : undefined;
     if (!requiredRoles) return;
 
-    if (!user?.role || !requiredRoles.includes(user.role as UserRole)) {
+    if (!hasRequiredRole(user?.role, requiredRoles)) {
       router.replace('/dashboard');
     }
   }, [isAuthenticated, isLoading, hasHydrated, pathname, router, user?.role]);

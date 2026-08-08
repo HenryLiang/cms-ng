@@ -8,6 +8,168 @@ export enum UserRole {
   REPORTER = 'REPORTER',
   EDITOR = 'EDITOR',
   ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN',
+}
+
+/** SUPER_ADMIN inherits every ADMIN permission; the reverse is never true. */
+export function hasRequiredRole(
+  role: UserRole | string | null | undefined,
+  requiredRoles: readonly UserRole[],
+): boolean {
+  if (!role) return false;
+  if (requiredRoles.includes(role as UserRole)) return true;
+  return (
+    role === UserRole.SUPER_ADMIN && requiredRoles.includes(UserRole.ADMIN)
+  );
+}
+
+export function isAdminRole(
+  role: UserRole | string | null | undefined,
+): boolean {
+  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+}
+
+export function isEditorRole(
+  role: UserRole | string | null | undefined,
+): boolean {
+  return role === UserRole.EDITOR || isAdminRole(role);
+}
+
+export function isSuperAdminRole(
+  role: UserRole | string | null | undefined,
+): boolean {
+  return role === UserRole.SUPER_ADMIN;
+}
+
+// ===== 系统一级功能 =====
+export enum SystemFeature {
+  WORKBENCH = 'WORKBENCH',
+  ARTICLES = 'ARTICLES',
+  MEDIA = 'MEDIA',
+  VIDEO = 'VIDEO',
+  REVIEW = 'REVIEW',
+  STORIES = 'STORIES',
+  AUTO_PUBLISH = 'AUTO_PUBLISH',
+  BILLING = 'BILLING',
+  ACCOUNTS = 'ACCOUNTS',
+  SETTINGS = 'SETTINGS',
+}
+
+export type SystemFeatureGroup = 'WORKSPACE' | 'AUTOMATION' | 'SYSTEM';
+
+export interface SystemFeatureDefinition {
+  key: SystemFeature;
+  label: string;
+  description: string;
+  group: SystemFeatureGroup;
+  configurable: boolean;
+  roles: readonly UserRole[];
+  /** Accounts stay reachable by SUPER_ADMIN even when hidden from ADMIN. */
+  superAdminAlwaysAvailable?: boolean;
+}
+
+const ALL_STAFF_ROLES = [
+  UserRole.REPORTER,
+  UserRole.EDITOR,
+  UserRole.ADMIN,
+] as const;
+const EDITOR_ROLES = [UserRole.EDITOR, UserRole.ADMIN] as const;
+const ADMIN_ROLES = [UserRole.ADMIN] as const;
+
+export const SYSTEM_FEATURE_CATALOG: readonly SystemFeatureDefinition[] = [
+  {
+    key: SystemFeature.WORKBENCH,
+    label: '工作台',
+    description: '登录后的默认工作区入口',
+    group: 'WORKSPACE',
+    configurable: false,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.ARTICLES,
+    label: '稿件管理',
+    description: '稿件创建、编辑和版本管理',
+    group: 'WORKSPACE',
+    configurable: true,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.MEDIA,
+    label: '媒体库',
+    description: '图片上传、检索和素材管理',
+    group: 'WORKSPACE',
+    configurable: true,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.VIDEO,
+    label: '视频创作',
+    description: '文生视频和稿件一键成片',
+    group: 'WORKSPACE',
+    configurable: true,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.REVIEW,
+    label: '审核台',
+    description: '编辑审核和退修流程',
+    group: 'WORKSPACE',
+    configurable: true,
+    roles: EDITOR_ROLES,
+  },
+  {
+    key: SystemFeature.STORIES,
+    label: '选题中心',
+    description: '选题发现、研究和采写协作',
+    group: 'WORKSPACE',
+    configurable: true,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.AUTO_PUBLISH,
+    label: '自动发布',
+    description: '自动发布任务和运行记录管理',
+    group: 'AUTOMATION',
+    configurable: true,
+    roles: EDITOR_ROLES,
+  },
+  {
+    key: SystemFeature.BILLING,
+    label: '计费管理',
+    description: '余额、消费记录和计费配置',
+    group: 'AUTOMATION',
+    configurable: true,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.ACCOUNTS,
+    label: '账号管理',
+    description: '账号创建、启停和消费查看',
+    group: 'SYSTEM',
+    configurable: true,
+    roles: ADMIN_ROLES,
+    superAdminAlwaysAvailable: true,
+  },
+  {
+    key: SystemFeature.SETTINGS,
+    label: '系统设置',
+    description: '系统级配置与功能开放管理',
+    group: 'SYSTEM',
+    configurable: false,
+    roles: ADMIN_ROLES,
+  },
+];
+
+export function getSystemFeatureDefinition(
+  feature: SystemFeature,
+): SystemFeatureDefinition {
+  const definition = SYSTEM_FEATURE_CATALOG.find(
+    (item) => item.key === feature,
+  );
+  if (!definition) {
+    throw new Error(`Unknown system feature: ${feature}`);
+  }
+  return definition;
 }
 
 // ===== 稿件状态 =====

@@ -35,7 +35,10 @@ model User {
   balanceAlert        BalanceAlert?
   mediaAssets         MediaAsset[]
   videoGenerationJobs VideoGenerationJob[]
+  featureSwitchUpdates SystemFeatureSwitch[] @relation("SystemFeatureSwitchUpdater")
+  featureSwitchAudits  SystemFeatureAudit[]  @relation("SystemFeatureAuditOperator")
 
+  @@index([role, isActive])
   @@map("users")
 }
 
@@ -169,6 +172,7 @@ enum UserRole {
   REPORTER
   EDITOR
   ADMIN
+  SUPER_ADMIN
 }
 
 enum ArticleStatus {
@@ -493,6 +497,39 @@ model RegistrationSwitch {
   updatedAt DateTime  @updatedAt
 
   @@map("registration_switches")
+}
+
+// 全局一级功能开关。没有对应行时按默认开放处理，保证升级兼容。
+model SystemFeatureSwitch {
+  feature     String   @id @db.VarChar(64)
+  enabled     Boolean  @default(true)
+  updatedById String?
+  reason      String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User?                @relation("SystemFeatureSwitchUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  audits    SystemFeatureAudit[]
+
+  @@index([updatedById])
+  @@map("system_feature_switches")
+}
+
+model SystemFeatureAudit {
+  id              String   @id @default(uuid())
+  feature         String   @db.VarChar(64)
+  previousEnabled Boolean
+  enabled         Boolean
+  operatorId      String?
+  reason          String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  featureSwitch SystemFeatureSwitch @relation(fields: [feature], references: [feature], onDelete: Cascade)
+  operator      User?               @relation("SystemFeatureAuditOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([feature, createdAt])
+  @@index([operatorId])
+  @@map("system_feature_audits")
 }
 
 // ===== 媒体资源管理 =====

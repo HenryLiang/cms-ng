@@ -28,11 +28,13 @@ import {
   transactionCategoryLabels,
 } from '@/lib/transaction-labels';
 import { Button, Card, PageHeader, Badge, Input } from '@/components/ui';
+import { useAuthStore } from '@/store/auth-store';
 
 const roleLabels: Record<UserRole, string> = {
   [UserRole.REPORTER]: '记者',
   [UserRole.EDITOR]: '编辑',
   [UserRole.ADMIN]: '管理员',
+  [UserRole.SUPER_ADMIN]: '超级管理员',
 };
 
 const languageLabels: Record<ContentLanguage, string> = {
@@ -53,6 +55,8 @@ function formatDate(dateStr: string | Date): string {
 }
 
 export default function AccountsPage() {
+  const currentUser = useAuthStore((state) => state.user);
+  const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -183,7 +187,8 @@ export default function AccountsPage() {
                   </td>
                   <td className="px-6 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {u.isActive ? (
+                      {u.role !== UserRole.SUPER_ADMIN || isSuperAdmin ? (
+                        u.isActive ? (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -192,7 +197,7 @@ export default function AccountsPage() {
                           <Ban className="h-3 w-3" />
                           禁用
                         </Button>
-                      ) : (
+                        ) : (
                         <button
                           onClick={() => handleToggleStatus(u)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
@@ -200,15 +205,18 @@ export default function AccountsPage() {
                           <CheckCircle2 className="h-3 w-3" />
                           启用
                         </button>
+                        )
+                      ) : null}
+                      {(u.role !== UserRole.SUPER_ADMIN || isSuperAdmin) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setConfirmReset(u)}
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          重置密码
+                        </Button>
                       )}
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setConfirmReset(u)}
-                      >
-                        <KeyRound className="h-3 w-3" />
-                        重置密码
-                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -228,6 +236,7 @@ export default function AccountsPage() {
 
       {createOpen && (
         <CreateAccountModal
+          canCreateSuperAdmin={isSuperAdmin}
           onClose={() => setCreateOpen(false)}
           onCreated={(user, initialPassword) => {
             setUsers((prev) => [user, ...prev]);
@@ -268,9 +277,11 @@ export default function AccountsPage() {
 function CreateAccountModal({
   onClose,
   onCreated,
+  canCreateSuperAdmin,
 }: {
   onClose: () => void;
   onCreated: (user: User, initialPassword: string) => void;
+  canCreateSuperAdmin: boolean;
 }) {
   const [form, setForm] = useState({
     email: '',
@@ -339,6 +350,9 @@ function CreateAccountModal({
             <option value={UserRole.REPORTER}>记者</option>
             <option value={UserRole.EDITOR}>编辑</option>
             <option value={UserRole.ADMIN}>管理员</option>
+            {canCreateSuperAdmin && (
+              <option value={UserRole.SUPER_ADMIN}>超级管理员</option>
+            )}
           </select>
         </Field>
         <Field label="部门（可选）" htmlFor="create-department">

@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
@@ -15,12 +16,23 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { safeJsonParse } from '../common/json.utils';
 import { serializeBillingTransaction } from '../common/billing-transaction.utils';
+import { isSuperAdminRole, UserRole } from '@cms-ng/shared';
 
 // 随机密码字母表剔除易混淆字符（0/O、1/l/I），便于人工抄录
 const PASSWORD_ALPHABET =
   'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const RANDOM_PASSWORD_LENGTH = 12;
 const BCRYPT_SALT_ROUNDS = 10;
+const TRANSACTION_RETRY_LIMIT = 3;
+
+function isRetryableTransactionConflict(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2034'
+  );
+}
 
 function generateRandomPassword(length = RANDOM_PASSWORD_LENGTH): string {
   let pwd = '';
@@ -118,10 +130,17 @@ export class UsersService {
   /**
    * 管理员创建账户。生成随机一次性密码（bcrypt 哈希存库），明文仅此一次返回给前端展示。
    */
-  async create(dto: CreateUserDto): Promise<{
+  async create(
+    dto: CreateUserDto,
+    operatorRole: UserRole,
+  ): Promise<{
     user: ReturnType<UsersService['serializeUser']>;
     initialPassword: string;
   }> {
+    if (dto.role === UserRole.SUPER_ADMIN && !isSuperAdminRole(operatorRole)) {
+      throw new ForbiddenException('只有超级管理员可以创建超级管理员账户');
+    }
+
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -152,7 +171,12 @@ export class UsersService {
    * 下次校验时回落 DB 读到最新状态——被禁用用户的后续请求立即被拒。
    * 禁止管理员禁用自己的账户，避免把自己锁死。
    */
-  async setStatus(id: string, dto: UpdateUserStatusDto, operatorId: string) {
+  async setStatus(
+    id: string,
+    dto: UpdateUserStatusDto,
+    operatorId: string,
+    operatorRole: UserRole,
+  ) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
@@ -162,13 +186,82 @@ export class UsersService {
       throw new BadRequestException('不能禁用自己的账户');
     }
 
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: { isActive: dto.isActive },
-      select: USER_SELECT,
-    });
+    if (
+      !dto.isActive &&
+      isSuperAdminRole(existing.role) &&
+      !isSuperAdminRole(operatorRole)
+    ) {
+      throw new ForbiddenException('只有超级管理员可以禁用超级管理员账户');
+    }
 
-    return this.serializeUser(user);
+    // The outside status can be stale (an inactive SUPER_ADMIN may be enabled
+    // concurrently), so every SUPER_ADMIN disable must re-check under lock.
+    const mustProtectLastSuperAdmin =
+      !dto.isActive && isSuperAdminRole(existing.role);
+
+    if (!mustProtectLastSuperAdmin) {
+      const user = await this.prisma.user.update({
+        where: { id },
+        data: { isActive: dto.isActive },
+        select: USER_SELECT,
+      });
+      return this.serializeUser(user);
+    }
+
+    for (let attempt = 1; attempt <= TRANSACTION_RETRY_LIMIT; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            // Every active SUPER_ADMIN disable acquires the same ordered lock set.
+            // The composite index keeps this lock scoped to the protected accounts.
+            const activeSuperAdmins = await tx.$queryRaw<Array<{ id: string }>>`
+              SELECT id
+              FROM users
+              WHERE role = ${UserRole.SUPER_ADMIN} AND isActive = TRUE
+              ORDER BY id
+              FOR UPDATE
+            `;
+
+            const current = await tx.user.findUnique({ where: { id } });
+            if (!current) {
+              throw new NotFoundException('User not found');
+            }
+
+            if (
+              current.isActive &&
+              isSuperAdminRole(current.role) &&
+              activeSuperAdmins.length <= 1
+            ) {
+              throw new BadRequestException(
+                '系统必须保留至少一个启用的超级管理员账户',
+              );
+            }
+
+            const user = await tx.user.update({
+              where: { id },
+              data: { isActive: dto.isActive },
+              select: USER_SELECT,
+            });
+
+            return this.serializeUser(user);
+          },
+          {
+            isolationLevel: 'Serializable',
+            maxWait: 5_000,
+            timeout: 10_000,
+          },
+        );
+      } catch (error) {
+        if (
+          attempt === TRANSACTION_RETRY_LIMIT ||
+          !isRetryableTransactionConflict(error)
+        ) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('Unreachable transaction retry state');
   }
 
   /**
@@ -202,12 +295,19 @@ export class UsersService {
   /**
    * 管理员重置密码。生成新的随机一次性密码，明文仅此一次返回。
    */
-  async resetPassword(userId: string): Promise<{ password: string }> {
+  async resetPassword(
+    userId: string,
+    operatorRole: UserRole,
+  ): Promise<{ password: string }> {
     const existing = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!existing) {
       throw new NotFoundException('User not found');
+    }
+
+    if (isSuperAdminRole(existing.role) && !isSuperAdminRole(operatorRole)) {
+      throw new ForbiddenException('只有超级管理员可以重置超级管理员密码');
     }
 
     const password = generateRandomPassword();

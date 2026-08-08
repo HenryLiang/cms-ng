@@ -21,6 +21,7 @@ import { BillingModule } from './billing/billing.module';
 import { AuthorStyleModule } from './authors/author-style.module';
 import { MediaModule } from './media/media.module';
 import { VideoModule } from './video/video.module';
+import { SystemFeaturesModule } from './system-features/system-features.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { VideoModule } from './video/video.module';
     ScheduleModule.forRoot(),
     StorageModule,
     AuthModule,
+    SystemFeaturesModule,
     UsersModule,
     StoriesModule,
     ArticlesModule,

@@ -30,11 +30,13 @@ import {
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@cms-ng/shared';
+import { SystemFeature, UserRole } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('articles')
 @ApiBearerAuth('bearer')
 @Controller('articles')
+@RequiresSystemFeature(SystemFeature.ARTICLES)
 export class ArticlesController {
   constructor(private articlesService: ArticlesService) {}
 
@@ -59,6 +61,7 @@ export class ArticlesController {
   }
 
   @Get('review-queue')
+  @RequiresSystemFeature(SystemFeature.REVIEW)
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
   @ApiOperation({
     summary: 'List articles awaiting editorial review (editor/admin)',
@@ -68,6 +71,7 @@ export class ArticlesController {
   }
 
   @Get(':id')
+  @RequiresSystemFeature(SystemFeature.ARTICLES, SystemFeature.REVIEW)
   @ApiOperation({ summary: 'Get an article by id (with access check)' })
   async findOne(
     @Param('id') id: string,
@@ -137,6 +141,7 @@ export class ArticlesController {
 
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
   @Patch(':id/review')
+  @RequiresSystemFeature(SystemFeature.REVIEW)
   @ApiOperation({
     summary: 'Submit an editorial review decision (approve/revision)',
   })

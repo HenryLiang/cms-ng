@@ -4,7 +4,9 @@ import {
   BadRequestException,
   UnauthorizedException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { UserRole } from '@cms-ng/shared';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
@@ -151,6 +153,20 @@ describe('UsersService', () => {
   });
 
   describe('create', () => {
+    it('forbids an ordinary admin from creating a SUPER_ADMIN', async () => {
+      await expect(
+        service.create(
+          {
+            email: 'super@example.com',
+            name: 'Super',
+            role: UserRole.SUPER_ADMIN,
+          },
+          UserRole.ADMIN,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
     it('should create a user with a random hashed password and return it once', async () => {
       prisma.user.findUnique.mockResolvedValue(null); // email not taken
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_password');
@@ -158,11 +174,14 @@ describe('UsersService', () => {
         mockUser({ email: 'new@example.com' }),
       );
 
-      const result = await service.create({
-        email: 'new@example.com',
-        name: 'New User',
-        role: 'REPORTER' as any,
-      });
+      const result = await service.create(
+        {
+          email: 'new@example.com',
+          name: 'New User',
+          role: UserRole.REPORTER,
+        },
+        UserRole.ADMIN,
+      );
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
         expect.any(String),
@@ -187,13 +206,128 @@ describe('UsersService', () => {
       prisma.user.findUnique.mockResolvedValue(mockUser());
 
       await expect(
-        service.create({ email: 'test@example.com', name: 'Dup' }),
+        service.create(
+          { email: 'test@example.com', name: 'Dup' },
+          UserRole.ADMIN,
+        ),
       ).rejects.toThrow(ConflictException);
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
   });
 
   describe('setStatus', () => {
+    it('forbids an ordinary admin from disabling a SUPER_ADMIN', async () => {
+      prisma.user.findUnique.mockResolvedValue(
+        mockUser({ id: 'super-id', role: UserRole.SUPER_ADMIN }),
+      );
+
+      await expect(
+        service.setStatus(
+          'super-id',
+          { isActive: false },
+          'admin-id',
+          UserRole.ADMIN,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('keeps at least one active SUPER_ADMIN account', async () => {
+      prisma.user.findUnique.mockResolvedValue(
+        mockUser({ id: 'target-super-id', role: UserRole.SUPER_ADMIN }),
+      );
+      prisma.$queryRaw.mockResolvedValue([{ id: 'target-super-id' }]);
+
+      await expect(
+        service.setStatus(
+          'target-super-id',
+          { isActive: false },
+          'operator-super-id',
+          UserRole.SUPER_ADMIN,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ isolationLevel: 'Serializable' }),
+      );
+      const [query] = (prisma.$queryRaw as jest.Mock).mock.calls[0] as [
+        TemplateStringsArray,
+      ];
+      expect(query.join('')).toContain('FOR UPDATE');
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rechecks an initially inactive SUPER_ADMIN under lock before disabling it', async () => {
+      prisma.user.findUnique
+        .mockResolvedValueOnce(
+          mockUser({
+            id: 'target-super-id',
+            role: UserRole.SUPER_ADMIN,
+            isActive: false,
+          }),
+        )
+        .mockResolvedValueOnce(
+          mockUser({
+            id: 'target-super-id',
+            role: UserRole.SUPER_ADMIN,
+            isActive: true,
+          }),
+        );
+      prisma.$queryRaw.mockResolvedValue([{ id: 'target-super-id' }]);
+
+      await expect(
+        service.setStatus(
+          'target-super-id',
+          { isActive: false },
+          'operator-super-id',
+          UserRole.SUPER_ADMIN,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('retries a serializable status transaction after a write conflict', async () => {
+      let attempts = 0;
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        (operation: (tx: typeof prisma) => unknown) => {
+          attempts += 1;
+          if (attempts === 1) {
+            return Promise.reject(
+              Object.assign(new Error('write conflict'), { code: 'P2034' }),
+            );
+          }
+          return Promise.resolve(operation(prisma));
+        },
+      );
+      prisma.user.findUnique.mockResolvedValue(
+        mockUser({ id: 'target-super-id', role: UserRole.SUPER_ADMIN }),
+      );
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'operator-super-id' },
+        { id: 'target-super-id' },
+      ]);
+      prisma.user.update.mockResolvedValue(
+        mockUser({
+          id: 'target-super-id',
+          role: UserRole.SUPER_ADMIN,
+          isActive: false,
+        }),
+      );
+
+      const result = await service.setStatus(
+        'target-super-id',
+        { isActive: false },
+        'operator-super-id',
+        UserRole.SUPER_ADMIN,
+      );
+
+      expect(attempts).toBe(2);
+      expect(result.isActive).toBe(false);
+    });
+
     it('should disable a user', async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser({ isActive: true }));
       prisma.user.update.mockResolvedValue(mockUser({ isActive: false }));
@@ -202,6 +336,7 @@ describe('UsersService', () => {
         'user-id',
         { isActive: false },
         'admin-id',
+        UserRole.ADMIN,
       );
 
       expect(prisma.user.update).toHaveBeenCalledWith({
@@ -209,6 +344,8 @@ describe('UsersService', () => {
         data: { isActive: false },
         select: expect.any(Object),
       });
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(result.isActive).toBe(false);
     });
 
@@ -220,6 +357,7 @@ describe('UsersService', () => {
         'user-id',
         { isActive: true },
         'admin-id',
+        UserRole.ADMIN,
       );
 
       expect(result.isActive).toBe(true);
@@ -229,7 +367,12 @@ describe('UsersService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.setStatus('nope', { isActive: false }, 'admin-id'),
+        service.setStatus(
+          'nope',
+          { isActive: false },
+          'admin-id',
+          UserRole.ADMIN,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -237,7 +380,12 @@ describe('UsersService', () => {
       prisma.user.findUnique.mockResolvedValue(mockUser({ id: 'admin-id' }));
 
       await expect(
-        service.setStatus('admin-id', { isActive: false }, 'admin-id'),
+        service.setStatus(
+          'admin-id',
+          { isActive: false },
+          'admin-id',
+          UserRole.ADMIN,
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.user.update).not.toHaveBeenCalled();
     });
@@ -246,7 +394,12 @@ describe('UsersService', () => {
       prisma.user.findUnique.mockResolvedValue(mockUser({ id: 'user-id' }));
       prisma.user.update.mockResolvedValue(mockUser({ isActive: false }));
 
-      await service.setStatus('user-id', { isActive: false }, 'admin-id');
+      await service.setStatus(
+        'user-id',
+        { isActive: false },
+        'admin-id',
+        UserRole.ADMIN,
+      );
 
       expect(prisma.user.update).toHaveBeenCalled();
     });
@@ -318,11 +471,22 @@ describe('UsersService', () => {
   });
 
   describe('resetPassword', () => {
+    it('forbids an ordinary admin from resetting a SUPER_ADMIN password', async () => {
+      prisma.user.findUnique.mockResolvedValue(
+        mockUser({ role: UserRole.SUPER_ADMIN }),
+      );
+
+      await expect(
+        service.resetPassword('super-id', UserRole.ADMIN),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
     it('should generate a new random password, hash it, and return plaintext once', async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser());
       (bcrypt.hash as jest.Mock).mockResolvedValue('reset_hash');
 
-      const result = await service.resetPassword('user-id');
+      const result = await service.resetPassword('user-id', UserRole.ADMIN);
 
       expect(result.password).toHaveLength(12);
       expect(bcrypt.hash).toHaveBeenCalledWith(
@@ -338,9 +502,9 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user does not exist', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.resetPassword('nope')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.resetPassword('nope', UserRole.ADMIN),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

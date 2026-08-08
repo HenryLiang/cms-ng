@@ -12,11 +12,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { UserRole } from '@cms-ng/shared';
+import { isAdminRole, SystemFeature, UserRole } from '@cms-ng/shared';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('users')
 @ApiBearerAuth('bearer')
@@ -27,6 +28,7 @@ export class UsersController {
 
   @Get()
   @Roles(UserRole.ADMIN)
+  @RequiresSystemFeature(SystemFeature.ACCOUNTS)
   @ApiOperation({ summary: 'List all users (admin only; returns balance)' })
   async findAll() {
     return this.usersService.findAll();
@@ -40,6 +42,7 @@ export class UsersController {
 
   @Get(':id')
   @Roles(UserRole.ADMIN)
+  @RequiresSystemFeature(SystemFeature.ACCOUNTS)
   @ApiOperation({ summary: 'Get a single user by id (admin only)' })
   async findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
@@ -55,7 +58,7 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: { userId: string; role: string },
   ) {
-    if ((user.role as UserRole) !== UserRole.ADMIN && id !== user.userId) {
+    if (!isAdminRole(user.role) && id !== user.userId) {
       throw new ForbiddenException('You can only update your own profile');
     }
     return this.usersService.update(id, dto);
@@ -65,37 +68,48 @@ export class UsersController {
 
   @Post()
   @Roles(UserRole.ADMIN)
+  @RequiresSystemFeature(SystemFeature.ACCOUNTS)
   @ApiOperation({
     summary:
       'Create a new account (admin only). Returns a one-time random password.',
   })
-  async create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  async create(
+    @Body() dto: CreateUserDto,
+    @CurrentUser('role') operatorRole: UserRole,
+  ) {
+    return this.usersService.create(dto, operatorRole);
   }
 
   @Patch(':id/status')
   @Roles(UserRole.ADMIN)
+  @RequiresSystemFeature(SystemFeature.ACCOUNTS)
   @ApiOperation({ summary: 'Enable/disable an account (admin only)' })
   async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateUserStatusDto,
     @CurrentUser('userId') operatorId: string,
+    @CurrentUser('role') operatorRole: UserRole,
   ) {
-    return this.usersService.setStatus(id, dto, operatorId);
+    return this.usersService.setStatus(id, dto, operatorId, operatorRole);
   }
 
   @Post(':id/reset-password')
   @Roles(UserRole.ADMIN)
+  @RequiresSystemFeature(SystemFeature.ACCOUNTS)
   @ApiOperation({
     summary:
       'Reset a user password (admin only). Returns a one-time random password.',
   })
-  async resetPassword(@Param('id') id: string) {
-    return this.usersService.resetPassword(id);
+  async resetPassword(
+    @Param('id') id: string,
+    @CurrentUser('role') operatorRole: UserRole,
+  ) {
+    return this.usersService.resetPassword(id, operatorRole);
   }
 
   @Get(':id/consumption')
   @Roles(UserRole.ADMIN)
+  @RequiresSystemFeature(SystemFeature.ACCOUNTS)
   @ApiOperation({ summary: 'Get a user consumption summary (admin only)' })
   async getConsumption(
     @Param('id') id: string,

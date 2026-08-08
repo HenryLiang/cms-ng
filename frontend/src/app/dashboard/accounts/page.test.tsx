@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
+let mockRole = 'ADMIN';
+
 vi.mock('@/lib/users-api', () => ({
   getUsers: vi.fn(),
   createUser: vi.fn(),
   updateUserStatus: vi.fn(),
   resetUserPassword: vi.fn(),
   getUserConsumption: vi.fn(),
+}));
+
+vi.mock('@/store/auth-store', () => ({
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({ user: { id: 'operator-id', role: mockRole } }),
 }));
 
 import AccountsPage from './page';
@@ -20,6 +27,7 @@ import { UserRole } from '@cms-ng/shared';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRole = UserRole.ADMIN;
 });
 
 const activeUser = {
@@ -83,6 +91,21 @@ describe('AccountsPage', () => {
     // one-time password shown
     expect(await screen.findByText('Ab3xY9Km2pQr')).toBeInTheDocument();
     expect(screen.getByText(/仅显示一次/)).toBeInTheDocument();
+  });
+
+  it('offers the SUPER_ADMIN role only to a SUPER_ADMIN operator', async () => {
+    vi.mocked(getUsers).mockResolvedValue([]);
+    const view = render(<AccountsPage />);
+    await screen.findByText('暂无账户');
+    fireEvent.click(screen.getByRole('button', { name: /新建账户/ }));
+    expect(screen.queryByRole('option', { name: '超级管理员' })).not.toBeInTheDocument();
+
+    view.unmount();
+    mockRole = UserRole.SUPER_ADMIN;
+    render(<AccountsPage />);
+    await screen.findByText('暂无账户');
+    fireEvent.click(screen.getByRole('button', { name: /新建账户/ }));
+    expect(screen.getByRole('option', { name: '超级管理员' })).toBeInTheDocument();
   });
 
   it('disables an active account on toggle', async () => {

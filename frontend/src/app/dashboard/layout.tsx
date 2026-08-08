@@ -7,7 +7,9 @@ import { useProtectedRoute } from '@/hooks/use-protected-route';
 import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
 import { getVideoCapability } from '@/lib/video-api';
-import { UserRole } from '@cms-ng/shared';
+import { SystemFeature, UserRole } from '@cms-ng/shared';
+import { useSystemFeaturesStore } from '@/store/system-features-store';
+import { canUseFeature, featureForPath } from '@/lib/feature-access';
 import {
   LogOut,
   LayoutDashboard,
@@ -28,12 +30,13 @@ import {
 } from 'lucide-react';
 import ToastHost from '@/components/toast-host';
 import ErrorBoundary from '@/components/error-boundary';
+import { FeatureUnavailable } from '@/components/feature-unavailable';
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  roles: UserRole[];
+  feature: SystemFeature;
   badge?: number;
 }
 
@@ -41,27 +44,27 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: '工作区',
     items: [
-      { href: '/dashboard', label: '工作台', icon: LayoutDashboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
-      { href: '/dashboard/articles', label: '稿件管理', icon: FileText, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
-      { href: '/dashboard/media', label: '媒体库', icon: Images, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+      { href: '/dashboard', label: '工作台', icon: LayoutDashboard, feature: SystemFeature.WORKBENCH },
+      { href: '/dashboard/articles', label: '稿件管理', icon: FileText, feature: SystemFeature.ARTICLES },
+      { href: '/dashboard/media', label: '媒体库', icon: Images, feature: SystemFeature.MEDIA },
       // 文生视频(PRD: docs/PRD-text-to-video.md);能力关闭时由 videoEnabled 过滤隐藏
-      { href: '/dashboard/video', label: '视频创作', icon: Clapperboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
-      { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, roles: [UserRole.EDITOR, UserRole.ADMIN] },
-      { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+      { href: '/dashboard/video', label: '视频创作', icon: Clapperboard, feature: SystemFeature.VIDEO },
+      { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, feature: SystemFeature.REVIEW },
+      { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, feature: SystemFeature.STORIES },
     ],
   },
   {
     label: '自动化',
     items: [
-      { href: '/dashboard/auto-publish', label: '自动发布', icon: Zap, roles: [UserRole.EDITOR, UserRole.ADMIN] },
-      { href: '/dashboard/billing', label: '计费管理', icon: Wallet, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+      { href: '/dashboard/auto-publish', label: '自动发布', icon: Zap, feature: SystemFeature.AUTO_PUBLISH },
+      { href: '/dashboard/billing', label: '计费管理', icon: Wallet, feature: SystemFeature.BILLING },
     ],
   },
   {
     label: '系统',
     items: [
-      { href: '/dashboard/accounts', label: '账号管理', icon: Users, roles: [UserRole.ADMIN] },
-      { href: '/dashboard/settings', label: '系统设置', icon: Settings, roles: [UserRole.ADMIN] },
+      { href: '/dashboard/accounts', label: '账号管理', icon: Users, feature: SystemFeature.ACCOUNTS },
+      { href: '/dashboard/settings', label: '系统设置', icon: Settings, feature: SystemFeature.SETTINGS },
     ],
   },
 ];
@@ -70,12 +73,14 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.REPORTER]: '记者',
   [UserRole.EDITOR]: '编辑',
   [UserRole.ADMIN]: '管理员',
+  [UserRole.SUPER_ADMIN]: '超级管理员',
 };
 
 const ROLE_CODES: Record<UserRole, string> = {
   [UserRole.REPORTER]: 'REPORTER',
   [UserRole.EDITOR]: 'EDITOR',
   [UserRole.ADMIN]: 'ADMIN',
+  [UserRole.SUPER_ADMIN]: 'SUPER ADMIN',
 };
 
 function isItemActive(pathname: string | null, href: string) {
@@ -93,6 +98,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isLoading = useAuthStore((state) => state.isLoading);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const pathname = usePathname();
+  const { statuses, isLoaded: featuresLoaded, load: loadFeatures } =
+    useSystemFeaturesStore();
 
   const role = user?.role as UserRole | undefined;
   const roleLabel = role ? ROLE_LABELS[role] : '';
@@ -106,12 +113,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => setVideoEnabled(false));
   }, []);
 
+  useEffect(() => {
+    if (hasHydrated && user) void loadFeatures(true);
+  }, [hasHydrated, loadFeatures, pathname, user]);
+
   // 过滤出当前角色可见的导航分组;视频创作按服务端能力显隐
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) =>
-        (role ? item.roles.includes(role) : false) &&
+        canUseFeature(item.feature, role, statuses) &&
         (item.href !== '/dashboard/video' || videoEnabled),
     ),
   })).filter((group) => group.items.length > 0);
@@ -121,8 +132,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     isItemActive(pathname, item.href),
   );
   const profileActive = pathname === '/dashboard/profile';
+  const activeFeature = pathname ? featureForPath(pathname) : null;
+  const activeFeatureAvailable = activeFeature
+    ? canUseFeature(activeFeature, role, statuses)
+    : true;
 
-  if (!hasHydrated || isLoading) {
+  if (!hasHydrated || isLoading || !featuresLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-canvas">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
@@ -253,7 +268,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* 内容区 */}
         <main className="flex-1 overflow-auto bg-canvas">
-          <ErrorBoundary>{children}</ErrorBoundary>
+          <ErrorBoundary>
+            {activeFeatureAvailable ? children : <FeatureUnavailable />}
+          </ErrorBoundary>
         </main>
       </div>
 

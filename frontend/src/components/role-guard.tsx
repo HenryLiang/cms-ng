@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuthStore } from '@/store/auth-store';
-import { UserRole } from '@cms-ng/shared';
+import { hasRequiredRole, UserRole } from '@cms-ng/shared';
 
 interface RoleGuardProps {
   roles: UserRole[];
@@ -12,7 +12,7 @@ interface RoleGuardProps {
 export function RoleGuard({ roles, children, fallback = null }: RoleGuardProps) {
   const { user } = useAuthStore();
 
-  if (!user?.role || !roles.includes(user.role as UserRole)) {
+  if (!hasRequiredRole(user?.role, roles)) {
     return fallback;
   }
 

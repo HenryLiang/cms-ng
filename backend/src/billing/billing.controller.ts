@@ -17,7 +17,8 @@ import type { Request } from 'express';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Public } from '../auth/public.decorator';
-import { UserRole } from '@cms-ng/shared';
+import { SystemFeature, UserRole } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 import { BillingService } from './billing.service';
 import { AlipayService } from './payment/alipay.service';
 import { WechatPayService } from './payment/wechat-pay.service';
@@ -42,6 +43,7 @@ export class BillingController {
   // ─── Balance ───
 
   @Get('balance')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @ApiOperation({ summary: 'Get the current user billing balance' })
   getBalance(@CurrentUser('userId') userId: string) {
     return this.billingService.getBalance(userId);
@@ -50,6 +52,7 @@ export class BillingController {
   // ─── Transactions ───
 
   @Get('transactions')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @ApiOperation({ summary: 'List the current user transactions' })
   getTransactions(
     @CurrentUser('userId') userId: string,
@@ -59,6 +62,7 @@ export class BillingController {
   }
 
   @Get('transactions/team')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @Roles(UserRole.EDITOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'List team-wide transactions (editor/admin only)' })
   getTeamTransactions(@Query() query: QueryTransactionsDto) {
@@ -68,12 +72,14 @@ export class BillingController {
   // ─── Config ───
 
   @Get('config')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @ApiOperation({ summary: 'Get all billing configuration items' })
   getAllConfigs() {
     return this.billingService.getAllConfigs();
   }
 
   @Put('config/:itemKey')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a billing configuration item (admin only)' })
   updateConfig(
@@ -87,6 +93,7 @@ export class BillingController {
   // ─── Top-up ───
 
   @Post('top-up/manual')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Manually top up a user balance (admin only)' })
   manualTopUp(
@@ -97,6 +104,7 @@ export class BillingController {
   }
 
   @Get('top-up/records')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'List manual top-up records (admin only)' })
   getTopUpRecords(
@@ -123,12 +131,14 @@ export class BillingController {
   // ─── Alert ───
 
   @Get('alert')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @ApiOperation({ summary: 'Get the current user low-balance alert settings' })
   getAlert(@CurrentUser('userId') userId: string) {
     return this.billingService.getAlert(userId);
   }
 
   @Put('alert')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @ApiOperation({
     summary: 'Update the current user low-balance alert settings',
   })
@@ -142,6 +152,7 @@ export class BillingController {
   // ─── Refund ───
 
   @Post('refund')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Issue a refund (admin only)' })
   refund(@CurrentUser('userId') adminId: string, @Body() dto: CreateRefundDto) {
@@ -151,6 +162,7 @@ export class BillingController {
   // ─── Report ───
 
   @Get('report')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Get a billing report for a date range (admin only)',
@@ -168,6 +180,7 @@ export class BillingController {
    * Create a top-up order via Alipay or WeChat Pay.
    */
   @Post('top-up/create')
+  @RequiresSystemFeature(SystemFeature.BILLING)
   @ApiOperation({ summary: 'Create a top-up order via Alipay or WeChat Pay' })
   async createTopUp(
     @CurrentUser('userId') userId: string,

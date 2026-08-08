@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { SystemFeature } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 import {
   CreateVideoJobDto,
   QueryVideoJobDto,
@@ -20,6 +22,7 @@ export class VideoJobController {
   }
 
   @Post('jobs')
+  @RequiresSystemFeature(SystemFeature.VIDEO)
   @ApiOperation({
     summary: '创建视频任务(L1:prompt→片段;L2:articleId→稿件成片)',
   })
@@ -32,6 +35,7 @@ export class VideoJobController {
   }
 
   @Get('jobs')
+  @RequiresSystemFeature(SystemFeature.VIDEO)
   @ApiOperation({ summary: '我的视频任务列表(分页/状态筛选)' })
   list(
     @CurrentUser('userId') userId: string,
@@ -41,12 +45,14 @@ export class VideoJobController {
   }
 
   @Get('jobs/:id')
+  @RequiresSystemFeature(SystemFeature.VIDEO)
   @ApiOperation({ summary: '视频任务详情' })
   get(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.jobs.get(userId, id);
   }
 
   @Post('jobs/:id/retry')
+  @RequiresSystemFeature(SystemFeature.VIDEO)
   @ApiOperation({
     summary: '重试失败任务(上传失败复用 provider 结果,不重复扣费)',
   })
@@ -55,6 +61,7 @@ export class VideoJobController {
   }
 
   @Post('jobs/:id/cancel')
+  @RequiresSystemFeature(SystemFeature.VIDEO)
   @ApiOperation({ summary: '取消进行中任务(provider 侧费用已发生,结果忽略)' })
   cancel(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.jobs.cancel(userId, id);
