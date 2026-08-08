@@ -32,7 +32,7 @@ describe('VolcengineSeedanceProvider', () => {
     const handle = await provider.submit({
       prompt: '一只柴犬在樱花树下奔跑',
       durationSec: 6,
-      resolution: '1080P',
+      resolution: '720P',
       aspectRatio: '9:16',
     });
 
@@ -42,7 +42,7 @@ describe('VolcengineSeedanceProvider', () => {
       'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
     );
     expect((body as any).content[0].text).toBe(
-      '一只柴犬在樱花树下奔跑 --ratio 9:16 --dur 5 --res 1080p',
+      '一只柴犬在樱花树下奔跑 --ratio 9:16 --dur 5 --res 768p',
     );
   });
 
@@ -84,10 +84,10 @@ describe('VolcengineSeedanceProvider', () => {
       provider.estimateCost({
         prompt: 'x',
         durationSec: 10,
-        resolution: '1080P',
+        resolution: '720P',
       }),
-    ).toBe(6);
-    expect(provider.estimateCost({ prompt: 'x' })).toBe(2.4);
+    ).toBe(4);
+    expect(provider.estimateCost({ prompt: 'x' })).toBe(1.8);
   });
 });
 
@@ -113,13 +113,13 @@ describe('VolcengineSeedanceProvider(2.x 系,如 2.0-mini)', () => {
     expect((body as any).generate_audio).toBe(true);
   });
 
-  it('未请求音频时不带 generate_audio;2.x 生成参数走顶层 body(768P→720p,时长 4~15 自由档)', async () => {
+  it('未请求音频时不带 generate_audio;2.x 生成参数走顶层 body(720P→720p,时长 4~15 自由档)', async () => {
     mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
 
     await provider.submit({
       prompt: 'x',
       durationSec: 6,
-      resolution: '768P',
+      resolution: '720P',
       aspectRatio: '9:16',
     });
     let [, body] = mockedAxios.post.mock.calls[0];
@@ -139,20 +139,20 @@ describe('VolcengineSeedanceProvider(2.x 系,如 2.0-mini)', () => {
     expect((body as any).duration).toBe(4);
   });
 
-  it('2.0-mini 分辨率档位:480P→480p;1080P 无档降级 720p', async () => {
+  it('2.0-mini 分辨率档位:480P->480p;720P->720p', async () => {
     mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
 
     await provider.submit({ prompt: 'x', resolution: '480P' });
     let [, body] = mockedAxios.post.mock.calls[0];
     expect((body as any).resolution).toBe('480p');
 
-    // 2.0-mini 仅 480p/720p 两档,1080P 请求降级而不是原样透传被拒
-    await provider.submit({ prompt: 'x', resolution: '1080P' });
+    // 720P 映射 2.x 原生 720p 档
+    await provider.submit({ prompt: 'x', resolution: '720P' });
     [, body] = mockedAxios.post.mock.calls[1];
     expect((body as any).resolution).toBe('720p');
   });
 
-  it('2.0 完整版保留 1080p 档;1.0 系 480P 回退 768p(后缀内嵌)', async () => {
+  it('2.0 完整版 720P->720p;1.0 系 480P 回退 768p(后缀内嵌)', async () => {
     const full = new VolcengineSeedanceProvider(
       configWith({
         ARK_API_KEY: 'ark-key',
@@ -160,8 +160,8 @@ describe('VolcengineSeedanceProvider(2.x 系,如 2.0-mini)', () => {
       }),
     );
     mockedAxios.post.mockResolvedValue({ data: { id: 'cgt-9' } });
-    await full.submit({ prompt: 'x', resolution: '1080P' });
-    expect((mockedAxios.post.mock.calls[0][1] as any).resolution).toBe('1080p');
+    await full.submit({ prompt: 'x', resolution: '720P' });
+    expect((mockedAxios.post.mock.calls[0][1] as any).resolution).toBe('720p');
 
     const legacy = new VolcengineSeedanceProvider(
       configWith({
@@ -237,7 +237,7 @@ describe('MinimaxHailuoProvider', () => {
     expect((mockedAxios.post.mock.calls[2][1] as any).duration).toBe(10);
   });
 
-  it('480P 无档映射 768P;1080P 透传', async () => {
+  it('480P/720P 均映射 768P', async () => {
     mockedAxios.post.mockResolvedValue({
       data: { task_id: 't', base_resp: { status_code: 0 } },
     });
@@ -245,8 +245,8 @@ describe('MinimaxHailuoProvider', () => {
     await provider.submit({ prompt: 'x', resolution: '480P' });
     expect((mockedAxios.post.mock.calls[0][1] as any).resolution).toBe('768P');
 
-    await provider.submit({ prompt: 'x', resolution: '1080P' });
-    expect((mockedAxios.post.mock.calls[1][1] as any).resolution).toBe('1080P');
+    await provider.submit({ prompt: 'x', resolution: '720P' });
+    expect((mockedAxios.post.mock.calls[1][1] as any).resolution).toBe('768P');
   });
 
   it('base_resp.status_code 非 0 时抛错', async () => {

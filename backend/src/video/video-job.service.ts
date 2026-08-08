@@ -166,7 +166,7 @@ export class VideoJobService {
       provider: this.provider?.name ?? null,
       defaults: {
         durationSec: 6,
-        resolution: '768P',
+        resolution: '480P',
         aspectRatio: '9:16',
       },
       // L2(稿件一键成片)能力分解:渲染开关 + 图片 provider 必备
@@ -271,7 +271,7 @@ export class VideoJobService {
       const req: VideoGenSubmitRequest = {
         prompt: dto.prompt,
         durationSec: dto.durationSec ?? 6,
-        resolution: dto.resolution ?? '768P',
+        resolution: dto.resolution ?? '480P',
         aspectRatio: dto.aspectRatio ?? '9:16',
         generateAudio: dto.generateAudio,
         ...submitOptions,
@@ -287,7 +287,7 @@ export class VideoJobService {
         articleId: isL2 ? dto.articleId : null,
         provider: this.provider.name,
         durationSec: dto.durationSec ?? null,
-        resolution: dto.resolution ?? '768P',
+        resolution: dto.resolution ?? '480P',
         aspectRatio: dto.aspectRatio ?? '9:16',
         generateAudio: isL2 ? null : (dto.generateAudio ?? null),
         submitOptions:
@@ -523,7 +523,7 @@ export class VideoJobService {
       const handle = await this.provider.submit({
         prompt: job.prompt,
         durationSec: job.durationSec ?? undefined,
-        resolution: (job.resolution as '480P' | '768P' | '1080P') ?? undefined,
+        resolution: (job.resolution as '480P' | '720P') ?? undefined,
         aspectRatio: (job.aspectRatio as '16:9' | '9:16' | '1:1') ?? undefined,
         generateAudio: job.generateAudio ?? undefined,
         ...submitOptions,

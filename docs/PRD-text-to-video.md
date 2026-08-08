@@ -155,7 +155,7 @@ interface VideoGenProvider {
   readonly name: 'volcengine' | 'minimax';
   /** 是否支持原生音频(Seedance 1.5+/2.x generate_audio)= L2 唯一配音通道(§17) */
   readonly supportsNativeAudio: boolean;
-  submit(req: { prompt: string; firstFrameUrl?: string; durationSec: number; resolution: '480P' | '768P' | '1080P'; aspectRatio: string; generateAudio?: boolean }): Promise<{ taskId: string }>;
+  submit(req: { prompt: string; firstFrameUrl?: string; durationSec: number; resolution: '480P' | '720P'; aspectRatio: string; generateAudio?: boolean }): Promise<{ taskId: string }>;
   poll(taskId: string): Promise<{ status: 'pending' | 'processing' | 'succeeded' | 'failed'; videoUrl?: string; error?: string }>;
   // 调用方负责:succeeded 后立即下载转存 COS(URL 有时效,MiniMax 9h)
 }
@@ -168,7 +168,7 @@ Provider 选择:env 配置默认值(`VIDEO_CLIP_PROVIDER`),任务发起时可覆
 ## 7. 合成层(本地 FFmpeg worker)
 
 - 形态:独立进程 `scripts/video-render/`,主服务通过任务目录(job dir:原料文件 + `compose-manifest.json`)交互;`VIDEO_RENDER_ENABLED=true` 才启用,未启用时前端隐藏入口(fail-open,同 Playwright/ES 先例)
-- 资源:纯 CPU,2~4GB 内存,无 GPU;1 分钟 1080p 成片约 1~3 分钟 CPU
+- 资源:纯 CPU,2~4GB 内存,无 GPU;1 分钟 720p 成片约 1~3 分钟 CPU
 - P1 合成能力:片段拼接(必要时补黑帧/静帧对齐时长)+ 配音轨(原生音频模式复用素材自带音轨)+ 背景音混音(`amix`)+ 字幕烧录(ASS,整句 cue;无 libass 时降级 `mov_text` 软字幕轨)+ 片头片尾
 - P2 再评估升级 Remotion(动效模板)——渲染层被 compose step 隔离,可整体替换;注意 Remotion 公司 ≥4 人需付费许可(Automators $0.01/渲染、$100/月保底、v5 强制遥测)
 
@@ -276,7 +276,7 @@ VIDEO_CLIP_PROVIDER=volcengine
 
 用户决策:配音不走独立 TTS,改用 **Seedance 2.x 原生音频**(`generate_audio:true`,视频/音频同一次生成,支持中文对白/旁白、音素级口型同步)。实现要点:
 
-1. **provider seam**:`VideoGenProvider.supportsNativeAudio`(按模型名判定:`seedance-1-5`/`seedance-2-` 支持,1.0 系不支持);`VideoGenSubmitRequest.generateAudio` → 请求体顶层 `generate_audio:true`(仅支持时落参,1.0 系静默忽略)。模型版本感知的参数映射:2.x 时长 4~15s 自由档(1.0 系仍归一 5/10)、2.x 无 768p 档 → 768P 映射 720p、**2.0-mini 仅 480p/720p 两档**(1080P 降级 720p);**2.x 的 ratio/duration/resolution 走顶层 body 参数**(官方文档形态),1.x 沿用 prompt 内嵌 `--` 后缀 —— 实测 2.x 下 `--res 480p` 后缀被静默忽略(退化默认 720p),顶层参数才生效
+1. **provider seam**:`VideoGenProvider.supportsNativeAudio`(按模型名判定:`seedance-1-5`/`seedance-2-` 支持,1.0 系不支持);`VideoGenSubmitRequest.generateAudio` → 请求体顶层 `generate_audio:true`(仅支持时落参,1.0 系静默忽略)。模型版本感知的参数映射:2.x 时长 4~15s 自由档(1.0 系仍归一 5/10)、分辨率收敛为 480P/720P 两档(2.x 原生 480p/720p;1.x 回退 768p;MiniMax 映射 768P);**2.x 的 ratio/duration/resolution 走顶层 body 参数**(官方文档形态),1.x 沿用 prompt 内嵌 `--` 后缀 —— 实测 2.x 下 `--res 480p` 后缀被静默忽略(退化默认 720p),顶层参数才生效
 2. **L2 原生音频模式** = 无 TTS 且片段 provider 支持原生音频:分镜 prompt 要求全部 `video_clip`(图片镜静默会破坏旁白连续性);素材提交时旁白确定性注入 prompt(追加 `画面配中文画外音旁白:「<narration>」`,不依赖 LLM 在分镜阶段遵守);`VOICE_SYNTHESIZING` 整步跳过,`ttsProvider='native'`(区分 TTS 缺失的 `'none'` 纯静默降级)
 3. **合成层**:无独立配音的视频镜用 ffprobe 探测素材音轨,有则 `audioPath=assetPath` 复用原生音轨(同一文件两次作输入,ffmpeg 允许);镜长取素材真实探测时长(避免 tpad 冻帧截断原生音频)。字幕在原生音频模式无词级时间戳 → 每镜整句 cue(既有降级路径,时间轴用真实镜长)
 4. **优先级**:TTS 配置在 → 独立 TTS 旁白仍是权威配音(视频镜不再请求原生音频,避免双配音);TTS 缺席 + 原生音频可用 → native;两者皆无 → none(纯字幕)

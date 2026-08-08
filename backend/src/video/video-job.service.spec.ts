@@ -24,7 +24,7 @@ const JOB = {
   provider: 'minimax',
   providerTaskId: null as string | null,
   durationSec: 6,
-  resolution: '768P',
+  resolution: '720P',
   aspectRatio: '9:16',
   generateAudio: null as boolean | null,
   submitOptions: null as string | null,

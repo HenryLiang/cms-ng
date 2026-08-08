@@ -45,9 +45,9 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   private readonly apiKey: string;
   private readonly apiBase: string;
   private readonly model: string;
-  /** 2.x 系(2.0/2.0-fast/2.0-mini/2.5):时长 4~15s 自由档,分辨率 480p/720p/1080p */
+  /** 2.x 系(2.0/2.0-fast/2.0-mini/2.5):时长 4~15s 自由档,分辨率 480p/720p */
   private readonly isV2: boolean;
-  /** 2.0-mini 轻量档:仅 480p/720p 两档(无 1080p),1080P 请求降级 720p */
+  /** 2.0-mini 轻量档:480p/720p 两档(与全系一致;1080P 已下线) */
   private readonly isV2Mini: boolean;
   private readonly requestTimeoutMs = 60_000;
 
@@ -219,9 +219,9 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   }
 
   estimateCost(req: VideoGenSubmitRequest): number {
-    // Seedance 按生成时长计费;1080P 单价更高。此处为展示用粗估,实际扣费以计费配置为准。
+    // Seedance 按生成时长计费;720P 单价高于 480P。此处为展示用粗估,实际扣费以计费配置为准。
     const seconds = req.durationSec ?? 6;
-    const perSecond = req.resolution === '1080P' ? 0.6 : 0.4;
+    const perSecond = req.resolution === '720P' ? 0.4 : 0.3;
     return Number((seconds * perSecond).toFixed(2));
   }
 
@@ -299,16 +299,12 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   }
 
   /**
-   * 分辨率档位按版本映射:2.x 全系 480p/720p,2.0/2.0-fast/2.5 另有 1080p;
-   * 2.0-mini 仅 480p/720p(1080P 降级 720p);1.x 无 480p/720p(回退 768p/1080p)。
+   * 分辨率档位按版本映射:2.x 原生 480p/720p(480P->480p,720P->720p);
+   * 1.x 无 480p/720p 档,统一回退 768p。存量 768P/1080P 值在 2.x 回落 720p、1.x 回落 768p。
    */
-  private resolutionParam(resolution: '480P' | '768P' | '1080P'): string {
-    if (!this.isV2) {
-      return resolution === '1080P' ? '1080p' : '768p';
-    }
-    if (resolution === '480P') return '480p';
-    if (resolution === '1080P') return this.isV2Mini ? '720p' : '1080p';
-    return '720p'; // 768P → 2.x 无 768p 档,映射 720p
+  private resolutionParam(resolution: '480P' | '720P'): string {
+    if (!this.isV2) return '768p'; // 1.x 无 480p/720p 档,统一回退 768p
+    return resolution === '480P' ? '480p' : '720p';
   }
 
   /**

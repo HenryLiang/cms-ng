@@ -169,7 +169,7 @@ export default function VideoStudioPage() {
   );
   const [prompt, setPrompt] = useState('');
   const [durationSec, setDurationSec] = useState(6);
-  const [resolution, setResolution] = useState<'480P' | '768P' | '1080P'>('768P');
+  const [resolution, setResolution] = useState<'480P' | '720P'>('480P');
   const [generateAudio, setGenerateAudio] = useState(false);
   const [references, setReferences] = useState<VideoReference[]>([]);
   const [seedInput, setSeedInput] = useState('');
@@ -208,7 +208,7 @@ export default function VideoStudioPage() {
         setCapability({
           enabled: false,
           provider: null,
-          defaults: { durationSec: 6, resolution: '768P', aspectRatio: '9:16' },
+          defaults: { durationSec: 6, resolution: '480P', aspectRatio: '9:16' },
           l2: false,
           nativeAudio: false,
           references: {
@@ -508,12 +508,11 @@ export default function VideoStudioPage() {
                 <select
                   id="video-resolution"
                   value={resolution}
-                  onChange={(e) => setResolution(e.target.value as '480P' | '768P' | '1080P')}
+                  onChange={(e) => setResolution(e.target.value as '480P' | '720P')}
                   className={SELECT_CLASS}
                 >
-                  <option value="480P">480P(2.x)</option>
-                  <option value="768P">768P</option>
-                  <option value="1080P">1080P</option>
+                  <option value="480P">480P</option>
+                  <option value="720P">720P</option>
                 </select>
               </div>
               <div>

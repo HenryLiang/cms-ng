@@ -96,14 +96,14 @@ export class CreateVideoJobDto {
   durationSec?: number;
 
   @ApiPropertyOptional({
-    enum: ['480P', '768P', '1080P'],
-    default: '768P',
+    enum: ['480P', '720P'],
+    default: '480P',
     description:
-      '480P/720P 为 Seedance 2.x 档(2.0-mini 仅这两档,1080P 降级 720p);MiniMax 无 480P 档映射 768P',
+      '480P/720P 两档(Seedance 2.x 原生支持;MiniMax 无 480P/720P 档,均映射 768P)',
   })
   @IsOptional()
-  @IsIn(['480P', '768P', '1080P'])
-  resolution?: '480P' | '768P' | '1080P';
+  @IsIn(['480P', '720P'])
+  resolution?: '480P' | '720P';
 
   @ApiPropertyOptional({ enum: ['16:9', '9:16', '1:1'], default: '9:16' })
   @IsOptional()

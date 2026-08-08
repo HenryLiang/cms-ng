@@ -136,7 +136,7 @@ export class AssetsStep {
       const handle = await this.deps.videoGen.submit({
         prompt,
         durationSec: Math.min(15, Math.max(2, scene.visual.durationHintSec)),
-        resolution: '768P',
+        resolution: '720P',
         generateAudio: this.nativeAudio || undefined,
       });
       asset.providerTaskId = handle.taskId;

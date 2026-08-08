@@ -41,7 +41,7 @@ interface MinimaxFileResponse {
  *
  * API 形态(2026-08 官方文档核实):
  * - 提交:POST {base}/v1/video_generation
- *   { model: 'MiniMax-Hailuo-2.3', prompt, duration: 6|10, resolution: '768P'|'1080P',
+ *   { model: 'MiniMax-Hailuo-2.3', prompt, duration: 6|10, resolution: '768P',
  *     prompt_optimizer, first_frame_image? } → { task_id }
  * - 轮询:GET {base}/v1/query/video_generation?task_id= →
  *   status: Preparing|Queueing|Processing|Success|Fail,成功时 file_id
@@ -110,9 +110,8 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
     };
     if (req.durationSec)
       body.duration = this.normalizeDuration(req.durationSec);
-    // Hailuo 2.3 仅 768P/1080P 两档;480P 请求映射到就近的 768P
-    if (req.resolution)
-      body.resolution = req.resolution === '1080P' ? '1080P' : '768P';
+    // Hailuo 2.3 仅 768P/1080P 两档;480P/720P 均映射最低档 768P
+    if (req.resolution) body.resolution = '768P';
     if (firstFrame) body.first_frame_image = firstFrame;
     this.logger.log(
       `[submit] hailuo request: ${JSON.stringify(sanitizeForLog(body))}`,
@@ -166,10 +165,9 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
   }
 
   estimateCost(req: VideoGenSubmitRequest): number {
-    // Hailuo-2.3 按条/按时长阶梯计价;此处为展示用粗估,实际扣费以计费配置为准。
+    // Hailuo-2.3 按条/按时长阶梯计价;480P/720P 均映射 768P。此处为展示用粗估,实际扣费以计费配置为准。
     const seconds = req.durationSec ?? 6;
-    const perSecond = req.resolution === '1080P' ? 0.8 : 0.5;
-    return Number((seconds * perSecond).toFixed(2));
+    return Number((seconds * 0.5).toFixed(2));
   }
 
   /** file_id → 临时下载 URL(9h 有效,调用方立即转存) */

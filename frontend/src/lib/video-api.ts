@@ -118,8 +118,8 @@ export interface CreateVideoJobParams {
   /** ARTICLE_TO_VIDEO 必填 */
   articleId?: string;
   durationSec?: number;
-  /** 480P/720P 为 Seedance 2.x 档(2.0-mini 仅这两档);MiniMax 无 480P 档 */
-  resolution?: '480P' | '768P' | '1080P';
+  /** 480P/720P 两档(Seedance 2.x 原生;MiniMax 映射 768P) */
+  resolution?: '480P' | '720P';
   aspectRatio?: '16:9' | '9:16' | '1:1';
   /** L1 原生音频(Seedance 1.5+/2.x):生成有声视频;provider 不支持时静默忽略 */
   generateAudio?: boolean;

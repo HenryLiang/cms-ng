@@ -603,7 +603,7 @@ model VideoGenerationJob {
   providerTaskId String?             @db.VarChar(100) // provider 侧异步任务 ID
   // 生成参数
   durationSec    Int?
-  resolution     String?             @db.VarChar(10) // '480P' | '768P' | '1080P'
+  resolution     String?             @db.VarChar(10) // '480P' | '720P'
   aspectRatio    String?             @db.VarChar(10) // '16:9' | '9:16' | '1:1'
   generateAudio  Boolean?            // L1 原生音频开关(Seedance 1.5+/2.x);null/false 静默
   // L1 可选提交参数(PRD §18):{ references:[{role,url}], seed?, draft?, returnLastFrame? } JSON 字符串
