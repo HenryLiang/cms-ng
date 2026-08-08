@@ -4,6 +4,7 @@ import { VideoGenProviderName } from '@cms-ng/shared';
 import axios from 'axios';
 import { sanitizeForLog } from '../../../common/sanitize.utils';
 import {
+  VideoGenDurationCapability,
   VideoGenParamCapabilities,
   VideoGenPollResult,
   VideoGenProvider,
@@ -64,6 +65,14 @@ export class VolcengineSeedanceProvider implements VideoGenProvider {
   /** Seedance 1.5+/2.x 支持 generate_audio(1.0 系不支持) */
   get supportsNativeAudio(): boolean {
     return /seedance-(1-5|2-)/.test(this.model);
+  }
+
+  /** 时长能力:2.x 自由档 4~15s;1.x 仅 5/10 档(其他值收敛最近档)*/
+  get durationCapabilities(): VideoGenDurationCapability {
+    if (this.isV2) {
+      return { mode: 'free', min: 4, max: 15 };
+    }
+    return { mode: 'fixed', min: 5, max: 10, allowed: [5, 10] };
   }
 
   /**

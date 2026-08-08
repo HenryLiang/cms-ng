@@ -409,6 +409,20 @@ describe('VolcengineSeedanceProvider 多模态参考物(PRD §18)', () => {
     });
   });
 
+  it('durationCapabilities:2.x free 4~15;1.x fixed [5,10]', () => {
+    expect(v2().durationCapabilities).toEqual({
+      mode: 'free',
+      min: 4,
+      max: 15,
+    });
+    expect(v1().durationCapabilities).toEqual({
+      mode: 'fixed',
+      min: 5,
+      max: 10,
+      allowed: [5, 10],
+    });
+  });
+
   it('submit/poll 被 Ark 400 拒绝时透出 error.message(而非只有状态码)', async () => {
     const arkReject = {
       message: 'Request failed with status code 400',
@@ -567,6 +581,15 @@ describe('MinimaxHailuoProvider 多模态参考物', () => {
       seed: false,
       draft: false,
       returnLastFrame: false,
+    });
+  });
+
+  it('durationCapabilities:fixed [6,10]', () => {
+    expect(provider().durationCapabilities).toEqual({
+      mode: 'fixed',
+      min: 6,
+      max: 10,
+      allowed: [6, 10],
     });
   });
 

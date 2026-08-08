@@ -36,6 +36,13 @@ export interface VideoCapability {
   seed: boolean;
   draft: boolean;
   returnLastFrame: boolean;
+  /** 时长能力:free=自由输入(min~max 整数),fixed=档位下拉(allowed)*/
+  duration: {
+    mode: 'free' | 'fixed';
+    min: number;
+    max: number;
+    allowed?: number[];
+  };
   /** 本地 FFmpeg 渲染开关 */
   render: boolean;
 }

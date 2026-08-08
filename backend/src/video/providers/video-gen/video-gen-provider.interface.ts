@@ -90,6 +90,19 @@ export interface VideoGenParamCapabilities {
   frameReferenceExclusive?: boolean;
 }
 
+/**
+ * 时长能力位(PRD §17.3 #3):provider 支持的时长模式,前端据此渲染自由输入或档位下拉。
+ * - free:任意整数(min~max,含端点),由 provider 钳制(Seedance 2.x 4~15s)
+ * - fixed:仅 allowed 内的档位(1.x 5/10、MiniMax Hailuo 6/10),其他值收敛到最近档
+ */
+export interface VideoGenDurationCapability {
+  mode: 'free' | 'fixed';
+  min: number;
+  max: number;
+  /** fixed 模式下的合法档位(free 模式不用)*/
+  allowed?: number[];
+}
+
 export interface VideoGenProvider {
   readonly name: VideoGenProviderName;
   /**
@@ -99,6 +112,8 @@ export interface VideoGenProvider {
   readonly supportsNativeAudio?: boolean;
   /** 可选参数能力位;缺省视为仅 first_frame、无 seed/draft/尾帧 */
   readonly paramCapabilities?: VideoGenParamCapabilities;
+  /** 时长能力位;缺省视为 fixed [6,10](保守默认,匹配历史前端档位)*/
+  readonly durationCapabilities?: VideoGenDurationCapability;
   submit(req: VideoGenSubmitRequest): Promise<VideoGenTaskHandle>;
   poll(taskId: string): Promise<VideoGenPollResult>;
   /** 单条片段估算成本(人民币元,用于任务发起前展示;实际扣费以计费配置为准) */

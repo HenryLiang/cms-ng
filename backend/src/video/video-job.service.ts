@@ -183,6 +183,13 @@ export class VideoJobService {
       seed: this.paramCaps.seed,
       draft: this.paramCaps.draft,
       returnLastFrame: this.paramCaps.returnLastFrame,
+      // 时长能力位(PRD §17.3 #3):free=自由输入(2.x 4~15s),fixed=档位下拉;缺省 fixed [6,10]
+      duration: this.provider?.durationCapabilities ?? {
+        mode: 'fixed' as const,
+        min: 6,
+        max: 10,
+        allowed: [6, 10],
+      },
       render: this.renderEnabled,
     };
   }

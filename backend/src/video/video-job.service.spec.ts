@@ -266,6 +266,28 @@ describe('VideoJobService', () => {
       });
     });
 
+    it('capability:provider 声明 durationCapabilities 时透出;缺省 fixed [6,10]', () => {
+      build();
+      // 缺省(provider 未声明)
+      expect(service.capability().duration).toEqual({
+        mode: 'fixed',
+        min: 6,
+        max: 10,
+        allowed: [6, 10],
+      });
+      // provider 声明 free 档
+      (provider as { durationCapabilities?: unknown }).durationCapabilities = {
+        mode: 'free',
+        min: 4,
+        max: 15,
+      };
+      expect(service.capability().duration).toEqual({
+        mode: 'free',
+        min: 4,
+        max: 15,
+      });
+    });
+
     it('L2 携带参考物/可选参数 → 400(仅 L1 支持)', async () => {
       build();
       await expect(

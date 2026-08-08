@@ -225,6 +225,7 @@ export default function VideoStudioPage() {
           seed: false,
           draft: false,
           returnLastFrame: false,
+          duration: { mode: 'fixed', min: 6, max: 10, allowed: [6, 10] },
           render: false,
         }),
       )
@@ -237,6 +238,18 @@ export default function VideoStudioPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [refresh]);
+
+  // 时长按能力位对齐:fixed 模式落到合法档位,free 模式钳制到 [min,max]
+  useEffect(() => {
+    if (!capability?.duration) return;
+    const { mode, min, max, allowed } = capability.duration;
+    if (mode === 'fixed' && allowed && !allowed.includes(durationSec)) {
+      setDurationSec(allowed[0]);
+    } else if (mode === 'free' && (durationSec < min || durationSec > max)) {
+      setDurationSec(Math.min(max, Math.max(min, durationSec)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capability?.duration]);
 
   // 有进行中任务时轮询;全部终态后停止
   useEffect(() => {
@@ -449,15 +462,46 @@ export default function VideoStudioPage() {
             <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
               <div>
                 <label htmlFor="video-duration" className="mb-1.5 block text-xs font-medium text-muted">时长</label>
-                <select
-                  id="video-duration"
-                  value={durationSec}
-                  onChange={(e) => setDurationSec(Number(e.target.value))}
-                  className={SELECT_CLASS}
-                >
-                  <option value={6}>6 秒</option>
-                  <option value={10}>10 秒</option>
-                </select>
+                {capability?.duration?.mode === 'free' ? (
+                  <input
+                    id="video-duration"
+                    type="number"
+                    min={capability.duration.min}
+                    max={capability.duration.max}
+                    step={1}
+                    value={durationSec}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (Number.isInteger(n)) {
+                        setDurationSec(
+                          Math.min(
+                            capability.duration.max,
+                            Math.max(capability.duration.min, n),
+                          ),
+                        );
+                      }
+                    }}
+                    className={`${SELECT_CLASS} w-24`}
+                  />
+                ) : (
+                  <select
+                    id="video-duration"
+                    value={durationSec}
+                    onChange={(e) => setDurationSec(Number(e.target.value))}
+                    className={SELECT_CLASS}
+                  >
+                    {(capability?.duration?.allowed ?? [6, 10]).map((d) => (
+                      <option key={d} value={d}>
+                        {d} 秒
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {capability?.duration?.mode === 'free' && (
+                  <span className="ml-1 text-[11px] text-subtle">
+                    {capability.duration.min}~{capability.duration.max}s
+                  </span>
+                )}
               </div>
               <div>
                 <label htmlFor="video-resolution" className="mb-1.5 block text-xs font-medium text-muted">分辨率</label>

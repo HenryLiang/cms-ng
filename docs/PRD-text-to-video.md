@@ -319,7 +319,7 @@ VIDEO_CLIP_PROVIDER=volcengine
 
 1. ~~多模态参考物 seam(`reference_video`/`reference_audio`/`first_frame`/`last_frame` 角色,§16.8 已知限制)~~ **已实现(§18,L1)**
 2. MiniMax 图片/视频 provider 真实联调(代码就绪,无凭证未实测)
-3. L1 时长自由档前端暴露(后端已支持 2.x 4~15s)
+3. ~~L1 时长自由档前端暴露(后端已支持 2.x 4~15s)~~ **已实现**:provider `durationCapabilities` 能力位(free/fixed),capability 透出,前端按 mode 渲染自由数字输入(2.x 4~15s)或档位下拉(1.x [5,10]、MiniMax [6,10]);顺带修正 1.x 档位前端原本错显 6/10(应为 5/10)
 4. Playwright 视频域回归覆盖
 5. 生产部署:`migrate deploy` + 宿主机 ffmpeg + `VIDEO_RENDER_ENABLED=true`
 6. L2 分镜级参考物(每镜挂 mediaAssetId/参考图)—— L1 seam 已就绪,L2 契约扩展另行设计

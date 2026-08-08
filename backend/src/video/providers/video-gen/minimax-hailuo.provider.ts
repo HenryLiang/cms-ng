@@ -4,6 +4,7 @@ import { VideoGenProviderName } from '@cms-ng/shared';
 import axios from 'axios';
 import { sanitizeForLog } from '../../../common/sanitize.utils';
 import {
+  VideoGenDurationCapability,
   VideoGenParamCapabilities,
   VideoGenPollResult,
   VideoGenProvider,
@@ -60,6 +61,13 @@ export class MinimaxHailuoProvider implements VideoGenProvider {
     seed: false,
     draft: false,
     returnLastFrame: false,
+  };
+  /** Hailuo 2.3 仅接受 6|10 秒档;其他时长收敛最近档(≤8->6,>8->10)*/
+  readonly durationCapabilities: VideoGenDurationCapability = {
+    mode: 'fixed',
+    min: 6,
+    max: 10,
+    allowed: [6, 10],
   };
   private readonly logger = new Logger(MinimaxHailuoProvider.name);
   private readonly apiKey: string;
