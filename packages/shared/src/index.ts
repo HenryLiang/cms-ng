@@ -73,6 +73,7 @@ export enum TransactionType {
   TOP_UP = 'TOP_UP',
   AI_LLM = 'AI_LLM',
   AI_IMAGE = 'AI_IMAGE',
+  AI_VIDEO = 'AI_VIDEO',
   PUBLISH = 'PUBLISH',
   AUTO_PUBLISH = 'AUTO_PUBLISH',
   DATA_FETCH = 'DATA_FETCH',
@@ -129,6 +130,52 @@ export enum MediaTagStatus {
   DONE = 'DONE',
   /** 打标失败(可重试) */
   FAILED = 'FAILED',
+}
+
+// ===== 文生视频(PRD: docs/PRD-text-to-video.md) =====
+/** 视频生成 provider(多媒体 seam,与文本 AI_PROVIDER 配置隔离) */
+export enum VideoGenProviderName {
+  VOLCENGINE = 'volcengine',
+  MINIMAX = 'minimax',
+}
+
+/** 任务模式:P0 仅 TEXT_TO_CLIP;ARTICLE_TO_VIDEO 为 P1 预留 */
+export enum VideoGenerationMode {
+  TEXT_TO_CLIP = 'TEXT_TO_CLIP',
+  ARTICLE_TO_VIDEO = 'ARTICLE_TO_VIDEO',
+}
+
+/** 视频任务状态机(P0 使用子集:PENDING→ASSETS_GENERATING→UPLOADING→SUCCEEDED/FAILED) */
+export enum VideoJobStatus {
+  PENDING = 'PENDING',
+  SCRIPTING = 'SCRIPTING',
+  STORYBOARDING = 'STORYBOARDING',
+  ASSETS_GENERATING = 'ASSETS_GENERATING',
+  VOICE_SYNTHESIZING = 'VOICE_SYNTHESIZING',
+  COMPOSING = 'COMPOSING',
+  UPLOADING = 'UPLOADING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+/** 视频任务 VO(后端 Prisma model 的序列化形态) */
+export interface VideoGenerationJob {
+  id: string;
+  mode: VideoGenerationMode;
+  status: VideoJobStatus;
+  provider: VideoGenProviderName;
+  prompt: string;
+  articleId?: string;
+  durationSec?: number;
+  resolution?: string;
+  aspectRatio?: string;
+  costEstimate?: number;
+  costActual?: number;
+  resultAssetId?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ===== 用户 =====

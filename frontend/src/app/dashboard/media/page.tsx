@@ -377,13 +377,28 @@ export default function MediaLibraryPage() {
               className="group block w-full overflow-hidden rounded-xl border border-line bg-surface text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={asset.thumbnailUrl ?? asset.url}
-                  alt={asset.altText ?? asset.fileName}
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
-                />
+                {asset.mimeType.startsWith('video/') ? (
+                  <>
+                    <video
+                      src={asset.url}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white tnum">
+                      {asset.duration ? `${asset.duration}s` : '视频'}
+                    </span>
+                  </>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={asset.thumbnailUrl ?? asset.url}
+                    alt={asset.altText ?? asset.fileName}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                )}
                 <SourceBadge source={asset.source} className="absolute left-2 top-2" />
                 <TagStatusBadge status={asset.tagStatus} error={asset.tagError} />
               </div>
@@ -590,12 +605,22 @@ function MediaDetailDrawer({
         {/* 内容 */}
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
           <div className="overflow-hidden rounded-lg bg-surface-muted ring-1 ring-line">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={asset.url}
-              alt={asset.altText ?? asset.fileName}
-              className="max-h-64 w-full object-contain"
-            />
+            {asset.mimeType.startsWith('video/') ? (
+              <video
+                src={asset.url}
+                controls
+                playsInline
+                preload="metadata"
+                className="max-h-64 w-full object-contain"
+              />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={asset.url}
+                alt={asset.altText ?? asset.fileName}
+                className="max-h-64 w-full object-contain"
+              />
+            )}
           </div>
 
           <Button variant="secondary" className="w-full" onClick={copyUrl}>
@@ -618,6 +643,12 @@ function MediaDetailDrawer({
               <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">大小</dt>
               <dd className="mt-0.5 text-xs text-foreground tnum">{formatSize(asset.size)}</dd>
             </div>
+            {asset.duration != null && (
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">时长</dt>
+                <dd className="mt-0.5 text-xs text-foreground tnum">{asset.duration} 秒</dd>
+              </div>
+            )}
             <div>
               <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">
                 创建时间

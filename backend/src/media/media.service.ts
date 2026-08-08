@@ -293,18 +293,22 @@ export class MediaService {
           search: esSearch || undefined,
           tag: esTag || undefined,
           source: query.source,
+          mimePrefix: query.mimePrefix,
           page,
           pageSize,
         });
         if (ids.length === 0) {
           return buildPaginatedResponse([], total, { page, pageSize });
         }
-        // 回表取完整 VO(ES 文档仅携带检索字段);双侧同源过滤再守 owner/status
+        // 回表取完整 VO(ES 文档仅携带检索字段);双侧同源过滤再守 owner/status/mime
         const rows = await this.prisma.mediaAsset.findMany({
           where: {
             id: { in: ids },
             ownerId: userId,
             status: requestedStatus,
+            ...(query.mimePrefix
+              ? { mimeType: { startsWith: `${query.mimePrefix}/` } }
+              : {}),
           },
         });
         // 按 ES 命中顺序排序(相关性/createdAt desc)
@@ -327,6 +331,8 @@ export class MediaService {
       status: requestedStatus,
     };
     if (query.source) where.source = query.source;
+    if (query.mimePrefix)
+      where.mimeType = { startsWith: `${query.mimePrefix}/` };
     // search 与 tag 各自构造 OR 组,同时存在时 AND 组合(避免互相覆盖 where.OR)
     const andClauses: Prisma.MediaAssetWhereInput[] = [];
     if (query.search) {

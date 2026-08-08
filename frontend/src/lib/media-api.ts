@@ -15,6 +15,8 @@ export interface MediaAsset {
   size: number;
   width?: number | null;
   height?: number | null;
+  /** 视频时长(秒);图片为 null/undefined */
+  duration?: number | null;
   source: MediaSource;
   sourceRef?: string | null;
   prompt?: string | null;
@@ -39,6 +41,8 @@ export interface GetMediaParams {
   status?: MediaStatus;
   search?: string;
   tag?: string;
+  /** MIME 大类过滤(image/video/audio 前缀匹配);视频域参考物选择器用 */
+  mimePrefix?: 'image' | 'video' | 'audio';
   page?: number;
   pageSize?: number;
 }

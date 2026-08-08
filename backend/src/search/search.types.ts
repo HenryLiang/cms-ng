@@ -28,6 +28,8 @@ export interface MediaSearchQuery {
   search?: string;
   tag?: string;
   source?: string;
+  /** MIME 大类过滤('image'|'video'|'audio',prefix 匹配 mimeType keyword) */
+  mimePrefix?: string;
   page: number;
   pageSize: number;
 }

@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useProtectedRoute } from '@/hooks/use-protected-route';
 import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
+import { getVideoCapability } from '@/lib/video-api';
 import { UserRole } from '@cms-ng/shared';
 import {
   LogOut,
@@ -17,6 +19,7 @@ import {
   Users,
   Settings,
   Images,
+  Clapperboard,
   Search,
   Bell,
   SlidersHorizontal,
@@ -41,6 +44,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: '/dashboard', label: '工作台', icon: LayoutDashboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
       { href: '/dashboard/articles', label: '稿件管理', icon: FileText, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
       { href: '/dashboard/media', label: '媒体库', icon: Images, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
+      // 文生视频(PRD: docs/PRD-text-to-video.md);能力关闭时由 videoEnabled 过滤隐藏
+      { href: '/dashboard/video', label: '视频创作', icon: Clapperboard, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
       { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, roles: [UserRole.EDITOR, UserRole.ADMIN] },
       { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, roles: [UserRole.REPORTER, UserRole.EDITOR, UserRole.ADMIN] },
     ],
@@ -93,10 +98,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const roleLabel = role ? ROLE_LABELS[role] : '';
   const roleCode = role ? ROLE_CODES[role] : '';
 
-  // 过滤出当前角色可见的导航分组
+  // 文生视频能力探测:功能关闭(未配置 provider)时隐藏导航入口
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  useEffect(() => {
+    getVideoCapability()
+      .then((c) => setVideoEnabled(c.enabled))
+      .catch(() => setVideoEnabled(false));
+  }, []);
+
+  // 过滤出当前角色可见的导航分组;视频创作按服务端能力显隐
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => (role ? item.roles.includes(role) : false)),
+    items: group.items.filter(
+      (item) =>
+        (role ? item.roles.includes(role) : false) &&
+        (item.href !== '/dashboard/video' || videoEnabled),
+    ),
   })).filter((group) => group.items.length > 0);
 
   // 顶栏面包屑：取当前激活的导航项标签

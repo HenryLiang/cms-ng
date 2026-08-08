@@ -11,6 +11,8 @@ const defaultBillingConfigs = [
   // AI
   { category: BillingCategory.AI, itemKey: 'ai_llm_per_1k_tokens', itemName: 'AI LLM 调用 (每1K tokens)', unitPrice: 0.02, unit: 'per_1k_tokens' },
   { category: BillingCategory.AI, itemKey: 'ai_image_per_piece', itemName: 'AI 图片生成 (每张)', unitPrice: 0.5, unit: 'per_image' },
+  { category: BillingCategory.AI, itemKey: 'ai_video_per_clip', itemName: 'AI 视频片段生成 (每条)', unitPrice: 2.0, unit: 'per_clip' },
+  { category: BillingCategory.AI, itemKey: 'ai_video_per_compose', itemName: 'AI 稿件成片 (每支)', unitPrice: 8.0, unit: 'per_video' },
 
   // Publishing
   { category: BillingCategory.PUBLISHING, itemKey: 'publish_website', itemName: '网站发布', unitPrice: 0.0, unit: 'per_article' },
