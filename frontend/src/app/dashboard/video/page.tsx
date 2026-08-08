@@ -244,6 +244,8 @@ export default function VideoStudioPage() {
     if (!capability?.duration) return;
     const { mode, min, max, allowed } = capability.duration;
     if (mode === 'fixed' && allowed && !allowed.includes(durationSec)) {
+      // 能力位加载后钳制时长(外部状态同步),set-state-in-effect 规则对此过严
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDurationSec(allowed[0]);
     } else if (mode === 'free' && (durationSec < min || durationSec > max)) {
       setDurationSec(Math.min(max, Math.max(min, durationSec)));
