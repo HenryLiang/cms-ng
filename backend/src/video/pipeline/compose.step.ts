@@ -23,11 +23,11 @@ import {
 /**
  * 合成 step:分镜 → 本地 FFmpeg 成片。
  *
- * 流程:建任务目录 → 下载各镜素材/配音 → 按(配音时长|时长hint)定镜长 →
- * 生成 ASS 字幕(词级时间戳优先,无则整句一 cue)→ ffmpeg 拼接/混音/字幕。
+ * 流程:建任务目录 → 下载各镜素材 → 原生音频模式的视频镜复用素材音轨并按
+ * 实测时长定镜长(其余按时长 hint)→ 每镜整句字幕 cue → ffmpeg 拼接/混音/字幕。
  * 开关 VIDEO_RENDER_ENABLED;jobDir 用完即清(原料都可从 COS 重下)。
  */
-/** prepareScene 产物:合成输入 + 关联的原始分镜(字幕 cue 需要 narration/wordTimestamps) */
+/** prepareScene 产物:合成输入 + 关联的原始分镜(字幕 cue 需要 narration) */
 type PreparedScene = ComposeSceneInput & { scene: StoryboardScene };
 
 export class ComposeStep {
@@ -36,12 +36,12 @@ export class ComposeStep {
   constructor(private readonly deps: VideoPipelineDeps) {}
 
   /**
-   * 原生音频模式:无 TTS 且片段 provider 支持原生音频(与 AssetsStep 同一判定)。
-   * 仅该模式下视频镜才复用素材原生音轨 —— 无 TTS 的 MiniMax/1.0 任务与
-   * media_asset 有声素材按既有行为走静音轨/时长 hint。
+   * 原生音频模式:片段 provider 支持原生音频(与 AssetsStep 同一判定)。
+   * 仅该模式下视频镜才复用素材原生音轨 —— 无原生音频能力的 provider
+   * (MiniMax/1.0)与 media_asset 有声素材按静音轨/时长 hint 处理。
    */
   private get nativeAudio(): boolean {
-    return !this.deps.tts && this.deps.videoGen?.supportsNativeAudio === true;
+    return this.deps.videoGen?.supportsNativeAudio === true;
   }
 
   isEnabled(): boolean {
@@ -115,13 +115,7 @@ export class ComposeStep {
     const ffprobeBin = this.deps.config.get<string>('FFPROBE_BIN') || undefined;
     let audioPath: string | undefined;
     let durationSec: number;
-    if (scene.voice?.audioUrl) {
-      audioPath = path.join(jobDir, `voice-${scene.index}.mp3`);
-      await downloadToFile(scene.voice.audioUrl, audioPath);
-      // 以真实音频时长为准(checkpoint 里的 durationMs 可能是估算值)
-      const probed = await probeDurationSec(audioPath, ffprobeBin);
-      durationSec = probed ?? sceneDurationSec(scene);
-    } else if (isVideo && this.nativeAudio) {
+    if (isVideo && this.nativeAudio) {
       // 原生音频模式的视频镜:复用素材原生音轨(有声生成),
       // 时长取真实探测值,避免冻帧补齐截断原生音频
       const assetDuration = await probeDurationSec(assetPath, ffprobeBin);
@@ -141,7 +135,7 @@ export class ComposeStep {
     };
   }
 
-  /** 字幕 cue:词级时间戳按词组句(≤18 字一 cue);无时间戳则整句一个 cue */
+  /** 字幕 cue:原生音频无词级时间戳,每镜整句一个 cue(时间轴按真实镜长) */
   private buildSubtitleCues(
     storyboard: Storyboard,
     scenes: PreparedScene[],
@@ -149,35 +143,11 @@ export class ComposeStep {
     const cues: SubtitleCue[] = [];
     let offsetMs = 0;
     for (const { durationSec, scene } of scenes) {
-      const words = scene.voice?.wordTimestamps;
-      if (words?.length) {
-        let buf: typeof words = [];
-        for (const w of words) {
-          buf.push(w);
-          const text = buf.map((x) => x.text).join('');
-          if (text.length >= 18 || /[。!?;,.!?;]$/.test(text)) {
-            cues.push({
-              text,
-              beginMs: offsetMs + buf[0].beginMs,
-              endMs: offsetMs + buf[buf.length - 1].endMs,
-            });
-            buf = [];
-          }
-        }
-        if (buf.length) {
-          cues.push({
-            text: buf.map((x) => x.text).join(''),
-            beginMs: offsetMs + buf[0].beginMs,
-            endMs: offsetMs + buf[buf.length - 1].endMs,
-          });
-        }
-      } else {
-        cues.push({
-          text: scene.narration,
-          beginMs: offsetMs,
-          endMs: offsetMs + durationSec * 1000,
-        });
-      }
+      cues.push({
+        text: scene.narration,
+        beginMs: offsetMs,
+        endMs: offsetMs + durationSec * 1000,
+      });
       offsetMs += durationSec * 1000;
     }
     return cues;

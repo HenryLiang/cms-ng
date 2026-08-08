@@ -2,7 +2,7 @@
  * 分镜 JSON 契约(LLM 输出 → 应用层手写校验,仓库无 zod 运行时依赖)。
  * 持久化为 VideoGenerationJob.storyboard(TEXT),解析用 safeJsonParse。
  *
- * checkpoint 设计:每镜的素材/配音进度直接落在 scenes[].asset / scenes[].voice 上,
+ * checkpoint 设计:每镜的素材进度直接落在 scenes[].asset 上,
  * 崩溃恢复时按 scene 状态续跑,不重复扣费。
  */
 
@@ -23,17 +23,9 @@ export interface StoryboardSceneAsset {
   error?: string;
 }
 
-export interface StoryboardSceneVoice {
-  /** 已转存 COS 的配音音频 URL(mp3) */
-  audioUrl: string;
-  durationMs: number;
-  /** 词级时间戳(minimax 必有;volcengine 支持则返回),用于字幕烧录 */
-  wordTimestamps?: Array<{ text: string; beginMs: number; endMs: number }>;
-}
-
 export interface StoryboardScene {
   index: number;
-  /** 该镜口播文本(送 TTS) */
+  /** 该镜口播文本(原生音频模式注入视频 prompt 作旁白;字幕 cue 亦取此) */
   narration: string;
   visual: {
     type: StoryboardVisualType;
@@ -46,9 +38,8 @@ export interface StoryboardScene {
   };
   /** 视频生成失败时的降级策略:P1 固定 'image' */
   fallback?: 'image';
-  /** 以下为运行时 checkpoint(LLM 不产出,assets/voice step 写回) */
+  /** 以下为运行时 checkpoint(LLM 不产出,assets step 写回) */
   asset?: StoryboardSceneAsset;
-  voice?: StoryboardSceneVoice;
 }
 
 export interface Storyboard {
@@ -161,10 +152,7 @@ export function parseStoryboard(
   };
 }
 
-/** 单镜目标时长(秒):有配音按配音,无配音按 hint */
+/** 单镜目标时长(秒):按时长 hint(原生音频模式下合成层以素材实测时长为准) */
 export function sceneDurationSec(scene: StoryboardScene): number {
-  if (scene.voice?.durationMs) {
-    return Math.max(2, Math.ceil(scene.voice.durationMs / 1000));
-  }
   return scene.visual.durationHintSec;
 }

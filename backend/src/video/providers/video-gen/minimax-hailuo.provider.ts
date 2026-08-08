@@ -51,7 +51,7 @@ interface MinimaxFileResponse {
 @Injectable()
 export class MinimaxHailuoProvider implements VideoGenProvider {
   readonly name = VideoGenProviderName.MINIMAX;
-  /** Hailuo 2.3 无原生音频;L2 配音走 MiniMax TTS(t2a_v2) */
+  /** Hailuo 2.3 无原生音频;L2 走该 provider 时成片无配音(纯字幕降级) */
   readonly supportsNativeAudio = false;
   private readonly logger = new Logger(MinimaxHailuoProvider.name);
   private readonly apiKey: string;

@@ -4,7 +4,6 @@ import { createMock } from '../common/test-helpers';
 import { VideoJobService } from './video-job.service';
 import { VideoGenProvider } from './providers/video-gen/video-gen-provider.interface';
 import { ImageGenProvider } from './providers/image-gen/image-gen-provider.interface';
-import { TtsProvider } from './providers/tts/tts-provider.interface';
 import { ComposeStep } from './pipeline/compose.step';
 import type { ChatCompletionProvider } from '../ai/providers';
 import type { PrismaService } from '../prisma/prisma.service';
@@ -85,7 +84,6 @@ describe('VideoJobService', () => {
   let provider: jest.Mocked<VideoGenProvider>;
   let chat: { chatCompletion: jest.Mock };
   let imageGen: jest.Mocked<ImageGenProvider> | null;
-  let tts: jest.Mocked<TtsProvider> | null;
   let service: VideoJobService;
 
   function build(opts?: {
@@ -93,7 +91,6 @@ describe('VideoJobService', () => {
     withProvider?: boolean;
     render?: string;
     withImageGen?: boolean;
-    withTts?: boolean;
   }) {
     prisma = {
       videoGenerationJob: {
@@ -145,20 +142,6 @@ describe('VideoJobService', () => {
               .fn()
               .mockResolvedValue({ imageUrl: 'https://tmp/img.jpg' }),
           } as unknown as jest.Mocked<ImageGenProvider>);
-    tts =
-      opts?.withTts === true
-        ? ({
-            name: 'minimax',
-            synthesize: jest.fn().mockResolvedValue({
-              audio: Buffer.from('mp3'),
-              durationMs: 3000,
-              wordTimestamps: [
-                { text: '你好', beginMs: 0, endMs: 500 },
-                { text: '世界', beginMs: 500, endMs: 1000 },
-              ],
-            }),
-          } as unknown as jest.Mocked<TtsProvider>)
-        : null;
     const config = createMock<ConfigService>({
       get: jest.fn((key: string) => {
         if (key === 'VIDEO_GENERATION_ENABLED') return opts?.enabled ?? 'true';
@@ -175,7 +158,6 @@ describe('VideoJobService', () => {
       opts?.withProvider === false ? null : provider,
       chat as unknown as ChatCompletionProvider,
       imageGen,
-      tts,
     );
   }
 
@@ -1011,49 +993,10 @@ describe('VideoJobService', () => {
         }
         composeSpy.mockRestore();
       });
-
-      it('TTS 可用时配音并落词级时间戳', async () => {
-        build({ withTts: true });
-        prisma.article.findUnique.mockResolvedValue({
-          title: '测试文章',
-          content: `<p>${'正文内容。'.repeat(20)}</p>`,
-        });
-        prisma.videoGenerationJob.update.mockImplementation(
-          (args: { data: Record<string, unknown> }) =>
-            Promise.resolve({ ...L2_JOB, ...args.data }),
-        );
-        prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
-        mockedAxios.get.mockResolvedValue({ data: new ArrayBuffer(8) });
-        prisma.mediaAsset.create.mockResolvedValue({ id: 'a', url: 'u' });
-        prisma.videoGenerationJob.findUnique.mockResolvedValue({ ...L2_JOB });
-        const composeSpy = jest
-          .spyOn(ComposeStep.prototype, 'run')
-          .mockResolvedValue({
-            outputPath: '/tmp/x.mp4',
-            buffer: Buffer.from('mp4'),
-            durationSec: 9,
-            subtitleMode: 'burned',
-          });
-        jest
-          .spyOn(ComposeStep.prototype, 'cleanup')
-          .mockResolvedValue(undefined);
-
-        await service.advance('job-1');
-
-        expect(
-          (tts as jest.Mocked<TtsProvider>).synthesize,
-        ).toHaveBeenCalledTimes(2);
-        expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({ ttsProvider: 'minimax' }),
-          }),
-        );
-        composeSpy.mockRestore();
-      });
     });
 
     describe('L2 重试落点', () => {
-      it('failedStep=voice → 回 VOICE_SYNTHESIZING 续跑', async () => {
+      it('failedStep=voice(存量 TTS 行)→ 回 COMPOSING(配音步已移除)', async () => {
         build();
         prisma.videoGenerationJob.findUnique.mockResolvedValue({
           ...L2_JOB,
@@ -1067,7 +1010,7 @@ describe('VideoJobService', () => {
 
         expect(prisma.videoGenerationJob.update).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: expect.objectContaining({ status: 'VOICE_SYNTHESIZING' }),
+            data: expect.objectContaining({ status: 'COMPOSING' }),
           }),
         );
       });

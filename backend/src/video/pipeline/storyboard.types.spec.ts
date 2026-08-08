@@ -150,17 +150,13 @@ describe('parseStoryboard 分镜契约', () => {
 });
 
 describe('sceneDurationSec', () => {
-  it('有配音按配音时长(向上取整,下限 2s);无配音按 hint', () => {
+  it('按时长 hint(原生音频模式下合成层以素材实测时长为准,不经此函数)', () => {
     const base = parseStoryboard(VALID, { aspectRatio: '9:16' }).scenes[0];
     expect(sceneDurationSec(base)).toBe(5);
     expect(
-      sceneDurationSec({
-        ...base,
-        voice: { audioUrl: 'u', durationMs: 4300 },
-      }),
-    ).toBe(5);
-    expect(
-      sceneDurationSec({ ...base, voice: { audioUrl: 'u', durationMs: 800 } }),
-    ).toBe(2);
+      sceneDurationSec(
+        parseStoryboard(VALID, { aspectRatio: '9:16' }).scenes[1],
+      ),
+    ).toBe(8);
   });
 });

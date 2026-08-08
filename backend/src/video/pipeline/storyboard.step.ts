@@ -16,10 +16,9 @@ export class StoryboardStep {
 
   async run(job: VideoGenerationJob, script: string): Promise<Storyboard> {
     const aspectRatio = job.aspectRatio ?? '9:16';
-    // 原生音频模式(无 TTS 且片段 provider 支持有声生成):
+    // 原生音频模式(片段 provider 支持有声生成):配音唯一通道,
     // 全部镜用 video_clip,旁白由视频模型原生生成;图片镜会静默,破坏旁白连续性
-    const nativeAudio =
-      !this.deps.tts && this.deps.videoGen?.supportsNativeAudio === true;
+    const nativeAudio = this.deps.videoGen?.supportsNativeAudio === true;
     const typeRule = nativeAudio
       ? 'type 全部用 "video_clip"(AI 有声视频片段,旁白由视频模型生成);'
       : 'type 优先用 "image"(AI 静帧图),只有动作感最强的 1~2 镜可用 "video_clip"(AI 视频片段,成本高);';

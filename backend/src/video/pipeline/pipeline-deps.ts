@@ -3,12 +3,11 @@ import type { ChatCompletionProvider } from '../../ai/providers';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { StorageService } from '../../storage/storage.service';
 import type { ImageGenProvider } from '../providers/image-gen/image-gen-provider.interface';
-import type { TtsProvider } from '../providers/tts/tts-provider.interface';
 import type { VideoGenProvider } from '../providers/video-gen/video-gen-provider.interface';
 
 /**
  * 管线 step 的底层能力依赖(注入共用,不含任何文章/auto-publish 过程逻辑)。
- * provider 均可空 —— 缺失时对应能力降级(无图/无配音),由 step 内部分支处理。
+ * provider 均可空 —— 缺失时对应能力降级(无图/无原生配音),由 step 内部分支处理。
  */
 export interface VideoPipelineDeps {
   prisma: PrismaService;
@@ -17,7 +16,6 @@ export interface VideoPipelineDeps {
   chat: ChatCompletionProvider;
   videoGen: VideoGenProvider | null;
   imageGen: ImageGenProvider | null;
-  tts: TtsProvider | null;
   storage: StorageService;
 }
 

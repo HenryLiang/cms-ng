@@ -35,7 +35,6 @@ function scene(partial: {
   type?: 'video_clip' | 'image' | 'media_asset';
   assetUrl: string;
   durationHintSec?: number;
-  voice?: StoryboardScene['voice'];
 }): StoryboardScene {
   return {
     index: partial.index,
@@ -47,7 +46,6 @@ function scene(partial: {
     },
     fallback: 'image',
     asset: { status: 'done', url: partial.assetUrl },
-    voice: partial.voice,
   };
 }
 
@@ -68,10 +66,9 @@ describe('ComposeStep.prepareScene(经 run 触达)', () => {
       prisma: createMock(),
       config,
       chat: createMock(),
-      // 原生音频模式 = 无 TTS 且片段 provider 支持原生音频
+      // 原生音频模式 = 片段 provider 支持原生音频(Seedance 1.5+/2.x)
       videoGen: { supportsNativeAudio: opts.nativeAudio } as never,
       imageGen: null,
-      tts: opts.nativeAudio ? null : ({} as never),
       storage: createMock(),
     };
     return new ComposeStep(deps);
@@ -123,7 +120,7 @@ describe('ComposeStep.prepareScene(经 run 触达)', () => {
     expect(input.durationSec).toBe(7.5);
   });
 
-  it('非原生模式(有 TTS)+ 有声视频素材 → 不混入原声,时长按 hint(既有行为)', async () => {
+  it('非原生模式(provider 无原生音频能力)+ 有声视频素材 → 不混入原声,时长按 hint(既有行为)', async () => {
     const input = await composedScene(
       build({ nativeAudio: false }),
       scene({
@@ -134,25 +131,9 @@ describe('ComposeStep.prepareScene(经 run 触达)', () => {
     );
     expect(input.audioPath).toBeUndefined();
     expect(input.durationSec).toBe(5);
-    // 非原生模式不探测素材(时长由 hint/配音决定)
+    // 非原生模式不探测素材(时长由 hint 决定)
     expect(mockedProbeDuration).not.toHaveBeenCalled();
     expect(mockedHasAudioStream).not.toHaveBeenCalled();
-  });
-
-  it('voice 分支优先于原生音轨分支:配音时长为准', async () => {
-    mockedProbeDuration.mockImplementation((p: string) =>
-      Promise.resolve(p.includes('voice') ? 3.2 : 7.5),
-    );
-    const input = await composedScene(
-      build({ nativeAudio: true }),
-      scene({
-        index: 0,
-        assetUrl: 'https://cos/scene-0.mp4',
-        voice: { audioUrl: 'https://cos/voice-0.mp3', durationMs: 3000 },
-      }),
-    );
-    expect(input.audioPath).toContain('voice-0.mp3');
-    expect(input.durationSec).toBe(3.2); // 真实配音时长,而非素材 7.5
   });
 
   it('图片镜:assetKind=image、不探测、时长按 hint', async () => {

@@ -23,11 +23,11 @@ export class AssetsStep {
   constructor(private readonly deps: VideoPipelineDeps) {}
 
   /**
-   * 原生音频模式:无 TTS 且片段 provider 支持原生音频(Seedance 1.5+/2.x)时,
-   * 视频镜直接生成有声视频(旁白注入 prompt),替代独立 TTS 配音。
+   * 原生音频模式:片段 provider 支持原生音频(Seedance 1.5+/2.x)时,
+   * 视频镜直接生成有声视频(旁白注入 prompt)—— 配音唯一通道,无独立 TTS。
    */
   private get nativeAudio(): boolean {
-    return !this.deps.tts && this.deps.videoGen?.supportsNativeAudio === true;
+    return this.deps.videoGen?.supportsNativeAudio === true;
   }
 
   /** 返回 true 表示全部镜素材就绪;有镜彻底失败(含降级失败)则快速抛错 */

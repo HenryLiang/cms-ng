@@ -609,7 +609,7 @@ model VideoGenerationJob {
   // P1(L2 稿件一键成片)checkpoint:JSON 字符串(仓库零 Json 字段惯例,用 safeJsonParse 解析)
   script         String?             @db.Text // 口播脚本(LLM 产出)
   storyboard     String?             @db.Text // 分镜 JSON(含每镜素材/配音/字幕 checkpoint)
-  ttsProvider    String?             @db.VarChar(20) // 配音 provider:'volcengine' | 'minimax' | 'none'
+  ttsProvider    String?             @db.VarChar(20) // 配音通道:'native' 原生音频 | 'none' 无配音(历史值 volcengine/minimax 为已移除的 TTS)
   // 成本
   costEstimate   Float?
   costActual     Float?

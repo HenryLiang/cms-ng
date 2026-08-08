@@ -109,11 +109,6 @@ function L2JobDetail({ job }: { job: VideoGenerationJobVo }) {
                   </p>
                 </div>
                 <span className="flex shrink-0 items-center gap-1">
-                  {s.voice && (
-                    <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">
-                      已配音
-                    </span>
-                  )}
                   {chip && (
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${chip.className}`}>
                       {chip.label}
@@ -179,7 +174,6 @@ export default function VideoStudioPage() {
           provider: null,
           defaults: { durationSec: 6, resolution: '768P', aspectRatio: '9:16' },
           l2: false,
-          tts: false,
           nativeAudio: false,
           render: false,
         }),
@@ -451,11 +445,10 @@ export default function VideoStudioPage() {
                   <option value="1:1">方形 1:1</option>
                 </select>
               </div>
-              {!capability.tts && capability.nativeAudio && (
+              {capability.nativeAudio ? (
                 <p className="text-xs text-muted">使用视频模型原生音频生成配音(Seedance 2.x)</p>
-              )}
-              {!capability.tts && !capability.nativeAudio && (
-                <p className="text-xs text-amber-600">未配置语音服务,本次成片将无配音(仅字幕)</p>
+              ) : (
+                <p className="text-xs text-amber-600">当前视频模型不支持原生音频,成片将无配音(仅字幕)</p>
               )}
               <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!articleId}>
                 {!submitting && <FileText className="h-4 w-4" />}

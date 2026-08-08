@@ -33,15 +33,10 @@ import { VideoPipelineDeps } from './pipeline/pipeline-deps';
 import { ScriptStep } from './pipeline/script.step';
 import { StoryboardStep } from './pipeline/storyboard.step';
 import { Storyboard } from './pipeline/storyboard.types';
-import { VoiceStep } from './pipeline/voice.step';
 import {
   IMAGE_GEN_PROVIDER,
   ImageGenProvider,
 } from './providers/image-gen/image-gen-provider.interface';
-import {
-  TTS_PROVIDER,
-  TtsProvider,
-} from './providers/tts/tts-provider.interface';
 import {
   VIDEO_GEN_PROVIDER,
   VideoGenProvider,
@@ -67,7 +62,7 @@ const L2_RETRY_STATE: Record<string, VideoJobStatus> = {
   script: 'SCRIPTING',
   storyboard: 'STORYBOARDING',
   assets: 'ASSETS_GENERATING',
-  voice: 'VOICE_SYNTHESIZING',
+  voice: 'COMPOSING', // 兼容:TTS 配音步已移除(2026-08-08),存量失败行直转合成
   compose: 'COMPOSING',
   upload: 'COMPOSING', // 合成目录已清理,重试从合成重来(原料均可从 COS 重下)
 };
@@ -97,7 +92,8 @@ export interface VideoJobVo extends VideoGenerationJob {
  *
  * L1(TEXT_TO_CLIP):PENDING→ASSETS_GENERATING→UPLOADING→SUCCEEDED
  * L2(ARTICLE_TO_VIDEO):PENDING→SCRIPTING→STORYBOARDING→ASSETS_GENERATING
- *   →VOICE_SYNTHESIZING→COMPOSING→UPLOADING→SUCCEEDED
+ *   →COMPOSING→UPLOADING→SUCCEEDED(配音走素材原生音频,无独立配音步;
+ *   VOICE_SYNTHESIZING 为已废弃状态,仅兼容存量行直转 COMPOSING)
  */
 @Injectable()
 export class VideoJobService {
@@ -123,8 +119,6 @@ export class VideoJobService {
     private readonly chat: ChatCompletionProvider,
     @Inject(IMAGE_GEN_PROVIDER)
     private readonly imageGen: ImageGenProvider | null,
-    @Inject(TTS_PROVIDER)
-    private readonly tts: TtsProvider | null,
   ) {
     const flag =
       (
@@ -154,10 +148,9 @@ export class VideoJobService {
         resolution: '768P',
         aspectRatio: '9:16',
       },
-      // L2(稿件一键成片)能力分解:渲染开关 + 图片 provider 必备;TTS 缺失时降级无配音
+      // L2(稿件一键成片)能力分解:渲染开关 + 图片 provider 必备
       l2: this.enabled && this.renderEnabled && this.imageGen != null,
-      tts: this.tts != null,
-      // 无 TTS 时的替代配音通道:片段模型原生音频(Seedance 1.5+/2.x)
+      // 配音通道 = 片段模型原生音频(Seedance 1.5+/2.x);false 时 L2 成片无配音(纯字幕)
       nativeAudio: this.provider?.supportsNativeAudio === true,
       render: this.renderEnabled,
     };
@@ -170,7 +163,6 @@ export class VideoJobService {
       chat: this.chat,
       videoGen: this.provider,
       imageGen: this.imageGen,
-      tts: this.tts,
       storage: this.storage,
     };
   }
@@ -481,7 +473,8 @@ export class VideoJobService {
   }
 
   /**
-   * L2 编排:脚本 → 分镜 → 素材(逐镜 checkpoint,多 tick)→ 配音 → 合成 → 上传。
+   * L2 编排:脚本 → 分镜 → 素材(逐镜 checkpoint,多 tick)→ 合成 → 上传。
+   * 配音由素材步的原生音频承担(旁白注入视频 prompt),无独立配音步。
    * 除素材步外每步幂等(崩溃后按状态重入续跑);素材步进度落 storyboard checkpoint。
    */
   private async advanceL2(job: VideoGenerationJob): Promise<void> {
@@ -541,21 +534,19 @@ export class VideoJobService {
           where: { id: job.id },
           data: {
             storyboard: JSON.stringify(storyboard),
-            status: 'VOICE_SYNTHESIZING',
+            // 配音通道 = 片段模型原生音频(Seedance 1.5+/2.x),无独立 TTS;
+            // 'none' = provider 无原生音频能力,成片纯字幕降级
+            ttsProvider: this.provider?.supportsNativeAudio ? 'native' : 'none',
+            status: 'COMPOSING',
           },
         });
       }
       if (current.status === 'VOICE_SYNTHESIZING') {
-        const storyboard = this.parseStoryboardCheckpoint(current);
-        await new VoiceStep(deps).run(current, storyboard);
+        // 兼容:TTS 配音步已移除(2026-08-08),存量进行中的行直转 COMPOSING
         current = await this.prisma.videoGenerationJob.update({
           where: { id: job.id },
           data: {
-            storyboard: JSON.stringify(storyboard),
-            // native = 无 TTS,由视频模型原生音频配音(Seedance 1.5+/2.x)
-            ttsProvider:
-              this.tts?.name ??
-              (this.provider?.supportsNativeAudio ? 'native' : 'none'),
+            ttsProvider: this.provider?.supportsNativeAudio ? 'native' : 'none',
             status: 'COMPOSING',
           },
         });
@@ -580,9 +571,7 @@ export class VideoJobService {
             ? 'storyboard'
             : current.status === 'ASSETS_GENERATING'
               ? 'assets'
-              : current.status === 'VOICE_SYNTHESIZING'
-                ? 'voice'
-                : 'compose';
+              : 'compose';
       await this.fail(job.id, step, err);
     }
   }

@@ -47,8 +47,8 @@ export interface VideoGenPollResult {
 export interface VideoGenProvider {
   readonly name: VideoGenProviderName;
   /**
-   * 是否支持原生音频生成(generate_audio)。L2 据此决策:
-   * 无 TTS 且片段 provider 支持原生音频时,视频镜用原生配音替代 TTS 旁白。
+   * 是否支持原生音频生成(generate_audio)。L2 据此决策配音通道:
+   * 支持原生音频时视频镜用原生配音;不支持则成片无配音(纯字幕降级)。
    */
   readonly supportsNativeAudio?: boolean;
   submit(req: VideoGenSubmitRequest): Promise<VideoGenTaskHandle>;
