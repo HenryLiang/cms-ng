@@ -81,6 +81,28 @@ describe('useRoleGuard', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it('should allow SUPER_ADMIN through admin routes', () => {
+    mockHasHydrated = true;
+    mockIsAuthenticated = true;
+    mockUser = { role: UserRole.SUPER_ADMIN };
+    mockPathname.mockReturnValue('/dashboard/settings');
+
+    renderHook(() => useRoleGuard());
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('should enforce roles on nested restricted routes', () => {
+    mockHasHydrated = true;
+    mockIsAuthenticated = true;
+    mockUser = { role: UserRole.REPORTER };
+    mockPathname.mockReturnValue('/dashboard/accounts/user-id');
+
+    renderHook(() => useRoleGuard());
+
+    expect(mockReplace).toHaveBeenCalledWith('/dashboard');
+  });
+
   it('should not redirect when route has no role restriction', () => {
     mockHasHydrated = true;
     mockIsAuthenticated = true;

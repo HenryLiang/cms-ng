@@ -93,6 +93,15 @@ describe('auth-store', () => {
       expect(useAuthStore.getState().isEditor()).toBe(true);
     });
 
+    it('SUPER_ADMIN inherits admin and editor checks', () => {
+      useAuthStore.setState({
+        user: { ...mockUser, role: UserRole.SUPER_ADMIN },
+      });
+      expect(useAuthStore.getState().isSuperAdmin()).toBe(true);
+      expect(useAuthStore.getState().isAdmin()).toBe(true);
+      expect(useAuthStore.getState().isEditor()).toBe(true);
+    });
+
     it('isEditor returns true for EDITOR', () => {
       useAuthStore.setState({ user: { ...mockUser, role: UserRole.EDITOR } });
       expect(useAuthStore.getState().isEditor()).toBe(true);

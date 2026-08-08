@@ -27,7 +27,8 @@ import { GoogleTrendsQueryDto } from './dto/google-trends-query.dto';
 import { SourcePaginationDto } from './dto/source-pagination.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import { type ApiResponse, UserRole } from '@cms-ng/shared';
+import { type ApiResponse, SystemFeature, UserRole } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 import { TopicSourceCatalog } from './sources/topic-source.catalog';
 import type {
   TopicSourceDefinition,
@@ -37,6 +38,7 @@ import type {
 @ApiTags('trending-topics')
 @ApiBearerAuth('bearer')
 @Controller('trending-topics')
+@RequiresSystemFeature(SystemFeature.STORIES)
 export class TrendingTopicsController {
   private readonly UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

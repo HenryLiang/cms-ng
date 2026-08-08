@@ -23,10 +23,13 @@ import { MediaService } from './media.service';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { SystemFeature } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('media')
 @ApiBearerAuth('bearer')
 @Controller('media')
+@RequiresSystemFeature(SystemFeature.MEDIA)
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 

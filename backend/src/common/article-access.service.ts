@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@cms-ng/shared';
+import { isAdminRole } from '@cms-ng/shared';
 
 export interface ArticleAccessUser {
   userId: string;
@@ -92,7 +92,7 @@ export class ArticleAccessService {
     options: CheckAccessOptions,
   ): void {
     const canAccess =
-      (user.role as UserRole) === UserRole.ADMIN ||
+      isAdminRole(user.role) ||
       authorId === user.userId ||
       editorId === user.userId;
 

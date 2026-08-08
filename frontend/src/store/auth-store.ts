@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AuthState } from '@/types/auth';
-import { UserRole } from '@cms-ng/shared';
+import {
+  isAdminRole,
+  isEditorRole,
+  isSuperAdminRole,
+  UserRole,
+} from '@cms-ng/shared';
 import { login as loginApi, register as registerApi, getCurrentUser, logoutClient } from '@/lib/auth-api';
 
 interface AuthStore extends AuthState {
@@ -11,6 +16,7 @@ interface AuthStore extends AuthState {
   logout: () => void;
   isEditor: () => boolean;
   isAdmin: () => boolean;
+  isSuperAdmin: () => boolean;
   isReporter: () => boolean;
   _hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
@@ -71,8 +77,9 @@ export const useAuthStore = create<AuthStore>()(
         set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
       },
 
-      isEditor: () => get().user?.role === UserRole.EDITOR || get().user?.role === UserRole.ADMIN,
-      isAdmin: () => get().user?.role === UserRole.ADMIN,
+      isEditor: () => isEditorRole(get().user?.role),
+      isAdmin: () => isAdminRole(get().user?.role),
+      isSuperAdmin: () => isSuperAdminRole(get().user?.role),
       isReporter: () => get().user?.role === UserRole.REPORTER,
     }),
     {

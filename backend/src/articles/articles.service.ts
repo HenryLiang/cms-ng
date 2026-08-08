@@ -16,7 +16,13 @@ import { AIService } from '../ai/ai.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { FindAllArticlesDto } from './dto/find-all-articles.dto';
-import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
+import {
+  ArticleStatus,
+  UserRole,
+  ContentLanguage,
+  isAdminRole,
+  isEditorRole,
+} from '@cms-ng/shared';
 import { safeJsonParse } from '../common/json.utils';
 import {
   deserializeArticle,
@@ -317,10 +323,7 @@ export class ArticlesService {
       select: { role: true },
     });
     if (!editor) throw new NotFoundException('Editor not found');
-    if (
-      (editor.role as UserRole) !== UserRole.EDITOR &&
-      (editor.role as UserRole) !== UserRole.ADMIN
-    ) {
+    if (!isEditorRole(editor.role)) {
       throw new ForbiddenException('Assigned user is not an editor');
     }
 
@@ -416,7 +419,7 @@ export class ArticlesService {
       where: { id: userId },
       select: { role: true },
     });
-    return user?.role === UserRole.ADMIN;
+    return isAdminRole(user?.role);
   }
 
   // ===== AI Operations =====

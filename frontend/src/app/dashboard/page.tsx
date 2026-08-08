@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { getStories, updateStory, type Story } from '@/lib/story-api';
@@ -17,6 +17,9 @@ import {
 import LanguageBadge from '@/components/language-badge';
 import { StatusBadge } from '@/components/ui';
 import { buttonClasses, Card } from '@/components/ui';
+import { SystemFeature } from '@cms-ng/shared';
+import { useSystemFeaturesStore } from '@/store/system-features-store';
+import { canUseFeature } from '@/lib/feature-access';
 
 const PIPELINE = [
   { key: 'DRAFT', label: '选题中', icon: Clock },
@@ -27,22 +30,28 @@ const PIPELINE = [
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const statuses = useSystemFeaturesStore((state) => state.statuses);
+  const storiesEnabled = canUseFeature(
+    SystemFeature.STORIES,
+    user?.role,
+    statuses,
+  );
   const [stories, setStories] = useState<Story[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(storiesEnabled);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
-  async function loadStories() {
+  const loadStories = useCallback(async () => {
     try {
       const data = await getStories();
       setStories(data);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadStories();
-  }, []);
+    if (storiesEnabled) void loadStories();
+  }, [loadStories, storiesEnabled]);
 
   async function moveStory(storyId: string, newStatus: string) {
     await updateStory(storyId, { status: newStatus as Story['status'] });
@@ -54,6 +63,25 @@ export default function DashboardPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
+      </div>
+    );
+  }
+
+  if (!storiesEnabled) {
+    return (
+      <div className="mx-auto max-w-7xl p-6">
+        <div className="mb-5">
+          <h1 className="text-xl font-semibold tracking-tight">
+            欢迎回来，{user?.name}
+          </h1>
+          <p className="mt-0.5 text-sm text-muted">查看你的创作工作区</p>
+        </div>
+        <Card className="p-8 text-center">
+          <p className="text-sm font-medium">选题功能当前未开放</p>
+          <p className="mt-1 text-xs text-muted">
+            工作台中的选题统计与最近选题已隐藏。
+          </p>
+        </Card>
       </div>
     );
   }

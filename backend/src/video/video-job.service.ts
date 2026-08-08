@@ -14,7 +14,7 @@ import {
   VideoJobStatus,
 } from '@prisma/client';
 // 计费参数类型来自 shared 枚举(DeductParams 契约),与 Prisma 枚举值同构但名义类型不同
-import { BillingCategory, TransactionType } from '@cms-ng/shared';
+import { BillingCategory, isEditorRole, TransactionType } from '@cms-ng/shared';
 import axios from 'axios';
 import { CHAT_PROVIDER } from '../ai/providers';
 import type { ChatCompletionProvider } from '../ai/providers';
@@ -259,7 +259,7 @@ export class VideoJobService {
       if (!article) {
         throw new NotFoundException('来源文章不存在');
       }
-      const privileged = role === 'EDITOR' || role === 'ADMIN';
+      const privileged = isEditorRole(role);
       if (article.authorId !== userId && !privileged) {
         throw new ServiceUnavailableException('只能用自己的文章生成视频');
       }

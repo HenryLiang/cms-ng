@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from '@cms-ng/shared';
+import { hasRequiredRole, UserRole } from '@cms-ng/shared';
 import { ROLES_KEY } from './roles.decorator';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
@@ -36,7 +36,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Access denied');
     }
 
-    const hasRole = requiredRoles.includes(user.role as UserRole);
+    const hasRole = hasRequiredRole(user.role, requiredRoles);
     if (!hasRole) {
       throw new ForbiddenException('Insufficient permissions');
     }

@@ -12,7 +12,7 @@ import {
   TransactionStatus,
   PaymentMethod,
   BillingCategory,
-  UserRole,
+  isAdminRole,
 } from '@cms-ng/shared';
 import { ManualTopUpDto } from './dto/manual-top-up.dto';
 import { UpdateBillingConfigDto } from './dto/update-billing-config.dto';
@@ -261,7 +261,7 @@ export class BillingService {
       where: { id: adminId },
       select: { role: true },
     });
-    if (!admin || (admin.role as UserRole) !== UserRole.ADMIN) {
+    if (!admin || !isAdminRole(admin.role)) {
       throw new ForbiddenException('Only admins can perform manual top-ups');
     }
 
@@ -717,7 +717,7 @@ export class BillingService {
       where: { id: adminId },
       select: { role: true },
     });
-    if (!admin || (admin.role as UserRole) !== UserRole.ADMIN) {
+    if (!admin || !isAdminRole(admin.role)) {
       throw new ForbiddenException('Only admins can process refunds');
     }
 

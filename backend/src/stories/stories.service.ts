@@ -10,7 +10,13 @@ import { ArticlesService } from '../articles/articles.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { FindAllStoriesDto } from './dto/find-all-stories.dto';
-import { ArticleStatus, UserRole, ContentLanguage } from '@cms-ng/shared';
+import {
+  ArticleStatus,
+  ContentLanguage,
+  isAdminRole,
+  isEditorRole,
+  UserRole,
+} from '@cms-ng/shared';
 import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 import { safeJsonParse } from '../common/json.utils';
 
@@ -194,7 +200,7 @@ export class StoriesService {
     if (!story) throw new NotFoundException('Story not found');
 
     const canAccess =
-      (user.role as UserRole) === UserRole.ADMIN ||
+      isAdminRole(user.role) ||
       story.reporterId === user.userId ||
       story.editorId === user.userId;
 
@@ -214,10 +220,7 @@ export class StoriesService {
       select: { role: true },
     });
     if (!editor) throw new NotFoundException('Editor not found');
-    if (
-      (editor.role as UserRole) !== UserRole.EDITOR &&
-      (editor.role as UserRole) !== UserRole.ADMIN
-    ) {
+    if (!isEditorRole(editor.role)) {
       throw new ForbiddenException('Assigned user is not an editor');
     }
 

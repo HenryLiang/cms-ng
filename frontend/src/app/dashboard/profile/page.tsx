@@ -19,6 +19,7 @@ const roleLabels: Record<UserRole, string> = {
   [UserRole.REPORTER]: '记者',
   [UserRole.EDITOR]: '编辑',
   [UserRole.ADMIN]: '管理员',
+  [UserRole.SUPER_ADMIN]: '超级管理员',
 };
 
 export default function ProfilePage() {

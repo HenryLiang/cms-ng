@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@cms-ng/shared';
+import { isAdminRole, UserRole } from '@cms-ng/shared';
 import type { TrendingTopic as TrendingTopicRecord } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 import { safeJsonParse } from '../common/json.utils';
@@ -69,7 +69,7 @@ export class TrendingTopicsService {
       where: { id },
     });
     if (!existing) throw new NotFoundException('Topic not found');
-    if (userRole !== UserRole.ADMIN && existing.createdBy !== userId) {
+    if (!isAdminRole(userRole) && existing.createdBy !== userId) {
       throw new ForbiddenException(
         'You do not have permission to update this topic',
       );
@@ -93,7 +93,7 @@ export class TrendingTopicsService {
       where: { id },
     });
     if (!existing) throw new NotFoundException('Topic not found');
-    if (userRole !== UserRole.ADMIN && existing.createdBy !== userId) {
+    if (!isAdminRole(userRole) && existing.createdBy !== userId) {
       throw new ForbiddenException(
         'You do not have permission to delete this topic',
       );

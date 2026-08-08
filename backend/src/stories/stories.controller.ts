@@ -16,11 +16,13 @@ import { FindAllStoriesDto } from './dto/find-all-stories.dto';
 import { GenerateDraftFromResearchKitDto } from './dto/generate-draft.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole, ContentLanguage } from '@cms-ng/shared';
+import { UserRole, ContentLanguage, SystemFeature } from '@cms-ng/shared';
+import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('stories')
 @ApiBearerAuth('bearer')
 @Controller('stories')
+@RequiresSystemFeature(SystemFeature.STORIES)
 export class StoriesController {
   constructor(private storiesService: StoriesService) {}
 

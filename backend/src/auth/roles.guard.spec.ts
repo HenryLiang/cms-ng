@@ -1,6 +1,7 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from './roles.guard';
+import { UserRole } from '@cms-ng/shared';
 
 describe('RolesGuard', () => {
   let guard: RolesGuard;
@@ -62,6 +63,38 @@ describe('RolesGuard', () => {
       );
 
       expect(result).toBe(true);
+    });
+
+    it('should allow SUPER_ADMIN to access ADMIN routes', () => {
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return false;
+          if (key === 'roles') return [UserRole.ADMIN];
+          return undefined;
+        });
+
+      const result = guard.canActivate(
+        createMockContext({ user: { role: UserRole.SUPER_ADMIN } }),
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('should not allow ADMIN to access SUPER_ADMIN-only routes', () => {
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockImplementation((key: string) => {
+          if (key === 'isPublic') return false;
+          if (key === 'roles') return [UserRole.SUPER_ADMIN];
+          return undefined;
+        });
+
+      expect(() =>
+        guard.canActivate(
+          createMockContext({ user: { role: UserRole.ADMIN } }),
+        ),
+      ).toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException when user role does not match', () => {

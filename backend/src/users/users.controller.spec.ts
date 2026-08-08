@@ -114,9 +114,9 @@ describe('UsersController', () => {
         initialPassword: 'randompwd12',
       });
 
-      const result = await controller.create(dto);
+      const result = await controller.create(dto, UserRole.ADMIN);
 
-      expect(usersService.create).toHaveBeenCalledWith(dto);
+      expect(usersService.create).toHaveBeenCalledWith(dto, UserRole.ADMIN);
       expect(result.initialPassword).toBe('randompwd12');
     });
   });
@@ -126,12 +126,18 @@ describe('UsersController', () => {
       usersService.setStatus.mockResolvedValue({ id: 'u2', isActive: false });
       const dto = { isActive: false };
 
-      const result = await controller.updateStatus('u2', dto, 'admin-id');
+      const result = await controller.updateStatus(
+        'u2',
+        dto,
+        'admin-id',
+        UserRole.ADMIN,
+      );
 
       expect(usersService.setStatus).toHaveBeenCalledWith(
         'u2',
         dto,
         'admin-id',
+        UserRole.ADMIN,
       );
       expect(result.isActive).toBe(false);
     });
@@ -141,9 +147,12 @@ describe('UsersController', () => {
     it('should delegate to service and return one-time password', async () => {
       usersService.resetPassword.mockResolvedValue({ password: 'newrandom12' });
 
-      const result = await controller.resetPassword('u2');
+      const result = await controller.resetPassword('u2', UserRole.ADMIN);
 
-      expect(usersService.resetPassword).toHaveBeenCalledWith('u2');
+      expect(usersService.resetPassword).toHaveBeenCalledWith(
+        'u2',
+        UserRole.ADMIN,
+      );
       expect(result.password).toBe('newrandom12');
     });
   });
