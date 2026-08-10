@@ -3,6 +3,7 @@ import { AIService } from '../../../ai/ai.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ArticleRunStatus } from '@cms-ng/shared';
 import { PipelineStep, PipelineContext } from '../step.interface';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ImageGenerationStep implements PipelineStep {
@@ -13,6 +14,7 @@ export class ImageGenerationStep implements PipelineStep {
   constructor(
     private aiService: AIService,
     private prisma: PrismaService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async execute(ctx: PipelineContext): Promise<PipelineContext> {
@@ -42,6 +44,9 @@ export class ImageGenerationStep implements PipelineStep {
       await this.prisma.article.update({
         where: { id: ctx.savedArticleId },
         data: { coverImage: result.url },
+      });
+      this.eventEmitter.emit('article.updated', {
+        articleId: ctx.savedArticleId,
       });
 
       this.logger.log(`Cover image generated: ${result.url}`);

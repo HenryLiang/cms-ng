@@ -4,7 +4,7 @@ import { Client } from '@elastic/elasticsearch';
 import { SearchService, SearchUnavailableException } from './search.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
-import type { MediaSearchQuery } from './search.types';
+import type { ArticleSearchQuery, MediaSearchQuery } from './search.types';
 
 // Mock ES Client 构造器(与 cos-storage.service.spec 同一模式,不打真实 ES)
 jest.mock('@elastic/elasticsearch');
@@ -29,6 +29,7 @@ describe('SearchService', () => {
     ELASTICSEARCH_ENABLED: 'true',
     ELASTICSEARCH_NODE: 'http://localhost:9200',
     ELASTICSEARCH_INDEX_MEDIA: 'media_assets',
+    ELASTICSEARCH_INDEX_ARTICLES: 'articles',
   };
 
   const baseQuery: MediaSearchQuery = {
@@ -52,6 +53,25 @@ describe('SearchService', () => {
     source: 'UPLOAD',
     mimeType: 'image/png',
     createdAt: new Date('2026-07-20T00:00:00.000Z'),
+  };
+
+  const baseArticle = {
+    id: 'article-1',
+    title: '气候政策新进展',
+    content: '<p>香港减碳计划</p>',
+    authorId: 'reporter-1',
+    editorId: 'editor-1',
+    status: 'IN_REVIEW',
+    storyId: 'story-1',
+    updatedAt: new Date('2026-08-10T00:00:00.000Z'),
+  };
+
+  const baseArticleQuery: ArticleSearchQuery = {
+    userId: 'editor-1',
+    role: 'EDITOR',
+    search: '气候政策',
+    page: 1,
+    pageSize: 20,
   };
 
   async function makeService(
@@ -117,6 +137,21 @@ describe('SearchService', () => {
       expect(service.isEnabled()).toBe(true);
     });
 
+    it('creates a separate IK index for article title and content search', async () => {
+      service = await makeService();
+      expect(mockClient.indices.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          index: 'articles',
+          mappings: expect.objectContaining({
+            properties: expect.objectContaining({
+              title: expect.objectContaining({ analyzer: 'ik_max_word' }),
+              content: expect.objectContaining({ analyzer: 'ik_max_word' }),
+            }),
+          }),
+        }),
+      );
+    });
+
     it('ensureIndex:索引已存在 -> 跳过创建,isEnabled true', async () => {
       mockClient.indices.exists.mockResolvedValue(true);
       service = await makeService();
@@ -132,6 +167,21 @@ describe('SearchService', () => {
       expect(service.isEnabled()).toBe(false);
     });
 
+    it('article index failure does not degrade a healthy media index', async () => {
+      mockClient.indices.exists.mockResolvedValue(false);
+      mockClient.indices.create.mockImplementation(({ index }) => {
+        if (index === 'articles') {
+          return Promise.reject(new Error('article mapping failed'));
+        }
+        return Promise.resolve({ acknowledged: true });
+      });
+
+      service = await makeService();
+
+      expect(service.isEnabled()).toBe(true);
+      expect(service.isArticleEnabled()).toBe(false);
+    });
+
     it('懒式自愈:初始化降级后,写路径重试 ensureReady 成功 -> 恢复可用', async () => {
       // 初始化时 ES down
       mockClient.indices.exists.mockRejectedValueOnce(
@@ -139,6 +189,7 @@ describe('SearchService', () => {
       );
       service = await makeService();
       expect(service.isEnabled()).toBe(false);
+      expect(service.isArticleEnabled()).toBe(true);
       // isConfigured 与 isEnabled 的区分:配置已开但索引未就绪 -> 检索仍降级
       expect(service.isConfigured()).toBe(true);
       expect(service.isEnabled()).toBe(false);
@@ -160,7 +211,7 @@ describe('SearchService', () => {
       mockClient.indices.exists.mockResolvedValue(true);
       prisma.mediaAsset.findUnique.mockResolvedValue(baseAsset);
       await service.indexAsset('a1'); // 被节流,不 heal
-      expect(mockClient.indices.exists).toHaveBeenCalledTimes(1); // 仅 onModuleInit 那次
+      expect(mockClient.indices.exists).toHaveBeenCalledTimes(2); // 启动时媒体/稿件各一次
       expect(mockClient.index).not.toHaveBeenCalled(); // 未就绪,跳过写
       // 投影被记脏(indexReady 恢复后 drainDirty 补投)
       expect(
@@ -323,6 +374,7 @@ describe('SearchService', () => {
       );
       // indexReady 被复位,下轮 ensureReady 才会重建索引(而非持续打一个不存在的索引)
       expect(service.isEnabled()).toBe(false);
+      expect(service.isArticleEnabled()).toBe(true);
     });
 
     it('tag 过滤 -> tags.keyword 与 aiTags.keyword OR(term 精确)', async () => {
@@ -372,6 +424,198 @@ describe('SearchService', () => {
       await expect(service.searchMedia(baseQuery)).rejects.toThrow(
         SearchUnavailableException,
       );
+    });
+  });
+
+  describe('article projection and search', () => {
+    const hitsResp = (ids: string[], total: number) => ({
+      hits: {
+        total: { value: total, relation: 'eq' },
+        hits: ids.map((id) => ({ _id: id })),
+      },
+    });
+
+    beforeEach(async () => {
+      service = await makeService();
+    });
+
+    it('indexes the latest article title, body and access fields', async () => {
+      prisma.article.findUnique.mockResolvedValue(baseArticle);
+
+      await service.indexArticle('article-1');
+
+      expect(mockClient.index).toHaveBeenCalledWith(
+        expect.objectContaining({
+          index: 'articles',
+          id: 'article-1',
+          document: expect.objectContaining({
+            title: '气候政策新进展',
+            content: '香港减碳计划',
+            authorId: 'reporter-1',
+            editorId: 'editor-1',
+            status: 'IN_REVIEW',
+            storyId: 'story-1',
+          }),
+          version: baseArticle.updatedAt.getTime(),
+          version_type: 'external_gte',
+        }),
+      );
+    });
+
+    it('searches title and content with editor access filters before pagination', async () => {
+      mockClient.search.mockResolvedValue(
+        hitsResp(['article-2', 'article-1'], 2),
+      );
+
+      await expect(
+        service.searchArticles({
+          ...baseArticleQuery,
+          storyId: 'story-1',
+          page: 2,
+          pageSize: 10,
+        }),
+      ).resolves.toEqual({ ids: ['article-2', 'article-1'], total: 2 });
+
+      const [body] = mockClient.search.mock.calls[0];
+      expect(body).toEqual(
+        expect.objectContaining({
+          index: 'articles',
+          from: 10,
+          size: 10,
+          track_total_hits: true,
+        }),
+      );
+      expect(body.query.bool.must).toEqual([
+        {
+          multi_match: expect.objectContaining({
+            query: '气候政策',
+            fields: ['title^3', 'content'],
+          }),
+        },
+      ]);
+      expect(body.query.bool.filter).toEqual(
+        expect.arrayContaining([
+          { term: { storyId: 'story-1' } },
+          {
+            bool: {
+              should: [
+                { term: { authorId: 'editor-1' } },
+                { term: { editorId: 'editor-1' } },
+                {
+                  terms: {
+                    status: ['PENDING_REVIEW', 'IN_REVIEW', 'REVISION'],
+                  },
+                },
+              ],
+              minimum_should_match: 1,
+            },
+          },
+        ]),
+      );
+    });
+
+    it('restricts reporter searches to their own articles', async () => {
+      mockClient.search.mockResolvedValue(hitsResp([], 0));
+      await service.searchArticles({
+        ...baseArticleQuery,
+        userId: 'reporter-1',
+        role: 'REPORTER',
+      });
+      const [body] = mockClient.search.mock.calls[0];
+      expect(body.query.bool.filter).toContainEqual({
+        term: { authorId: 'reporter-1' },
+      });
+    });
+
+    it('deletes article projections idempotently', async () => {
+      await service.deleteArticle('article-1');
+      expect(mockClient.delete).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 'articles', id: 'article-1' }),
+      );
+    });
+
+    it('records a dirty article and enters degraded mode when an async projection write fails', async () => {
+      prisma.article.findUnique.mockResolvedValue(baseArticle);
+      mockClient.index.mockRejectedValue(new Error('connection reset'));
+
+      service.handleArticleUpsert({ articleId: 'article-1' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(
+        (
+          service as unknown as {
+            dirtyArticleIds: Set<string>;
+          }
+        ).dirtyArticleIds,
+      ).toContain('article-1');
+      expect(service.isEnabled()).toBe(true);
+      expect(service.isArticleEnabled()).toBe(false);
+    });
+
+    it('serializes updates for the same article so an older request cannot finish last', async () => {
+      const first = {
+        ...baseArticle,
+        title: '旧标题',
+        updatedAt: new Date('2026-08-10T00:00:00.000Z'),
+      };
+      const second = {
+        ...baseArticle,
+        title: '新标题',
+        updatedAt: new Date('2026-08-10T00:00:01.000Z'),
+      };
+      prisma.article.findUnique
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(second);
+      let releaseFirst: (() => void) | undefined;
+      mockClient.index
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              releaseFirst = () => resolve({ result: 'updated' });
+            }),
+        )
+        .mockResolvedValueOnce({ result: 'updated' });
+
+      service.handleArticleUpsert({ articleId: 'article-1' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      service.handleArticleUpsert({ articleId: 'article-1' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(prisma.article.findUnique).toHaveBeenCalledTimes(1);
+      releaseFirst?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(
+        mockClient.index.mock.calls.map(([request]) => request.document.title),
+      ).toEqual(['旧标题', '新标题']);
+    });
+
+    it('re-enters degraded mode when a dirty projection retry fails, then heals again', async () => {
+      const internal = service as unknown as {
+        articleIndexReady: boolean;
+        articleLastHealAttempt: number;
+        dirtyArticleIds: Set<string>;
+        drainDirtyArticles: () => Promise<void>;
+        ensureArticleReady: () => Promise<boolean>;
+      };
+      internal.dirtyArticleIds.add('article-1');
+      prisma.article.findUnique.mockResolvedValue(baseArticle);
+      mockClient.index.mockRejectedValueOnce(new Error('still down'));
+
+      await internal.drainDirtyArticles();
+
+      expect(internal.articleIndexReady).toBe(false);
+      expect(internal.dirtyArticleIds).toContain('article-1');
+
+      mockClient.indices.exists.mockResolvedValue(true);
+      mockClient.index.mockResolvedValue({ result: 'updated' });
+      internal.articleLastHealAttempt = 0;
+      await internal.ensureArticleReady();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(internal.articleIndexReady).toBe(true);
+      expect(internal.dirtyArticleIds.size).toBe(0);
     });
   });
 

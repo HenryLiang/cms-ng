@@ -43,6 +43,11 @@ import {
   OptimizeGEODto,
 } from './dto/ai-operations.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  SearchService,
+  SearchUnavailableException,
+} from '../search/search.service';
 
 @Injectable()
 export class ArticlesService {
@@ -118,6 +123,8 @@ export class ArticlesService {
     private prisma: PrismaService,
     private aiService: AIService,
     private articleAccess: ArticleAccessService,
+    private searchService: SearchService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async create(authorId: string, dto: CreateArticleDto) {
@@ -164,6 +171,8 @@ export class ArticlesService {
       },
     });
 
+    this.eventEmitter.emit('article.updated', { articleId: article.id });
+
     return deserializeArticle(article);
   }
 
@@ -203,15 +212,57 @@ export class ArticlesService {
 
     const search = query.search?.trim();
     if (search) {
-      const searchWhere: Prisma.ArticleWhereInput = {
-        OR: [
-          { title: { contains: search } },
-          { content: { contains: search } },
-        ],
-      };
-      where = Object.keys(where).length
-        ? { AND: [where, searchWhere] }
-        : searchWhere;
+      try {
+        const result = await this.searchService.searchArticles({
+          userId: user.userId,
+          role: user.role,
+          search,
+          storyId,
+          page,
+          pageSize,
+        });
+        if (result.ids.length === 0) {
+          return buildPaginatedResponse([], result.total, { page, pageSize });
+        }
+
+        // ES 负责分页前权限过滤；回表仍复核 MySQL 权限，避免刷新延迟泄漏数据。
+        const idWhere: Prisma.ArticleWhereInput = {
+          id: { in: result.ids },
+        };
+        const databaseWhere = Object.keys(where).length
+          ? { AND: [where, idWhere] }
+          : idWhere;
+        const rows = await this.prisma.article.findMany({
+          where: databaseWhere,
+          include: {
+            author: { select: { id: true, name: true, email: true } },
+            editor: { select: { id: true, name: true, email: true } },
+            story: { select: { id: true, title: true } },
+          },
+        });
+        const byId = new Map(rows.map((article) => [article.id, article]));
+        const articles = result.ids
+          .map((id) => byId.get(id))
+          .filter((article): article is NonNullable<typeof article> =>
+            Boolean(article),
+          )
+          .map((article) => deserializeArticle(article));
+        return buildPaginatedResponse(articles, result.total, {
+          page,
+          pageSize,
+        });
+      } catch (error) {
+        if (!(error instanceof SearchUnavailableException)) throw error;
+        const searchWhere: Prisma.ArticleWhereInput = {
+          OR: [
+            { title: { contains: search } },
+            { content: { contains: search } },
+          ],
+        };
+        where = Object.keys(where).length
+          ? { AND: [where, searchWhere] }
+          : searchWhere;
+      }
     }
 
     const skip = (page - 1) * pageSize;
@@ -311,6 +362,8 @@ export class ArticlesService {
       });
     }
 
+    this.eventEmitter.emit('article.updated', { articleId: id });
+
     return deserializeArticle(article);
   }
 
@@ -318,6 +371,7 @@ export class ArticlesService {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
     await this.prisma.article.delete({ where: { id } });
+    this.eventEmitter.emit('article.deleted', { articleId: id });
     return { success: true };
   }
 
@@ -349,6 +403,7 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
+    this.eventEmitter.emit('article.updated', { articleId: id });
     return deserializeArticle(updated);
   }
 
@@ -418,6 +473,8 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
+
+    this.eventEmitter.emit('article.updated', { articleId: id });
 
     // TODO: store review comment in a separate ReviewComment table
     return {
@@ -665,6 +722,7 @@ export class ArticlesService {
       where: { id },
       data: { coverImage: result.url },
     });
+    this.eventEmitter.emit('article.updated', { articleId: id });
 
     return result;
   }
@@ -729,6 +787,8 @@ export class ArticlesService {
         version: newVersion,
       },
     });
+
+    this.eventEmitter.emit('article.updated', { articleId: id });
 
     return this.serializeArticle(article);
   }

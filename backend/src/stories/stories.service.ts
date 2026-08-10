@@ -19,6 +19,7 @@ import {
 } from '@cms-ng/shared';
 import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 import { safeJsonParse } from '../common/json.utils';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class StoriesService {
@@ -26,6 +27,7 @@ export class StoriesService {
     private prisma: PrismaService,
     private aiService: AIService,
     private articlesService: ArticlesService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async create(reporterId: string, dto: CreateStoryDto) {
@@ -183,12 +185,19 @@ export class StoriesService {
     // #55: 显式先清空关联 Article.storyId 防 orphan 数据。
     // schema 已有 onDelete: SetNull(双保险),但显式 updateMany
     // 让我们能在 service 层记录清理数,且对旧数据 schema 也安全。
+    const affectedArticles = await this.prisma.article.findMany({
+      where: { storyId: id },
+      select: { id: true },
+    });
     await this.prisma.article.updateMany({
       where: { storyId: id },
       data: { storyId: null },
     });
 
     await this.prisma.story.delete({ where: { id } });
+    for (const article of affectedArticles) {
+      this.eventEmitter.emit('article.updated', { articleId: article.id });
+    }
     return { success: true };
   }
 

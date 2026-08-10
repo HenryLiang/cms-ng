@@ -13,6 +13,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  SearchService,
+  SearchUnavailableException,
+} from '../search/search.service';
 
 describe('ArticlesService', () => {
   let service: ArticlesService;
@@ -29,6 +34,8 @@ describe('ArticlesService', () => {
     factCheck: jest.Mock;
     generateReviewReport: jest.Mock;
   };
+  let searchService: { searchArticles: jest.Mock };
+  let eventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
@@ -44,6 +51,8 @@ describe('ArticlesService', () => {
       factCheck: jest.fn(),
       generateReviewReport: jest.fn(),
     };
+    searchService = { searchArticles: jest.fn() };
+    eventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -51,6 +60,8 @@ describe('ArticlesService', () => {
         ArticleAccessService,
         { provide: PrismaService, useValue: prisma },
         { provide: AIService, useValue: aiService },
+        { provide: SearchService, useValue: searchService },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 
@@ -114,6 +125,9 @@ describe('ArticlesService', () => {
         }),
       });
       expect(result.title).toBe('Test Article');
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
+        articleId: 'article-id',
+      });
     });
 
     it('should create article with contentLanguage', async () => {
@@ -154,28 +168,59 @@ describe('ArticlesService', () => {
   });
 
   describe('findAll', () => {
-    it('should search article titles and content with a trimmed term', async () => {
+    it('should search article titles and content in Elasticsearch with a trimmed term', async () => {
+      searchService.searchArticles.mockResolvedValue({
+        ids: ['article-id'],
+        total: 1,
+      });
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
-      prisma.article.count.mockResolvedValue(1);
 
-      await service.findAll(
+      const result = await service.findAll(
         { userId: 'admin-id', role: 'ADMIN' },
         { search: '  climate  ' },
       );
 
-      const where = {
-        OR: [
-          { title: { contains: 'climate' } },
-          { content: { contains: 'climate' } },
-        ],
-      };
+      expect(searchService.searchArticles).toHaveBeenCalledWith({
+        userId: 'admin-id',
+        role: 'ADMIN',
+        search: 'climate',
+        storyId: undefined,
+        page: 1,
+        pageSize: 20,
+      });
       expect(prisma.article.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where }),
+        expect.objectContaining({ where: { id: { in: ['article-id'] } } }),
       );
-      expect(prisma.article.count).toHaveBeenCalledWith({ where });
+      expect(prisma.article.count).not.toHaveBeenCalled();
+      expect(result.meta.total).toBe(1);
     });
 
-    it('should combine search with the existing editor access rules', async () => {
+    it('should delegate editor access rules and story filtering to Elasticsearch', async () => {
+      searchService.searchArticles.mockResolvedValue({
+        ids: ['article-id'],
+        total: 1,
+      });
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+
+      await service.findAll(
+        { userId: 'editor-id', role: 'EDITOR' },
+        { search: 'climate', storyId: 'story-id', page: 2, pageSize: 10 },
+      );
+
+      expect(searchService.searchArticles).toHaveBeenCalledWith({
+        userId: 'editor-id',
+        role: 'EDITOR',
+        search: 'climate',
+        storyId: 'story-id',
+        page: 2,
+        pageSize: 10,
+      });
+    });
+
+    it('should fall back to MySQL title/content LIKE when Elasticsearch is unavailable', async () => {
+      searchService.searchArticles.mockRejectedValue(
+        new SearchUnavailableException('ES down'),
+      );
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
       prisma.article.count.mockResolvedValue(1);
 
@@ -184,31 +229,31 @@ describe('ArticlesService', () => {
         { search: 'climate' },
       );
 
-      expect(prisma.article.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            AND: [
+      const where = {
+        AND: [
+          {
+            OR: [
+              { authorId: 'editor-id' },
+              { editorId: 'editor-id' },
               {
-                OR: [
-                  { authorId: 'editor-id' },
-                  { editorId: 'editor-id' },
-                  {
-                    status: {
-                      in: ['PENDING_REVIEW', 'IN_REVIEW', 'REVISION'],
-                    },
-                  },
-                ],
-              },
-              {
-                OR: [
-                  { title: { contains: 'climate' } },
-                  { content: { contains: 'climate' } },
-                ],
+                status: {
+                  in: ['PENDING_REVIEW', 'IN_REVIEW', 'REVISION'],
+                },
               },
             ],
           },
-        }),
+          {
+            OR: [
+              { title: { contains: 'climate' } },
+              { content: { contains: 'climate' } },
+            ],
+          },
+        ],
+      };
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where }),
       );
+      expect(prisma.article.count).toHaveBeenCalledWith({ where });
     });
 
     it('should ignore a blank search term', async () => {
@@ -223,6 +268,7 @@ describe('ArticlesService', () => {
       expect(prisma.article.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: {} }),
       );
+      expect(searchService.searchArticles).not.toHaveBeenCalled();
     });
 
     it('should return all articles for admin (paginated, default page=1 size=20)', async () => {
@@ -397,6 +443,9 @@ describe('ArticlesService', () => {
         where: { id: 'article-id' },
       });
       expect(result.success).toBe(true);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.deleted', {
+        articleId: 'article-id',
+      });
     });
 
     it('should throw NotFoundException when article not found', async () => {

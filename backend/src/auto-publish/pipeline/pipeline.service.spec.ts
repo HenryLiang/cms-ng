@@ -21,6 +21,7 @@ import { NotificationStep } from './steps/notification.step';
 import { BillingCheckStep } from './steps/billing-check.step';
 import { BillingService } from '../../billing/billing.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Mock modules that have ESM compatibility issues with Jest
 jest.mock('https-proxy-agent', () => ({
@@ -153,6 +154,7 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: BillingService, useValue: billingService },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: BillingCheckStep, useValue: billingCheckStep },
         // Step stubs — replaced wholesale below; existence is enough for DI
         { provide: TopicCollectionStep, useValue: {} },
@@ -426,6 +428,7 @@ describe('PipelineService - kill switch mid-batch interruption (issue #115)', ()
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: BillingService, useValue: billingService },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: BillingCheckStep, useValue: billingCheckStep },
         { provide: TopicCollectionStep, useValue: {} },
         { provide: ResearchStep, useValue: {} },

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ArticleStatus,
   ArticleRunStatus,
@@ -13,7 +14,10 @@ export class ArticleSaveStep implements PipelineStep {
   readonly successStatus = ArticleRunStatus.SAVED;
   private readonly logger = new Logger(ArticleSaveStep.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private eventEmitter: EventEmitter2,
+  ) {}
 
   async execute(ctx: PipelineContext): Promise<PipelineContext> {
     if (!ctx.draft) throw new Error('No draft to save');
@@ -87,6 +91,8 @@ export class ArticleSaveStep implements PipelineStep {
       where: { id: ctx.articleId },
       data: { articleId: article.id },
     });
+
+    this.eventEmitter.emit('article.updated', { articleId: article.id });
 
     // Trace observability
     const trace = ctx.trace?.[ctx.trace.length - 1];
