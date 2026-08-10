@@ -5,7 +5,12 @@ import { MemoryLockService } from './memory-lock.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { PipelineService } from './pipeline.service';
 import { PipelineStep, PipelineContext } from './step.interface';
-import { ArticleRunStatus, RunStatus } from '@cms-ng/shared';
+import {
+  ArticleRunStatus,
+  NotificationLevel,
+  NotificationType,
+  RunStatus,
+} from '@cms-ng/shared';
 import { TopicCollectionStep } from './steps/topic-collection.step';
 import { ResearchStep } from './steps/research.step';
 import { ArticleGenerationStep } from './steps/article-generation.step';
@@ -15,6 +20,7 @@ import { PublishStep } from './steps/publish.step';
 import { NotificationStep } from './steps/notification.step';
 import { BillingCheckStep } from './steps/billing-check.step';
 import { BillingService } from '../../billing/billing.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 // Mock modules that have ESM compatibility issues with Jest
 jest.mock('https-proxy-agent', () => ({
@@ -23,6 +29,10 @@ jest.mock('https-proxy-agent', () => ({
 jest.mock('../../ai/ai.service', () => ({
   AIService: jest.fn().mockImplementation(() => ({})),
 }));
+
+const notificationsService = {
+  publish: jest.fn().mockResolvedValue(undefined),
+};
 
 describe('PipelineService — notification step isolation (issue #56)', () => {
   let service: PipelineService;
@@ -142,6 +152,7 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
         { provide: MemoryLockService, useValue: mockLock },
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: BillingService, useValue: billingService },
+        { provide: NotificationsService, useValue: notificationsService },
         { provide: BillingCheckStep, useValue: billingCheckStep },
         // Step stubs — replaced wholesale below; existence is enough for DI
         { provide: TopicCollectionStep, useValue: {} },
@@ -169,6 +180,7 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
 
     mockPrisma.autoPublishTask.findUnique.mockResolvedValue({
       id: taskId,
+      name: '每日热点自动发布',
       status: 'ACTIVE',
       batchSize,
       retryConfig: '{"maxRetries":0,"retryDelayMs":100}',
@@ -202,6 +214,29 @@ describe('PipelineService — notification step isolation (issue #56)', () => {
     const finalArticleUpdate = articleUpdates[articleUpdates.length - 1][0];
     expect(finalArticleUpdate.data.status).not.toBe(ArticleRunStatus.FAILED);
     expect(finalArticleUpdate.data.failedStep).toBeUndefined();
+  });
+
+  it('publishes the terminal run status to the task owner notification feed', async () => {
+    setupTaskAndRun(1);
+
+    await service.runTask('task-1', 'MANUAL');
+
+    expect(notificationsService.publish).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: NotificationType.TASK,
+      level: NotificationLevel.SUCCESS,
+      title: '自动发布完成',
+      message: '每日热点自动发布：成功 1 篇，失败 0 篇',
+      actionUrl: '/dashboard/auto-publish',
+      metadata: {
+        taskId: 'task-1',
+        runId: 'run-1',
+        status: RunStatus.COMPLETED,
+        successCount: 1,
+        failedCount: 0,
+      },
+      dedupeKey: 'auto-publish-run:run-1:COMPLETED',
+    });
   });
 
   it('marks run FAILED when the publish step throws (real critical failure)', async () => {
@@ -390,6 +425,7 @@ describe('PipelineService - kill switch mid-batch interruption (issue #115)', ()
         { provide: MemoryLockService, useValue: mockLock },
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: BillingService, useValue: billingService },
+        { provide: NotificationsService, useValue: notificationsService },
         { provide: BillingCheckStep, useValue: billingCheckStep },
         { provide: TopicCollectionStep, useValue: {} },
         { provide: ResearchStep, useValue: {} },

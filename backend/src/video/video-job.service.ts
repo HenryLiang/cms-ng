@@ -14,7 +14,13 @@ import {
   VideoJobStatus,
 } from '@prisma/client';
 // 计费参数类型来自 shared 枚举(DeductParams 契约),与 Prisma 枚举值同构但名义类型不同
-import { BillingCategory, isEditorRole, TransactionType } from '@cms-ng/shared';
+import {
+  BillingCategory,
+  isEditorRole,
+  NotificationLevel,
+  NotificationType,
+  TransactionType,
+} from '@cms-ng/shared';
 import axios from 'axios';
 import { CHAT_PROVIDER } from '../ai/providers';
 import type { ChatCompletionProvider } from '../ai/providers';
@@ -24,6 +30,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
 import { STORAGE_SERVICE } from '../storage/storage.service';
 import type { StorageService } from '../storage/storage.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateVideoJobDto,
   QueryVideoJobDto,
@@ -132,6 +139,7 @@ export class VideoJobService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly billing: BillingService,
+    private readonly notifications: NotificationsService,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly search: SearchService,
     @Inject(VIDEO_GEN_PROVIDER)
@@ -885,6 +893,9 @@ export class VideoJobService {
       data: { status: 'SUCCEEDED', resultAssetId: asset.id },
     });
     await this.deductBilling(job, opts);
+    await this.publishVideoStatus(job, 'SUCCEEDED', {
+      resultAssetId: asset.id,
+    });
     // ES 索引 fail-open(warn-only),与媒体库上传路径行为一致;
     // 不发 media.asset.created 事件 —— 那会触发图片打标队列
     try {
@@ -970,7 +981,7 @@ export class VideoJobService {
   private async fail(jobId: string, step: string, err: unknown): Promise<void> {
     const message = (err as Error)?.message ?? String(err);
     this.logger.warn(`任务 ${jobId} 失败于 ${step}: ${message}`);
-    await this.prisma.videoGenerationJob.update({
+    const job = await this.prisma.videoGenerationJob.update({
       where: { id: jobId },
       data: {
         status: 'FAILED',
@@ -978,6 +989,51 @@ export class VideoJobService {
         error: message.slice(0, 1000),
       },
     });
+    if (job.userId && job.prompt) {
+      await this.publishVideoStatus(job, 'FAILED', {
+        failedStep: step,
+        error: message.slice(0, 1000),
+      });
+    }
+  }
+
+  private async publishVideoStatus(
+    job: Pick<VideoGenerationJob, 'id' | 'userId' | 'prompt'>,
+    status: 'SUCCEEDED' | 'FAILED',
+    details: {
+      resultAssetId?: string;
+      failedStep?: string;
+      error?: string;
+    },
+  ): Promise<void> {
+    const succeeded = status === 'SUCCEEDED';
+    const subject = `“${job.prompt.slice(0, 40)}”`;
+    try {
+      await this.notifications.publish({
+        userId: job.userId,
+        type: NotificationType.TASK,
+        level: succeeded ? NotificationLevel.SUCCESS : NotificationLevel.ERROR,
+        title: succeeded ? '视频生成完成' : '视频生成失败',
+        message: succeeded
+          ? `${subject}已生成，可前往视频创作查看。`
+          : `${subject}生成失败：${details.error || '未知错误'}`,
+        actionUrl: '/dashboard/video',
+        metadata: {
+          jobId: job.id,
+          status,
+          ...(details.resultAssetId
+            ? { resultAssetId: details.resultAssetId }
+            : {}),
+          ...(details.failedStep ? { failedStep: details.failedStep } : {}),
+          ...(details.error ? { error: details.error } : {}),
+        },
+        dedupeKey: `video-job:${job.id}:${status}`,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `视频任务通知写入失败 job=${job.id}: ${(error as Error).message}`,
+      );
+    }
   }
 
   private async deductBilling(

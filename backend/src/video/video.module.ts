@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AIModule } from '../ai/ai.module';
 import { BillingModule } from '../billing/billing.module';
 import { SearchModule } from '../search/search.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { createImageGenProvider } from './providers/image-gen/image-gen-provider.factory';
 import { IMAGE_GEN_PROVIDER } from './providers/image-gen/image-gen-provider.interface';
 import { createVideoGenProvider } from './providers/video-gen/video-gen-provider.factory';
@@ -21,7 +22,7 @@ import { VideoJobService } from './video-job.service';
  * 渲染(ffmpeg 合成)由 VIDEO_RENDER_ENABLED 独立开关。
  */
 @Module({
-  imports: [AIModule, BillingModule, SearchModule],
+  imports: [AIModule, BillingModule, SearchModule, NotificationsModule],
   controllers: [VideoJobController],
   providers: [
     {

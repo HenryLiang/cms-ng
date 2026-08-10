@@ -12,6 +12,8 @@ import {
   TransactionStatus,
   PaymentMethod,
   BillingCategory,
+  NotificationLevel,
+  NotificationType,
   isAdminRole,
 } from '@cms-ng/shared';
 import { ManualTopUpDto } from './dto/manual-top-up.dto';
@@ -24,6 +26,7 @@ import {
 import { UpdateAlertDto } from './dto/update-alert.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { serializeBillingTransaction } from '../common/billing-transaction.utils';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export class InsufficientBalanceException extends BadRequestException {
   constructor(required: number, available: number) {
@@ -65,6 +68,7 @@ export class BillingService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {
     this.billingEnabled =
       this.config.get<string>('BILLING_ENABLED') !== 'false';
@@ -132,11 +136,13 @@ export class BillingService {
       });
       if (existing) {
         this.logger.debug(`Idempotent deduct hit: ${params.idempotencyKey}`);
-        return this.serializeTransaction(existing);
+        const result = this.serializeTransaction(existing);
+        await this.publishDeductionNotification(result);
+        return result;
       }
     }
 
-    return this.prisma.$transaction(
+    const result = await this.prisma.$transaction(
       async (tx) => {
         // 1. Row-level lock
         const rows = await tx.$queryRaw<Array<{ balance: string }>>`
@@ -189,6 +195,42 @@ export class BillingService {
         timeout: 10000,
       },
     );
+    await this.publishDeductionNotification(result);
+    return result;
+  }
+
+  private async publishDeductionNotification(transaction: {
+    id: string;
+    userId: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    description: string;
+  }): Promise<void> {
+    const amount = Math.abs(transaction.amount);
+    try {
+      await this.notifications.publish({
+        userId: transaction.userId,
+        type: NotificationType.BILLING,
+        level: NotificationLevel.INFO,
+        title: '扣费成功',
+        message:
+          `${transaction.description}，扣除 ¥${amount.toFixed(2)}，` +
+          `余额 ¥${transaction.balanceAfter.toFixed(2)}`,
+        actionUrl: '/dashboard/billing/transactions',
+        metadata: {
+          transactionId: transaction.id,
+          transactionType: transaction.type,
+          amount,
+          balanceAfter: transaction.balanceAfter,
+        },
+        dedupeKey: `billing:${transaction.id}`,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `扣费通知写入失败 transaction=${transaction.id}: ${(error as Error).message}`,
+      );
+    }
   }
 
   /**

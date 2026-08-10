@@ -23,7 +23,6 @@ import {
   Images,
   Clapperboard,
   Search,
-  Bell,
   SlidersHorizontal,
   BrainCircuit,
   type LucideIcon,
@@ -31,6 +30,7 @@ import {
 import ToastHost from '@/components/toast-host';
 import ErrorBoundary from '@/components/error-boundary';
 import { FeatureUnavailable } from '@/components/feature-unavailable';
+import NotificationBell from '@/components/notification-bell';
 
 interface NavItem {
   href: string;
@@ -252,10 +252,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:bg-surface-muted hover:text-foreground" title="筛选">
               <SlidersHorizontal className="h-4 w-4" />
             </button>
-            <button className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:bg-surface-muted hover:text-foreground" title="通知">
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-cyan-400" />
-            </button>
+            <NotificationBell />
             <Link
               href="/dashboard/profile"
               className="brand-gradient ml-1 flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"

@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
+import { NotificationLevel, NotificationType } from '@cms-ng/shared';
 import { createMock } from '../common/test-helpers';
 import { VideoJobService } from './video-job.service';
 import { VideoGenProvider } from './providers/video-gen/video-gen-provider.interface';
@@ -10,6 +11,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import type { BillingService } from '../billing/billing.service';
 import type { SearchService } from '../search/search.service';
 import type { StorageService } from '../storage/storage.service';
+import type { NotificationsService } from '../notifications/notifications.service';
 import axios from 'axios';
 
 jest.mock('axios');
@@ -83,6 +85,7 @@ describe('VideoJobService', () => {
   };
   let storage: { put: jest.Mock };
   let search: { indexAsset: jest.Mock };
+  let notifications: { publish: jest.Mock };
   let provider: jest.Mocked<VideoGenProvider>;
   let chat: { chatCompletion: jest.Mock };
   let imageGen: jest.Mocked<ImageGenProvider> | null;
@@ -119,6 +122,7 @@ describe('VideoJobService', () => {
       }),
     };
     search = { indexAsset: jest.fn().mockResolvedValue(undefined) };
+    notifications = { publish: jest.fn().mockResolvedValue(undefined) };
     provider = {
       name: 'minimax',
       submit: jest.fn(),
@@ -155,6 +159,7 @@ describe('VideoJobService', () => {
       prisma as unknown as PrismaService,
       config,
       billing as unknown as BillingService,
+      notifications as unknown as NotificationsService,
       storage as unknown as StorageService,
       search as unknown as SearchService,
       opts?.withProvider === false ? null : provider,
@@ -633,7 +638,9 @@ describe('VideoJobService', () => {
         updatedAt: new Date(),
       });
       prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
-      prisma.videoGenerationJob.update.mockResolvedValue({});
+      prisma.videoGenerationJob.update.mockImplementation(({ data }) =>
+        Promise.resolve({ ...JOB, ...data }),
+      );
       prisma.mediaAsset.create.mockResolvedValue(asset);
       provider.poll.mockResolvedValue({
         state: 'succeeded',
@@ -679,6 +686,20 @@ describe('VideoJobService', () => {
           }),
         }),
       );
+      expect(notifications.publish).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: NotificationType.TASK,
+        level: NotificationLevel.SUCCESS,
+        title: '视频生成完成',
+        message: '“一只柴犬在樱花树下奔跑”已生成，可前往视频创作查看。',
+        actionUrl: '/dashboard/video',
+        metadata: {
+          jobId: 'job-1',
+          status: 'SUCCEEDED',
+          resultAssetId: 'asset-1',
+        },
+        dedupeKey: 'video-job:job-1:SUCCEEDED',
+      });
     });
 
     it('上传转存失败 → FAILED(failedStep=upload),供重试复用 provider 结果', async () => {
@@ -690,7 +711,9 @@ describe('VideoJobService', () => {
         updatedAt: new Date(),
       });
       prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
-      prisma.videoGenerationJob.update.mockResolvedValue({});
+      prisma.videoGenerationJob.update.mockImplementation(({ data }) =>
+        Promise.resolve({ ...JOB, ...data }),
+      );
       provider.poll.mockResolvedValue({
         state: 'succeeded',
         videoUrl: 'https://cdn/temp.mp4',
@@ -707,6 +730,21 @@ describe('VideoJobService', () => {
           }),
         }),
       );
+      expect(notifications.publish).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: NotificationType.TASK,
+        level: NotificationLevel.ERROR,
+        title: '视频生成失败',
+        message: '“一只柴犬在樱花树下奔跑”生成失败：download timeout',
+        actionUrl: '/dashboard/video',
+        metadata: {
+          jobId: 'job-1',
+          status: 'FAILED',
+          failedStep: 'upload',
+          error: 'download timeout',
+        },
+        dedupeKey: 'video-job:job-1:FAILED',
+      });
     });
 
     it('returnLastFrame:尾帧图入媒体库并回写 lastFrameAssetId;尾帧失败不影响主片', async () => {
