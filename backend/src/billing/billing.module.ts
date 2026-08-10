@@ -3,8 +3,10 @@ import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { AlipayService } from './payment/alipay.service';
 import { WechatPayService } from './payment/wechat-pay.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [BillingController],
   providers: [BillingService, AlipayService, WechatPayService],
   exports: [BillingService],

@@ -79,7 +79,11 @@ Automated content pipeline for scheduled/triggered article publishing without hu
 
 ## Email Notifications
 
-SMTP-based email notifications are configured via `SMTP_*` env vars and sent **inline via `nodemailer` directly in `auto-publish/pipeline/pipeline.service.ts`** (a run-summary email; there is no dedicated `MailerService`/`NotificationService` module, and the `NotificationStep` only logs — actual email happens at the run level after all articles complete). No review-assignment or other operational email exists. All SMTP vars are optional — the app boots without them and surfaces errors only when a module attempts to send mail.
+SMTP-based email notifications are configured via `SMTP_*` env vars and sent **inline via `nodemailer` directly in `auto-publish/pipeline/pipeline.service.ts`** (a run-summary email; there is no dedicated `MailerService`, and the pipeline `NotificationStep` only logs — actual email happens at the run level after all articles complete). No review-assignment or other operational email exists. All SMTP vars are optional — the app boots without them and surfaces errors only when a module attempts to send mail.
+
+## In-App Notifications
+
+`backend/src/notifications/` is the user-scoped in-app notification module. `NotificationsService.publish()` is the single producer interface and supports retry-safe `dedupeKey` values; `GET /notifications`, `PATCH /notifications/:id/read`, and `PATCH /notifications/read-all` power the dashboard bell. Producers currently include completed billing deductions, auto-publish run terminal states, and video-generation success/failure. Notification writes are best-effort after the source-of-truth transaction/status update, so a notification outage never rolls back billing or task completion. The frontend polls every 30 seconds and refreshes on window focus; there is no WebSocket/SSE channel.
 
 ## Trending Topics
 

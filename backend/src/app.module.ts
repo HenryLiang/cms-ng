@@ -22,6 +22,7 @@ import { AuthorStyleModule } from './authors/author-style.module';
 import { MediaModule } from './media/media.module';
 import { VideoModule } from './video/video.module';
 import { SystemFeaturesModule } from './system-features/system-features.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { SystemFeaturesModule } from './system-features/system-features.module';
     ScheduleModule.forRoot(),
     StorageModule,
     AuthModule,
+    NotificationsModule,
     SystemFeaturesModule,
     UsersModule,
     StoriesModule,

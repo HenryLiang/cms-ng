@@ -32,6 +32,7 @@ model User {
   autoPublishTasks    AutoPublishTask[]
   topUpRecords        TopUpRecord[]
   billingTransactions BillingTransaction[]
+  notifications       Notification[]
   balanceAlert        BalanceAlert?
   mediaAssets         MediaAsset[]
   videoGenerationJobs VideoGenerationJob[]
@@ -453,6 +454,41 @@ model BillingTransaction {
   @@index([articleId])
   @@index([aiOperationId])
   @@map("billing_transactions")
+}
+
+// ─── 站内通知 ───
+
+enum NotificationType {
+  TASK
+  BILLING
+  SYSTEM
+}
+
+enum NotificationLevel {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+model Notification {
+  id        String            @id @default(uuid())
+  type      NotificationType
+  level     NotificationLevel @default(INFO)
+  title     String            @db.VarChar(120)
+  message   String            @db.VarChar(500)
+  actionUrl String?           @db.VarChar(500)
+  metadata  String?           @db.Text
+  dedupeKey String?           @unique @db.VarChar(255)
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
 }
 
 // 余额预警配置

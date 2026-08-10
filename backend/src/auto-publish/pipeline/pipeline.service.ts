@@ -7,6 +7,8 @@ import {
   ArticleStatus,
   TransactionType,
   BillingCategory,
+  NotificationLevel,
+  NotificationType,
 } from '@cms-ng/shared';
 import { AutoPublishTask } from '@prisma/client';
 import {
@@ -17,6 +19,7 @@ import {
 import { MemoryLockService } from './memory-lock.service';
 import { AutoPublishSchedulerService } from '../auto-publish-scheduler.service';
 import { BillingService } from '../../billing/billing.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { TopicCollectionStep } from './steps/topic-collection.step';
 import { ResearchStep } from './steps/research.step';
 import { ArticleGenerationStep } from './steps/article-generation.step';
@@ -57,6 +60,7 @@ export class PipelineService {
     private config: ConfigService,
     private lock: MemoryLockService,
     private billingService: BillingService,
+    private notifications: NotificationsService,
     @Inject(forwardRef(() => AutoPublishSchedulerService))
     private scheduler: AutoPublishSchedulerService,
     private billingCheckStep: BillingCheckStep,
@@ -190,9 +194,14 @@ export class PipelineService {
       // Without this, an activated kill switch would run all batchSize
       // articles to completion (持续扣费/发布).
       if (await this.scheduler.isKillSwitchActive()) {
+        const skippedCount = task.batchSize - i;
         this.logger.warn(
           `Kill switch activated mid-batch - stopping run ${run.id} ` +
             `after ${i}/${task.batchSize} article(s)`,
+        );
+        failedCount += skippedCount;
+        errors.push(
+          `Kill switch activated: ${skippedCount} article(s) skipped`,
         );
         break;
       }
@@ -263,6 +272,14 @@ export class PipelineService {
       where: { id: taskId },
       data: { lastRunAt: new Date() },
     });
+
+    await this.publishRunStatusNotification(
+      task,
+      run.id,
+      runStatus,
+      successCount,
+      failedCount,
+    );
 
     // Send notification email
     await this.sendRunNotification(
@@ -665,6 +682,56 @@ export class PipelineService {
     } catch (error: any) {
       this.logger.warn(
         `Failed to send notification email: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  private async publishRunStatusNotification(
+    task: AutoPublishTask,
+    runId: string,
+    status: RunStatus,
+    successCount: number,
+    failedCount: number,
+  ): Promise<void> {
+    const presentation = {
+      [RunStatus.COMPLETED]: {
+        level: NotificationLevel.SUCCESS,
+        title: '自动发布完成',
+      },
+      [RunStatus.PARTIAL]: {
+        level: NotificationLevel.WARNING,
+        title: '自动发布部分完成',
+      },
+      [RunStatus.FAILED]: {
+        level: NotificationLevel.ERROR,
+        title: '自动发布失败',
+      },
+      [RunStatus.RUNNING]: {
+        level: NotificationLevel.INFO,
+        title: '自动发布进行中',
+      },
+    }[status];
+
+    try {
+      await this.notifications.publish({
+        userId: task.createdBy,
+        type: NotificationType.TASK,
+        level: presentation.level,
+        title: presentation.title,
+        message: `${task.name}：成功 ${successCount} 篇，失败 ${failedCount} 篇`,
+        actionUrl: '/dashboard/auto-publish',
+        metadata: {
+          taskId: task.id,
+          runId,
+          status,
+          successCount,
+          failedCount,
+        },
+        dedupeKey: `auto-publish-run:${runId}:${status}`,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `自动发布站内通知写入失败 run=${runId}: ${(error as Error).message}`,
       );
     }
   }

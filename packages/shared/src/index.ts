@@ -263,6 +263,37 @@ export enum BillingCategory {
   OTHER = 'OTHER',
 }
 
+// ===== 站内通知 =====
+export enum NotificationType {
+  TASK = 'TASK',
+  BILLING = 'BILLING',
+  SYSTEM = 'SYSTEM',
+}
+
+export enum NotificationLevel {
+  INFO = 'INFO',
+  SUCCESS = 'SUCCESS',
+  WARNING = 'WARNING',
+  ERROR = 'ERROR',
+}
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  level: NotificationLevel;
+  title: string;
+  message: string;
+  actionUrl?: string | null;
+  metadata: Record<string, unknown>;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  items: NotificationItem[];
+  unreadCount: number;
+}
+
 // ===== 媒体资源 =====
 export enum MediaSource {
   UPLOAD = 'UPLOAD',

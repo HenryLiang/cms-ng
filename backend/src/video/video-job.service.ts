@@ -14,7 +14,13 @@ import {
   VideoJobStatus,
 } from '@prisma/client';
 // 计费参数类型来自 shared 枚举(DeductParams 契约),与 Prisma 枚举值同构但名义类型不同
-import { BillingCategory, isEditorRole, TransactionType } from '@cms-ng/shared';
+import {
+  BillingCategory,
+  isEditorRole,
+  NotificationLevel,
+  NotificationType,
+  TransactionType,
+} from '@cms-ng/shared';
 import axios from 'axios';
 import { CHAT_PROVIDER } from '../ai/providers';
 import type { ChatCompletionProvider } from '../ai/providers';
@@ -24,6 +30,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
 import { STORAGE_SERVICE } from '../storage/storage.service';
 import type { StorageService } from '../storage/storage.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateVideoJobDto,
   QueryVideoJobDto,
@@ -132,6 +139,7 @@ export class VideoJobService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly billing: BillingService,
+    private readonly notifications: NotificationsService,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly search: SearchService,
     @Inject(VIDEO_GEN_PROVIDER)
@@ -238,6 +246,7 @@ export class VideoJobService {
 
     const isL2 = dto.mode === 'ARTICLE_TO_VIDEO';
     const submitOptions = this.validateSubmitOptions(dto, isL2);
+    let jobPrompt = dto.prompt?.trim() ?? '';
     let costEstimate: number;
     if (isL2) {
       if (!this.renderEnabled) {
@@ -263,6 +272,7 @@ export class VideoJobService {
       if (article.authorId !== userId && !privileged) {
         throw new ServiceUnavailableException('只能用自己的文章生成视频');
       }
+      jobPrompt = article.title.trim() || '稿件成片';
       costEstimate = await this.estimateL2Cost();
     } else {
       if (!dto.prompt?.trim()) {
@@ -283,7 +293,7 @@ export class VideoJobService {
       data: {
         userId,
         mode: isL2 ? 'ARTICLE_TO_VIDEO' : 'TEXT_TO_CLIP',
-        prompt: dto.prompt?.trim() ?? '',
+        prompt: jobPrompt,
         articleId: isL2 ? dto.articleId : null,
         provider: this.provider.name,
         durationSec: dto.durationSec ?? null,
@@ -885,6 +895,9 @@ export class VideoJobService {
       data: { status: 'SUCCEEDED', resultAssetId: asset.id },
     });
     await this.deductBilling(job, opts);
+    await this.publishVideoStatus(job, 'SUCCEEDED', {
+      resultAssetId: asset.id,
+    });
     // ES 索引 fail-open(warn-only),与媒体库上传路径行为一致;
     // 不发 media.asset.created 事件 —— 那会触发图片打标队列
     try {
@@ -924,20 +937,40 @@ export class VideoJobService {
       );
     }
 
-    // 上传/合成阶段僵尸(进程崩溃于下载/转存/渲染中)→ 置 FAILED,用户重试
-    const staleUploads = await this.prisma.videoGenerationJob.updateMany({
+    // 上传/合成阶段僵尸(进程崩溃于下载/转存/渲染中)→ 逐条抢占为 FAILED,
+    // 以便给每位任务所有者写入一条可追踪的失败通知。
+    const staleCutoff = new Date(Date.now() - UPLOAD_STALE_MS);
+    const staleUploads = await this.prisma.videoGenerationJob.findMany({
       where: {
         status: 'UPLOADING',
-        updatedAt: { lt: new Date(Date.now() - UPLOAD_STALE_MS) },
+        updatedAt: { lt: staleCutoff },
       },
-      data: {
-        status: 'FAILED',
+      orderBy: { updatedAt: 'asc' },
+      take: 50,
+    });
+    let cleanedCount = 0;
+    for (const job of staleUploads) {
+      const claimed = await this.prisma.videoGenerationJob.updateMany({
+        where: {
+          id: job.id,
+          status: 'UPLOADING',
+          updatedAt: { lt: staleCutoff },
+        },
+        data: {
+          status: 'FAILED',
+          failedStep: 'upload',
+          error: '上传/合成中断(进程重启),请重试',
+        },
+      });
+      if (!claimed.count) continue;
+      cleanedCount += claimed.count;
+      await this.publishVideoStatus(job, 'FAILED', {
         failedStep: 'upload',
         error: '上传/合成中断(进程重启),请重试',
-      },
-    });
-    if (staleUploads.count) {
-      this.logger.warn(`清理上传僵尸任务 ${staleUploads.count} 个`);
+      });
+    }
+    if (cleanedCount) {
+      this.logger.warn(`清理上传僵尸任务 ${cleanedCount} 个`);
     }
   }
 
@@ -970,7 +1003,7 @@ export class VideoJobService {
   private async fail(jobId: string, step: string, err: unknown): Promise<void> {
     const message = (err as Error)?.message ?? String(err);
     this.logger.warn(`任务 ${jobId} 失败于 ${step}: ${message}`);
-    await this.prisma.videoGenerationJob.update({
+    const job = await this.prisma.videoGenerationJob.update({
       where: { id: jobId },
       data: {
         status: 'FAILED',
@@ -978,6 +1011,55 @@ export class VideoJobService {
         error: message.slice(0, 1000),
       },
     });
+    if (job.userId) {
+      await this.publishVideoStatus(job, 'FAILED', {
+        failedStep: step,
+        error: message.slice(0, 1000),
+      });
+    }
+  }
+
+  private async publishVideoStatus(
+    job: Pick<VideoGenerationJob, 'id' | 'userId' | 'prompt' | 'retryCount'>,
+    status: 'SUCCEEDED' | 'FAILED',
+    details: {
+      resultAssetId?: string;
+      failedStep?: string;
+      error?: string;
+    },
+  ): Promise<void> {
+    const succeeded = status === 'SUCCEEDED';
+    const displayName = job.prompt.trim() || '视频任务';
+    const subject = `“${displayName.slice(0, 40)}”`;
+    try {
+      await this.notifications.publish({
+        userId: job.userId,
+        type: NotificationType.TASK,
+        level: succeeded ? NotificationLevel.SUCCESS : NotificationLevel.ERROR,
+        title: succeeded ? '视频生成完成' : '视频生成失败',
+        message: succeeded
+          ? `${subject}已生成，可前往视频创作查看。`
+          : `${subject}生成失败：${details.error || '未知错误'}`,
+        actionUrl: '/dashboard/video',
+        metadata: {
+          jobId: job.id,
+          status,
+          ...(details.resultAssetId
+            ? { resultAssetId: details.resultAssetId }
+            : {}),
+          ...(details.failedStep ? { failedStep: details.failedStep } : {}),
+          ...(details.error ? { error: details.error } : {}),
+        },
+        dedupeKey:
+          status === 'FAILED'
+            ? `video-job:${job.id}:${status}:attempt-${job.retryCount}`
+            : `video-job:${job.id}:${status}`,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `视频任务通知写入失败 job=${job.id}: ${(error as Error).message}`,
+      );
+    }
   }
 
   private async deductBilling(

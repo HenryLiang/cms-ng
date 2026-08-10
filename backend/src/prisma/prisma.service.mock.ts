@@ -75,6 +75,17 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
+    notification: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      upsert: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+    },
     topUpRecord: {
       findUnique: jest.fn(),
       findMany: jest.fn(),

@@ -16,14 +16,20 @@ import {
   TransactionStatus,
   PaymentMethod,
   BillingCategory,
+  NotificationLevel,
+  NotificationType,
   UserRole,
 } from '@cms-ng/shared';
 import { EstimateOperationType } from './dto/estimate-cost.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('BillingService', () => {
   let service: BillingService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let configService: { get: jest.Mock };
+  const notifications = {
+    publish: jest.fn().mockResolvedValue(undefined),
+  };
 
   const mockTxClient = () => ({
     $queryRaw: jest.fn().mockResolvedValue([{ balance: '100.0000' }]),
@@ -95,6 +101,7 @@ describe('BillingService', () => {
         BillingService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: configService },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -219,6 +226,7 @@ describe('BillingService', () => {
           BillingService,
           { provide: PrismaService, useValue: prisma },
           { provide: ConfigService, useValue: configService },
+          { provide: NotificationsService, useValue: notifications },
         ],
       }).compile();
       const disabledService = module.get<BillingService>(BillingService);
@@ -256,6 +264,29 @@ describe('BillingService', () => {
       expect(result.id).toBe('tx-1');
     });
 
+    it('publishes the completed deduction to the user notification feed', async () => {
+      const tx = mockTxClient();
+      prisma.$transaction.mockImplementation(async (fn) => fn(tx));
+
+      await service.deduct(deductParams);
+
+      expect(notifications.publish).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: NotificationType.BILLING,
+        level: NotificationLevel.INFO,
+        title: '扣费成功',
+        message: 'test，扣除 ¥5.00，余额 ¥95.00',
+        actionUrl: '/dashboard/billing/transactions',
+        metadata: {
+          transactionId: 'tx-1',
+          transactionType: TransactionType.AI_LLM,
+          amount: 5,
+          balanceAfter: 95,
+        },
+        dedupeKey: 'billing:tx-1',
+      });
+    });
+
     it('should update balance correctly', async () => {
       const tx = mockTxClient();
       tx.$queryRaw.mockResolvedValue([{ balance: '50.0000' }]);
@@ -286,6 +317,7 @@ describe('BillingService', () => {
           BillingService,
           { provide: PrismaService, useValue: prisma },
           { provide: ConfigService, useValue: configService },
+          { provide: NotificationsService, useValue: notifications },
         ],
       }).compile();
       const disabledService = module.get<BillingService>(BillingService);
