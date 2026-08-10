@@ -1,15 +1,32 @@
-import { IsOptional, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
-import { IsInt, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Query DTO for GET /articles.
  *
  * 分页参数在 service 层通过 common/pagination.ts 兜底, 这里只做
- * schema 校验 (>= 1 的整数, 可选)。storyId 单独接收。
+ * schema 校验 (>= 1 的整数, 可选)。search 与 storyId 单独接收。
  */
 export class FindAllArticlesDto {
+  @ApiProperty({
+    description: 'Search article titles and full content',
+    example: 'climate policy',
+    maxLength: 200,
+    required: false,
+  })
+  @Transform(
+    ({ value }) => {
+      const search: unknown = value;
+      return typeof search === 'string' ? search.trim() : search;
+    },
+    { toClassOnly: true },
+  )
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
   @ApiProperty({
     description: '1-based page number for pagination',
     example: 1,

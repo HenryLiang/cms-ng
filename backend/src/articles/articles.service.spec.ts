@@ -154,6 +154,77 @@ describe('ArticlesService', () => {
   });
 
   describe('findAll', () => {
+    it('should search article titles and content with a trimmed term', async () => {
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+      prisma.article.count.mockResolvedValue(1);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { search: '  climate  ' },
+      );
+
+      const where = {
+        OR: [
+          { title: { contains: 'climate' } },
+          { content: { contains: 'climate' } },
+        ],
+      };
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where }),
+      );
+      expect(prisma.article.count).toHaveBeenCalledWith({ where });
+    });
+
+    it('should combine search with the existing editor access rules', async () => {
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+      prisma.article.count.mockResolvedValue(1);
+
+      await service.findAll(
+        { userId: 'editor-id', role: 'EDITOR' },
+        { search: 'climate' },
+      );
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                OR: [
+                  { authorId: 'editor-id' },
+                  { editorId: 'editor-id' },
+                  {
+                    status: {
+                      in: ['PENDING_REVIEW', 'IN_REVIEW', 'REVISION'],
+                    },
+                  },
+                ],
+              },
+              {
+                OR: [
+                  { title: { contains: 'climate' } },
+                  { content: { contains: 'climate' } },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+    });
+
+    it('should ignore a blank search term', async () => {
+      prisma.article.findMany.mockResolvedValue([]);
+      prisma.article.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { search: '   ' },
+      );
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
+    });
+
     it('should return all articles for admin (paginated, default page=1 size=20)', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
       prisma.article.count.mockResolvedValue(1);

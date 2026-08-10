@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { api } from './api';
-import { aiFactCheck, aiReviewReport, type FactCheckResult, type ReviewReportResult } from './article-api';
+import {
+  aiFactCheck,
+  aiReviewReport,
+  getArticles,
+  type FactCheckResult,
+  type ReviewReportResult,
+} from './article-api';
 
 vi.mock('./api', () => ({
   api: {
+    get: vi.fn(),
     post: vi.fn(),
   },
 }));
@@ -11,6 +18,25 @@ vi.mock('./api', () => ({
 describe('article-api', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('getArticles', () => {
+    it('passes the full-text search term to GET /articles', async () => {
+      const response = {
+        data: {
+          data: [],
+          meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+        },
+      };
+      vi.mocked(api.get).mockResolvedValue(response);
+
+      const result = await getArticles({ search: 'carbon' });
+
+      expect(api.get).toHaveBeenCalledWith('/articles', {
+        params: { search: 'carbon' },
+      });
+      expect(result).toEqual(response.data);
+    });
   });
 
   describe('aiFactCheck', () => {

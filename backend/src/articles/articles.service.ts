@@ -201,6 +201,19 @@ export class ArticlesService {
       where = { ...where, storyId };
     }
 
+    const search = query.search?.trim();
+    if (search) {
+      const searchWhere: Prisma.ArticleWhereInput = {
+        OR: [
+          { title: { contains: search } },
+          { content: { contains: search } },
+        ],
+      };
+      where = Object.keys(where).length
+        ? { AND: [where, searchWhere] }
+        : searchWhere;
+    }
+
     const skip = (page - 1) * pageSize;
 
     const [articles, total] = await Promise.all([

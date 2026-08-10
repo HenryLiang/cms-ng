@@ -55,6 +55,7 @@ export interface PaginatedResponse<T> {
 
 export interface GetArticlesParams {
   storyId?: string;
+  search?: string;
   page?: number;
   pageSize?: number;
 }
