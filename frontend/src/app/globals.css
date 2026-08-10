@@ -57,6 +57,49 @@
     radial-gradient(circle at 28% 18%, rgba(34, 211, 238, 0.18), transparent 42%),
     radial-gradient(circle at 72% 82%, rgba(37, 99, 235, 0.22), transparent 46%);
 }
+
+/* 新通知：快速浮入，停留后在 2 秒生命周期末尾轻柔淡出。 */
+@keyframes notification-popup-lifecycle {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  10%,
+  86% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+}
+
+@keyframes notification-popup-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.notification-popup {
+  animation: notification-popup-lifecycle 2s ease both;
+  transform-origin: top right;
+}
+
+.notification-popup-progress {
+  animation: notification-popup-progress 2s linear forwards;
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-popup,
+  .notification-popup-progress {
+    animation: none;
+  }
+}
 /* 细网格底纹（叠加在深色面板上） */
 @utility grid-overlay {
   background-image:

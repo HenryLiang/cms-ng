@@ -1,5 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   NotificationLevel,
   NotificationType,
@@ -45,6 +51,8 @@ describe("NotificationBell", () => {
     vi.mocked(markAllNotificationsRead).mockResolvedValue({ updatedCount: 1 });
   });
 
+  afterEach(() => vi.useRealTimers());
+
   it("shows unread notifications and marks an opened item as read", async () => {
     render(<NotificationBell />);
 
@@ -75,5 +83,40 @@ describe("NotificationBell", () => {
     expect(
       screen.getByRole("button", { name: "通知，无未读消息" }),
     ).toBeInTheDocument();
+  });
+
+  it("pops up only notifications received after initial load for two seconds", async () => {
+    vi.useFakeTimers();
+    const newItem: NotificationItem = {
+      ...item,
+      id: "notice-2",
+      level: NotificationLevel.ERROR,
+      title: "视频生成失败",
+      message: "生成服务暂时不可用，请稍后重试。",
+      createdAt: "2026-08-10T02:01:00.000Z",
+    };
+    vi.mocked(getNotifications)
+      .mockResolvedValueOnce({ items: [item], unreadCount: 1 })
+      .mockResolvedValueOnce({
+        items: [newItem, item],
+        unreadCount: 2,
+      });
+
+    render(<NotificationBell />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await Promise.resolve();
+    });
+    expect(
+      screen.getByRole("status", { name: "新通知：视频生成失败" }),
+    ).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(1_999));
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

@@ -24,6 +24,7 @@ import {
 } from "@/lib/notification-api";
 
 const REFRESH_INTERVAL_MS = 30_000;
+const POPUP_DURATION_MS = 2_000;
 
 function formatRelativeTime(value: string): string {
   const elapsedMs = Date.now() - new Date(value).getTime();
@@ -56,11 +57,70 @@ function NotificationIcon({ item }: { item: NotificationItem }) {
   return <Info className="h-4 w-4 text-blue-500" />;
 }
 
+function NotificationPopup({
+  item,
+  onOpen,
+}: {
+  item: NotificationItem;
+  onOpen: () => void;
+}) {
+  const content = (
+    <>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted ring-1 ring-line/80">
+        <NotificationIcon item={item} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-600">
+          新消息
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-semibold text-foreground">
+          {item.title}
+        </span>
+        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted">
+          {item.message}
+        </span>
+      </span>
+    </>
+  );
+
+  return (
+    <div
+      role="status"
+      aria-label={`新通知：${item.title}`}
+      className="notification-popup absolute right-0 top-12 z-[70] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line/90 bg-surface/95 shadow-2xl shadow-slate-950/15 backdrop-blur"
+    >
+      {item.actionUrl ? (
+        <Link
+          href={item.actionUrl}
+          onClick={onOpen}
+          className="flex gap-3 p-3.5 text-left transition-colors hover:bg-surface-muted/70"
+        >
+          {content}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex w-full gap-3 p-3.5 text-left transition-colors hover:bg-surface-muted/70"
+        >
+          {content}
+        </button>
+      )}
+      <span
+        aria-hidden="true"
+        className="notification-popup-progress block h-0.5 bg-gradient-to-r from-cyan-400 to-blue-500"
+      />
+    </div>
+  );
+}
+
 export default function NotificationBell() {
   const rootRef = useRef<HTMLDivElement>(null);
   const mutationVersion = useRef(0);
+  const seenNotificationIds = useRef<Set<string> | null>(null);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [popupQueue, setPopupQueue] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -70,6 +130,26 @@ export default function NotificationBell() {
     try {
       const data = await getNotifications(20);
       if (versionAtRequest !== mutationVersion.current) return;
+      if (seenNotificationIds.current === null) {
+        seenNotificationIds.current = new Set(data.items.map((item) => item.id));
+      } else {
+        const newItems = data.items
+          .filter(
+            (item) =>
+              !item.readAt && !seenNotificationIds.current?.has(item.id),
+          )
+          .reverse();
+        data.items.forEach((item) => seenNotificationIds.current?.add(item.id));
+        if (newItems.length > 0) {
+          setPopupQueue((current) => {
+            const queuedIds = new Set(current.map((item) => item.id));
+            return [
+              ...current,
+              ...newItems.filter((item) => !queuedIds.has(item.id)),
+            ];
+          });
+        }
+      }
       setItems(data.items);
       setUnreadCount(data.unreadCount);
       setLoadFailed(false);
@@ -111,7 +191,24 @@ export default function NotificationBell() {
     };
   }, [open]);
 
+  const activePopup = popupQueue[0] ?? null;
+
+  useEffect(() => {
+    if (!activePopup) return;
+    const timeout = window.setTimeout(() => {
+      setPopupQueue((current) =>
+        current[0]?.id === activePopup.id
+          ? current.slice(1)
+          : current.filter((item) => item.id !== activePopup.id),
+      );
+    }, POPUP_DURATION_MS);
+    return () => window.clearTimeout(timeout);
+  }, [activePopup]);
+
   const markRead = (item: NotificationItem) => {
+    setPopupQueue((current) =>
+      current.filter((entry) => entry.id !== item.id),
+    );
     if (item.readAt) return;
     mutationVersion.current += 1;
     const now = new Date().toISOString();
@@ -162,6 +259,17 @@ export default function NotificationBell() {
           </span>
         )}
       </button>
+
+      {activePopup && (
+        <NotificationPopup
+          key={activePopup.id}
+          item={activePopup}
+          onOpen={() => {
+            markRead(activePopup);
+            setOpen(false);
+          }}
+        />
+      )}
 
       {open && (
         <section
