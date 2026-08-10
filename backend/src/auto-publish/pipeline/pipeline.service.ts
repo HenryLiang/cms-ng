@@ -194,9 +194,14 @@ export class PipelineService {
       // Without this, an activated kill switch would run all batchSize
       // articles to completion (持续扣费/发布).
       if (await this.scheduler.isKillSwitchActive()) {
+        const skippedCount = task.batchSize - i;
         this.logger.warn(
           `Kill switch activated mid-batch - stopping run ${run.id} ` +
             `after ${i}/${task.batchSize} article(s)`,
+        );
+        failedCount += skippedCount;
+        errors.push(
+          `Kill switch activated: ${skippedCount} article(s) skipped`,
         );
         break;
       }

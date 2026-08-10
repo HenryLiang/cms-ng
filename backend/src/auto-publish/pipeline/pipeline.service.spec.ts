@@ -477,8 +477,9 @@ describe('PipelineService - kill switch mid-batch interruption (issue #115)', ()
 
     const updateCall = mockPrisma.autoPublishRun.update.mock.calls[0][0];
     expect(updateCall.data.successCount).toBe(1);
-    expect(updateCall.data.failedCount).toBe(0);
-    expect(updateCall.data.status).toBe(RunStatus.COMPLETED);
+    expect(updateCall.data.failedCount).toBe(1);
+    expect(updateCall.data.status).toBe(RunStatus.PARTIAL);
+    expect(updateCall.data.errorLog).toContain('Kill switch');
   });
 
   it('marks the in-progress article FAILED when kill switch activates before a step', async () => {

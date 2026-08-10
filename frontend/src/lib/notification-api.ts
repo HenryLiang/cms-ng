@@ -1,23 +1,39 @@
-import type { NotificationItem, NotificationList } from "@cms-ng/shared";
+import type {
+  ApiResponse,
+  NotificationItem,
+  NotificationList,
+} from "@cms-ng/shared";
 import { api } from "./api";
 
+function unwrapResponse<T>(response: ApiResponse<T>): T {
+  if (response.success && response.data !== undefined) {
+    return response.data;
+  }
+  throw new Error(response.error?.message ?? "通知接口返回异常");
+}
+
 export async function getNotifications(limit = 20): Promise<NotificationList> {
-  const response = await api.get("/notifications", { params: { limit } });
-  return response.data;
+  const { data } = await api.get<ApiResponse<NotificationList>>(
+    "/notifications",
+    { params: { limit } },
+  );
+  return unwrapResponse(data);
 }
 
 export async function markNotificationRead(
   id: string,
 ): Promise<NotificationItem> {
-  const response = await api.patch(
+  const { data } = await api.patch<ApiResponse<NotificationItem>>(
     `/notifications/${encodeURIComponent(id)}/read`,
   );
-  return response.data;
+  return unwrapResponse(data);
 }
 
 export async function markAllNotificationsRead(): Promise<{
   updatedCount: number;
 }> {
-  const response = await api.patch("/notifications/read-all");
-  return response.data;
+  const { data } = await api.patch<ApiResponse<{ updatedCount: number }>>(
+    "/notifications/read-all",
+  );
+  return unwrapResponse(data);
 }

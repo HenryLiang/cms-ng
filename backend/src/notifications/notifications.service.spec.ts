@@ -58,6 +58,8 @@ describe('NotificationsService', () => {
       ],
       unreadCount: 1,
     });
+    expect(result.items[0]).not.toHaveProperty('userId');
+    expect(result.items[0]).not.toHaveProperty('dedupeKey');
   });
 
   it('marks a notification as read only when it belongs to the current user', async () => {

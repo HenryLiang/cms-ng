@@ -246,6 +246,7 @@ export class VideoJobService {
 
     const isL2 = dto.mode === 'ARTICLE_TO_VIDEO';
     const submitOptions = this.validateSubmitOptions(dto, isL2);
+    let jobPrompt = dto.prompt?.trim() ?? '';
     let costEstimate: number;
     if (isL2) {
       if (!this.renderEnabled) {
@@ -271,6 +272,7 @@ export class VideoJobService {
       if (article.authorId !== userId && !privileged) {
         throw new ServiceUnavailableException('只能用自己的文章生成视频');
       }
+      jobPrompt = article.title.trim() || '稿件成片';
       costEstimate = await this.estimateL2Cost();
     } else {
       if (!dto.prompt?.trim()) {
@@ -291,7 +293,7 @@ export class VideoJobService {
       data: {
         userId,
         mode: isL2 ? 'ARTICLE_TO_VIDEO' : 'TEXT_TO_CLIP',
-        prompt: dto.prompt?.trim() ?? '',
+        prompt: jobPrompt,
         articleId: isL2 ? dto.articleId : null,
         provider: this.provider.name,
         durationSec: dto.durationSec ?? null,
@@ -935,20 +937,40 @@ export class VideoJobService {
       );
     }
 
-    // 上传/合成阶段僵尸(进程崩溃于下载/转存/渲染中)→ 置 FAILED,用户重试
-    const staleUploads = await this.prisma.videoGenerationJob.updateMany({
+    // 上传/合成阶段僵尸(进程崩溃于下载/转存/渲染中)→ 逐条抢占为 FAILED,
+    // 以便给每位任务所有者写入一条可追踪的失败通知。
+    const staleCutoff = new Date(Date.now() - UPLOAD_STALE_MS);
+    const staleUploads = await this.prisma.videoGenerationJob.findMany({
       where: {
         status: 'UPLOADING',
-        updatedAt: { lt: new Date(Date.now() - UPLOAD_STALE_MS) },
+        updatedAt: { lt: staleCutoff },
       },
-      data: {
-        status: 'FAILED',
+      orderBy: { updatedAt: 'asc' },
+      take: 50,
+    });
+    let cleanedCount = 0;
+    for (const job of staleUploads) {
+      const claimed = await this.prisma.videoGenerationJob.updateMany({
+        where: {
+          id: job.id,
+          status: 'UPLOADING',
+          updatedAt: { lt: staleCutoff },
+        },
+        data: {
+          status: 'FAILED',
+          failedStep: 'upload',
+          error: '上传/合成中断(进程重启),请重试',
+        },
+      });
+      if (!claimed.count) continue;
+      cleanedCount += claimed.count;
+      await this.publishVideoStatus(job, 'FAILED', {
         failedStep: 'upload',
         error: '上传/合成中断(进程重启),请重试',
-      },
-    });
-    if (staleUploads.count) {
-      this.logger.warn(`清理上传僵尸任务 ${staleUploads.count} 个`);
+      });
+    }
+    if (cleanedCount) {
+      this.logger.warn(`清理上传僵尸任务 ${cleanedCount} 个`);
     }
   }
 
@@ -989,7 +1011,7 @@ export class VideoJobService {
         error: message.slice(0, 1000),
       },
     });
-    if (job.userId && job.prompt) {
+    if (job.userId) {
       await this.publishVideoStatus(job, 'FAILED', {
         failedStep: step,
         error: message.slice(0, 1000),
@@ -998,7 +1020,7 @@ export class VideoJobService {
   }
 
   private async publishVideoStatus(
-    job: Pick<VideoGenerationJob, 'id' | 'userId' | 'prompt'>,
+    job: Pick<VideoGenerationJob, 'id' | 'userId' | 'prompt' | 'retryCount'>,
     status: 'SUCCEEDED' | 'FAILED',
     details: {
       resultAssetId?: string;
@@ -1007,7 +1029,8 @@ export class VideoJobService {
     },
   ): Promise<void> {
     const succeeded = status === 'SUCCEEDED';
-    const subject = `“${job.prompt.slice(0, 40)}”`;
+    const displayName = job.prompt.trim() || '视频任务';
+    const subject = `“${displayName.slice(0, 40)}”`;
     try {
       await this.notifications.publish({
         userId: job.userId,
@@ -1027,7 +1050,10 @@ export class VideoJobService {
           ...(details.failedStep ? { failedStep: details.failedStep } : {}),
           ...(details.error ? { error: details.error } : {}),
         },
-        dedupeKey: `video-job:${job.id}:${status}`,
+        dedupeKey:
+          status === 'FAILED'
+            ? `video-job:${job.id}:${status}:attempt-${job.retryCount}`
+            : `video-job:${job.id}:${status}`,
       });
     } catch (error) {
       this.logger.warn(

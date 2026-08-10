@@ -531,6 +531,27 @@ describe('VideoJobService', () => {
         }),
       });
     });
+
+    it('重试后的失败使用新 dedupeKey，避免被首次失败通知吞掉', async () => {
+      build();
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
+      prisma.videoGenerationJob.findUnique.mockResolvedValue({
+        ...JOB,
+        retryCount: 1,
+      });
+      prisma.videoGenerationJob.update.mockImplementation(({ data }) =>
+        Promise.resolve({ ...JOB, retryCount: 1, ...data }),
+      );
+      provider.submit.mockRejectedValue(new Error('quota exhausted again'));
+
+      await service.submitStage('job-1');
+
+      expect(notifications.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dedupeKey: 'video-job:job-1:FAILED:attempt-1',
+        }),
+      );
+    });
   });
 
   describe('pollStage', () => {
@@ -743,7 +764,7 @@ describe('VideoJobService', () => {
           failedStep: 'upload',
           error: 'download timeout',
         },
-        dedupeKey: 'video-job:job-1:FAILED',
+        dedupeKey: 'video-job:job-1:FAILED:attempt-0',
       });
     });
 
@@ -874,10 +895,19 @@ describe('VideoJobService', () => {
   });
 
   describe('sweep 僵尸清理', () => {
-    it('上传阶段超 10 分钟 → FAILED(upload)', async () => {
+    it('上传阶段超时 → FAILED(upload) 并通知任务所有者', async () => {
       build();
-      prisma.videoGenerationJob.findMany.mockResolvedValue([]);
-      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 2 });
+      const staleJob = {
+        ...JOB,
+        mode: 'ARTICLE_TO_VIDEO',
+        prompt: '',
+        status: 'UPLOADING',
+        updatedAt: new Date('2026-08-01T00:00:00Z'),
+      };
+      prisma.videoGenerationJob.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([staleJob]);
+      prisma.videoGenerationJob.updateMany.mockResolvedValue({ count: 1 });
 
       await service.sweep();
 
@@ -888,6 +918,14 @@ describe('VideoJobService', () => {
             status: 'FAILED',
             failedStep: 'upload',
           }),
+        }),
+      );
+      expect(notifications.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          title: '视频生成失败',
+          message: expect.stringContaining('“视频任务”生成失败'),
+          dedupeKey: 'video-job:job-1:FAILED:attempt-0',
         }),
       );
     });
@@ -972,6 +1010,7 @@ describe('VideoJobService', () => {
             data: expect.objectContaining({
               mode: 'ARTICLE_TO_VIDEO',
               articleId: 'article-1',
+              prompt: 't',
             }),
           }),
         );

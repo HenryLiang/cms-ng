@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationLevel, NotificationType } from '@cms-ng/shared';
+import {
+  NotificationLevel,
+  NotificationType,
+  type NotificationItem,
+  type NotificationList,
+} from '@cms-ng/shared';
 import type { Notification } from '@prisma/client';
 import { safeJsonParse } from '../common/json.utils';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +24,7 @@ export interface PublishNotificationInput {
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async publish(input: PublishNotificationInput) {
+  async publish(input: PublishNotificationInput): Promise<NotificationItem> {
     const notification = this.prisma.notification;
     const data = {
       userId: input.userId,
@@ -41,7 +46,7 @@ export class NotificationsService {
     return this.serialize(created);
   }
 
-  async list(userId: string, limit = 20) {
+  async list(userId: string, limit = 20): Promise<NotificationList> {
     const notification = this.prisma.notification;
     const [items, unreadCount] = await Promise.all([
       notification.findMany({
@@ -58,7 +63,7 @@ export class NotificationsService {
     };
   }
 
-  async markRead(userId: string, id: string) {
+  async markRead(userId: string, id: string): Promise<NotificationItem> {
     const notification = this.prisma.notification;
     const owned = await notification.findFirst({ where: { id, userId } });
     if (!owned) throw new NotFoundException('通知不存在');
@@ -78,9 +83,14 @@ export class NotificationsService {
     return { updatedCount: result.count };
   }
 
-  private serialize(item: Notification) {
+  private serialize(item: Notification): NotificationItem {
     return {
-      ...item,
+      id: item.id,
+      type: item.type as NotificationType,
+      level: item.level as NotificationLevel,
+      title: item.title,
+      message: item.message,
+      actionUrl: item.actionUrl,
       metadata: safeJsonParse<Record<string, unknown>>(item.metadata, {}),
       readAt: item.readAt?.toISOString() ?? null,
       createdAt: item.createdAt.toISOString(),

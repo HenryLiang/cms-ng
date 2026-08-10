@@ -72,6 +72,7 @@ async function bootstrap() {
       )
       .addTag('ai', 'AI writing operations (draft, research kit, fact-check)')
       .addTag('billing', 'Top-ups, balance, transactions, billing config')
+      .addTag('notifications', 'In-app task, billing, and system notifications')
       .addTag(
         'media',
         'Media asset library (image upload, AI-generated, management)',
