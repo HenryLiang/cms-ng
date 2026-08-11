@@ -86,5 +86,6 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          # 应用日志: systemd 单元 append 写入 .cms-ng-*.log,journalctl 留有副本,两者都抓
           ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
-            "cd '${DEPLOY_PATH}' && tail -n 100 .cms-ng-backend.log 2>/dev/null; tail -n 50 .cms-ng-frontend.log 2>/dev/null" || true
+            "cd '${DEPLOY_PATH}' && tail -n 100 .cms-ng-backend.log 2>/dev/null; tail -n 50 .cms-ng-frontend.log 2>/dev/null; journalctl -u cms-ng-backend -n 100 --no-pager 2>/dev/null; journalctl -u cms-ng-frontend -n 50 --no-pager 2>/dev/null" || true

@@ -4,6 +4,7 @@ set -e
 # ============================================================
 # CMS-NG 服务管理脚本
 # 用法:
+#   ./scripts/cms-ng-service.sh install [--prod]            # 首次/升级后: 安装 systemd 单元 + logrotate
 #   ./scripts/cms-ng-service.sh start  [--prod] [--no-build]
 #   ./scripts/cms-ng-service.sh stop   [--prod]
 #   ./scripts/cms-ng-service.sh restart [--prod] [--no-build]
@@ -12,14 +13,15 @@ set -e
 #
 # 模式:
 #   (默认)  开发模式 (npm run dev, turbo)
-#   --prod   生产模式 (宿主机进程: nginx 反代 + node/next 后台进程 + rsshub 容器)
+#   --prod   生产模式 (systemd 守护: nginx 反代 + systemd 单元 + rsshub 容器)
 #
 # 生产模式选项:
 #   --no-build  跳过构建 (仅启动已有产物，用于快速重启非代码变更的场景)
 #
 # 生产架构:
-#   nginx (80/443) -> 127.0.0.1:3000 (frontend next start)
-#                 -> 127.0.0.1:3001 (backend node dist/src/main)
+#   nginx (80/443) -> 127.0.0.1:3000 (cms-ng-frontend.service, next start)
+#                 -> 127.0.0.1:3001 (cms-ng-backend.service, node dist/src/main)
+#   应用进程由 systemd 守护: 崩溃自动拉起 (Restart=on-failure) + 开机自启 (enable)
 #   rsshub (docker, :1200)
 #   elasticsearch (外部;直连 backend/.env 中 ELASTICSEARCH_NODE,仅 ELASTICSEARCH_ENABLED=true 时使用,媒体全文检索)
 #   MySQL 为外部中间件
@@ -53,13 +55,18 @@ set -e
 #     - 仅重启服务，代码未变更 (如改了 .env、调整 nginx 配置后重启)
 #     - 不适用于 schema 变更、依赖更新、任何代码改动
 #
+#   首次部署或从旧版 (nohup+PID) 升级:
+#     ./scripts/cms-ng-service.sh install --prod   # 写入 systemd 单元 + logrotate, enable 开机自启
+#     (升级时先用旧脚本 stop --prod 停掉 nohup 进程,再 install + start --prod --no-build)
+#
 # ============================================================
-# 日志与 PID 文件
+# 日志文件
 # ============================================================
 #
-#   backend  日志: .cms-ng-backend.log     PID: .cms-ng-backend.pid
-#   frontend 日志: .cms-ng-frontend.log    PID: .cms-ng-frontend.pid
-#   dev 合并日志: .cms-ng-dev.log          PID: .cms-ng-dev.pid
+#   backend  日志: .cms-ng-backend.log    (systemd append 写入; 亦可 journalctl -u cms-ng-backend -f)
+#   frontend 日志: .cms-ng-frontend.log   (journalctl -u cms-ng-frontend -f)
+#   dev 合并日志: .cms-ng-dev.log         PID: .cms-ng-dev.pid (仅 dev 模式用 PID 文件)
+#   日志轮转: /etc/logrotate.d/cms-ng (daily, 保留 14 份, copytruncate)
 #
 #   查看日志: ./scripts/cms-ng-service.sh logs --prod backend
 #             ./scripts/cms-ng-service.sh logs --prod frontend
@@ -70,9 +77,11 @@ set -e
 # ============================================================
 #
 #   Q: start --prod 后 backend/frontend 显示 "未响应"
-#   A: 查看对应日志: logs --prod backend / logs --prod frontend
+#   A: 查看日志: logs --prod backend / logs --prod frontend
+#      或:       journalctl -u cms-ng-backend -n 100 --no-pager
 #      常见原因: 端口被占 (ss -ltnp | grep -E ':3000|:3001')、
-#                .env 变量缺失、DATABASE_URL 不可达
+#                .env 变量缺失、DATABASE_URL 不可达、
+#                旧 nohup 进程残留占端口 (pkill -f "node dist/src/main"; pkill -f "next start")
 #
 #   Q: 数据库迁移失败
 #   A: 脚本会中止发布 (exit 1)。迁移在启动前执行，不会出现新代码对旧 schema 运行。
@@ -80,13 +89,14 @@ set -e
 #      可手动重试迁移: cd backend && npx prisma migrate deploy
 #      若需创建新迁移 (仅开发环境): npx prisma migrate dev --name <描述>
 #
-#   Q: frontend 容器/进程起来但页面 502
+#   Q: frontend 进程起来但页面 502
 #   A: 检查 nginx: nginx -t && systemctl status nginx
 #      nginx 反代配置: /etc/nginx/conf.d/cms-ng.conf
+#      注意: 新增后端控制器 (@Controller('xxx')) 必须同步该配置中的路径前缀清单,否则公网 404
 #
 #   Q: 端口冲突 (3000/3001 被其他进程占用)
-#   A: stop --prod 后重新 start --prod
-#      或手动清理: pkill -f "node dist/src/main"; pkill -f "next start"
+#   A: systemctl stop cms-ng-backend cms-ng-frontend 后重新 start --prod
+#      或手动清理残留: pkill -f "node dist/src/main"; pkill -f "next start"
 #
 #   Q: RSSHub 容器未启动
 #   A: 非致命，手动拉起: docker compose -f docker-compose.yml up -d
@@ -101,15 +111,19 @@ FRONTEND_DIR="$PROJECT_DIR/frontend"
 PID_FILE="$PROJECT_DIR/.cms-ng-dev.pid"
 LOG_FILE="$PROJECT_DIR/.cms-ng-dev.log"
 
-# prod 模式
-BACKEND_PID_FILE="$PROJECT_DIR/.cms-ng-backend.pid"
-FRONTEND_PID_FILE="$PROJECT_DIR/.cms-ng-frontend.pid"
+# prod 模式 (systemd 守护;日志仍落仓库根,保持 logs --prod 习惯不变)
 BACKEND_LOG_FILE="$PROJECT_DIR/.cms-ng-backend.log"
 FRONTEND_LOG_FILE="$PROJECT_DIR/.cms-ng-frontend.log"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"  # rsshub 中间件容器 (ES 已改为外部连接)
 BACKEND_ENV="$BACKEND_DIR/.env"
 PRISMA_SCHEMA="$BACKEND_DIR/prisma/schema.prisma"
 PRISMA_CLIENT_HASH_FILE="$PROJECT_DIR/node_modules/.prisma-client-schema-hash"
+
+# systemd 单元
+SYSTEMD_DIR="/etc/systemd/system"
+BACKEND_UNIT="cms-ng-backend.service"
+FRONTEND_UNIT="cms-ng-frontend.service"
+LOGROTATE_CONF="/etc/logrotate.d/cms-ng"
 
 # 健康检查端口
 PROD_FRONTEND_PORT=3000
@@ -187,9 +201,10 @@ es_curl() {
 
 usage() {
     cat <<EOF
-用法: $0 {start|stop|restart|status|logs} [--prod] [--no-build]
+用法: $0 {install|start|stop|restart|status|logs} [--prod] [--no-build]
 
 命令:
+  install  安装生产运行环境 (systemd 单元 + logrotate, 仅 --prod; 首次/升级后执行一次)
   start    启动服务
   stop     停止服务
   restart  重启服务
@@ -198,12 +213,13 @@ usage() {
 
 模式:
   (默认)  开发模式 (npm run dev)
-  --prod   生产模式 (宿主机进程 + rsshub 容器; ES 为外部连接)
+  --prod   生产模式 (systemd 单元守护 + rsshub 容器; ES 为外部连接)
 
 生产模式选项 (仅 start/restart --prod):
   --no-build  跳过构建 (仅启动已有产物)
 
 示例:
+  $0 install --prod             # 首次: 安装 systemd 单元 + 日志轮转
   $0 start                      # 开发模式启动
   $0 start --prod               # 生产发布 (build+启动+迁移+验证)
   $0 start --prod --no-build    # 生产启动 (跳过构建)
@@ -298,8 +314,125 @@ logs_dev() {
 }
 
 # ============================================================
-# 生产模式 (宿主机进程)
+# 生产模式 (systemd 守护)
 # ============================================================
+
+prod_units_installed() {
+    [ -f "$SYSTEMD_DIR/$BACKEND_UNIT" ] && [ -f "$SYSTEMD_DIR/$FRONTEND_UNIT" ]
+}
+
+prod_require_units() {
+    if ! prod_units_installed; then
+        echo "        Error: systemd 单元未安装 ($SYSTEMD_DIR/$BACKEND_UNIT 等不存在)"
+        echo "               首次部署或脚本升级后请先执行: $0 install --prod"
+        exit 1
+    fi
+}
+
+# 安装生产运行环境: 生成两个 systemd 单元 + logrotate 配置, daemon-reload + enable。
+# 幂等: 重复执行只是覆盖同样的文件。只安装不启动 (启动走 start --prod)。
+prod_install() {
+    echo "[install] 安装生产运行环境 (systemd 单元 + 日志轮转)..."
+
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "        Error: 需要 root 运行 (写入 $SYSTEMD_DIR 与 /etc/logrotate.d)"
+        exit 1
+    fi
+
+    local node_bin next_bin
+    node_bin=$(command -v node || true)
+    if [ -z "$node_bin" ]; then
+        echo "        Error: node 未安装"
+        exit 1
+    fi
+    # npm workspaces 会把 next 提升到仓库根 node_modules, frontend/node_modules 下未必有
+    next_bin="$FRONTEND_DIR/node_modules/next/dist/bin/next"
+    [ -f "$next_bin" ] || next_bin="$PROJECT_DIR/node_modules/next/dist/bin/next"
+    if [ ! -f "$next_bin" ]; then
+        echo "        Error: 未找到 next 可执行文件 (先执行 npm ci 安装依赖)"
+        exit 1
+    fi
+
+    echo "        node: $node_bin ($("$node_bin" --version))"
+    echo "        next: $next_bin"
+
+    # backend 单元。StartLimitIntervalSec=0: DB/ES 等外部依赖抖动导致连续崩溃时
+    # 不进入 failed 放弃态,持续按 RestartSec 重试(单机个人项目,宁可重试不要躺平)。
+    cat > "$SYSTEMD_DIR/$BACKEND_UNIT" <<EOF
+[Unit]
+Description=CMS-NG Backend (NestJS)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=$BACKEND_DIR
+Environment=NODE_ENV=production
+ExecStart=$node_bin dist/src/main
+Restart=on-failure
+RestartSec=5
+# 优雅退出: SIGTERM 后最多等 15s 再 SIGKILL (替代旧 nohup 脚本的 2s 后 kill -9)
+TimeoutStopSec=15
+# 日志仍落仓库根 .cms-ng-backend.log (logs --prod 不变), journald 同时留存:
+# journalctl -u $BACKEND_UNIT -f
+StandardOutput=append:$BACKEND_LOG_FILE
+StandardError=append:$BACKEND_LOG_FILE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    echo "        已写入 $SYSTEMD_DIR/$BACKEND_UNIT"
+
+    # frontend 单元: 直跑 next bin 而非 npm run start, 去掉 npm 包装层,
+    # 进程树干净、SIGTERM 直接送达 next-server。
+    cat > "$SYSTEMD_DIR/$FRONTEND_UNIT" <<EOF
+[Unit]
+Description=CMS-NG Frontend (Next.js)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=$FRONTEND_DIR
+Environment=NODE_ENV=production
+ExecStart=$node_bin $next_bin start
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+StandardOutput=append:$FRONTEND_LOG_FILE
+StandardError=append:$FRONTEND_LOG_FILE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    echo "        已写入 $SYSTEMD_DIR/$FRONTEND_UNIT"
+
+    # 日志轮转: systemd append 写文件, copytruncate 原地截断, 无需通知进程
+    if command -v logrotate > /dev/null 2>&1; then
+        cat > "$LOGROTATE_CONF" <<EOF
+$BACKEND_LOG_FILE $FRONTEND_LOG_FILE $LOG_FILE {
+    daily
+    rotate 14
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+        echo "        已写入 $LOGROTATE_CONF (daily, 保留 14 份)"
+    else
+        echo "        Warn: 未安装 logrotate, 跳过日志轮转配置"
+    fi
+
+    systemctl daemon-reload
+    systemctl enable "$BACKEND_UNIT" "$FRONTEND_UNIT" > /dev/null 2>&1
+    echo "        已 enable (开机自启): $BACKEND_UNIT, $FRONTEND_UNIT"
+    echo ""
+    echo "        安装完成。启动服务: $0 start --prod [--no-build]"
+    echo "        从旧 nohup 方式升级: 先 pkill 旧进程, 再 $0 start --prod --no-build"
+}
 
 prod_preflight() {
     echo "[1/8] 前置检查..."
@@ -458,54 +591,21 @@ prod_build() {
 }
 
 prod_stop_apps() {
-    echo "[4/8] 停止旧应用进程..."
+    echo "[4/8] 停止旧应用进程 (systemd)..."
 
-    # backend
-    if [ -f "$BACKEND_PID_FILE" ]; then
-        local pid=$(cat "$BACKEND_PID_FILE" 2>/dev/null || echo "")
-        if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
-            kill "$pid" 2>/dev/null || true
-            sleep 2
-            kill -9 "$pid" 2>/dev/null || true
-            echo "        backend 已停止 (PID: $pid)"
-        fi
-        rm -f "$BACKEND_PID_FILE"
-    fi
-    pkill -f "node dist/main" 2>/dev/null || true
-    pkill -f "node dist/src/main" 2>/dev/null || true
-
-    # frontend
-    if [ -f "$FRONTEND_PID_FILE" ]; then
-        local pid=$(cat "$FRONTEND_PID_FILE" 2>/dev/null || echo "")
-        if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
-            kill "$pid" 2>/dev/null || true
-            sleep 2
-            kill -9 "$pid" 2>/dev/null || true
-            echo "        frontend 已停止 (PID: $pid)"
-        fi
-        rm -f "$FRONTEND_PID_FILE"
-    fi
-    pkill -f "next start" 2>/dev/null || true
-    pkill -f "next-server" 2>/dev/null || true
-
-    sleep 1
-    echo "        旧进程已清理"
+    # systemctl stop 对已停止的单元是 no-op;
+    # SIGTERM -> TimeoutStopSec=15 -> SIGKILL, 优雅退出替代旧脚本的 kill -9
+    systemctl stop "$BACKEND_UNIT" "$FRONTEND_UNIT" 2>/dev/null || true
+    echo "        应用进程已停止"
 }
 
 prod_start_apps() {
-    echo "[6/8] 启动应用..."
+    echo "[6/8] 启动应用 (systemd)..."
 
-    cd "$BACKEND_DIR"
-    # NODE_ENV=production: Swagger 不挂载、helmet CSP 生效(main.ts 依赖此判断)。
-    # 不设置时后端按 development 运行,生产会意外暴露 /api-docs。
-    NODE_ENV=production nohup node dist/src/main > "$BACKEND_LOG_FILE" 2>&1 &
-    echo $! > "$BACKEND_PID_FILE"
-    echo "        backend  PID: $(cat "$BACKEND_PID_FILE")  日志: $BACKEND_LOG_FILE"
-
-    cd "$FRONTEND_DIR"
-    nohup npm run start > "$FRONTEND_LOG_FILE" 2>&1 &
-    echo $! > "$FRONTEND_PID_FILE"
-    echo "        frontend PID: $(cat "$FRONTEND_PID_FILE")  日志: $FRONTEND_LOG_FILE"
+    systemctl start "$BACKEND_UNIT"
+    echo "        backend  已启动 ($BACKEND_UNIT)  日志: $BACKEND_LOG_FILE"
+    systemctl start "$FRONTEND_UNIT"
+    echo "        frontend 已启动 ($FRONTEND_UNIT)  日志: $FRONTEND_LOG_FILE"
 
     echo "        启动 RSSHub 容器..."
     cd "$PROJECT_DIR"
@@ -612,6 +712,7 @@ start_prod() {
     local bootstrap_password="${ADMIN_BOOTSTRAP_PASSWORD:-}"
     unset ADMIN_BOOTSTRAP_EMAIL ADMIN_BOOTSTRAP_PASSWORD
 
+    prod_require_units
     prod_preflight
     prod_prisma_check_and_generate "$@"
     prod_build "$@"
@@ -631,35 +732,11 @@ start_prod() {
 }
 
 stop_prod() {
-    echo "[stop] 停止生产模式..."
+    echo "[stop] 停止生产模式 (systemd)..."
 
-    if [ -f "$BACKEND_PID_FILE" ]; then
-        local pid=$(cat "$BACKEND_PID_FILE" 2>/dev/null || echo "")
-        if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
-            kill "$pid" 2>/dev/null || true
-            sleep 2
-            kill -9 "$pid" 2>/dev/null || true
-            echo "        backend 已停止 (PID: $pid)"
-        fi
-        rm -f "$BACKEND_PID_FILE"
-    fi
-    pkill -f "node dist/main" 2>/dev/null || true
-    pkill -f "node dist/src/main" 2>/dev/null || true
-
-    if [ -f "$FRONTEND_PID_FILE" ]; then
-        local pid=$(cat "$FRONTEND_PID_FILE" 2>/dev/null || echo "")
-        if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
-            kill "$pid" 2>/dev/null || true
-            sleep 2
-            kill -9 "$pid" 2>/dev/null || true
-            echo "        frontend 已停止 (PID: $pid)"
-        fi
-        rm -f "$FRONTEND_PID_FILE"
-    fi
-    pkill -f "next start" 2>/dev/null || true
-    pkill -f "next-server" 2>/dev/null || true
-
-    echo "        应用进程已停止 (rsshub 容器保留)"
+    prod_require_units
+    systemctl stop "$BACKEND_UNIT" "$FRONTEND_UNIT"
+    echo "        应用进程已停止 (rsshub 容器保留; systemd 会在开机时自动拉起, 如需禁用: systemctl disable $BACKEND_UNIT $FRONTEND_UNIT)"
 }
 
 restart_prod() {
@@ -668,29 +745,20 @@ restart_prod() {
 }
 
 status_prod() {
-    echo "[status] 生产模式:"
+    echo "[status] 生产模式 (systemd):"
 
-    local be_pid=""
-    if [ -f "$BACKEND_PID_FILE" ]; then
-        be_pid=$(cat "$BACKEND_PID_FILE" 2>/dev/null || echo "")
-    fi
-    if [ -n "$be_pid" ] && ps -p "$be_pid" > /dev/null 2>&1; then
-        echo "        backend:  运行中 (PID: $be_pid)"
-        echo "                  日志: $BACKEND_LOG_FILE"
-    else
-        echo "        backend:  未运行"
+    if ! prod_units_installed; then
+        echo "        Warn: systemd 单元未安装, 请先执行: $0 install --prod"
     fi
 
-    local fe_pid=""
-    if [ -f "$FRONTEND_PID_FILE" ]; then
-        fe_pid=$(cat "$FRONTEND_PID_FILE" 2>/dev/null || echo "")
-    fi
-    if [ -n "$fe_pid" ] && ps -p "$fe_pid" > /dev/null 2>&1; then
-        echo "        frontend: 运行中 (PID: $fe_pid)"
-        echo "                  日志: $FRONTEND_LOG_FILE"
-    else
-        echo "        frontend: 未运行"
-    fi
+    local be_active be_enabled fe_active fe_enabled
+    be_active=$(systemctl is-active "$BACKEND_UNIT" 2>/dev/null || echo "unknown")
+    be_enabled=$(systemctl is-enabled "$BACKEND_UNIT" 2>/dev/null || echo "unknown")
+    fe_active=$(systemctl is-active "$FRONTEND_UNIT" 2>/dev/null || echo "unknown")
+    fe_enabled=$(systemctl is-enabled "$FRONTEND_UNIT" 2>/dev/null || echo "unknown")
+
+    echo "        backend:  $be_active (enabled: $be_enabled)  日志: $BACKEND_LOG_FILE"
+    echo "        frontend: $fe_active (enabled: $fe_enabled)  日志: $FRONTEND_LOG_FILE"
 
     echo "        rsshub:   $(docker ps --filter name=cms-ng-rsshub --format '{{.Status}}' 2>/dev/null || echo '未运行')"
     if es_enabled; then
@@ -729,11 +797,11 @@ logs_prod() {
     local service="${1:-}"
     case "$service" in
         backend)
-            echo "[logs] backend 日志 ($BACKEND_LOG_FILE) (Ctrl+C 退出):"
+            echo "[logs] backend 日志 ($BACKEND_LOG_FILE; 亦可 journalctl -u $BACKEND_UNIT -f) (Ctrl+C 退出):"
             tail -f "$BACKEND_LOG_FILE"
             ;;
         frontend)
-            echo "[logs] frontend 日志 ($FRONTEND_LOG_FILE) (Ctrl+C 退出):"
+            echo "[logs] frontend 日志 ($FRONTEND_LOG_FILE; 亦可 journalctl -u $FRONTEND_UNIT -f) (Ctrl+C 退出):"
             tail -f "$FRONTEND_LOG_FILE"
             ;;
         rsshub)
@@ -758,6 +826,14 @@ CMD="${1:-usage}"
 shift 2>/dev/null || true
 
 case "$CMD" in
+    install)
+        if is_prod "$@"; then
+            prod_install
+        else
+            echo "install 仅用于 --prod (开发模式无需安装)"
+            exit 1
+        fi
+        ;;
     start)
         if is_prod "$@"; then
             start_prod "$@"
