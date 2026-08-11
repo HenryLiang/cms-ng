@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Zod schemas for the 8 LLM JSON parse sites in ai.service.ts.
+ * Zod schemas for the LLM JSON parse sites in ai.service.ts.
  *
  * Why: previously the code did `const parsed = JSON.parse(response.content)`
  * and then read `parsed.foo` fields without runtime validation. If the LLM
@@ -13,10 +13,9 @@ import { z } from 'zod';
  * Each schema matches the corresponding TypeScript interface in
  * `frontend/src/lib/article-api.ts` — when one changes, the other should too.
  *
- * Failure mode: if a schema doesn't match, the call site catches the
- * ZodError and falls back to the static `fallback` object in
- * `AIOperationLogger.run` (see the `fn` closure pattern in ai.service.ts).
- * We log the raw response + Zod issues at warn level for observability.
+ * Failure mode depends on the interaction: background/fail-open calls use
+ * `AIOperationLogger.run` with a static fallback, while explicit user actions
+ * such as one-click tagging use `runOrThrow` so the UI can report the failure.
  */
 
 // ===== Shared building blocks =====
@@ -83,6 +82,11 @@ export const draftResultSchema = z.object({
   title: z.string().nullish(),
   subtitle: z.string().nullish(),
   content: z.string().nullish(),
+  tags: z.array(z.string()).nullish(),
+});
+
+export const articleTagsSchema = z.object({
+  tags: z.array(z.string()),
 });
 
 // ===== Site 4: factCheck =====

@@ -20,6 +20,7 @@ import type {
 } from './providers';
 import { CHAT_PROVIDER, KimiProvider } from './providers';
 import {
+  articleTagsSchema,
   draftResultSchema,
   factCheckResultSchema,
   geoResultSchema,
@@ -47,6 +48,7 @@ import {
   GenerateHeadlinesInput,
   HeadlineOption,
   GenerateExcerptInput,
+  GenerateArticleTagsInput,
   ChatInput,
   ChatMessage,
   GenerateDraftInput,
@@ -118,6 +120,16 @@ interface WikipediaSummary {
 /** axios 等 HTTP 错误的最小形状(用于 duck-type 检查 response.status) */
 interface HttpLikeError {
   response?: { status?: number };
+}
+
+function normalizeArticleTags(tags: readonly string[] | null | undefined) {
+  return Array.from(
+    new Set(
+      (tags ?? [])
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0 && tag.length <= 30),
+    ),
+  ).slice(0, 8);
 }
 
 @Injectable()
@@ -623,6 +635,61 @@ ${input.content.slice(0, 2000)}
     });
   }
 
+  // ===== 稿件标签生成 =====
+  async generateArticleTags(
+    userId: string,
+    articleId: string | undefined,
+    input: GenerateArticleTagsInput,
+  ): Promise<string[]> {
+    const prompt = `请为以下新闻稿生成 3-8 个简洁、具体、便于检索的标签。
+
+标题：${input.title}
+正文：${input.content.replace(/<[^>]+>/g, ' ').slice(0, 4000)}
+
+要求：
+- 标签优先包含核心人物、机构、地点、事件和行业主题
+- 不要输出“新闻”“资讯”等过于宽泛的词
+- 单个标签不超过 30 个字符
+- 只输出 JSON：{"tags":["标签1","标签2"]}`;
+
+    await this.checkAIBalance(userId, (800 / 1000) * 0.02);
+
+    const { result, tokensUsed, aiOpId } = await this.aiLog.runOrThrow({
+      userId,
+      articleId,
+      agentType: 'WRITING',
+      action: 'generate_article_tags',
+      prompt,
+      model: this.chatProvider.model,
+      fn: async () => {
+        const response = await this.chatProvider.chatCompletion({
+          messages: [
+            {
+              role: 'system',
+              content: `你是一名新闻资料编辑，擅长提取稳定、准确、可检索的稿件标签。${this.getLanguageInstruction(input.language)}。输出必须是有效的 JSON。`,
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+        });
+        const parsed = articleTagsSchema.parse(JSON.parse(response.content));
+        return {
+          result: normalizeArticleTags(parsed.tags),
+          tokensUsed: response.usage?.totalTokens,
+        };
+      },
+    });
+    await this.deductLLMBilling({
+      userId,
+      aiOperationId: aiOpId,
+      tokensUsed,
+      articleId,
+      description: 'AI 稿件打标',
+    });
+    return result;
+  }
+
   // ===== 对话助手 =====
   async chatWithAI(
     userId: string,
@@ -795,7 +862,8 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
 {
   "title": "稿件标题",
   "subtitle": "副标题",
-  "content": "<p>导语段落...</p><h2>小标题</h2><p>正文...</p>"
+  "content": "<p>导语段落...</p><h2>小标题</h2><p>正文...</p>",
+  "tags": ["3-8 个简洁、具体、便于检索的稿件标签"]
 }`;
 
     // Pre-check balance (estimate ~4000 tokens for draft generation)
@@ -840,10 +908,15 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
           );
           throw err;
         }
+        const generatedTags = normalizeArticleTags(parsed.tags);
+        const fallbackTags = normalizeArticleTags(
+          input.storyTags?.length ? input.storyTags : [input.storyTitle],
+        );
         const result: DraftResult = {
           title: parsed.title || input.currentTitle || input.storyTitle,
           subtitle: parsed.subtitle ?? undefined,
           content: this.sanitizeDraftHTML(parsed.content || ''),
+          tags: generatedTags.length ? generatedTags : fallbackTags,
         };
 
         return { result, tokensUsed: response.usage?.totalTokens };
@@ -852,6 +925,9 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
         title: input.currentTitle || input.storyTitle,
         subtitle: '',
         content: '<p>AI 初稿生成暫時不可用，請稍後重試。</p>',
+        tags: normalizeArticleTags(
+          input.storyTags?.length ? input.storyTags : [input.storyTitle],
+        ),
       },
       onSuccess: (aiOpId, tokensUsed) =>
         this.deductLLMBilling({

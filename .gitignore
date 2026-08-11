@@ -93,3 +93,6 @@ data/*
 
 # Plans directory (local working notes, not tracked)
 plans/
+
+# Local codebase knowledge graph (rebuilt per workspace)
+.codebase-memory/

@@ -323,6 +323,42 @@ describe('AIService', () => {
     });
   });
 
+  describe('generateArticleTags', () => {
+    it('returns normalized tags for an article', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            tags: [' 香港 ', '人工智能', '香港', '', 'x'.repeat(31)],
+          }),
+        ),
+      );
+
+      const result = await service.generateArticleTags(
+        'user-id',
+        'article-id',
+        {
+          title: '香港人工智能产业发展',
+          content: '香港推出人工智能产业扶持政策。',
+        },
+      );
+
+      expect(result).toEqual(['香港', '人工智能']);
+    });
+
+    it('surfaces provider failures for the user-triggered tagging action', async () => {
+      mockChatProvider.chatCompletion.mockRejectedValue(
+        new Error('tagging unavailable'),
+      );
+
+      await expect(
+        service.generateArticleTags('user-id', 'article-id', {
+          title: '标题',
+          content: '正文',
+        }),
+      ).rejects.toThrow('tagging unavailable');
+    });
+  });
+
   describe('chatWithAI', () => {
     it('should return reply on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
@@ -355,6 +391,7 @@ describe('AIService', () => {
             title: 'Draft Title',
             subtitle: 'Draft Subtitle',
             content: '<p>Draft content</p>',
+            tags: ['人工智能', ' 科技 ', '人工智能'],
           }),
         ),
       );
@@ -368,6 +405,7 @@ describe('AIService', () => {
       expect(result.title).toBe('Draft Title');
       expect(result.subtitle).toBe('Draft Subtitle');
       expect(result.content).toBe('<p>Draft content</p>');
+      expect(result.tags).toEqual(['人工智能', '科技']);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
 
@@ -382,7 +420,27 @@ describe('AIService', () => {
 
       expect(result.title).toBe('Current Title');
       expect(result.content).toContain('暫時不可用');
+      expect(result.tags).toEqual(['Story Title']);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
+    });
+
+    it('should fall back to story tags when the model returns no tags', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            title: 'Draft Title',
+            content: '<p>Draft content</p>',
+            tags: [],
+          }),
+        ),
+      );
+
+      const result = await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: ['已有线索标签'],
+      });
+
+      expect(result.tags).toEqual(['已有线索标签']);
     });
 
     it('should use storyTitle as fallback title when currentTitle missing', async () => {

@@ -9,13 +9,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 import { ArticlesService } from '../articles/articles.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('StoriesService', () => {
   let service: StoriesService;
   let prisma: ReturnType<typeof createMockPrismaService>;
+  let eventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
+    prisma.article.findMany.mockResolvedValue([]);
+    eventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -34,6 +38,7 @@ describe('StoriesService', () => {
             create: jest.fn(),
           },
         },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 
@@ -311,6 +316,11 @@ describe('StoriesService', () => {
 
     it('should null out Article.storyId before deleting story (#55 cascade)', async () => {
       prisma.story.findUnique.mockResolvedValue(mockStory());
+      prisma.article.findMany.mockResolvedValue([
+        { id: 'article-1' },
+        { id: 'article-2' },
+        { id: 'article-3' },
+      ]);
       prisma.article.updateMany.mockResolvedValue({ count: 3 });
       prisma.story.delete.mockResolvedValue(mockStory());
 
@@ -332,6 +342,10 @@ describe('StoriesService', () => {
       });
       // updateMany must run BEFORE story.delete to avoid FK error
       expect(callOrder).toEqual(['article.updateMany', 'story.delete']);
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(3);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
+        articleId: 'article-1',
+      });
     });
 
     it('should still invoke updateMany even when no articles reference the story', async () => {
@@ -558,6 +572,7 @@ describe('StoriesService', () => {
         title: 'Draft Title',
         subtitle: 'Draft Subtitle',
         content: '<p>Draft content</p>',
+        tags: ['香港', '选举'],
       });
       const articlesService = (service as never).articlesService;
       articlesService.create.mockResolvedValue({
@@ -601,6 +616,7 @@ describe('StoriesService', () => {
         subtitle: 'Draft Subtitle',
         content: '<p>Draft content</p>',
         status: 'WRITING',
+        tags: ['香港', '选举'],
       });
       expect(prisma.story.update).toHaveBeenCalledWith({
         where: { id: 'story-id' },

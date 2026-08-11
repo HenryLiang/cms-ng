@@ -8,6 +8,7 @@ import {
   PolishTextDto,
   GenerateHeadlinesDto,
   GenerateExcerptDto,
+  GenerateArticleTagsDto,
   ChatWithAIDto,
 } from './ai-operations.dto';
 
@@ -109,6 +110,30 @@ describe('AI Operations DTOs', () => {
     it('should pass with empty object', async () => {
       const dto = plainToInstance(GenerateExcerptDto, {});
       expect(await validate(dto)).toHaveLength(0);
+    });
+  });
+
+  describe('GenerateArticleTagsDto', () => {
+    it('accepts current editor content and a valid language', async () => {
+      const dto = plainToInstance(GenerateArticleTagsDto, {
+        title: '当前标题',
+        content: '<p>当前正文</p>',
+        language: 'SIMPLIFIED_CHINESE',
+        tags: ['手工标签'],
+      });
+      expect(await validate(dto)).toHaveLength(0);
+    });
+
+    it('rejects non-string editor content', async () => {
+      const dto = plainToInstance(GenerateArticleTagsDto, { content: 123 });
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'content')).toBe(true);
+    });
+
+    it('rejects non-string current tags', async () => {
+      const dto = plainToInstance(GenerateArticleTagsDto, { tags: [123] });
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'tags')).toBe(true);
     });
   });
 

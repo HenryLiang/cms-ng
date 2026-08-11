@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { api } from './api';
-import { aiFactCheck, aiReviewReport, type FactCheckResult, type ReviewReportResult } from './article-api';
+import { ContentLanguage } from '@cms-ng/shared';
+import {
+  aiFactCheck,
+  aiTag,
+  aiReviewReport,
+  getArticles,
+  type FactCheckResult,
+  type ReviewReportResult,
+} from './article-api';
 
 vi.mock('./api', () => ({
   api: {
+    get: vi.fn(),
     post: vi.fn(),
   },
 }));
@@ -11,6 +20,25 @@ vi.mock('./api', () => ({
 describe('article-api', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('getArticles', () => {
+    it('passes the full-text search term to GET /articles', async () => {
+      const response = {
+        data: {
+          data: [],
+          meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+        },
+      };
+      vi.mocked(api.get).mockResolvedValue(response);
+
+      const result = await getArticles({ search: 'carbon' });
+
+      expect(api.get).toHaveBeenCalledWith('/articles', {
+        params: { search: 'carbon' },
+      });
+      expect(result).toEqual(response.data);
+    });
   });
 
   describe('aiFactCheck', () => {
@@ -39,6 +67,27 @@ describe('article-api', () => {
       vi.mocked(api.post).mockRejectedValue(new Error('Network error'));
 
       await expect(aiFactCheck('article-1')).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('aiTag', () => {
+    it('calls the one-click AI tagging endpoint and returns the updated article', async () => {
+      const article = { id: 'article-1', tags: ['香港', '人工智能'] };
+      vi.mocked(api.post).mockResolvedValue({ data: article });
+
+      const input = {
+        title: '当前标题',
+        content: '<p>当前正文</p>',
+        language: ContentLanguage.SIMPLIFIED_CHINESE,
+        tags: ['手工标签'],
+      };
+      const result = await aiTag('article-1', input);
+
+      expect(api.post).toHaveBeenCalledWith(
+        '/articles/article-1/ai-tags',
+        input,
+      );
+      expect(result.tags).toEqual(['香港', '人工智能']);
     });
   });
 

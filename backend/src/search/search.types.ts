@@ -39,3 +39,32 @@ export interface MediaSearchResult {
   ids: string[];
   total: number;
 }
+
+/** 稿件 ES 文档。MySQL 仍是唯一事实源，ES 只保存检索与权限过滤所需投影。 */
+export interface ArticleSearchDoc {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  authorId: string;
+  editorId: string | null;
+  status: string;
+  storyId: string | null;
+  updatedAt: string;
+}
+
+/** searchArticles 入参；权限条件必须在 ES 分页前应用，保证 total 与分页准确。 */
+export interface ArticleSearchQuery {
+  userId: string;
+  role: string;
+  search: string;
+  storyId?: string;
+  page: number;
+  pageSize: number;
+}
+
+/** searchArticles 返回本页稿件 id（保持 ES 排序）及权限过滤后的总数。 */
+export interface ArticleSearchResult {
+  ids: string[];
+  total: number;
+}

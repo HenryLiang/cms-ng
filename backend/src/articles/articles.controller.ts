@@ -20,6 +20,7 @@ import {
   PolishTextDto,
   GenerateHeadlinesDto,
   GenerateExcerptDto,
+  GenerateArticleTagsDto,
   ChatWithAIDto,
   GenerateDraftDto,
   FactCheckDto,
@@ -217,6 +218,16 @@ export class ArticlesController {
     @Body() dto: GenerateExcerptDto,
   ) {
     return this.articlesService.aiExcerpt(id, user, dto);
+  }
+
+  @Post(':id/ai-tags')
+  @ApiOperation({ summary: 'AI: generate and merge article tags' })
+  aiTag(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: GenerateArticleTagsDto,
+  ) {
+    return this.articlesService.aiTag(id, user, dto);
   }
 
   @Post(':id/ai-chat')

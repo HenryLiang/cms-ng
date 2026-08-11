@@ -13,6 +13,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  SearchService,
+  SearchUnavailableException,
+} from '../search/search.service';
 
 describe('ArticlesService', () => {
   let service: ArticlesService;
@@ -24,11 +29,14 @@ describe('ArticlesService', () => {
     polishText: jest.Mock;
     generateHeadlines: jest.Mock;
     generateExcerpt: jest.Mock;
+    generateArticleTags: jest.Mock;
     chatWithAI: jest.Mock;
     generateDraft: jest.Mock;
     factCheck: jest.Mock;
     generateReviewReport: jest.Mock;
   };
+  let searchService: { searchArticles: jest.Mock };
+  let eventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
@@ -39,11 +47,14 @@ describe('ArticlesService', () => {
       polishText: jest.fn(),
       generateHeadlines: jest.fn(),
       generateExcerpt: jest.fn(),
+      generateArticleTags: jest.fn(),
       chatWithAI: jest.fn(),
       generateDraft: jest.fn(),
       factCheck: jest.fn(),
       generateReviewReport: jest.fn(),
     };
+    searchService = { searchArticles: jest.fn() };
+    eventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -51,6 +62,8 @@ describe('ArticlesService', () => {
         ArticleAccessService,
         { provide: PrismaService, useValue: prisma },
         { provide: AIService, useValue: aiService },
+        { provide: SearchService, useValue: searchService },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 
@@ -114,6 +127,9 @@ describe('ArticlesService', () => {
         }),
       });
       expect(result.title).toBe('Test Article');
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
+        articleId: 'article-id',
+      });
     });
 
     it('should create article with contentLanguage', async () => {
@@ -154,6 +170,110 @@ describe('ArticlesService', () => {
   });
 
   describe('findAll', () => {
+    it('should search article titles and content in Elasticsearch with a trimmed term', async () => {
+      searchService.searchArticles.mockResolvedValue({
+        ids: ['article-id'],
+        total: 1,
+      });
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+
+      const result = await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { search: '  climate  ' },
+      );
+
+      expect(searchService.searchArticles).toHaveBeenCalledWith({
+        userId: 'admin-id',
+        role: 'ADMIN',
+        search: 'climate',
+        storyId: undefined,
+        page: 1,
+        pageSize: 20,
+      });
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: ['article-id'] } } }),
+      );
+      expect(prisma.article.count).not.toHaveBeenCalled();
+      expect(result.meta.total).toBe(1);
+    });
+
+    it('should delegate editor access rules and story filtering to Elasticsearch', async () => {
+      searchService.searchArticles.mockResolvedValue({
+        ids: ['article-id'],
+        total: 1,
+      });
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+
+      await service.findAll(
+        { userId: 'editor-id', role: 'EDITOR' },
+        { search: 'climate', storyId: 'story-id', page: 2, pageSize: 10 },
+      );
+
+      expect(searchService.searchArticles).toHaveBeenCalledWith({
+        userId: 'editor-id',
+        role: 'EDITOR',
+        search: 'climate',
+        storyId: 'story-id',
+        page: 2,
+        pageSize: 10,
+      });
+    });
+
+    it('should fall back to MySQL title/content/tag LIKE when Elasticsearch is unavailable', async () => {
+      searchService.searchArticles.mockRejectedValue(
+        new SearchUnavailableException('ES down'),
+      );
+      prisma.article.findMany.mockResolvedValue([mockArticle()]);
+      prisma.article.count.mockResolvedValue(1);
+
+      await service.findAll(
+        { userId: 'editor-id', role: 'EDITOR' },
+        { search: 'climate' },
+      );
+
+      const where = {
+        AND: [
+          {
+            OR: [
+              { authorId: 'editor-id' },
+              { editorId: 'editor-id' },
+              {
+                status: {
+                  in: ['PENDING_REVIEW', 'IN_REVIEW', 'REVISION'],
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              { title: { contains: 'climate' } },
+              { content: { contains: 'climate' } },
+              { tags: { contains: 'climate' } },
+            ],
+          },
+        ],
+      };
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where }),
+      );
+      expect(prisma.article.count).toHaveBeenCalledWith({ where });
+    });
+
+    it('should ignore a blank search term', async () => {
+      prisma.article.findMany.mockResolvedValue([]);
+      prisma.article.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { search: '   ' },
+      );
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
+      expect(searchService.searchArticles).not.toHaveBeenCalled();
+    });
+
     it('should return all articles for admin (paginated, default page=1 size=20)', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
       prisma.article.count.mockResolvedValue(1);
@@ -326,6 +446,9 @@ describe('ArticlesService', () => {
         where: { id: 'article-id' },
       });
       expect(result.success).toBe(true);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.deleted', {
+        articleId: 'article-id',
+      });
     });
 
     it('should throw NotFoundException when article not found', async () => {
@@ -406,6 +529,107 @@ describe('ArticlesService', () => {
       const result = await service.aiExcerpt('article-id', mockUser, {});
 
       expect(result.excerpt).toBe('Excerpt');
+    });
+
+    it('aiTag should merge AI tags without removing manual tags', async () => {
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ tags: '["手工标签","香港"]' }),
+      );
+      aiService.generateArticleTags.mockResolvedValue(['香港', '人工智能']);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({ tags: '["手工标签","香港","人工智能"]', version: 2 }),
+      );
+
+      const result = await service.aiTag('article-id', mockUser);
+
+      expect(aiService.generateArticleTags).toHaveBeenCalledWith(
+        'author-id',
+        'article-id',
+        expect.objectContaining({
+          title: 'Test Article',
+          content: 'Content',
+        }),
+      );
+      expect(result.tags).toEqual(['手工标签', '香港', '人工智能']);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
+        articleId: 'article-id',
+      });
+    });
+
+    it('aiTag should preserve current unsaved manual tags and classify editor content', async () => {
+      aiService.generateArticleTags.mockResolvedValue(['即时标签']);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({ tags: '["未保存手工标签","即时标签"]', version: 2 }),
+      );
+
+      await service.aiTag('article-id', mockUser, {
+        title: '编辑器里的新标题',
+        content: '<p>尚未保存的新正文</p>',
+        language: 'SIMPLIFIED_CHINESE' as never,
+        tags: ['未保存手工标签'],
+      });
+
+      expect(aiService.generateArticleTags).toHaveBeenCalledWith(
+        'author-id',
+        'article-id',
+        {
+          title: '编辑器里的新标题',
+          content: '<p>尚未保存的新正文</p>',
+          language: 'SIMPLIFIED_CHINESE',
+        },
+      );
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tags: '["未保存手工标签","即时标签"]',
+          }),
+        }),
+      );
+    });
+
+    it('aiTag should persist unsaved manual tags when AI returns no tags', async () => {
+      aiService.generateArticleTags.mockResolvedValue([]);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({ tags: '["未保存手工标签"]', version: 2 }),
+      );
+
+      const result = await service.aiTag('article-id', mockUser, {
+        tags: ['未保存手工标签'],
+      });
+
+      expect(result.tags).toEqual(['未保存手工标签']);
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ tags: '["未保存手工标签"]' }),
+        }),
+      );
+    });
+
+    it('aiTag should merge tags saved while the AI request is running', async () => {
+      prisma.article.findUnique
+        .mockResolvedValueOnce(mockArticle({ tags: '["原标签"]', version: 1 }))
+        .mockResolvedValueOnce(
+          mockArticle({ tags: '["原标签","并发手工标签"]', version: 2 }),
+        );
+      aiService.generateArticleTags.mockResolvedValue(['AI标签']);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({
+          tags: '["原标签","并发手工标签","AI标签"]',
+          version: 3,
+        }),
+      );
+
+      await service.aiTag('article-id', mockUser);
+
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'article-id', version: 2 },
+          data: expect.objectContaining({
+            tags: '["原标签","并发手工标签","AI标签"]',
+            version: 3,
+          }),
+        }),
+      );
     });
 
     it('aiChat should call aiService.chatWithAI', async () => {

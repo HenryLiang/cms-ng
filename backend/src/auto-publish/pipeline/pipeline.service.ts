@@ -31,6 +31,7 @@ import { BillingCheckStep } from './steps/billing-check.step';
 import { EstimateOperationType } from '../../billing/dto/estimate-cost.dto';
 import { safeJsonParse } from '../../common/json.utils';
 import * as nodemailer from 'nodemailer';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /**
  * Thrown when the kill switch activates mid-pipeline (issue #115).
@@ -61,6 +62,7 @@ export class PipelineService {
     private lock: MemoryLockService,
     private billingService: BillingService,
     private notifications: NotificationsService,
+    private eventEmitter: EventEmitter2,
     @Inject(forwardRef(() => AutoPublishSchedulerService))
     private scheduler: AutoPublishSchedulerService,
     private billingCheckStep: BillingCheckStep,
@@ -241,6 +243,9 @@ export class PipelineService {
               where: { id: ctx.savedArticleId },
               data: { status: ArticleStatus.PIPELINE_FAILED },
             });
+            this.eventEmitter.emit('article.updated', {
+              articleId: ctx.savedArticleId,
+            });
           } catch {
             // ignore — article may not exist
           }
@@ -410,6 +415,9 @@ export class PipelineService {
           await this.prisma.article.update({
             where: { id: ctx.savedArticleId },
             data: { status: ArticleStatus.PIPELINE_FAILED },
+          });
+          this.eventEmitter.emit('article.updated', {
+            articleId: ctx.savedArticleId,
           });
         } catch {
           // ignore

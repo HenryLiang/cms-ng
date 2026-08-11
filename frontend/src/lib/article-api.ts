@@ -55,6 +55,7 @@ export interface PaginatedResponse<T> {
 
 export interface GetArticlesParams {
   storyId?: string;
+  search?: string;
   page?: number;
   pageSize?: number;
 }
@@ -193,6 +194,7 @@ export interface DraftResult {
   title: string;
   subtitle?: string;
   content: string;
+  tags: string[];
 }
 
 export async function aiGenerateDraft(
@@ -202,6 +204,19 @@ export async function aiGenerateDraft(
   authorSlug?: string,
 ): Promise<DraftResult> {
   const res = await api.post(`/articles/${id}/ai-draft`, { instruction, language, authorSlug });
+  return res.data;
+}
+
+export async function aiTag(
+  id: string,
+  input: {
+    title: string;
+    content: string;
+    tags: string[];
+    language?: ContentLanguage;
+  },
+): Promise<Article> {
+  const res = await api.post(`/articles/${id}/ai-tags`, input);
   return res.data;
 }
 
