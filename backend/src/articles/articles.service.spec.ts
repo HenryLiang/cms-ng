@@ -29,6 +29,7 @@ describe('ArticlesService', () => {
     polishText: jest.Mock;
     generateHeadlines: jest.Mock;
     generateExcerpt: jest.Mock;
+    generateArticleTags: jest.Mock;
     chatWithAI: jest.Mock;
     generateDraft: jest.Mock;
     factCheck: jest.Mock;
@@ -46,6 +47,7 @@ describe('ArticlesService', () => {
       polishText: jest.fn(),
       generateHeadlines: jest.fn(),
       generateExcerpt: jest.fn(),
+      generateArticleTags: jest.fn(),
       chatWithAI: jest.fn(),
       generateDraft: jest.fn(),
       factCheck: jest.fn(),
@@ -217,7 +219,7 @@ describe('ArticlesService', () => {
       });
     });
 
-    it('should fall back to MySQL title/content LIKE when Elasticsearch is unavailable', async () => {
+    it('should fall back to MySQL title/content/tag LIKE when Elasticsearch is unavailable', async () => {
       searchService.searchArticles.mockRejectedValue(
         new SearchUnavailableException('ES down'),
       );
@@ -246,6 +248,7 @@ describe('ArticlesService', () => {
             OR: [
               { title: { contains: 'climate' } },
               { content: { contains: 'climate' } },
+              { tags: { contains: 'climate' } },
             ],
           },
         ],
@@ -526,6 +529,107 @@ describe('ArticlesService', () => {
       const result = await service.aiExcerpt('article-id', mockUser, {});
 
       expect(result.excerpt).toBe('Excerpt');
+    });
+
+    it('aiTag should merge AI tags without removing manual tags', async () => {
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ tags: '["手工标签","香港"]' }),
+      );
+      aiService.generateArticleTags.mockResolvedValue(['香港', '人工智能']);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({ tags: '["手工标签","香港","人工智能"]', version: 2 }),
+      );
+
+      const result = await service.aiTag('article-id', mockUser);
+
+      expect(aiService.generateArticleTags).toHaveBeenCalledWith(
+        'author-id',
+        'article-id',
+        expect.objectContaining({
+          title: 'Test Article',
+          content: 'Content',
+        }),
+      );
+      expect(result.tags).toEqual(['手工标签', '香港', '人工智能']);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
+        articleId: 'article-id',
+      });
+    });
+
+    it('aiTag should preserve current unsaved manual tags and classify editor content', async () => {
+      aiService.generateArticleTags.mockResolvedValue(['即时标签']);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({ tags: '["未保存手工标签","即时标签"]', version: 2 }),
+      );
+
+      await service.aiTag('article-id', mockUser, {
+        title: '编辑器里的新标题',
+        content: '<p>尚未保存的新正文</p>',
+        language: 'SIMPLIFIED_CHINESE' as never,
+        tags: ['未保存手工标签'],
+      });
+
+      expect(aiService.generateArticleTags).toHaveBeenCalledWith(
+        'author-id',
+        'article-id',
+        {
+          title: '编辑器里的新标题',
+          content: '<p>尚未保存的新正文</p>',
+          language: 'SIMPLIFIED_CHINESE',
+        },
+      );
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tags: '["未保存手工标签","即时标签"]',
+          }),
+        }),
+      );
+    });
+
+    it('aiTag should persist unsaved manual tags when AI returns no tags', async () => {
+      aiService.generateArticleTags.mockResolvedValue([]);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({ tags: '["未保存手工标签"]', version: 2 }),
+      );
+
+      const result = await service.aiTag('article-id', mockUser, {
+        tags: ['未保存手工标签'],
+      });
+
+      expect(result.tags).toEqual(['未保存手工标签']);
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ tags: '["未保存手工标签"]' }),
+        }),
+      );
+    });
+
+    it('aiTag should merge tags saved while the AI request is running', async () => {
+      prisma.article.findUnique
+        .mockResolvedValueOnce(mockArticle({ tags: '["原标签"]', version: 1 }))
+        .mockResolvedValueOnce(
+          mockArticle({ tags: '["原标签","并发手工标签"]', version: 2 }),
+        );
+      aiService.generateArticleTags.mockResolvedValue(['AI标签']);
+      prisma.article.update.mockResolvedValue(
+        mockArticle({
+          tags: '["原标签","并发手工标签","AI标签"]',
+          version: 3,
+        }),
+      );
+
+      await service.aiTag('article-id', mockUser);
+
+      expect(prisma.article.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'article-id', version: 2 },
+          data: expect.objectContaining({
+            tags: '["原标签","并发手工标签","AI标签"]',
+            version: 3,
+          }),
+        }),
+      );
     });
 
     it('aiChat should call aiService.chatWithAI', async () => {

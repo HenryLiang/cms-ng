@@ -1,4 +1,5 @@
 import {
+  articleTagsSchema,
   draftResultSchema,
   factCheckResultSchema,
   headlinesSchema,
@@ -68,6 +69,18 @@ describe('LLM JSON Zod schemas', () => {
 
     it('accepts an empty object (all fields optional)', () => {
       expect(() => draftResultSchema.parse({})).not.toThrow();
+    });
+  });
+
+  describe('articleTagsSchema', () => {
+    it('accepts an object containing string tags', () => {
+      expect(
+        articleTagsSchema.parse({ tags: ['香港', '人工智能'] }).tags,
+      ).toEqual(['香港', '人工智能']);
+    });
+
+    it('rejects non-string tags', () => {
+      expect(() => articleTagsSchema.parse({ tags: [123] })).toThrow();
     });
   });
 

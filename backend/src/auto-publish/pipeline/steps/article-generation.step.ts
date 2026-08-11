@@ -69,7 +69,7 @@ export class ArticleGenerationStep implements PipelineStep {
       subtitle: draft.subtitle,
       content: draft.content,
       excerpt,
-      tags: [ctx.topic],
+      tags: draft.tags?.length ? draft.tags : [ctx.topic],
     };
 
     // Trace observability

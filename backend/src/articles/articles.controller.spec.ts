@@ -27,6 +27,7 @@ describe('ArticlesController', () => {
     aiPolish: jest.Mock;
     aiHeadlines: jest.Mock;
     aiExcerpt: jest.Mock;
+    aiTag: jest.Mock;
     aiChat: jest.Mock;
     aiFactCheck: jest.Mock;
     aiReview: jest.Mock;
@@ -51,6 +52,7 @@ describe('ArticlesController', () => {
       aiPolish: jest.fn(),
       aiHeadlines: jest.fn(),
       aiExcerpt: jest.fn(),
+      aiTag: jest.fn(),
       aiChat: jest.fn(),
       aiFactCheck: jest.fn(),
       aiReview: jest.fn(),
@@ -291,6 +293,24 @@ describe('ArticlesController', () => {
   });
 
   // ===== AI Operations =====
+  describe('aiTag', () => {
+    it('should trigger one-click AI tagging for the article', async () => {
+      articlesService.aiTag.mockResolvedValue(
+        mockArticle({ tags: ['香港', '人工智能'] }),
+      );
+
+      const dto = { title: '当前标题', content: '<p>当前正文</p>' };
+      const result = await controller.aiTag(mockUser, 'article-id', dto);
+
+      expect(articlesService.aiTag).toHaveBeenCalledWith(
+        'article-id',
+        mockUser,
+        dto,
+      );
+      expect(result.tags).toEqual(['香港', '人工智能']);
+    });
+  });
+
   const aiTests = [
     { name: 'aiRewrite', method: 'aiRewrite' as const, dto: { text: 'Hello' } },
     { name: 'aiExpand', method: 'aiExpand' as const, dto: { text: 'Hello' } },

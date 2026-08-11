@@ -59,6 +59,12 @@ export interface GenerateExcerptInput {
   authorSlug?: string;
 }
 
+export interface GenerateArticleTagsInput {
+  title: string;
+  content: string;
+  language?: ContentLanguage;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -94,6 +100,7 @@ export interface DraftResult {
   title: string;
   subtitle?: string;
   content: string;
+  tags: string[];
 }
 
 export interface FactCheckFinding {

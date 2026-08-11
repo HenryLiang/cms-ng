@@ -45,6 +45,7 @@ export interface ArticleSearchDoc {
   id: string;
   title: string;
   content: string;
+  tags: string[];
   authorId: string;
   editorId: string | null;
   status: string;

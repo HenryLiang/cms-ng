@@ -386,7 +386,7 @@ export class SearchService implements OnModuleInit {
       {
         multi_match: {
           query: params.search,
-          fields: ['title^3', 'content'],
+          fields: ['title^3', 'tags^2', 'content'],
           type: 'best_fields',
         },
       },
@@ -549,7 +549,10 @@ export class SearchService implements OnModuleInit {
     mappings: typeof MEDIA_INDEX_MAPPINGS | typeof ARTICLE_INDEX_MAPPINGS,
   ): Promise<void> {
     const exists = await this.client!.indices.exists({ index });
-    if (exists) return;
+    if (exists) {
+      await this.client!.indices.putMapping({ index, ...mappings });
+      return;
+    }
     await this.client!.indices.create({
       index,
       settings: { ...settings },

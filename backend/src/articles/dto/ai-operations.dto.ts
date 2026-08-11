@@ -1,5 +1,6 @@
 import {
   IsString,
+  IsArray,
   IsOptional,
   IsInt,
   IsIn,
@@ -222,6 +223,43 @@ export class GenerateExcerptDto {
   @IsString()
   @IsOptional()
   authorSlug?: string;
+}
+
+export class GenerateArticleTagsDto {
+  @ApiProperty({
+    description: 'Current editor title; falls back to the saved title',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @ApiProperty({
+    description: 'Current editor content; falls back to the saved content',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  content?: string;
+
+  @ApiProperty({
+    description: 'Current manual tags in the editor, including unsaved changes',
+    type: [String],
+    required: false,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  tags?: string[];
+
+  @ApiProperty({
+    description: 'Language of the article content',
+    enum: ContentLanguage,
+    required: false,
+  })
+  @IsIn(Object.values(ContentLanguage))
+  @IsOptional()
+  language?: ContentLanguage;
 }
 
 export class ChatMessageDto {

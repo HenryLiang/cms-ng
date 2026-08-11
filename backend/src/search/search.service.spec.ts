@@ -19,7 +19,7 @@ describe('SearchService', () => {
   let prisma: ReturnType<typeof createMockPrismaService>;
   let config: { get: jest.Mock };
   let mockClient: {
-    indices: { exists: jest.Mock; create: jest.Mock };
+    indices: { exists: jest.Mock; create: jest.Mock; putMapping: jest.Mock };
     index: jest.Mock;
     delete: jest.Mock;
     search: jest.Mock;
@@ -59,6 +59,7 @@ describe('SearchService', () => {
     id: 'article-1',
     title: '气候政策新进展',
     content: '<p>香港减碳计划</p>',
+    tags: '["香港","减碳政策"]',
     authorId: 'reporter-1',
     editorId: 'editor-1',
     status: 'IN_REVIEW',
@@ -101,6 +102,7 @@ describe('SearchService', () => {
       indices: {
         exists: jest.fn().mockResolvedValue(false),
         create: jest.fn().mockResolvedValue({ acknowledged: true }),
+        putMapping: jest.fn().mockResolvedValue({ acknowledged: true }),
       },
       index: jest.fn().mockResolvedValue({ result: 'created' }),
       delete: jest.fn().mockResolvedValue({ result: 'deleted' }),
@@ -157,6 +159,21 @@ describe('SearchService', () => {
       service = await makeService();
       expect(mockClient.indices.create).not.toHaveBeenCalled();
       expect(service.isEnabled()).toBe(true);
+    });
+
+    it('updates an existing article mapping so tags use IK analysis', async () => {
+      mockClient.indices.exists.mockResolvedValue(true);
+
+      service = await makeService();
+
+      expect(mockClient.indices.putMapping).toHaveBeenCalledWith(
+        expect.objectContaining({
+          index: 'articles',
+          properties: expect.objectContaining({
+            tags: expect.objectContaining({ analyzer: 'ik_max_word' }),
+          }),
+        }),
+      );
     });
 
     it('ES 不可达/IK 缺失 -> ensureIndex 抛错,降级 isEnabled false(不 fail-fast)', async () => {
@@ -451,6 +468,7 @@ describe('SearchService', () => {
           document: expect.objectContaining({
             title: '气候政策新进展',
             content: '香港减碳计划',
+            tags: ['香港', '减碳政策'],
             authorId: 'reporter-1',
             editorId: 'editor-1',
             status: 'IN_REVIEW',
@@ -462,7 +480,7 @@ describe('SearchService', () => {
       );
     });
 
-    it('searches title and content with editor access filters before pagination', async () => {
+    it('searches title, tags and content with editor access filters before pagination', async () => {
       mockClient.search.mockResolvedValue(
         hitsResp(['article-2', 'article-1'], 2),
       );
@@ -489,7 +507,7 @@ describe('SearchService', () => {
         {
           multi_match: expect.objectContaining({
             query: '气候政策',
-            fields: ['title^3', 'content'],
+            fields: ['title^3', 'tags^2', 'content'],
           }),
         },
       ]);

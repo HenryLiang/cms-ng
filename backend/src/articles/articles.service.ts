@@ -35,6 +35,7 @@ import {
   PolishTextDto,
   GenerateHeadlinesDto,
   GenerateExcerptDto,
+  GenerateArticleTagsDto,
   ChatWithAIDto,
   GenerateDraftDto,
   FactCheckDto,
@@ -257,6 +258,7 @@ export class ArticlesService {
           OR: [
             { title: { contains: search } },
             { content: { contains: search } },
+            { tags: { contains: search } },
           ],
         };
         where = Object.keys(where).length
@@ -588,6 +590,58 @@ export class ArticlesService {
       authorSlug: dto.authorSlug,
     });
     return { excerpt: result };
+  }
+
+  async aiTag(
+    id: string,
+    user: { userId: string; role: string },
+    dto: GenerateArticleTagsDto = {},
+  ) {
+    const article = await this.verifyAccessAndGet(id, user);
+    const generatedTags = await this.aiService.generateArticleTags(
+      user.userId,
+      id,
+      {
+        title: dto.title?.trim() || article.title,
+        content: dto.content ?? article.content,
+        language: dto.language ?? (article.contentLanguage as ContentLanguage),
+      },
+    );
+
+    // AI 请求可能持续数秒；写入前重读并做版本比较，避免覆盖期间保存的手工标签。
+    const latestArticle = await this.verifyAccessAndGet(id, user);
+    const parsedTags = safeJsonParse<unknown>(latestArticle.tags, []);
+    const existingTags = Array.isArray(parsedTags)
+      ? parsedTags.filter((tag): tag is string => typeof tag === 'string')
+      : [];
+    const normalizedExistingTags = Array.from(
+      new Set(existingTags.map((tag) => tag.trim()).filter(Boolean)),
+    );
+    const tags = Array.from(
+      new Set(
+        [...normalizedExistingTags, ...(dto.tags ?? []), ...generatedTags]
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (
+      tags.length === normalizedExistingTags.length &&
+      tags.every((tag, index) => tag === normalizedExistingTags[index])
+    ) {
+      return this.serializeArticle(latestArticle);
+    }
+
+    const updated = await this.prisma.article.update({
+      where: { id, version: latestArticle.version },
+      data: serializeArticleInput({
+        tags,
+        version: latestArticle.version + 1,
+      }),
+      include: ArticlesService.ARTICLE_COMMON_INCLUDE,
+    });
+    this.eventEmitter.emit('article.updated', { articleId: id });
+    return this.serializeArticle(updated);
   }
 
   async aiChat(

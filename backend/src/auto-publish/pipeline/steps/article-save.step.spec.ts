@@ -37,7 +37,7 @@ describe('ArticleSaveStep', () => {
       draft: {
         title: '自动发布稿件',
         content: '<p>正文</p>',
-        tags: [],
+        tags: ['香港', '人工智能'],
       },
       contentConfig: { language: 'SIMPLIFIED_CHINESE' },
       publishConfig: { platform: 'WECHAT' },
@@ -46,5 +46,13 @@ describe('ArticleSaveStep', () => {
     expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
       articleId: 'article-1',
     });
+    expect(prisma.article.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tags: '["香港","人工智能"]',
+          aiGeneratedParts: expect.stringContaining('"tags"'),
+        }),
+      }),
+    );
   });
 });

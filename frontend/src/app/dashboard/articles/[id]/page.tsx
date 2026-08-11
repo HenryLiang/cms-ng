@@ -15,6 +15,7 @@ import {
   aiPolish,
   aiHeadlines,
   aiExcerpt,
+  aiTag,
   aiChat,
   aiGenerateDraft,
   aiFactCheck,
@@ -45,6 +46,7 @@ import ReviewReportPanel from '@/components/review-report-panel';
 import SEOPanel from '@/components/seo-panel';
 import GEOPanel from '@/components/geo-panel';
 import ChannelPanel from '@/components/channels/channel-panel';
+import ArticleTagsEditor from '@/components/article-tags-editor';
 import { Badge, Button, StatusBadge, buttonClasses } from '@/components/ui';
 import {
   ArrowLeft,
@@ -87,6 +89,7 @@ export default function ArticleEditorPage() {
   const [subtitle, setSubtitle] = useState('');
   const [content, setContent] = useState('');
   const [excerpt, setExcerpt] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
   // Author-style persona selector. authorSlug='' means "use default generation".
   // Loaded once on mount from GET /authors; degrades gracefully when no data on disk.
@@ -112,6 +115,7 @@ export default function ArticleEditorPage() {
 
   // AI Excerpt state
   const [excerptLoading, setExcerptLoading] = useState(false);
+  const [tagLoading, setTagLoading] = useState(false);
 
   // AI Draft Generation state
   const [showDraftPreview, setShowDraftPreview] = useState(false);
@@ -205,6 +209,7 @@ export default function ArticleEditorPage() {
       setSubtitle(data.subtitle || '');
       setContent(data.content);
       setExcerpt(data.excerpt || '');
+      setTags(data.tags ?? []);
       if (data.contentLanguage) {
         setContentLanguage(data.contentLanguage);
       }
@@ -248,6 +253,7 @@ export default function ArticleEditorPage() {
         subtitle: subtitle || undefined,
         content: latestContent,
         excerpt: excerpt || undefined,
+        tags,
         status: status as ArticleStatus,
         contentLanguage,
         coverImage: article?.coverImage ?? null,
@@ -442,6 +448,27 @@ export default function ArticleEditorPage() {
     }
   }
 
+  async function handleGenerateTags() {
+    setTagLoading(true);
+    try {
+      const latestContent = editorRef.current?.editor?.getHTML() ?? content;
+      const updated = await aiTag(articleId, {
+        title,
+        content: latestContent,
+        tags,
+        language: contentLanguage,
+      });
+      setArticle(updated);
+      setTags((current) =>
+        Array.from(new Set([...current, ...(updated.tags ?? [])])),
+      );
+    } catch {
+      // 错误已由 api 拦截器 toast；避免点击事件产生 unhandled rejection
+    } finally {
+      setTagLoading(false);
+    }
+  }
+
   // ===== AI Draft Generation =====
   async function handleGenerateDraft() {
     setDraftLoading(true);
@@ -465,6 +492,9 @@ export default function ArticleEditorPage() {
     } else {
       setContent((prev) => prev + '\n\n' + draftResult.content);
     }
+    setTags((current) =>
+      Array.from(new Set([...current, ...(draftResult.tags ?? [])])),
+    );
     setShowDraftPreview(false);
     setDraftResult(null);
   }
@@ -1079,6 +1109,13 @@ export default function ArticleEditorPage() {
         {/* Right sidebar */}
         <aside className="w-[30rem] border-l border-line bg-canvas p-4 overflow-auto flex flex-col">
           <div className="space-y-6 flex-1">
+            <ArticleTagsEditor
+              tags={tags}
+              onChange={setTags}
+              onAITag={handleGenerateTags}
+              aiLoading={tagLoading}
+            />
+
             {/* Excerpt */}
             <div>
               <div className="flex items-center justify-between">

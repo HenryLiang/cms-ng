@@ -67,6 +67,7 @@ export class ArticleSaveStep implements PipelineStep {
           'subtitle',
           'content',
           'excerpt',
+          'tags',
         ]),
         contentLanguage: ctx.contentConfig.language as ContentLanguage,
         publishedAt: new Date(),

@@ -15,8 +15,8 @@ import * as dotenv from 'dotenv';
 import {
   ARTICLE_INDEX_MAPPINGS,
   ARTICLE_INDEX_SETTINGS,
+  buildArticleSearchBackfillAction,
   buildArticleSearchDoc,
-  getArticleSearchVersion,
 } from '../src/search/article-index.mapping';
 import { redactConnectionString } from '../src/common/redact.utils';
 
@@ -140,14 +140,7 @@ async function main(): Promise<void> {
     if (!options.dryRun) {
       try {
         const operations = batch.flatMap((article) => [
-          {
-            index: {
-              _index: indexName,
-              _id: article.id,
-              version: getArticleSearchVersion(article),
-              version_type: 'external',
-            },
-          },
+          buildArticleSearchBackfillAction(indexName, article),
           buildArticleSearchDoc(article),
         ]);
         const response = await client.bulk({ operations, refresh: false });

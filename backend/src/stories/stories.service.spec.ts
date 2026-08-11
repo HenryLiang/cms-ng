@@ -572,6 +572,7 @@ describe('StoriesService', () => {
         title: 'Draft Title',
         subtitle: 'Draft Subtitle',
         content: '<p>Draft content</p>',
+        tags: ['香港', '选举'],
       });
       const articlesService = (service as never).articlesService;
       articlesService.create.mockResolvedValue({
@@ -615,6 +616,7 @@ describe('StoriesService', () => {
         subtitle: 'Draft Subtitle',
         content: '<p>Draft content</p>',
         status: 'WRITING',
+        tags: ['香港', '选举'],
       });
       expect(prisma.story.update).toHaveBeenCalledWith({
         where: { id: 'story-id' },

@@ -300,6 +300,7 @@ export class StoriesService {
       subtitle: draft.subtitle,
       content: draft.content,
       status: ArticleStatus.WRITING,
+      tags: draft.tags,
     });
 
     // 3. Update story status to WRITING
