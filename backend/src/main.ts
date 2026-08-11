@@ -16,14 +16,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(), {
     rawBody: true,
   });
-  // Production runs behind nginx (127.0.0.1 reverse proxy). Without
-  // 'trust proxy', req.ip is always 127.0.0.1 and the rate limiter
-  // (@nestjs/throttler tracks req.ip) degrades to one shared bucket for
-  // ALL users — a DoS lever. 'loopback' trusts only X-Forwarded-For set
-  // by the loopback proxy, not by arbitrary clients (adversarial review).
+  // Host production uses a loopback nginx; Docker production uses one
+  // unexposed proxy hop. Without `trust proxy`, @nestjs/throttler sees every
+  // request as the proxy IP and one client can exhaust the shared bucket.
+  // validateEnv restricts this to `loopback` or `1` so arbitrary forwarded
+  // headers can never be trusted by configuration accident.
   const expressApp = app.getHttpAdapter().getInstance() as Express;
-  expressApp.set('trust proxy', 'loopback');
   const config = app.get(ConfigService);
+  const trustProxy = config.get<string>('TRUST_PROXY') ?? 'loopback';
+  expressApp.set('trust proxy', trustProxy === '1' ? 1 : 'loopback');
   const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
   // Security headers (issue #107). CSP is disabled outside production because
   // Swagger UI (dev-only) needs inline scripts/styles; the API itself serves

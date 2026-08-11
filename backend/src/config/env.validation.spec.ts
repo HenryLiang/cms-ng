@@ -153,4 +153,16 @@ describe('validateEnv', () => {
       expect(joined).toContain('***@');
     }
   });
+
+  it.each(['loopback', '1'])('accepts TRUST_PROXY=%s', (value) => {
+    expect(validateEnv({ ...goodBase, TRUST_PROXY: value }).success).toBe(true);
+  });
+
+  it('rejects unsafe TRUST_PROXY values', () => {
+    const r = validateEnv({ ...goodBase, TRUST_PROXY: 'true' });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.errors.some((e) => e.includes('TRUST_PROXY'))).toBe(true);
+    }
+  });
 });
