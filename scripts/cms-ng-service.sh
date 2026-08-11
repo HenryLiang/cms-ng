@@ -160,6 +160,31 @@ es_node() {
     fi
 }
 
+# 读取 backend/.env 中 ELASTICSEARCH_USERNAME / PASSWORD(与 es_node 同样的清洗)。
+es_auth_user() {
+    local raw
+    raw=$(grep -E '^[[:space:]]*ELASTICSEARCH_USERNAME[[:space:]]*=' "$BACKEND_ENV" 2>/dev/null | head -n1 | cut -d= -f2-)
+    printf '%s' "$raw" | sed 's/[[:space:]]#.*$//' | tr -d "\"'[:space:]"
+}
+es_auth_pass() {
+    local raw
+    raw=$(grep -E '^[[:space:]]*ELASTICSEARCH_PASSWORD[[:space:]]*=' "$BACKEND_ENV" 2>/dev/null | head -n1 | cut -d= -f2-)
+    printf '%s' "$raw" | sed 's/[[:space:]]#.*$//' | tr -d "\"'[:space:]"
+}
+
+# 统一的 ES curl 调用:自动带 -k(HTTPS 自签证书放行)和 Basic 认证(若 .env 配了账号密码)。
+# 用法: es_curl <url> [额外 curl 参数...]
+es_curl() {
+    local url="$1"; shift
+    local user pass auth_args=()
+    user=$(es_auth_user)
+    pass=$(es_auth_pass)
+    if [ -n "$user" ] && [ -n "$pass" ]; then
+        auth_args+=( --user "${user}:${pass}" )
+    fi
+    curl -sk "${auth_args[@]}" "$@" "$url"
+}
+
 usage() {
     cat <<EOF
 用法: $0 {start|stop|restart|status|logs} [--prod] [--no-build]
@@ -322,12 +347,13 @@ prod_preflight() {
     if es_enabled; then
         local node
         node=$(es_node)
-        # 可达性(非致命):ES 不可达时检索降级 LIKE
-        if curl -sf "${node}/_cluster/health" >/dev/null 2>&1; then
+        # 可达性(非致命):ES 不可达时检索降级 LIKE。
+        # es_curl 自动处理 HTTPS 自签证书(-k)和 Basic 认证(ES 8.x xpack security)
+        if es_curl "${node}/_cluster/health" -f -o /dev/null 2>/dev/null; then
             echo "        Elasticsearch OK ($node)"
         else
             echo "        Warn: ELASTICSEARCH_ENABLED=true 但 $node 暂不可达"
-            echo "               检索将降级 LIKE;请检查 ELASTICSEARCH_NODE / 网络连通性"
+            echo "               检索将降级 LIKE;请检查 ELASTICSEARCH_NODE / 凭证 / 网络连通性"
         fi
     fi
 }
@@ -533,7 +559,7 @@ prod_health() {
         local es_status
         local node
         node=$(es_node)
-        es_status=$(curl -s -o /dev/null -w "%{http_code}" "${node}/_cluster/health" 2>/dev/null || echo "000")
+        es_status=$(es_curl "${node}/_cluster/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
         if [ "$es_status" = "200" ]; then
             echo "        Elasticsearch ($node): ✓ 可访问"
         else
@@ -671,7 +697,7 @@ status_prod() {
         local node
         node=$(es_node)
         local es_status
-        es_status=$(curl -s -o /dev/null -w "%{http_code}" "${node}/_cluster/health" 2>/dev/null || echo "000")
+        es_status=$(es_curl "${node}/_cluster/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
         if [ "$es_status" = "200" ]; then
             echo "        elasticsearch: ✓ 可访问 ($node)"
         else
