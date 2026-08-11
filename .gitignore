@@ -44,6 +44,7 @@ coverage/
 .playwright-mcp/
 .playwright-cli/
 .claude/
+opencode.json
 
 # Playwright test runtime artifacts (re-generated on each run)
 tests/regression/results/

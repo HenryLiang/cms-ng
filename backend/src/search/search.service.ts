@@ -111,6 +111,10 @@ export class SearchService implements OnModuleInit {
       node: this.node,
       auth: username && password ? { username, password } : undefined,
       requestTimeout: WRITE_TIMEOUT_MS,
+      // ES 8.x 默认开启 xpack security(HTTPS),自签证书时需放行校验,
+      // 否则 Node client 报 "self-signed certificate in certificate chain" 无法连接。
+      // 9200 仅绑环回/内网时此放宽安全可控;公网暴露的 ES 应配 CA 证书而非关闭校验。
+      tls: { rejectUnauthorized: false },
     });
     this.enabled = true;
     // 两个索引独立初始化/自愈；任一失败都不阻断应用或拖累另一索引。

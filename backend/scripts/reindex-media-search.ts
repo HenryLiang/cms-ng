@@ -126,6 +126,8 @@ async function main() {
         : undefined,
     requestTimeout: 30_000, // bulk 批量写,放宽超时
     maxRetries: 2,
+    // ES 8.x 默认 HTTPS + 自签证书,与 search.service.ts 保持一致
+    tls: { rejectUnauthorized: false },
   });
 
   const where = buildWhere(opts);
