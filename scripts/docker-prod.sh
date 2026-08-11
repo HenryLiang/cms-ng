@@ -7,7 +7,7 @@ BACKEND_ENV="$PROJECT_DIR/backend/.env"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/docker-prod.sh {up|down|status|logs|migrate|config} [service]
+Usage: ./scripts/docker-prod.sh {up|down|status|logs|migrate|init-admin|config} [service]
 
   up       Build local images (or pull CMS_NG_*_IMAGE) and start the stack.
            The one-shot migrate service must succeed before backend starts.
@@ -15,6 +15,9 @@ Usage: ./scripts/docker-prod.sh {up|down|status|logs|migrate|config} [service]
   status   Show container and health status.
   logs     Follow logs; optionally pass a service name.
   migrate  Re-run `prisma migrate deploy` as a disposable container.
+  init-admin
+           Create or reset the SUPER_ADMIN account after the stack is up.
+           Set ADMIN_EMAIL/ADMIN_PASSWORD or enter them at the prompts.
   config   Validate Compose configuration without printing expanded secrets.
 
 Optional profiles:
@@ -57,6 +60,27 @@ compose() {
   docker compose --project-directory "$PROJECT_DIR" -f "$COMPOSE_FILE" "$@"
 }
 
+require_admin_value() {
+  local variable_name="$1"
+  local prompt="$2"
+  local secret="${3:-false}"
+  local value="${!variable_name:-}"
+
+  if [[ -z "$value" && -t 0 ]]; then
+    if [[ "$secret" == "true" ]]; then
+      read -r -s -p "$prompt" value
+      echo
+    else
+      read -r -p "$prompt" value
+    fi
+  fi
+  if [[ -z "$value" ]]; then
+    echo "Error: $variable_name is required" >&2
+    exit 1
+  fi
+  printf -v "$variable_name" '%s' "$value"
+}
+
 cmd="${1:-}"
 if [[ -z "$cmd" ]]; then
   usage
@@ -74,7 +98,9 @@ case "$cmd" in
         exit 1
       fi
       compose pull backend frontend proxy
-      compose up -d --no-build --remove-orphans "$@"
+      # Pulled application images are reused. Optional build-only services
+      # such as the Elasticsearch+IK profile may still build on first use.
+      compose up -d --remove-orphans "$@"
     else
       compose up -d --build --remove-orphans "$@"
     fi
@@ -96,6 +122,18 @@ case "$cmd" in
     preflight
     compose run --rm migrate
     ;;
+  init-admin)
+    preflight
+    require_admin_value ADMIN_EMAIL "Admin email: "
+    require_admin_value ADMIN_PASSWORD "Admin password: " true
+    ADMIN_NAME="${ADMIN_NAME:-Super Admin}"
+    ADMIN_EMAIL="$ADMIN_EMAIL" \
+      ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+      ADMIN_NAME="$ADMIN_NAME" \
+      compose run --rm --no-deps \
+        -e ADMIN_EMAIL -e ADMIN_PASSWORD -e ADMIN_NAME \
+        backend node dist/scripts/create-admin.js
+    ;;
   config)
     preflight
     compose config --quiet
@@ -109,4 +147,3 @@ case "$cmd" in
     exit 1
     ;;
 esac
-

@@ -19,12 +19,15 @@ async function bootstrap() {
   // Host production uses a loopback nginx; Docker production uses one
   // unexposed proxy hop. Without `trust proxy`, @nestjs/throttler sees every
   // request as the proxy IP and one client can exhaust the shared bucket.
-  // validateEnv restricts this to `loopback` or `1` so arbitrary forwarded
-  // headers can never be trusted by configuration accident.
+  // validateEnv restricts this to `loopback`, `1`, or `2` so arbitrary
+  // forwarding chains cannot be trusted by configuration accident.
   const expressApp = app.getHttpAdapter().getInstance() as Express;
   const config = app.get(ConfigService);
   const trustProxy = config.get<string>('TRUST_PROXY') ?? 'loopback';
-  expressApp.set('trust proxy', trustProxy === '1' ? 1 : 'loopback');
+  expressApp.set(
+    'trust proxy',
+    trustProxy === 'loopback' ? 'loopback' : Number(trustProxy),
+  );
   const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
   // Security headers (issue #107). CSP is disabled outside production because
   // Swagger UI (dev-only) needs inline scripts/styles; the API itself serves

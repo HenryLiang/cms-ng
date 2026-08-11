@@ -7,6 +7,7 @@ x-backend-image: &backend-image
     dockerfile: docker/backend/Dockerfile
     args:
       NODE_VERSION: ${NODE_VERSION:-24.18.0}
+      INSTALL_FFMPEG: ${INSTALL_FFMPEG:-false}
       INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-false}
 
 x-backend-env: &backend-env
@@ -15,8 +16,9 @@ x-backend-env: &backend-env
   environment:
     NODE_ENV: production
     PORT: 3001
-    TRUST_PROXY: "1"
+    TRUST_PROXY: ${CMS_NG_TRUST_PROXY_HOPS:-1}
     AUTHORS_DATA_DIR: /app/backend/data/authors
+    WECHAT_PAY_PRIVATE_KEY_PATH: /run/secrets/wechat-pay-private-key.pem
   extra_hosts:
     - host.docker.internal:host-gateway
 
@@ -37,6 +39,13 @@ services:
         condition: service_completed_successfully
         restart: true
     expose: ["3001"]
+    volumes:
+      - type: bind
+        source: ${WECHAT_PAY_PRIVATE_KEY_FILE:-./docker/secrets/empty.pem}
+        target: /run/secrets/wechat-pay-private-key.pem
+        read_only: true
+        bind:
+          create_host_path: false
     mem_limit: ${BACKEND_MEMORY_LIMIT:-2g}
     healthcheck:
       test:

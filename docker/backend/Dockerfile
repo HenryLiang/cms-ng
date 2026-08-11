@@ -1,13 +1,20 @@
 # syntax=docker/dockerfile:1.7
 
 ARG NODE_VERSION=24.18.0
+ARG INSTALL_FFMPEG=false
 
 FROM node:${NODE_VERSION}-bookworm-slim AS base
+ARG INSTALL_FFMPEG
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates openssl tini \
+    && if [ "${INSTALL_FFMPEG}" = "true" ]; then \
+         apt-get install -y --no-install-recommends ffmpeg; \
+       elif [ "${INSTALL_FFMPEG}" != "false" ]; then \
+         echo "INSTALL_FFMPEG must be true or false" >&2; exit 1; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS dependencies

@@ -19,7 +19,7 @@ type AiProvider = (typeof VALID_AI_PROVIDERS)[number];
 const VALID_VISION_PROVIDERS = ['gemini', 'kimi', 'openai'] as const;
 // 文生视频 provider 与文本/视觉均隔离;未配置时功能降级关闭(不 fail-fast)
 const VALID_VIDEO_GEN_PROVIDERS = ['volcengine', 'minimax'] as const;
-const VALID_TRUST_PROXY_VALUES = ['loopback', '1'] as const;
+const VALID_TRUST_PROXY_VALUES = ['loopback', '1', '2'] as const;
 
 export interface ValidatedEnv {
   DATABASE_URL: string;
@@ -136,9 +136,9 @@ export function validateEnv(
   }
 
   // The host-process deployment only trusts a loopback nginx. The Docker
-  // deployment has an unexposed backend behind exactly one proxy hop, so it
-  // uses `1`. Reject arbitrary values to avoid accidentally trusting client-
-  // supplied X-Forwarded-For headers.
+  // deployment has an unexposed backend behind one proxy hop, or two when its
+  // public ingress is restricted to an outer LB/CDN. Reject arbitrary values
+  // to avoid accidentally trusting client-supplied X-Forwarded-For headers.
   if (
     env.TRUST_PROXY !== undefined &&
     !(VALID_TRUST_PROXY_VALUES as readonly string[]).includes(env.TRUST_PROXY)

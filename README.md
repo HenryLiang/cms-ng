@@ -439,7 +439,9 @@ migrate (one-shot) -> prisma migrate deploy -> success -> backend starts
 
 `backend` / `frontend` 端口只在 Docker 网络中暴露，宿主机只发布
 proxy 的 `CMS_NG_HTTP_PORT`（默认 80）。TLS 建议在云负载均衡/CDN 终止；
-如果直接暴露单机，请在 proxy 前增加宿主机 Caddy/nginx 管理证书。
+如果直接暴露单机，请在 proxy 前增加宿主机 Caddy/nginx 管理证书。默认
+`CMS_NG_TRUST_PROXY_HOPS=1`；若 Compose proxy 前还有一层代理，需设置为
+`2`，并用防火墙禁止绕过外层代理直接访问 Compose 入口，避免伪造客户端 IP。
 
 #### 首次启动
 
@@ -449,6 +451,9 @@ cp backend/.env.example backend/.env
 # MySQL 在宿主机时可用 host.docker.internal。
 
 ./scripts/docker-prod.sh up
+
+# 空库首次启动后创建 SUPER_ADMIN（命令会交互式隐藏输入密码）：
+./scripts/docker-prod.sh init-admin
 ```
 
 `up` 会自动构建镜像并按以下顺序启动：
@@ -479,7 +484,17 @@ COMPOSE_PROFILES=rss,search ./scripts/docker-prod.sh up   # 两者都启用
 
 若设置 `PLAYWRIGHT_ENABLED=true`，构建 backend 镜像时还需设置
 `INSTALL_PLAYWRIGHT=true`。Elasticsearch profile 还要在 `backend/.env` 设置
-`ELASTICSEARCH_ENABLED=true`。
+`ELASTICSEARCH_ENABLED=true`。若启用 `VIDEO_RENDER_ENABLED=true`，需用
+`INSTALL_FFMPEG=true ./scripts/docker-prod.sh up` 构建包含 `ffmpeg` / `ffprobe`
+的后端镜像；默认不安装，以避免给不使用视频渲染的单例增加约 400MB 依赖。
+
+启用微信支付时，不要把私钥复制进镜像。保留 `backend/.env` 中的商户配置，
+并在启动 shell 中提供只读宿主机文件：
+
+```bash
+export WECHAT_PAY_PRIVATE_KEY_FILE=/secure/path/apiclient_key.pem
+./scripts/docker-prod.sh up
+```
 
 #### GHCR 镜像部署
 
@@ -492,7 +507,10 @@ export CMS_NG_FRONTEND_IMAGE=ghcr.io/<owner>/<repo>/frontend:<git-sha>
 ./scripts/docker-prod.sh up
 ```
 
-当两个镜像变量都存在时，脚本只拉取镜像，不会在生产服务器现场构建。
+当两个应用镜像变量都存在时，脚本会拉取并复用它们，不会现场重建应用。
+若同时首次启用 `search` profile，Elasticsearch+IK 辅助镜像仍会在服务器构建。
+GHCR 的默认 backend 镜像不含 FFmpeg；需要视频渲染时应使用
+`INSTALL_FFMPEG=true` 自行构建并发布对应 backend 镜像。
 
 #### 日常运维
 
@@ -500,6 +518,7 @@ export CMS_NG_FRONTEND_IMAGE=ghcr.io/<owner>/<repo>/frontend:<git-sha>
 ./scripts/docker-prod.sh status
 ./scripts/docker-prod.sh logs backend
 ./scripts/docker-prod.sh migrate
+./scripts/docker-prod.sh init-admin
 ./scripts/docker-prod.sh down
 ```
 

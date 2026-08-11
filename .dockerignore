@@ -14,6 +14,7 @@ coverage
 playwright-report
 tests/regression/results
 backend/uploads
+docker/secrets
 
 *.log
 *.pid

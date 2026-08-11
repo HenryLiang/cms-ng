@@ -154,7 +154,7 @@ describe('validateEnv', () => {
     }
   });
 
-  it.each(['loopback', '1'])('accepts TRUST_PROXY=%s', (value) => {
+  it.each(['loopback', '1', '2'])('accepts TRUST_PROXY=%s', (value) => {
     expect(validateEnv({ ...goodBase, TRUST_PROXY: value }).success).toBe(true);
   });
 
