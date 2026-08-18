@@ -87,6 +87,11 @@ login-page.png
 
 .alipay-sandbox/
 
+# Docker deployment secrets (only the documented empty placeholder is tracked)
+docker/secrets/*
+!docker/secrets/README.md
+!docker/secrets/empty.pem
+
 # Local data (not tracked in git)
 # 例外:data/authors 是 author-style 测试 fixture(spec 依赖 8 个 persona),需跟踪
 data/*

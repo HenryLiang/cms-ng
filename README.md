@@ -11,7 +11,8 @@ cms-ng/
 ├── frontend/          # Next.js 16 + React 19 + Tailwind CSS v4
 ├── backend/           # NestJS 11 + Prisma ORM + MySQL 8
 ├── packages/shared/   # 前后端共享类型与常量
-└── docker-compose.yml # 仅编排 RSSHub（MySQL 为外部中间件）
+├── docker-compose.yml      # 开发中间件（RSSHub / Elasticsearch）
+└── docker-compose.prod.yml # 单例生产容器编排
 ```
 
 | 层级        | 技术                                                              |
@@ -422,7 +423,109 @@ cms-ng/
 
 ## 生产部署
 
-生产环境采用 **nginx 反代 + 宿主机进程** 架构（非 Docker 编排应用本身），由 `scripts/cms-ng-service.sh --prod` 统一管理发布流程：**前置检查 → 构建 → 停旧进程 → 启动 backend/frontend 为 nohup 后台进程 + RSSHub 容器 → 数据库迁移 → 健康检查 → admin 初始化**。
+新部署优先使用 **Docker Compose + 不可变镜像**。原有的宿主机
+nginx + nohup 流程保留为兼容方案。
+
+### Docker Compose（推荐）
+
+#### 架构
+
+```text
+Internet -> proxy (:80) -> frontend (:3000)
+                       \-> backend  (:3001) -> external MySQL 8
+
+migrate (one-shot) -> prisma migrate deploy -> success -> backend starts
+```
+
+`backend` / `frontend` 端口只在 Docker 网络中暴露，宿主机只发布
+proxy 的 `CMS_NG_HTTP_PORT`（默认 80）。TLS 建议在云负载均衡/CDN 终止；
+如果直接暴露单机，请在 proxy 前增加宿主机 Caddy/nginx 管理证书。默认
+`CMS_NG_TRUST_PROXY_HOPS=1`；若 Compose proxy 前还有一层代理，需设置为
+`2`，并用防火墙禁止绕过外层代理直接访问 Compose 入口，避免伪造客户端 IP。
+
+#### 首次启动
+
+```bash
+cp backend/.env.example backend/.env
+# 编辑 backend/.env；Docker 内不能用 localhost 连外部 MySQL。
+# MySQL 在宿主机时可用 host.docker.internal。
+
+./scripts/docker-prod.sh up
+
+# 空库首次启动后创建 SUPER_ADMIN（命令会交互式隐藏输入密码）：
+./scripts/docker-prod.sh init-admin
+```
+
+`up` 会自动构建镜像并按以下顺序启动：
+
+1. `migrate` 以一次性容器运行 `prisma migrate deploy`
+2. 只有迁移退出码为 0 时才启动 `backend`
+3. backend 健康后启动 `frontend`
+4. 前后端都健康后启动 `proxy`
+
+`migrate deploy` **只应用仓库中已提交的 migration**：不会从
+`schema.prisma` 自动创建 migration，不会检测 schema drift，也不会执行 seed。
+本地修改 schema 后仍要先执行并提交：
+
+```bash
+cd backend && npx prisma migrate dev --name <description>
+```
+
+可选服务使用 Compose profile：
+
+```bash
+# 启用 profile 前在 backend/.env 使用容器内服务名：
+# RSS_HUB_URL=http://rsshub:1200
+# ELASTICSEARCH_NODE=http://elasticsearch:9200
+COMPOSE_PROFILES=rss ./scripts/docker-prod.sh up          # RSSHub
+COMPOSE_PROFILES=search ./scripts/docker-prod.sh up       # Elasticsearch
+COMPOSE_PROFILES=rss,search ./scripts/docker-prod.sh up   # 两者都启用
+```
+
+若设置 `PLAYWRIGHT_ENABLED=true`，构建 backend 镜像时还需设置
+`INSTALL_PLAYWRIGHT=true`。Elasticsearch profile 还要在 `backend/.env` 设置
+`ELASTICSEARCH_ENABLED=true`。若启用 `VIDEO_RENDER_ENABLED=true`，需用
+`INSTALL_FFMPEG=true ./scripts/docker-prod.sh up` 构建包含 `ffmpeg` / `ffprobe`
+的后端镜像；默认不安装，以避免给不使用视频渲染的单例增加约 400MB 依赖。
+
+启用微信支付时，不要把私钥复制进镜像。保留 `backend/.env` 中的商户配置，
+并在启动 shell 中提供只读宿主机文件：
+
+```bash
+export WECHAT_PAY_PRIVATE_KEY_FILE=/secure/path/apiclient_key.pem
+./scripts/docker-prod.sh up
+```
+
+#### GHCR 镜像部署
+
+`.github/workflows/container-images.yml` 在 main 分支构建并发布 amd64 镜像。
+服务器先使用只读 `read:packages` token 登录 GHCR，然后设置：
+
+```bash
+export CMS_NG_BACKEND_IMAGE=ghcr.io/<owner>/<repo>/backend:<git-sha>
+export CMS_NG_FRONTEND_IMAGE=ghcr.io/<owner>/<repo>/frontend:<git-sha>
+./scripts/docker-prod.sh up
+```
+
+当两个应用镜像变量都存在时，脚本会拉取并复用它们，不会现场重建应用。
+若同时首次启用 `search` profile，Elasticsearch+IK 辅助镜像仍会在服务器构建。
+GHCR 的默认 backend 镜像不含 FFmpeg；需要视频渲染时应使用
+`INSTALL_FFMPEG=true` 自行构建并发布对应 backend 镜像。
+
+#### 日常运维
+
+```bash
+./scripts/docker-prod.sh status
+./scripts/docker-prod.sh logs backend
+./scripts/docker-prod.sh migrate
+./scripts/docker-prod.sh init-admin
+./scripts/docker-prod.sh down
+```
+
+### 宿主机进程部署（兼容）
+
+旧生产环境仍可使用 **nginx 反代 + 宿主机进程** 架构，由
+`scripts/cms-ng-service.sh --prod` 管理发布流程。
 
 ### 1. 架构
 
@@ -447,7 +550,7 @@ MySQL             (外部中间件)
 
 ### 3. 标准发布流程（每次更新代码后执行）
 
-这是**唯一的发布入口**——每次代码更新后按以下步骤操作，无需手动 build/migrate/重启：
+这是**宿主机模式的发布入口**——每次代码更新后按以下步骤操作：
 
 ```bash
 # 1. 拉取最新代码
@@ -460,7 +563,7 @@ diff backend/.env.example backend/.env
 #    cd backend && npx prisma migrate dev --name <描述>
 #    （生产环境只用 migrate deploy，不会创建新迁移）
 
-# 4. 执行完整发布（构建 + 启动 + 迁移 + 验证 + admin 初始化）
+# 4. 执行完整发布（构建 + 迁移 + 启动 + 验证 + admin 初始化）
 ./scripts/cms-ng-service.sh start --prod
 
 # 5. 验证发布结果
@@ -472,8 +575,8 @@ diff backend/.env.example backend/.env
 1. **前置检查** — node 可用、`backend/.env` 存在且含 `DATABASE_URL`/`JWT_SECRET`
 2. **构建** — `shared` → `backend` (nest build) → `frontend` (next build)
 3. **停止旧进程** — 按 PID 文件停 backend/frontend，并 pkill 兜底清理遗留进程
-4. **启动** — backend (`nohup node dist/src/main`)、frontend (`nohup npm run start`) 为后台进程；`docker compose up -d` 拉起 RSSHub 容器
-5. **数据库迁移** — 等待 backend 就绪后 `npx prisma migrate deploy`（只应用已有迁移，不创建新迁移）
+4. **数据库迁移** — `npx prisma migrate deploy`（只应用已有迁移，失败即中止）
+5. **启动** — backend (`nohup node dist/src/main`)、frontend (`nohup npm run start`) 为后台进程；`docker compose up -d` 拉起 RSSHub 容器
 6. **健康检查** — frontend `/login` (HTTP 200) + backend `/users` (HTTP 401 无 token 为正常)
 7. **admin 初始化** — 注册或确认 admin 账号
 
@@ -535,7 +638,7 @@ server {
     }
 
     # 后端 API (路径前缀匹配)
-    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|uploads) {
+    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|media|notifications|authors|system-features|video|uploads) {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -557,7 +660,7 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
 
     location / { proxy_pass http://127.0.0.1:3000; /* 同上 proxy_set_header ... */ }
-    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|uploads) {
+    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|media|notifications|authors|system-features|video|uploads) {
         proxy_pass http://127.0.0.1:3001; /* 同上 proxy_set_header ... */
     }
 }
@@ -581,19 +684,20 @@ server {
 | 现象 | 排查步骤 |
 | ---- | -------- |
 | `start --prod` 后服务未响应 | `logs --prod backend` / `logs --prod frontend` 查日志；`ss -ltnp \| grep -E ':3000\|:3001'` 查端口占用 |
-| 数据库迁移失败 | 脚本不中断（Warning 提示），手动重试：`cd backend && npx prisma migrate deploy`；确认 `DATABASE_URL` 可达 |
+| 数据库迁移失败 | 脚本中止发布；确认 `DATABASE_URL` 可达且迁移 SQL 正确，修复后重跑 `start --prod` |
 | 页面 502 | `nginx -t && systemctl status nginx`；检查 `/etc/nginx/conf.d/cms-ng.conf` 反代目标是否正确 |
 | 端口冲突 (3000/3001 被占) | `stop --prod` 后重新 `start --prod`；或手动 `pkill -f "node dist/src/main"; pkill -f "next start"` |
 | RSSHub 容器未启动 | 非致命，手动拉起：`docker compose -f docker-compose.yml up -d` |
 | 构建失败 | 确认 `packages/shared` 已构建（`cd packages/shared && npm run build`）；检查 node 版本 ≥ 20 |
 
-### 9. 容器编排边界
+### 9. 旧版容器编排边界
 
-仓库内 Docker Compose **仅编排 RSSHub**（开发与生产共用 `docker-compose.yml`），**不编排应用本身与数据中间件**：
+旧的 `docker-compose.yml` **仅编排 RSSHub/Elasticsearch**，不编排应用本身；
+新的 `docker-compose.prod.yml` 负责生产应用编排。两种模式都保持 MySQL 为外部依赖：
 
-- 应用（backend + frontend）以宿主机进程运行，由 nginx 反代
+- 宿主机兼容模式下，应用（backend + frontend）以宿主机进程运行，由 nginx 反代
 - MySQL 为外部依赖，部署前先准备好
-- RSSHub 唯一进容器的应用层服务（`docker-compose.yml`，端口 `1200`）
+- `docker-compose.yml` 中 RSSHub 和 Elasticsearch 均可选；生产 Compose 通过 profile 启用它们
 
 ---
 
