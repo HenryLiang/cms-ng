@@ -44,6 +44,11 @@ coverage/
 .playwright-mcp/
 .playwright-cli/
 .claude/
+!.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/cms-ng-write-article
 opencode.json
 
 # Playwright test runtime artifacts (re-generated on each run)
