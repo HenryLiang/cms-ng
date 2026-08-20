@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMS-NG 从 0 到 1 写稿"
+  short_description: "通过 CMS-NG API 完成写稿、审校、送审及 WordPress 发布"
+  default_prompt: "使用 $cms-ng-write-article 从一个想法开始完成写稿和审校，提交审核，并在审核通过后按确认发布到 WordPress。"
