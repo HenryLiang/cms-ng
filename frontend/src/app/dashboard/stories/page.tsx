@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -18,6 +18,14 @@ import {
   type TopicSourceDefinition,
 } from '@/lib/topic-api';
 import {
+  filterUnadopted,
+  formatImportedAt,
+  paginateTopics,
+  sortTopics,
+  TOPIC_PAGE_SIZE,
+  type TopicSortMode,
+} from '@/lib/topic-list-utils';
+import {
   Plus,
   Flame,
   Loader2,
@@ -34,6 +42,8 @@ import {
   ChevronRight,
   Calendar,
   Play,
+  Check,
+  Database,
 } from 'lucide-react';
 import { Button, Badge } from '@/components/ui';
 
@@ -61,6 +71,11 @@ export default function StoryHubPage() {
   const [suggestions, setSuggestions] = useState<StorySuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [adoptingId, setAdoptingId] = useState<string | null>(null);
+
+  // 已录入热点清单（右侧栏）：筛选 + 排序 + 分页
+  const [topicSort, setTopicSort] = useState<TopicSortMode>('heat');
+  const [unadoptedOnly, setUnadoptedOnly] = useState(false);
+  const [topicPage, setTopicPage] = useState(1);
 
   // News source state
   const [sourceDefinitions, setSourceDefinitions] = useState<
@@ -114,6 +129,7 @@ export default function StoryHubPage() {
     try {
       const data = await getTopics();
       setTopics(data);
+      return data;
     } finally {
       setLoading(false);
     }
@@ -139,7 +155,14 @@ export default function StoryHubPage() {
     if (!confirm('确定删除这个热点？')) return;
     await deleteTopic(id);
     if (selectedTopic?.id === id) setSelectedTopic(null);
-    await loadTopics();
+    const data = await loadTopics();
+    // 删除可能导致总页数缩小：按当前筛选后的可见条数收敛页码，
+    // 避免后续新增时跳回失效旧页码
+    if (data) {
+      const visibleCount = filterUnadopted(data, unadoptedOnly).length;
+      const maxPage = Math.max(1, Math.ceil(visibleCount / TOPIC_PAGE_SIZE));
+      setTopicPage((current) => Math.min(current, maxPage));
+    }
   }
 
   async function handleGetAISuggestions() {
@@ -272,6 +295,30 @@ export default function StoryHubPage() {
     (source) => source.id === activeNewsSource,
   );
 
+  // 已录入热点：未采纳筛选 → 排序 → 每页 10 条分页（页码越界时在 paginateTopics 内收敛）
+  const visibleTopics = useMemo(
+    () => sortTopics(filterUnadopted(topics, unadoptedOnly), topicSort),
+    [topics, unadoptedOnly, topicSort],
+  );
+  const topicPageData = paginateTopics(visibleTopics, topicPage);
+
+  function handleTopicSortChange(mode: TopicSortMode) {
+    setTopicSort(mode);
+    setTopicPage(1);
+  }
+
+  function handleToggleUnadopted() {
+    setUnadoptedOnly((current) => !current);
+    setTopicPage(1);
+  }
+
+  function handleSelectTopic(topic: TrendingTopic) {
+    setSelectedTopic(topic);
+    setShowAISuggestions(false);
+    setActiveNewsSource(null);
+    setNewsPage(1);
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -282,8 +329,8 @@ export default function StoryHubPage() {
 
   return (
     <div className="flex h-full">
-      {/* Left sidebar - Topic list */}
-      <div className="w-80 border-r border-line bg-surface flex flex-col">
+      {/* Left sidebar - 数据源与操作入口 */}
+      <div className="w-80 shrink-0 border-r border-line bg-surface overflow-auto">
         <div className="p-4 border-b border-line">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-semibold text-foreground">选题中心</h1>
@@ -402,65 +449,10 @@ export default function StoryHubPage() {
           </form>
         )}
 
-        <div className="flex-1 overflow-auto">
-          {topics.map((topic) => (
-            <div
-              key={topic.id}
-              onClick={() => {
-                setSelectedTopic(topic);
-                setShowAISuggestions(false);
-                setActiveNewsSource(null);
-                setNewsPage(1);
-              }}
-              className={`w-full text-left p-4 border-b border-line hover:bg-surface-muted transition-colors cursor-pointer ${
-                selectedTopic?.id === topic.id ? 'bg-canvas' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-foreground truncate">
-                    {topic.title}
-                  </h3>
-                  {topic.description && (
-                    <p className="mt-1 text-xs text-muted line-clamp-2">
-                      {topic.description}
-                    </p>
-                  )}
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-xs text-orange-500 tnum">
-                      <Flame className="h-3 w-3" />
-                      {topic.heatScore}
-                    </span>
-                    {topic.status === 'ADOPTED' && (
-                      <Badge tone="success">已采纳</Badge>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteTopic(topic.id);
-                  }}
-                  className="text-subtle hover:text-red-500"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          ))}
-          {topics.length === 0 && (
-            <div className="p-8 text-center">
-              <p className="text-sm text-subtle">暂无热点</p>
-              <p className="mt-1 text-xs text-subtle">
-                点击上方按钮录入或获取 AI 推荐
-              </p>
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Right panel - Detail or AI Suggestions or News Source */}
-      <div className="flex-1 bg-canvas p-8 overflow-auto">
+      {/* Middle panel - Detail or AI Suggestions or News Source */}
+      <div className="flex-1 min-w-0 bg-canvas p-8 overflow-auto">
         {activeNewsSource && activeSourceDefinition ? (
           <NewsSourcePanel
             source={activeSourceDefinition}
@@ -497,6 +489,192 @@ export default function StoryHubPage() {
           <EmptyState onGetSuggestions={handleGetAISuggestions} />
         )}
       </div>
+
+      {/* Right sidebar - 已录入热点清单（筛选 + 排序 + 分页） */}
+      <ImportedTopicsPanel
+        topics={topicPageData.items}
+        total={topicPageData.total}
+        sort={topicSort}
+        onSortChange={handleTopicSortChange}
+        unadoptedOnly={unadoptedOnly}
+        onToggleUnadopted={handleToggleUnadopted}
+        page={topicPageData.page}
+        totalPages={topicPageData.totalPages}
+        onPageChange={setTopicPage}
+        selectedId={selectedTopic?.id ?? null}
+        onSelect={handleSelectTopic}
+        onDelete={handleDeleteTopic}
+      />
+    </div>
+  );
+}
+
+const TOPIC_SORT_TABS: { key: TopicSortMode; label: string }[] = [
+  { key: 'heat', label: '热度优先' },
+  { key: 'recent', label: '最近录入' },
+];
+
+function ImportedTopicsPanel({
+  topics,
+  total,
+  sort,
+  onSortChange,
+  unadoptedOnly,
+  onToggleUnadopted,
+  page,
+  totalPages,
+  onPageChange,
+  selectedId,
+  onSelect,
+  onDelete,
+}: {
+  topics: TrendingTopic[];
+  total: number;
+  sort: TopicSortMode;
+  onSortChange: (mode: TopicSortMode) => void;
+  unadoptedOnly: boolean;
+  onToggleUnadopted: () => void;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  selectedId: string | null;
+  onSelect: (topic: TrendingTopic) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="w-80 shrink-0 border-l border-line bg-surface flex flex-col">
+      <div className="p-4 border-b border-line">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <Database className="h-4 w-4 text-cyan-600" />
+            已录入热点
+          </h2>
+          <span className="text-xs text-subtle tnum">
+            {unadoptedOnly ? `未采纳 ${total} 条` : `共 ${total} 条`}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {TOPIC_SORT_TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSortChange(key)}
+              className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                sort === key
+                  ? 'bg-orange-100 font-semibold text-orange-700'
+                  : 'border border-line bg-surface text-muted hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-pressed={unadoptedOnly}
+            onClick={onToggleUnadopted}
+            title="只看未采纳的热点"
+            className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
+              unadoptedOnly
+                ? 'bg-cyan-100 font-semibold text-cyan-700'
+                : 'border border-dashed border-line bg-surface text-muted hover:text-foreground'
+            }`}
+          >
+            {unadoptedOnly && <Check className="h-3 w-3" />}
+            未采纳
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        {topics.map((topic) => (
+          <div
+            key={topic.id}
+            onClick={() => onSelect(topic)}
+            className={`w-full text-left p-4 border-b border-line hover:bg-surface-muted transition-colors cursor-pointer ${
+              selectedId === topic.id ? 'bg-canvas' : ''
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-medium text-foreground truncate">
+                  {topic.title}
+                </h3>
+                {topic.description && (
+                  <p className="mt-1 text-xs text-muted line-clamp-2">
+                    {topic.description}
+                  </p>
+                )}
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1 text-xs text-orange-500 tnum">
+                    <Flame className="h-3 w-3" />
+                    {topic.heatScore}
+                  </span>
+                  {topic.status === 'ADOPTED' && (
+                    <Badge tone="success">已采纳</Badge>
+                  )}
+                </div>
+                <div className="mt-1.5 flex items-center gap-2 text-xs text-subtle">
+                  {topic.source && (
+                    <span className="truncate">{topic.source}</span>
+                  )}
+                  <span className="tnum shrink-0">
+                    {formatImportedAt(topic.createdAt)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(topic.id);
+                }}
+                className="text-subtle hover:text-red-500"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+        ))}
+        {total === 0 && (
+          <div className="p-8 text-center">
+            <p className="text-sm text-subtle">
+              {unadoptedOnly ? '暂无未采纳热点' : '暂无已录入热点'}
+            </p>
+            {!unadoptedOnly && (
+              <p className="mt-1 text-xs text-subtle">
+                从外部数据源导入，或点击左侧「录入热点」创建
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-line px-4 py-3">
+          <span className="text-xs text-muted tnum">
+            第 {page}/{totalPages} 页
+          </span>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              上一页
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+            >
+              下一页
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -916,7 +1094,7 @@ function EmptyState({ onGetSuggestions }: { onGetSuggestions: () => void }) {
       </div>
       <h3 className="text-lg font-medium text-foreground">选题中心</h3>
       <p className="mt-2 text-sm text-muted max-w-sm">
-        从左侧选择一个热点查看详情，或使用 AI 获取个性化选题推荐
+        从右侧已录入清单选择一个热点查看详情，或使用 AI 获取个性化选题推荐
       </p>
       <button
         onClick={onGetSuggestions}
