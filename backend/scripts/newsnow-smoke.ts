@@ -1,0 +1,118 @@
+/**
+ * newsnow 源冒烟测试 -- 逐源真实外呼(Phase 0 可达性 PoC)。
+ *
+ * 用法(backend 目录):
+ *   npx ts-node scripts/newsnow-smoke.ts            # 全部源直连
+ *   npx ts-node scripts/newsnow-smoke.ts --proxy    # 海外源走 HTTP_PROXY 代理
+ *   npx ts-node scripts/newsnow-smoke.ts --only newsnow-toutiao,newsnow-cls-telegraph
+ *
+ * 输出逐源结果表(条数/耗时/错误),退出码:全部通过 0,任一失败 1。
+ * 这是本机可达性验证,不代表海外生产机房的网络结论(需在 prod 机器上跑)。
+ */
+import {
+  configureNewsnowClient,
+  DEFAULT_NEWSNOW_PROXY_DOMAINS,
+} from '../src/trending-topics/sources/newsnow/newsnow-http.client';
+import {
+  NEWSNOW_SOURCE_ENTRIES,
+  NewsnowSourceEntry,
+} from '../src/trending-topics/sources/newsnow/newsnow-source.registry';
+
+interface SourceResult {
+  id: string;
+  label: string;
+  ok: boolean;
+  count: number;
+  ms: number;
+  error?: string;
+}
+
+async function run(): Promise<number> {
+  const useProxy = process.argv.includes('--proxy');
+  const onlyArg = process.argv.find((arg) => arg.startsWith('--only='));
+  const only = onlyArg
+    ? onlyArg.slice('--only='.length).split(',').map((s) => s.trim()).filter(Boolean)
+    : null;
+
+  if (useProxy) {
+    const proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
+    if (!proxyUrl) {
+      console.error('--proxy 需要设置 HTTP_PROXY 环境变量');
+      return 2;
+    }
+    configureNewsnowClient({
+      proxyEnabled: true,
+      proxyUrl,
+      proxyDomains: new Set(DEFAULT_NEWSNOW_PROXY_DOMAINS),
+    });
+    console.log(
+      `代理已启用: ${proxyUrl} (域名: ${DEFAULT_NEWSNOW_PROXY_DOMAINS.join(', ')})\n`,
+    );
+  }
+
+  const entries: NewsnowSourceEntry[] = NEWSNOW_SOURCE_ENTRIES.filter(
+    (entry) => !only || only.includes(entry.id),
+  );
+
+  const results: SourceResult[] = [];
+  // 串行执行:避免并发触发各平台反爬限流,结果更接近真实单源表现
+  for (const entry of entries) {
+    process.stdout.write(`抓取 ${entry.label} (${entry.id}) ... `);
+    const start = Date.now();
+    try {
+      const items = await entry.getter();
+      const valid = items.filter(
+        (item) => item.title?.trim() && item.url,
+      ).length;
+      const result: SourceResult = {
+        id: entry.id,
+        label: entry.label,
+        ok: items.length > 0,
+        count: items.length,
+        ms: Date.now() - start,
+        error: items.length
+          ? valid < items.length
+            ? `${valid}/${items.length} 条字段不完整`
+            : undefined
+          : '返回空列表',
+      };
+      results.push(result);
+      console.log(
+        result.ok
+          ? `OK ${items.length} 条, ${result.ms}ms${result.error ? ` (${result.error})` : ''}`
+          : `EMPTY, ${result.ms}ms`,
+      );
+    } catch (error) {
+      const message = (error as Error).message.slice(0, 100);
+      results.push({
+        id: entry.id,
+        label: entry.label,
+        ok: false,
+        count: 0,
+        ms: Date.now() - start,
+        error: message,
+      });
+      console.log(`FAIL: ${message}`);
+    }
+  }
+
+  const passed = results.filter((r) => r.ok).length;
+  console.log(`\n========== 汇总: ${passed}/${results.length} 通过 ==========`);
+  const failures = results.filter((r) => !r.ok);
+  if (failures.length) {
+    console.log('\n失败源(生产白名单 NEWSNOW_SOURCES 可先裁掉):');
+    for (const failure of failures) {
+      console.log(
+        `  ${failure.id.padEnd(28)} ${failure.label.padEnd(12)} ${failure.error}`,
+      );
+    }
+  }
+  return failures.length ? 1 : 0;
+}
+
+run()
+  .then((code) => process.exit(code))
+  .catch((error) => {
+    console.error('smoke 脚本异常:', error);
+    process.exit(2);
+  });
