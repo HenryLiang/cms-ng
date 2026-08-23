@@ -7,6 +7,7 @@ import { TwitterService } from './twitter.service';
 import { WikipediaService } from './wikipedia.service';
 import { RssTopicSourceAdapter } from './sources/rss-topic-source.adapter';
 import { GoogleTrendsRealtimeAdapter } from './sources/google-trends-realtime.topic-source.adapter';
+import { NewsnowTopicSourceAdapter } from './sources/newsnow/newsnow.topic-source.adapter';
 import {
   TOPIC_SOURCE_ADAPTERS,
   TopicSourceCatalog,
@@ -21,6 +22,7 @@ import {
     WikipediaService,
     RssTopicSourceAdapter,
     GoogleTrendsRealtimeAdapter,
+    NewsnowTopicSourceAdapter,
     {
       provide: TOPIC_SOURCE_ADAPTERS,
       useFactory: (
@@ -28,12 +30,14 @@ import {
         twitter: TwitterService,
         wikipedia: WikipediaService,
         googleTrendsRealtime: GoogleTrendsRealtimeAdapter,
-      ) => [rss, twitter, wikipedia, googleTrendsRealtime],
+        newsnow: NewsnowTopicSourceAdapter,
+      ) => [rss, twitter, wikipedia, googleTrendsRealtime, newsnow],
       inject: [
         RssTopicSourceAdapter,
         TwitterService,
         WikipediaService,
         GoogleTrendsRealtimeAdapter,
+        NewsnowTopicSourceAdapter,
       ],
     },
     TopicSourceCatalog,
