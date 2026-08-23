@@ -48,6 +48,8 @@ export interface NewsnowSourceEntry {
   label: string;
   category: TopicSourceCategory;
   icon: TopicSourceDefinition['icon'];
+  /** 热榜卡片墙形态:hottest=名次榜单,realtime=快讯时间线。 */
+  listType: 'hottest' | 'realtime';
   getter: NewsItemGetter;
   cacheTtlSeconds: number;
 }
@@ -61,6 +63,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   // ── 国内热搜榜 ──
   {
     id: 'newsnow-baidu',
+    listType: 'hottest',
     label: '百度热搜',
     category: 'trending',
     icon: 'flame',
@@ -69,6 +72,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-douyin',
+    listType: 'hottest',
     label: '抖音热点',
     category: 'trending',
     icon: 'flame',
@@ -77,6 +81,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-toutiao',
+    listType: 'hottest',
     label: '头条热榜',
     category: 'trending',
     icon: 'flame',
@@ -85,6 +90,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-tieba',
+    listType: 'hottest',
     label: '贴吧热议',
     category: 'trending',
     icon: 'social',
@@ -93,6 +99,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-kuaishou',
+    listType: 'hottest',
     label: '快手热榜',
     category: 'trending',
     icon: 'video',
@@ -101,6 +108,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-hupu',
+    listType: 'hottest',
     label: '虎扑步行街',
     category: 'trending',
     icon: 'social',
@@ -109,6 +117,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-tencent-hot',
+    listType: 'hottest',
     label: '腾讯热点',
     category: 'trending',
     icon: 'flame',
@@ -117,6 +126,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-kaopu',
+    listType: 'hottest',
     label: '靠谱热搜',
     category: 'trending',
     icon: 'trending',
@@ -125,6 +135,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-thepaper',
+    listType: 'hottest',
     label: '澎湃热榜',
     category: 'news',
     icon: 'newspaper',
@@ -133,6 +144,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-ifeng',
+    listType: 'hottest',
     label: '凤凰网',
     category: 'news',
     icon: 'newspaper',
@@ -143,6 +155,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   // ── 财经 ──
   {
     id: 'newsnow-cls-telegraph',
+    listType: 'realtime',
     label: '财联社电报',
     category: 'news',
     icon: 'newspaper',
@@ -151,6 +164,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-cls-hot',
+    listType: 'hottest',
     label: '财联社热门',
     category: 'news',
     icon: 'newspaper',
@@ -159,6 +173,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-cls-depth',
+    listType: 'realtime',
     label: '财联社深度',
     category: 'news',
     icon: 'newspaper',
@@ -167,6 +182,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-wallstreetcn-quick',
+    listType: 'realtime',
     label: '华尔街见闻快讯',
     category: 'news',
     icon: 'newspaper',
@@ -175,6 +191,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-wallstreetcn-news',
+    listType: 'realtime',
     label: '华尔街见闻要闻',
     category: 'news',
     icon: 'newspaper',
@@ -183,6 +200,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-wallstreetcn-hot',
+    listType: 'hottest',
     label: '华尔街见闻最热',
     category: 'news',
     icon: 'newspaper',
@@ -191,6 +209,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-jin10',
+    listType: 'realtime',
     label: '金十快讯',
     category: 'news',
     icon: 'newspaper',
@@ -199,6 +218,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-gelonghui',
+    listType: 'realtime',
     label: '格隆汇要闻',
     category: 'news',
     icon: 'newspaper',
@@ -207,6 +227,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-mktnews-flash',
+    listType: 'realtime',
     label: 'MKT快讯',
     category: 'news',
     icon: 'newspaper',
@@ -215,6 +236,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-xueqiu-hotstock',
+    listType: 'hottest',
     label: '雪球热股',
     category: 'trending',
     icon: 'trending',
@@ -225,6 +247,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   // ── 科技/开发者 ──
   {
     id: 'newsnow-aihot',
+    listType: 'realtime',
     label: 'AI 热榜',
     category: 'news',
     icon: 'newspaper',
@@ -233,6 +256,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-ithome',
+    listType: 'realtime',
     label: 'IT之家',
     category: 'news',
     icon: 'newspaper',
@@ -241,6 +265,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-sspai',
+    listType: 'hottest',
     label: '少数派热文',
     category: 'news',
     icon: 'newspaper',
@@ -249,6 +274,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-juejin',
+    listType: 'hottest',
     label: '掘金热榜',
     category: 'social',
     icon: 'social',
@@ -257,6 +283,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-nowcoder',
+    listType: 'hottest',
     label: '牛客热搜',
     category: 'social',
     icon: 'social',
@@ -265,6 +292,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-hackernews',
+    listType: 'hottest',
     label: 'Hacker News',
     category: 'social',
     icon: 'social',
@@ -273,6 +301,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-github-trending',
+    listType: 'hottest',
     label: 'GitHub Trending',
     category: 'social',
     icon: 'social',
@@ -281,6 +310,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-solidot',
+    listType: 'realtime',
     label: 'Solidot',
     category: 'news',
     icon: 'newspaper',
@@ -291,6 +321,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   // ── 国际中文媒体 ──
   {
     id: 'newsnow-cankaoxiaoxi',
+    listType: 'realtime',
     label: '参考消息',
     category: 'news',
     icon: 'newspaper',
@@ -299,6 +330,7 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   },
   {
     id: 'newsnow-sputniknewscn',
+    listType: 'realtime',
     label: '卫星通讯社',
     category: 'news',
     icon: 'newspaper',

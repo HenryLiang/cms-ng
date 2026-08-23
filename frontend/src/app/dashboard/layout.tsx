@@ -23,6 +23,7 @@ import {
   Images,
   Clapperboard,
   Search,
+  Radar,
   SlidersHorizontal,
   BrainCircuit,
   type LucideIcon,
@@ -51,6 +52,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: '/dashboard/video', label: '视频创作', icon: Clapperboard, feature: SystemFeature.VIDEO },
       { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, feature: SystemFeature.REVIEW },
       { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, feature: SystemFeature.STORIES },
+      { href: '/dashboard/hot-topics', label: '实时热点', icon: Radar, feature: SystemFeature.HOT_TOPICS },
     ],
   },
   {

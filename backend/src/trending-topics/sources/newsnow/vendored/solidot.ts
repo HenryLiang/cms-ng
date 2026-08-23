@@ -13,6 +13,7 @@ interface SolidotItem {
   contentSnippet?: string;
   summary?: string;
   link?: string;
+  isoDate?: string;
 }
 
 interface SolidotFeed {
@@ -37,6 +38,7 @@ export async function fetchSolidot(): Promise<NewsItem[]> {
     id: item.link ?? item.title ?? '',
     title: item.title ?? '',
     url: item.link ?? '',
+    pubDate: item.isoDate,
     extra: {
       hover: item.contentSnippet || item.summary || undefined,
     },

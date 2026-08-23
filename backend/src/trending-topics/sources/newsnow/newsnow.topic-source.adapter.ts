@@ -1,5 +1,5 @@
 /**
- * newsnow 数据源 adapter -- 把移植自 ourongxing/newsnow 的 32 个热榜/
+ * newsnow 数据源 adapter -- 把移植自 ourongxing/newsnow 的 30 个热榜/
  * 快讯源接入 TopicSourceCatalog(选题模块「一个新机制 = 一个 adapter」的
  * 既有约定;与 RssTopicSourceAdapter/TwitterService 同级注册)。
  *
@@ -103,6 +103,7 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
       label: entry.label,
       category: entry.category,
       icon: entry.icon,
+      listType: entry.listType,
     }));
   }
 
@@ -126,8 +127,18 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
     const cached = this.cache.get(cacheKey);
     if (cached) {
       try {
-        const items = JSON.parse(cached) as TopicCandidate[];
-        return this.paginate(items, query.page, query.limit);
+        // 缓存携带真实抓取时刻:命中时回传原始 fetchedAt(而非响应时间),
+        // 前端「X分钟前更新」标识才有意义。
+        const payload = JSON.parse(cached) as {
+          items: TopicCandidate[];
+          fetchedAt: string;
+        };
+        return this.paginate(
+          payload.items,
+          query.page,
+          query.limit,
+          payload.fetchedAt,
+        );
       } catch {
         this.cache.del(cacheKey); // 缓存损坏 -> 重新抓取
       }
@@ -139,10 +150,15 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
         0,
         MAX_ITEMS_PER_SOURCE,
       );
+      const fetchedAt = new Date().toISOString();
       if (items.length) {
-        this.cache.set(cacheKey, JSON.stringify(items), entry.cacheTtlSeconds);
+        this.cache.set(
+          cacheKey,
+          JSON.stringify({ items, fetchedAt }),
+          entry.cacheTtlSeconds,
+        );
       }
-      return this.paginate(items, query.page, query.limit);
+      return this.paginate(items, query.page, query.limit, fetchedAt);
     } catch (error) {
       const message = (error as Error).message;
       this.logger.warn(`newsnow 源 ${entry.label} 抓取失败: ${message}`);
@@ -171,12 +187,14 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
       const title = item.title?.trim();
       if (!title || seen.has(title)) continue;
       seen.add(title);
+      const publishedAt = this.toIsoDate(item.pubDate ?? item.extra?.date);
       candidates.push({
         title,
         description: item.extra?.hover?.trim() || title,
         source: sourceId,
         heatScore: 0,
         tags: [],
+        ...(publishedAt ? { publishedAt } : {}),
         articles: item.url
           ? [
               {
@@ -195,6 +213,14 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
     return candidates;
   }
 
+  /** NewsItem 的 pubDate/extra.date(毫秒时间戳或日期串)转 ISO;无效则省略。 */
+  private toIsoDate(value: number | string | undefined): string | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    const ms = typeof value === 'number' ? value : Date.parse(value);
+    if (!Number.isFinite(ms)) return undefined;
+    return new Date(ms).toISOString();
+  }
+
   /** 按排名位置派生 heatScore:第 0 条=98,末条=50,线性递减。 */
   private rankToScore(rank: number, total: number): number {
     if (total <= 1) return 98;
@@ -205,6 +231,7 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
     items: TopicCandidate[],
     requestedPage = 1,
     requestedLimit = 10,
+    fetchedAt = new Date().toISOString(),
   ): TopicSourcePage {
     const page = Math.max(1, requestedPage);
     const limit = Math.min(50, Math.max(1, requestedLimit));
@@ -216,7 +243,7 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
       limit,
       totalPages: Math.ceil(items.length / limit) || 1,
       status: 'available',
-      fetchedAt: new Date().toISOString(),
+      fetchedAt,
     };
   }
 }

@@ -49,6 +49,7 @@ export enum SystemFeature {
   VIDEO = 'VIDEO',
   REVIEW = 'REVIEW',
   STORIES = 'STORIES',
+  HOT_TOPICS = 'HOT_TOPICS',
   AUTO_PUBLISH = 'AUTO_PUBLISH',
   BILLING = 'BILLING',
   ACCOUNTS = 'ACCOUNTS',
@@ -121,6 +122,14 @@ export const SYSTEM_FEATURE_CATALOG: readonly SystemFeatureDefinition[] = [
     key: SystemFeature.STORIES,
     label: '选题中心',
     description: '选题发现、研究和采写协作',
+    group: 'WORKSPACE',
+    configurable: true,
+    roles: ALL_STAFF_ROLES,
+  },
+  {
+    key: SystemFeature.HOT_TOPICS,
+    label: '实时热点',
+    description: '热榜与快讯聚合监控(newsnow 数据源)',
     group: 'WORKSPACE',
     configurable: true,
     roles: ALL_STAFF_ROLES,
@@ -768,6 +777,8 @@ export interface TopicSourceDefinition {
   label: string;
   category: TopicSourceCategory;
   icon: 'newspaper' | 'trending' | 'flame' | 'video' | 'social' | 'calendar';
+  /** 热榜卡片墙的列表形态:hottest=名次榜单,realtime=快讯时间线(目前仅 newsnow 源设置)。 */
+  listType?: 'hottest' | 'realtime';
   parameters?: TopicSourceParameter[];
   aggregate?: boolean;
   autoFetch?: boolean;
@@ -789,6 +800,8 @@ export interface TopicCandidate {
   heatScore: number;
   tags: string[];
   articles: TopicCandidateLink[];
+  /** 条目发布时间(ISO 8601);仅带时间的源(如 newsnow 快讯类)填充。 */
+  publishedAt?: string;
   coverImage?: string;
   year?: number;
   type?: string;

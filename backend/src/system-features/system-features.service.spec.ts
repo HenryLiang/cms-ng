@@ -168,7 +168,7 @@ describe('SystemFeaturesService', () => {
 
     const details = await service.getDetails();
 
-    expect(details).toHaveLength(10);
+    expect(details).toHaveLength(11);
     expect(
       details.find((item) => item.key === SystemFeature.VIDEO),
     ).toMatchObject({

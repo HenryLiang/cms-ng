@@ -85,6 +85,22 @@ describe('NewsnowTopicSourceAdapter', () => {
       expect(adapter.listDefinitions({})).toEqual([]);
     });
 
+    it('每个定义透出 listType(实时热点页卡片形态)', () => {
+      const adapter = new NewsnowTopicSourceAdapter(buildConfig());
+      const definitions = adapter.listDefinitions({});
+
+      for (const definition of definitions) {
+        expect(['hottest', 'realtime']).toContain(definition.listType);
+      }
+      // 热搜榜与快讯两类都有代表
+      expect(
+        definitions.find((d) => d.id === 'newsnow-toutiao')?.listType,
+      ).toBe('hottest');
+      expect(
+        definitions.find((d) => d.id === 'newsnow-cls-telegraph')?.listType,
+      ).toBe('realtime');
+    });
+
     it('NEWSNOW_SOURCES 白名单只暴露指定源', () => {
       const adapter = new NewsnowTopicSourceAdapter(
         buildConfig({
@@ -209,6 +225,48 @@ describe('NewsnowTopicSourceAdapter', () => {
       const page = await adapter.fetch('newsnow-toutiao', {}, { limit: 50 });
 
       expect(page.total).toBe(30);
+    });
+
+    it('带时间的源填充 publishedAt(秒级 ctime 转 ISO)', async () => {
+      mockResponsesByUrl([
+        {
+          match: 'cls.cn/v1/roll',
+          value: {
+            data: {
+              roll_data: [
+                {
+                  id: 1,
+                  title: '电报一',
+                  brief: '',
+                  shareurl: '',
+                  ctime: 1700000000,
+                  is_ad: 0,
+                },
+              ],
+            },
+          },
+        },
+      ]);
+      const adapter = new NewsnowTopicSourceAdapter(buildConfig());
+
+      const page = await adapter.fetch('newsnow-cls-telegraph', {}, {});
+
+      expect(page.items[0].publishedAt).toBe(
+        new Date(1700000000 * 1000).toISOString(),
+      );
+    });
+
+    it('缓存命中时 fetchedAt 保持首次抓取时刻(而非响应时间)', async () => {
+      mockResponsesByUrl([
+        { match: 'toutiao.com/hot-event', value: TOUTIAO_FIXTURE },
+      ]);
+      const adapter = new NewsnowTopicSourceAdapter(buildConfig());
+
+      const first = await adapter.fetch('newsnow-toutiao', {}, { limit: 10 });
+      const second = await adapter.fetch('newsnow-toutiao', {}, { limit: 10 });
+
+      expect(mockMyFetch).toHaveBeenCalledTimes(1);
+      expect(second.fetchedAt).toBe(first.fetchedAt);
     });
   });
 });

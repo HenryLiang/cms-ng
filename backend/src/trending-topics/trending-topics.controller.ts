@@ -69,6 +69,9 @@ export class TrendingTopicsController {
   }
 
   @Get('sources')
+  // 方法级覆盖类级 STORIES:实时热点页(HOT_TOPICS)与选题中心共用此端点,
+  // 任一特性开启即可访问(guard 为或语义)。
+  @RequiresSystemFeature(SystemFeature.STORIES, SystemFeature.HOT_TOPICS)
   @ApiOperation({
     summary: 'List available topic sources and their parameters',
   })
@@ -83,6 +86,8 @@ export class TrendingTopicsController {
   }
 
   @Get('sources/:sourceId/items')
+  // 同上:HOT_TOPICS 或 STORIES 任一开启即可。
+  @RequiresSystemFeature(SystemFeature.STORIES, SystemFeature.HOT_TOPICS)
   @ApiOperation({
     summary: 'Fetch normalized topic candidates from any source',
   })
