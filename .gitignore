@@ -51,6 +51,10 @@ coverage/
 !.claude/skills/cms-ng-write-article
 opencode.json
 
+# Agent skill packages: only the portable ZIP is tracked; extracted dirs stay local
+skill-packages/*
+!skill-packages/*.zip
+
 # Playwright test runtime artifacts (re-generated on each run)
 tests/regression/results/
 
