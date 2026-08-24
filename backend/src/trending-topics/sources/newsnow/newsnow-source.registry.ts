@@ -35,13 +35,13 @@ import { fetchTencentHot } from './vendored/tencent';
 import { fetchThepaperHot } from './vendored/thepaper';
 import { fetchTiebaHot } from './vendored/tieba';
 import { fetchToutiaoHot } from './vendored/toutiao';
-import { fetchXiaohongshuHot } from './xiaohongshu';
 import {
   fetchWallstreetcnHot,
   fetchWallstreetcnNews,
   fetchWallstreetcnQuick,
 } from './vendored/wallstreetcn';
 import { fetchXueqiuHotStock } from './vendored/xueqiu';
+import { createTophubGetter } from './tophub';
 
 export interface NewsnowSourceEntry {
   /** CMS 数据源 id(带 newsnow- 前缀)。 */
@@ -59,6 +59,96 @@ const FLASH_TTL = 120;
 const BOARD_TTL = 300;
 const LIST_TTL = 1800;
 const FEED_TTL = 600;
+
+/**
+ * tophub 镜像榜清单 -- node 是 tophub.today 节点 id(URL /n/<node>)。
+ * 实测基线(2026-08-24 经本地 RSSHub):11 个节点全部可达。
+ */
+const TOPHUB_BOARDS: Array<{
+  node: string;
+  id: string;
+  label: string;
+  category: TopicSourceCategory;
+  icon: TopicSourceDefinition['icon'];
+}> = [
+  {
+    node: 'L4MdA5ldxD',
+    id: 'newsnow-xiaohongshu',
+    label: '小红书热榜',
+    category: 'trending',
+    icon: 'flame',
+  },
+  {
+    node: 'WnBe01o371',
+    id: 'newsnow-wechat-hot',
+    label: '微信热文榜',
+    category: 'trending',
+    icon: 'flame',
+  },
+  {
+    node: 'j8Rv21noLw',
+    id: 'newsnow-wechat-words',
+    label: '微信热词',
+    category: 'trending',
+    icon: 'flame',
+  },
+  {
+    node: 'VaobJ98oAj',
+    id: 'newsnow-weibo-topics',
+    label: '微博话题榜',
+    category: 'trending',
+    icon: 'flame',
+  },
+  {
+    node: 'LwkvlBqez1',
+    id: 'newsnow-douban-topics',
+    label: '豆瓣热门话题',
+    category: 'culture',
+    icon: 'social',
+  },
+  {
+    node: 'n6YoVqDeZa',
+    id: 'newsnow-quark',
+    label: '夸克热搜',
+    category: 'trending',
+    icon: 'trending',
+  },
+  {
+    node: 'NaEdZndrOM',
+    id: 'newsnow-sogou',
+    label: '搜狗热点',
+    category: 'trending',
+    icon: 'trending',
+  },
+  {
+    node: 'KMZd7x6erO',
+    id: 'newsnow-so360',
+    label: '360热点',
+    category: 'trending',
+    icon: 'trending',
+  },
+  {
+    node: 'qYwv48MvPa',
+    id: 'newsnow-ftchinese',
+    label: 'FT中文网热榜',
+    category: 'news',
+    icon: 'newspaper',
+  },
+  {
+    node: 'RrvWOl3v5z',
+    id: 'newsnow-guancha',
+    label: '观察者网要闻',
+    category: 'news',
+    icon: 'newspaper',
+  },
+  {
+    node: 'K7GdaKLoQy',
+    id: 'newsnow-chouti',
+    label: '抽屉热榜',
+    category: 'trending',
+    icon: 'trending',
+  },
+];
 
 export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
   // ── 国内热搜榜 ──
@@ -106,18 +196,6 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
     icon: 'video',
     getter: fetchKuaishouHot,
     cacheTtlSeconds: BOARD_TTL,
-  },
-  {
-    // 本地扩展(非上游移植):经 RSSHub tophub 路由,依赖 RSSHub 容器。
-    // TTL 对齐 RSSHub 路由缓存(CACHE_EXPIRE=1800):更短的 TTL 只会在
-    // 窗口内重复拿到同一份数据却重置 fetchedAt,让「N 分钟前更新」失真
-    id: 'newsnow-xiaohongshu',
-    listType: 'hottest',
-    label: '小红书热榜',
-    category: 'trending',
-    icon: 'flame',
-    getter: fetchXiaohongshuHot,
-    cacheTtlSeconds: LIST_TTL,
   },
   {
     id: 'newsnow-hupu',
@@ -350,6 +428,21 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
     getter: fetchSputniknewsCn,
     cacheTtlSeconds: FEED_TTL,
   },
+
+  // ── tophub 镜像榜(本地扩展,非上游移植)──
+  // 经 RSSHub /tophub/:id 路由抓 tophub.today 镜像(含签名/登录墙后的
+  // 小红书、公众号),依赖 RSSHub 容器。TTL 对齐 RSSHub 路由缓存
+  // (CACHE_EXPIRE=1800):更短的 TTL 只会在窗口内重复拿到同一份数据
+  // 却重置 fetchedAt,让「N 分钟前更新」失真。
+  ...TOPHUB_BOARDS.map((board) => ({
+    id: board.id,
+    listType: 'hottest' as const,
+    label: board.label,
+    category: board.category,
+    icon: board.icon,
+    getter: createTophubGetter(board.node),
+    cacheTtlSeconds: LIST_TTL,
+  })),
 ];
 
 export function findNewsnowEntry(
