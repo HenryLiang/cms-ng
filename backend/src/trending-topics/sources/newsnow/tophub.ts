@@ -17,7 +17,7 @@ import { getNewsnowRssHubUrl, myFetch } from './newsnow-http.client';
 import type { NewsItem, NewsItemGetter } from './newsnow.types';
 
 /** 裸热度数字(如 "10.0万"/"918.6w"),透出时加「热度 」前缀。 */
-const BARE_HEAT_RE = /^[0-9][0-9.,]*\s*[万亿wW]?$/;
+const BARE_HEAT_RE = /^[0-9][0-9.,]*\s*[万亿wW]?(人在看)?$/;
 
 async function fetchTophubBoard(node: string): Promise<NewsItem[]> {
   // responseType 钉死为 text:ofetch 按 Content-Type 嗅探时,IANA 注册的
