@@ -231,7 +231,7 @@ export class AuthService {
     // iat at all is hand-crafted; treat it as non-refreshable.
     const maxAgeSec = parseDurationSec(
       this.config.get<string>('JWT_REFRESH_MAX_AGE'),
-      // Default 90d: must exceed the longest documented JWT_EXPIRES_IN (30d)
+      // Default 90d: must exceed the longest documented JWT_EXPIRES_IN (12h)
       // or the refresh window closes before the first token expires.
       90 * 86400,
     );
