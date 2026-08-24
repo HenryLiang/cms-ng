@@ -261,8 +261,17 @@ export async function composeVideo(
     }
   }
 
-  // 组装参数:全部输入在前(含软字幕轨输入),filter_complex / -map 等输出选项在后
-  const args: string[] = ['-y', ...inputArgs];
+  // 组装参数:全部输入在前(含软字幕轨输入),filter_complex / -map 等输出选项在后。
+  // -nostats + -loglevel error:tpad/trim 逐帧刷 "Past duration too large" 告警,
+  // 默认日志级别下 stderr 会冲破 execFile 的 maxBuffer(8MB)导致误杀进程
+  const args: string[] = [
+    '-y',
+    '-hide_banner',
+    '-nostats',
+    '-loglevel',
+    'error',
+    ...inputArgs,
+  ];
   let subInputIdx = -1;
   if (subtitleMode === 'soft' && assPath) {
     args.push('-i', assPath);
