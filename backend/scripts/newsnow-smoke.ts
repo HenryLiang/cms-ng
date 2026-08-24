@@ -47,7 +47,7 @@ async function run(): Promise<number> {
         .filter(Boolean)
     : null;
 
-  // 经 RSSHub 路由的源(newsnow-xiaohongshu):注入 RSS_HUB_URL(.env/env),
+  // 经 RSSHub 路由的源(tophub 镜像榜 11 源):注入 RSS_HUB_URL(.env/env),
   // 缺省 localhost:1200
   configureNewsnowClient({ rssHubUrl: process.env.RSS_HUB_URL });
 
