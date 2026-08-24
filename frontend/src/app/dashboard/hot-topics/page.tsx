@@ -114,7 +114,6 @@ export default function HotTopicsPage() {
     <div className="mx-auto max-w-7xl p-6">
       <PageHeader
         title="实时热点"
-        subtitle="各平台热榜与财经快讯聚合,数据来自 newsnow 源"
         actions={
           <Button
             variant="secondary"
