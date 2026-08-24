@@ -75,7 +75,12 @@ export class NewsnowTopicSourceAdapter implements TopicSourceAdapter {
           .map((domain) => domain.trim().toLowerCase())
           .filter(Boolean),
       );
-      configureNewsnowClient({ proxyEnabled, proxyUrl, proxyDomains });
+      configureNewsnowClient({
+        proxyEnabled,
+        proxyUrl,
+        proxyDomains,
+        rssHubUrl: this.config.get<string>('RSS_HUB_URL'),
+      });
       if (proxyEnabled && !proxyUrl) {
         this.logger.warn(
           'NEWSNOW_PROXY_ENABLED=true 但未配置 HTTP_PROXY,海外源将直连(可能失败)',

@@ -35,6 +35,7 @@ import { fetchTencentHot } from './vendored/tencent';
 import { fetchThepaperHot } from './vendored/thepaper';
 import { fetchTiebaHot } from './vendored/tieba';
 import { fetchToutiaoHot } from './vendored/toutiao';
+import { fetchXiaohongshuHot } from './xiaohongshu';
 import {
   fetchWallstreetcnHot,
   fetchWallstreetcnNews,
@@ -105,6 +106,18 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
     icon: 'video',
     getter: fetchKuaishouHot,
     cacheTtlSeconds: BOARD_TTL,
+  },
+  {
+    // 本地扩展(非上游移植):经 RSSHub tophub 路由,依赖 RSSHub 容器。
+    // TTL 对齐 RSSHub 路由缓存(CACHE_EXPIRE=1800):更短的 TTL 只会在
+    // 窗口内重复拿到同一份数据却重置 fetchedAt,让「N 分钟前更新」失真
+    id: 'newsnow-xiaohongshu',
+    listType: 'hottest',
+    label: '小红书热榜',
+    category: 'trending',
+    icon: 'flame',
+    getter: fetchXiaohongshuHot,
+    cacheTtlSeconds: LIST_TTL,
   },
   {
     id: 'newsnow-hupu',

@@ -35,7 +35,11 @@ interface NewsnowClientConfig {
   proxyEnabled: boolean;
   proxyUrl?: string;
   proxyDomains: Set<string>;
+  /** RSSHub 实例地址(经 RSSHub 路由的源使用,如小红书热榜)。 */
+  rssHubUrl?: string;
 }
+
+const DEFAULT_RSS_HUB_URL = 'http://localhost:1200';
 
 let clientConfig: NewsnowClientConfig = {
   proxyEnabled: false,
@@ -133,4 +137,13 @@ export async function fetchResponseCookies(url: string): Promise<string[]> {
 export function resetNewsnowClientForTest(): void {
   clientConfig = { proxyEnabled: false, proxyDomains: new Set() };
   proxyAgent = null;
+}
+
+/**
+ * RSSHub 实例地址(去尾部斜杠;未配置时回落 localhost 默认)。
+ * 注意:newsnow-smoke.ts 等脚本不经 Nest ConfigService,需自行
+ * configureNewsnowClient({ rssHubUrl }) 或接受 localhost 默认值。
+ */
+export function getNewsnowRssHubUrl(): string {
+  return (clientConfig.rssHubUrl || DEFAULT_RSS_HUB_URL).replace(/\/+$/, '');
 }
