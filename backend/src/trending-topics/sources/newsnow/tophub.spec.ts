@@ -25,6 +25,7 @@ const RSS_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>小红书 ‧ 热榜</title><link>https://tophub.today/n/L4MdA5ldxD</link>
 <item><title>用万能旅行拍照姿势美美出片</title><description>918.6w</description><link>https://www.xiaohongshu.com/search_result?keyword=a</link></item>
 <item><title>豆瓣话题</title><description>714篇内容 · 47.4万次浏览</description><link>https://www.douban.com/?p=b</link></item>
+<item><title>360在看</title><description>73643人在看</description><link>https://www.so.com/?p=v</link></item>
 <item><title>重复条目</title><description>100w</description><link>https://www.douban.com/?p=b</link></item>
 <item><title>无描述条目</title><description></description><link>https://www.xiaohongshu.com/search_result?keyword=c</link></item>
 </channel></rss>`;
@@ -46,6 +47,7 @@ describe('tophub 镜像榜解析', () => {
     expect(items.map((i) => i.title)).toEqual([
       '用万能旅行拍照姿势美美出片',
       '豆瓣话题',
+      '360在看',
       '无描述条目',
     ]);
     // 裸热度数字 -> 「热度 」前缀,避免被当成正文
@@ -54,8 +56,10 @@ describe('tophub 镜像榜解析', () => {
     expect(items[1].extra).toEqual({
       hover: '714篇内容 · 47.4万次浏览',
     });
+    // "N人在看" 式热度也加前缀(360 热榜实测格式)
+    expect(items[2].extra).toEqual({ hover: '热度 73643人在看' });
     // 空描述不挂 extra,adapter 侧 description 回落为标题
-    expect(items[2].extra).toBeUndefined();
+    expect(items[3].extra).toBeUndefined();
     // channel 级 <link>(tophub 节点页)不得成为条目
     expect(items.some((i) => i.url.includes('tophub.today'))).toBe(false);
   });
