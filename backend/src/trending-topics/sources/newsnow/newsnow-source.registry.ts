@@ -35,6 +35,7 @@ import { fetchTencentHot } from './vendored/tencent';
 import { fetchThepaperHot } from './vendored/thepaper';
 import { fetchTiebaHot } from './vendored/tieba';
 import { fetchToutiaoHot } from './vendored/toutiao';
+import { fetchXiaohongshuHot } from './xiaohongshu';
 import {
   fetchWallstreetcnHot,
   fetchWallstreetcnNews,
@@ -104,6 +105,16 @@ export const NEWSNOW_SOURCE_ENTRIES: NewsnowSourceEntry[] = [
     category: 'trending',
     icon: 'video',
     getter: fetchKuaishouHot,
+    cacheTtlSeconds: BOARD_TTL,
+  },
+  {
+    // 本地扩展(非上游移植):经 RSSHub tophub 路由,依赖 RSSHub 容器
+    id: 'newsnow-xiaohongshu',
+    listType: 'hottest',
+    label: '小红书热榜',
+    category: 'trending',
+    icon: 'flame',
+    getter: fetchXiaohongshuHot,
     cacheTtlSeconds: BOARD_TTL,
   },
   {
