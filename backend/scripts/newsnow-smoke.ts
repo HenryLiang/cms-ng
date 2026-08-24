@@ -9,10 +9,11 @@
  * 输出逐源结果表(条数/耗时/错误),退出码:全部通过 0,任一失败 1。
  * 这是本机可达性验证,不代表海外生产机房的网络结论(需在 prod 机器上跑)。
  *
- * 注意:newsnow-xiaohongshu 经 RSSHub tophub 路由,冒烟前需保证 RSSHub
- * 容器在跑且本机可达(读取 .env 的 RSS_HUB_URL,缺省 http://localhost:1200)。
- * compose-prod 栈里 RSSHub 只在内部网络 expose,该源请在 backend 容器内
- * 验证,宿主机上跑出 ECONNREFUSED 属预期,不要因此把它裁出白名单。
+ * 注意:tophub 镜像榜(11 个,如 newsnow-xiaohongshu、newsnow-wechat-hot)经
+ * RSSHub /tophub/:id 路由,冒烟前需保证 RSSHub 容器在跑且本机可达(读取
+ * .env 的 RSS_HUB_URL,缺省 http://localhost:1200)。compose-prod 栈里
+ * RSSHub 只在内部网络 expose,这些源请在 backend 容器内验证,宿主机上
+ * 跑出 ECONNREFUSED 属预期,不要因此把它们裁出白名单。
  */
 import * as dotenv from 'dotenv';
 import {
@@ -46,7 +47,7 @@ async function run(): Promise<number> {
         .filter(Boolean)
     : null;
 
-  // 经 RSSHub 路由的源(newsnow-xiaohongshu):注入 RSS_HUB_URL(.env/env),
+  // 经 RSSHub 路由的源(tophub 镜像榜 11 源):注入 RSS_HUB_URL(.env/env),
   // 缺省 localhost:1200
   configureNewsnowClient({ rssHubUrl: process.env.RSS_HUB_URL });
 

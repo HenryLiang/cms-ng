@@ -1,6 +1,7 @@
 /**
  * newsnow 数据源 adapter -- 把移植自 ourongxing/newsnow 的 30 个热榜/
- * 快讯源接入 TopicSourceCatalog(选题模块「一个新机制 = 一个 adapter」的
+ * 快讯源 + 11 个本地 tophub 镜像榜(经 RSSHub,见 registry TOPHUB_BOARDS)
+ * 接入 TopicSourceCatalog(选题模块「一个新机制 = 一个 adapter」的
  * 既有约定;与 RssTopicSourceAdapter/TwitterService 同级注册)。
  *
  * 设计要点:
