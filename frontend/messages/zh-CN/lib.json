@@ -1,0 +1,56 @@
+{
+  "articleStatus": {
+    "draft": "草稿",
+    "writing": "采写中",
+    "aiOptimizing": "AI优化中",
+    "pendingReview": "待审核",
+    "inReview": "审核中",
+    "revision": "退回修改",
+    "approved": "已通过",
+    "published": "已发布",
+    "archived": "已归档",
+    "pipelineFailed": "发布失败",
+    "autoPublished": "自动发布",
+    "unknown": "未知"
+  },
+  "transaction": {
+    "type": {
+      "TOP_UP": "充值",
+      "AI_LLM": "AI调用",
+      "AI_IMAGE": "图片生成",
+      "PUBLISH": "发布",
+      "AUTO_PUBLISH": "自动发布",
+      "DATA_FETCH": "数据抓取",
+      "REFUND": "退款",
+      "ADJUSTMENT": "调整"
+    },
+    "category": {
+      "AI": "AI 消费",
+      "PUBLISHING": "发布消费",
+      "OTHER": "其他"
+    }
+  },
+  "relativeTime": {
+    "justNow": "刚刚",
+    "minutesAgo": "{count}分钟前",
+    "hoursAgo": "{count}小时前",
+    "yesterdayAt": "昨天 {time}",
+    "monthDay": "{month}月{day}日"
+  },
+  "apiError": {
+    "network": "网络异常，请检查连接后重试",
+    "server": "服务器错误，请稍后重试",
+    "forbidden": "没有权限执行此操作",
+    "notFound": "资源不存在",
+    "requestFailed": "请求失败"
+  },
+  "media": {
+    "uploadFailed": "上传失败"
+  },
+  "systemFeatures": {
+    "apiError": "系统功能接口返回异常"
+  },
+  "notifications": {
+    "apiError": "通知接口返回异常"
+  }
+}

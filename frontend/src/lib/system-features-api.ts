@@ -1,6 +1,7 @@
 import type { ApiResponse, SystemFeatureDefinition } from "@cms-ng/shared";
 import { SystemFeature } from "@cms-ng/shared";
 import { api } from "./api";
+import { libT } from "@/i18n/client-dict";
 
 export interface SystemFeatureStatus extends SystemFeatureDefinition {
   enabled: boolean;
@@ -32,7 +33,7 @@ function unwrapResponse<T>(response: ApiResponse<T>): T {
   if (response.success && response.data !== undefined) {
     return response.data;
   }
-  throw new Error(response.error?.message ?? "系统功能接口返回异常");
+  throw new Error(response.error?.message ?? libT('systemFeatures.apiError'));
 }
 
 export async function getFeatureStatuses(): Promise<SystemFeatureStatus[]> {

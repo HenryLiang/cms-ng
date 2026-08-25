@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { Mail, Lock, User, BrainCircuit, Lightbulb, Wand2, Zap, UserPlus } from 'lucide-react';
 import { getRegistrationStatus } from '@/lib/auth-api';
 import { Button, Input } from '@/components/ui';
+import LocaleSwitcher from '@/components/locale-switcher';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -94,6 +95,10 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen">
+      {/* 语言切换(右上角固定) */}
+      <div className="fixed right-4 top-4 z-50">
+        <LocaleSwitcher />
+      </div>
       {/* 左：品牌面板 */}
       <div className="glow-panel relative hidden w-1/2 flex-col justify-between overflow-hidden p-12 lg:flex">
         <div className="grid-overlay absolute inset-0 opacity-60" />

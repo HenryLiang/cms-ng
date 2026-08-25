@@ -32,6 +32,7 @@ import ToastHost from '@/components/toast-host';
 import ErrorBoundary from '@/components/error-boundary';
 import { FeatureUnavailable } from '@/components/feature-unavailable';
 import NotificationBell from '@/components/notification-bell';
+import LocaleSwitcher from '@/components/locale-switcher';
 
 interface NavItem {
   href: string;
@@ -254,6 +255,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:bg-surface-muted hover:text-foreground" title="筛选">
               <SlidersHorizontal className="h-4 w-4" />
             </button>
+            <LocaleSwitcher />
             <NotificationBell />
             <Link
               href="/dashboard/profile"

@@ -4,12 +4,13 @@ import type {
   NotificationList,
 } from "@cms-ng/shared";
 import { api } from "./api";
+import { libT } from "@/i18n/client-dict";
 
 function unwrapResponse<T>(response: ApiResponse<T>): T {
   if (response.success && response.data !== undefined) {
     return response.data;
   }
-  throw new Error(response.error?.message ?? "通知接口返回异常");
+  throw new Error(response.error?.message ?? libT('notifications.apiError'));
 }
 
 export async function getNotifications(limit = 20): Promise<NotificationList> {

@@ -1,0 +1,60 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "New",
+    "submit": "Submit",
+    "close": "Close",
+    "back": "Back",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "search": "Search",
+    "filter": "Filter",
+    "view": "View",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download",
+    "upload": "Upload",
+    "export": "Export",
+    "import": "Import",
+    "more": "More"
+  },
+  "state": {
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "submitting": "Submitting…",
+    "deleting": "Deleting…",
+    "empty": "No data",
+    "all": "All",
+    "yes": "Yes",
+    "no": "No",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "feedback": {
+    "success": "Success",
+    "failed": "Operation failed",
+    "deleteConfirm": "Delete this? This cannot be undone.",
+    "unsavedChanges": "You have unsaved changes",
+    "networkError": "Network error, please try again later"
+  },
+  "pagination": {
+    "prev": "Previous",
+    "next": "Next",
+    "total": "{count} items"
+  },
+  "form": {
+    "required": "Required",
+    "invalidFormat": "Invalid format",
+    "searchPlaceholder": "Search…"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{count} min ago",
+    "hoursAgo": "{count} h ago",
+    "daysAgo": "{count} d ago"
+  }
+}

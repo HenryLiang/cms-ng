@@ -24,8 +24,8 @@ import {
   type UserConsumption,
 } from '@/lib/users-api';
 import {
-  transactionTypeLabels,
-  transactionCategoryLabels,
+  getTransactionTypeLabel,
+  getTransactionCategoryLabel,
 } from '@/lib/transaction-labels';
 import { Button, Card, PageHeader, Badge, Input } from '@/components/ui';
 import { useAuthStore } from '@/store/auth-store';
@@ -555,7 +555,7 @@ function ConsumptionDrawer({ user, onClose }: { user: User; onClose: () => void 
                         key={cat}
                         className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm"
                       >
-                        <span className="text-muted">{transactionCategoryLabels[cat] || cat}</span>
+                        <span className="text-muted">{getTransactionCategoryLabel(cat)}</span>
                         <span className="font-medium text-foreground tnum">¥{amount.toFixed(2)}</span>
                       </div>
                     ))
@@ -577,7 +577,7 @@ function ConsumptionDrawer({ user, onClose }: { user: User; onClose: () => void 
                         <div className="min-w-0">
                           <p className="truncate text-foreground">{tx.description}</p>
                           <p className="text-xs text-subtle">
-                            {transactionTypeLabels[tx.type] || tx.type} · {formatDate(tx.createdAt)}
+                            {getTransactionTypeLabel(tx.type)} · {formatDate(tx.createdAt)}
                           </p>
                         </div>
                         <span

@@ -7,7 +7,7 @@ import {
   type BillingTransaction,
   type TransactionSummary,
 } from '@/lib/billing-api';
-import { transactionTypeLabels } from '@/lib/transaction-labels';
+import { getTransactionTypeLabel } from '@/lib/transaction-labels';
 import { Badge, Button, Card, PageHeader } from '@/components/ui';
 
 const typeOptions = [
@@ -173,7 +173,7 @@ export default function TransactionsPage() {
                     <td className="tnum px-6 py-3 text-muted">{formatDate(tx.createdAt)}</td>
                     <td className="px-6 py-3">
                       <Badge tone="neutral">
-                        {transactionTypeLabels[tx.type] || tx.type}
+                        {getTransactionTypeLabel(tx.type)}
                       </Badge>
                     </td>
                     <td className="px-6 py-3 text-foreground">{tx.description}</td>
