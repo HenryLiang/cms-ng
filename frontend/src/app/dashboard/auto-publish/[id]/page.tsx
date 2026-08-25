@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   getTask,
   updateTask,
@@ -27,6 +28,9 @@ import {
 export default function TaskDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const t = useTranslations('autoPublish');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const [task, setTask] = useState<AutoPublishTask | null>(null);
   const [runs, setRuns] = useState<AutoPublishRun[]>([]);
@@ -55,7 +59,7 @@ export default function TaskDetailPage() {
     setRunning(true);
     try {
       await manualRun(id);
-      alert('手动运行已触发');
+      alert(t('detail.runTriggered'));
       setTimeout(loadData, 2000);
     } finally {
       setRunning(false);
@@ -81,7 +85,7 @@ export default function TaskDetailPage() {
 
   if (!task) {
     return (
-      <div className="p-8 text-center text-muted">任务不存在</div>
+      <div className="p-8 text-center text-muted">{t('detail.notFound')}</div>
     );
   }
 
@@ -92,7 +96,7 @@ export default function TaskDetailPage() {
         className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        返回任务列表
+        {t('detail.back')}
       </Link>
 
       {/* Header */}
@@ -106,7 +110,7 @@ export default function TaskDetailPage() {
             <TaskStatusBadge status={task.status} />
             <span className="text-subtle">|</span>
             <span className="text-muted">
-              创建者: {task.createdByUser?.name || '未知'}
+              {t('detail.creator', { name: task.createdByUser?.name || t('detail.unknownUser') })}
             </span>
           </div>
         </div>
@@ -117,7 +121,7 @@ export default function TaskDetailPage() {
             onClick={handleRun}
           >
             <Zap className="h-4 w-4" />
-            手动运行
+            {t('detail.manualRun')}
           </Button>
           <button
             onClick={handleToggle}
@@ -129,11 +133,11 @@ export default function TaskDetailPage() {
           >
             {task.status === AutoTaskStatus.ACTIVE ? (
               <>
-                <Pause className="h-4 w-4" /> 暂停
+                <Pause className="h-4 w-4" /> {t('detail.pause')}
               </>
             ) : (
               <>
-                <Play className="h-4 w-4" /> 启用
+                <Play className="h-4 w-4" /> {t('detail.enable')}
               </>
             )}
           </button>
@@ -142,24 +146,24 @@ export default function TaskDetailPage() {
 
       {/* Config Cards */}
       <div className="grid grid-cols-2 gap-4 mb-8">
-        <ConfigCard title="调度配置">
+        <ConfigCard title={t('detail.scheduleConfig')}>
           <div className="space-y-1 text-sm text-muted">
-            <div>时间: {task.scheduleConfig.times?.join(', ') || '未设置'}</div>
-            <div>时区: {task.scheduleConfig.timezone || 'Asia/Hong_Kong'}</div>
-            <div>每次生成: {task.batchSize} 篇</div>
+            <div>{t('detail.times', { times: task.scheduleConfig.times?.join(', ') || t('detail.notSet') })}</div>
+            <div>{t('detail.timezone', { timezone: task.scheduleConfig.timezone || 'Asia/Hong_Kong' })}</div>
+            <div>{t('detail.batchSize', { count: task.batchSize })}</div>
             {task.nextRunAt && task.status === AutoTaskStatus.ACTIVE && (
               <div className="text-blue-600 tnum">
-                下次运行: {new Date(task.nextRunAt).toLocaleString('zh-HK')}
+                {t('detail.nextRun', { time: new Date(task.nextRunAt).toLocaleString(locale) })}
               </div>
             )}
           </div>
         </ConfigCard>
 
-        <ConfigCard title="选题策略">
+        <ConfigCard title={t('detail.topicStrategy')}>
           <div className="space-y-1 text-sm text-muted">
             {task.topicStrategy.fixedKeywords?.length > 0 && (
               <div>
-                关键词:{' '}
+                {t('detail.keywords')}{' '}
                 {task.topicStrategy.fixedKeywords.map((k) => (
                   <span
                     key={k}
@@ -170,43 +174,43 @@ export default function TaskDetailPage() {
                 ))}
               </div>
             )}
-            <div>热点选题: {task.topicStrategy.useTrending ? '是' : '否'}</div>
+            <div>{t('detail.useTrending', { value: task.topicStrategy.useTrending ? tCommon('state.yes') : tCommon('state.no') })}</div>
           </div>
         </ConfigCard>
 
-        <ConfigCard title="内容配置">
+        <ConfigCard title={t('detail.contentConfig')}>
           <div className="space-y-1 text-sm text-muted">
             <div>
-              风格:{' '}
+              {t('detail.style')}{' '}
               {
-                { news_brief: '快讯', standard: '标准报道', analysis: '深度分析', listicle: '列表体' }[
+                { news_brief: t('style.news_brief'), standard: t('style.standard'), analysis: t('style.analysis'), listicle: t('style.listicle') }[
                   task.contentConfig.style
                 ] || task.contentConfig.style
               }
             </div>
-            <div>字数上限: {task.contentConfig.maxLength}</div>
+            <div>{t('detail.maxLength', { count: task.contentConfig.maxLength })}</div>
             <div>
-              语言:{' '}
+              {t('detail.language')}{' '}
               {
                 {
-                  TRADITIONAL_CHINESE_HK: '繁体中文（港式）',
-                  SIMPLIFIED_CHINESE: '简体中文',
-                  TRADITIONAL_CHINESE_CANTONESE: '粤语书面语',
-                  ENGLISH: 'English',
+                  TRADITIONAL_CHINESE_HK: t('language.TRADITIONAL_CHINESE_HK'),
+                  SIMPLIFIED_CHINESE: t('language.SIMPLIFIED_CHINESE'),
+                  TRADITIONAL_CHINESE_CANTONESE: t('language.TRADITIONAL_CHINESE_CANTONESE'),
+                  ENGLISH: t('language.ENGLISH'),
                 }[task.contentConfig.language] || task.contentConfig.language
               }
             </div>
           </div>
         </ConfigCard>
 
-        <ConfigCard title="发布配置">
+        <ConfigCard title={t('detail.publishConfig')}>
           <div className="space-y-1 text-sm text-muted">
-            <div>平台: {task.publishConfig.platform}</div>
+            <div>{t('detail.platform', { platform: task.publishConfig.platform })}</div>
             <div>
-              发布状态: {task.publishConfig.postStatus || 'publish'}
+              {t('detail.postStatus', { status: task.publishConfig.postStatus || 'publish' })}
             </div>
             {task.publishConfig.category && (
-              <div>分类: {task.publishConfig.category}</div>
+              <div>{t('detail.category', { category: task.publishConfig.category })}</div>
             )}
           </div>
         </ConfigCard>
@@ -214,7 +218,7 @@ export default function TaskDetailPage() {
 
       {/* Run History */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">运行历史</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">{t('detail.runHistory')}</h2>
         <div className="space-y-2">
           {runs.map((run) => (
             <Link
@@ -226,12 +230,12 @@ export default function TaskDetailPage() {
                 <RunStatusIcon status={run.status} />
                 <div>
                   <div className="text-sm font-medium text-foreground tnum">
-                    {new Date(run.startedAt).toLocaleString('zh-HK')}
+                    {new Date(run.startedAt).toLocaleString(locale)}
                   </div>
                   <div className="text-xs text-muted tnum">
-                    {run.triggerType === 'MANUAL' ? '手动触发' : '定时触发'}
+                    {run.triggerType === 'MANUAL' ? t('trigger.MANUAL') : t('trigger.SCHEDULED')}
                     {' · '}
-                    成功 {run.successCount} / 失败 {run.failedCount} / 计划 {run.totalArticles}
+                    {t('detail.runSummary', { success: run.successCount, failed: run.failedCount, total: run.totalArticles })}
                   </div>
                 </div>
               </div>
@@ -240,7 +244,7 @@ export default function TaskDetailPage() {
           ))}
           {runs.length === 0 && (
             <div className="rounded-lg border border-dashed border-line-strong p-8 text-center text-muted text-sm">
-              暂无运行记录
+              {t('detail.noRuns')}
             </div>
           )}
         </div>
@@ -259,10 +263,11 @@ function ConfigCard({ title, children }: { title: string; children: React.ReactN
 }
 
 function TaskStatusBadge({ status }: { status: string }) {
+  const t = useTranslations('autoPublish');
   const map: Record<string, { label: string; tone: 'success' | 'warning' | 'neutral' }> = {
-    ACTIVE: { label: '运行中', tone: 'success' },
-    PAUSED: { label: '已暂停', tone: 'warning' },
-    DISABLED: { label: '已禁用', tone: 'neutral' },
+    ACTIVE: { label: t('status.ACTIVE'), tone: 'success' },
+    PAUSED: { label: t('status.PAUSED'), tone: 'warning' },
+    DISABLED: { label: t('status.DISABLED'), tone: 'neutral' },
   };
   const config = map[status] || map.PAUSED;
   return <Badge tone={config.tone}>{config.label}</Badge>;
@@ -284,11 +289,12 @@ function RunStatusIcon({ status }: { status: string }) {
 }
 
 function RunStatusBadge({ status }: { status: string }) {
+  const t = useTranslations('autoPublish');
   const map: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
-    COMPLETED: { label: '完成', tone: 'success' },
-    PARTIAL: { label: '部分成功', tone: 'warning' },
-    FAILED: { label: '失败', tone: 'danger' },
-    RUNNING: { label: '运行中', tone: 'info' },
+    COMPLETED: { label: t('status.COMPLETED'), tone: 'success' },
+    PARTIAL: { label: t('status.PARTIAL'), tone: 'warning' },
+    FAILED: { label: t('status.FAILED'), tone: 'danger' },
+    RUNNING: { label: t('status.RUNNING'), tone: 'info' },
   };
   const config = map[status] || { label: status, tone: 'neutral' as const };
   return <Badge tone={config.tone}>{config.label}</Badge>;

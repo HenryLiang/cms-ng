@@ -1,2 +1,69 @@
 {
+  "title": "Settings",
+  "subtitle": "Manage system-level switches",
+  "tabs": {
+    "registration": "Registration",
+    "features": "Feature Availability"
+  },
+  "states": {
+    "open": "Enabled",
+    "closed": "Disabled"
+  },
+  "registration": {
+    "title": "Registration",
+    "description": "Controls whether new users can register. When disabled, the register page shows a \"Registration closed\" notice; existing users can still log in.",
+    "currentStatus": "Current status:",
+    "openAction": "Open registration",
+    "closeAction": "Close registration",
+    "reasonLabel": "Reason for the change (optional, for audit)",
+    "reasonPlaceholder": "e.g. Closing sign-ups before the official launch / temporarily closed during maintenance",
+    "reset": "Reset",
+    "loadFailed": "Failed to load registration status",
+    "opened": "Registration is now open",
+    "closedMessage": "Registration is now closed",
+    "saveFailed": "Failed to save"
+  },
+  "features": {
+    "loadFailed": "Failed to load feature availability",
+    "updateFailed": "Failed to update feature status",
+    "openedMessage": "{label} enabled",
+    "closedMessage": "{label} disabled",
+    "loading": "Loading feature status…",
+    "warning": "When a feature is disabled, its top-level entry is hidden from the sidebar and direct API calls are blocked. Auto-publish background jobs and payment callbacks are not affected.",
+    "protected": "Protected",
+    "enableWithLabel": "Enable {label}",
+    "disableWithLabel": "Disable {label}",
+    "confirmEnable": "Confirm Enable",
+    "confirmDisable": "Confirm Disable",
+    "enableDescription": "Once enabled, users with the required role will see this entry again and can access it.",
+    "disableDescription": "Once disabled, the entry is hidden from the sidebar and direct access is also blocked.",
+    "reasonPlaceholderOptional": "Enter a reason for the change (optional)",
+    "reasonPlaceholderRequired": "Enter a reason for disabling (required)",
+    "confirmAria": "Confirm feature status change",
+    "lastAction": "Last action: {state}",
+    "operator": "Operator: {name}",
+    "operationTime": "Time: {time}",
+    "operationReason": "Reason: {reason}",
+    "noReason": "No reason provided",
+    "systemOperator": "System",
+    "groups": {
+      "workspace": "Workspace",
+      "automation": "Automation",
+      "system": "System"
+    },
+    "videoCapability": {
+      "label": "Service capability: ",
+      "available": "Available ({provider})",
+      "providerFallback": "configured",
+      "unavailable": "Unavailable (no provider configured)"
+    },
+    "audit": {
+      "loadFailed": "Failed to load audit log",
+      "title": "{label} Audit Log",
+      "viewAria": "View {label} audit log",
+      "limitHint": "Shows at most the 100 most recent records",
+      "closeAria": "Close audit log",
+      "empty": "No changes yet"
+    }
+  }
 }

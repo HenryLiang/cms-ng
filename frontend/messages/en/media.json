@@ -1,2 +1,65 @@
 {
+  "title": "Media Library",
+  "subtitlePre": "Manage uploaded and AI-generated images —",
+  "subtitlePost": "items",
+  "uploadImage": "Upload Image",
+  "closeUploadPanel": "Close upload panel",
+  "searchPlaceholder": "Search file name / tags / description",
+  "keywordChip": "Keyword: {keyword}",
+  "clearKeyword": "Clear keyword",
+  "tagChip": "Tag: {tag}",
+  "clearTag": "Clear tag",
+  "deleteConfirm": "Delete this image? The COS object will be deleted as well. This cannot be undone.",
+  "videoLabel": "Video",
+  "source": {
+    "upload": "Upload",
+    "aiGenerated": "AI generated"
+  },
+  "tagging": {
+    "title": "AI Tags",
+    "inProgress": "Tagging",
+    "inProgressTitle": "AI tagging in progress",
+    "inProgressEllipsis": "Tagging…",
+    "failed": "Tagging failed",
+    "failedWithError": "Tagging failed: {error}",
+    "empty": "No AI tags yet",
+    "retag": "Retag",
+    "retagTitle": "Regenerate AI tags",
+    "retagDisabledTitle": "Tagging in progress, please wait"
+  },
+  "outOfRange": {
+    "title": "No content on this page",
+    "descPre": "Total",
+    "descPost": "items; the page count may have changed",
+    "backToFirst": "Back to page 1"
+  },
+  "empty": {
+    "title": "Your media library is empty",
+    "desc": "Upload local images, or let AI generate illustrations in the article editor",
+    "filteredTitle": "No matching images found",
+    "filteredDesc": "Try a different keyword or source filter",
+    "clearFilters": "Clear filters",
+    "uploadFirst": "Upload your first image"
+  },
+  "grid": {
+    "filterByTagAria": "Filter by tag {tag}"
+  },
+  "pagination": {
+    "summary": "{total} items · Page {page} of {totalPages}"
+  },
+  "detail": {
+    "dialogTitle": "Image Details",
+    "copyUrl": "Copy URL",
+    "fieldType": "Type",
+    "fieldDimensions": "Dimensions",
+    "fieldSize": "Size",
+    "fieldDuration": "Duration",
+    "durationSeconds": "{duration} sec",
+    "fieldCreatedAt": "Created At",
+    "fieldFileName": "File Name",
+    "editMeta": "Edit Metadata",
+    "fieldTitle": "Title",
+    "altLabel": "Alt text (accessibility + SEO)",
+    "tagsLabel": "Tags (comma-separated)"
+  }
 }

@@ -1,5 +1,120 @@
 {
   "localeSwitcher": {
     "label": "切换界面语言"
+  },
+  "editor": {
+    "placeholder": "开始写作...",
+    "promptLink": "输入链接地址",
+    "promptYoutube": "输入 YouTube 视频链接",
+    "promptColor": "输入颜色值（如 #ff0000 或 red）",
+    "bold": "加粗",
+    "italic": "斜体",
+    "underline": "下划线",
+    "highlight": "高亮",
+    "textColor": "文字颜色",
+    "heading1": "一级标题",
+    "heading2": "二级标题",
+    "bulletList": "无序列表",
+    "orderedList": "有序列表",
+    "quote": "引用",
+    "alignLeft": "左对齐",
+    "alignCenter": "居中对齐",
+    "alignRight": "右对齐",
+    "alignJustify": "两端对齐",
+    "insertLink": "插入链接",
+    "insertImage": "插入图片",
+    "insertYoutube": "插入 YouTube 视频",
+    "table": "表格",
+    "insertTable": "插入 3x3 表格",
+    "addColumnBefore": "在当前列前插入",
+    "addColumnAfter": "在当前列后插入",
+    "deleteColumn": "删除当前列",
+    "addRowBefore": "在当前行前插入",
+    "addRowAfter": "在当前行后插入",
+    "deleteRow": "删除当前行",
+    "deleteTable": "删除表格",
+    "undo": "撤销",
+    "redo": "重做",
+    "charCount": "{chars} 字 / {words} 词"
+  },
+  "trace": {
+    "steps": {
+      "billingCheck": "计费检查",
+      "topicCollection": "选题采集",
+      "research": "资料调研",
+      "articleGeneration": "文章生成",
+      "articleSave": "文章保存",
+      "imageGeneration": "封面配图",
+      "publish": "平台发布",
+      "notification": "通知"
+    },
+    "dataSources": "数据来源",
+    "fixedKeywords": "固定关键词",
+    "trendingTopics": "热门话题",
+    "itemCount": "{count} 个",
+    "filterFunnel": "过滤漏斗",
+    "funnelRaw": "原始 {count}",
+    "funnelFiltered": "过滤后 {count}",
+    "funnelDeduped": "去重后 {count}",
+    "funnelSelected": "选中 1",
+    "timeline": "时间线",
+    "people": "人物",
+    "dataPoints": "数据点",
+    "opinions": "观点",
+    "hideFullResearch": "收起完整调研数据",
+    "showFullResearch": "查看完整调研数据",
+    "billingDisabled": "计费功能已禁用，跳过检查",
+    "currentBalance": "当前余额",
+    "estimatedCost": "预估费用",
+    "decisionLog": "决策日志",
+    "metadata": "元数据",
+    "errorInfo": "错误信息",
+    "empty": "暂无执行追踪数据",
+    "totalDuration": "总耗时: {duration}"
+  },
+  "notificationBell": {
+    "justNow": "刚刚",
+    "minutesAgo": "{minutes} 分钟前",
+    "hoursAgo": "{hours} 小时前",
+    "daysAgo": "{days} 天前",
+    "newMessage": "新消息",
+    "newNotificationAria": "新通知：{title}",
+    "triggerUnread": "通知，{count} 条未读",
+    "triggerNoUnread": "通知，无未读消息",
+    "dialogAria": "通知中心",
+    "title": "通知",
+    "unreadCount": "{count} 条未读消息",
+    "allRead": "已全部读完",
+    "markAllRead": "全部已读",
+    "loadFailed": "通知加载失败，请稍后重试",
+    "empty": "暂时没有通知"
+  },
+  "uploader": {
+    "unsupportedType": "不支持的文件类型：{name}（仅 jpg/png/webp/gif）",
+    "fileTooLarge": "文件过大：{name}（上限 10MB）",
+    "uploadFailed": "上传失败，请重试",
+    "uploading": "上传中…",
+    "dropHint": "点击、拖拽或粘贴图片到此处",
+    "formatHint": "支持 jpg/png/webp/gif，单文件 ≤ 10MB"
+  },
+  "errorBoundary": {
+    "title": "页面出现了一些问题",
+    "description": "请尝试刷新页面，或返回工作台继续操作。",
+    "reload": "重新加载",
+    "backToDashboard": "返回工作台"
+  },
+  "toast": {
+    "regionAria": "通知",
+    "dismissAria": "关闭通知"
+  },
+  "featureUnavailable": {
+    "title": "此功能当前未开放",
+    "description": "该功能已由超级管理员暂停开放。如需使用，请联系超级管理员。"
+  },
+  "tagsEditor": {
+    "title": "稿件标签",
+    "aiTag": "AI 一键打标",
+    "removeTagAria": "删除标签 {tag}",
+    "placeholder": "输入标签后按回车"
   }
 }

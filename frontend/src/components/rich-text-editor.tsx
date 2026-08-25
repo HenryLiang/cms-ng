@@ -38,6 +38,7 @@ import {
   Redo,
 } from 'lucide-react';
 import { forwardRef, useImperativeHandle, useEffect, useState, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { MediaPicker } from './media-picker';
 
 export interface RichTextEditorRef {
@@ -52,6 +53,7 @@ interface RichTextEditorProps {
 
 const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   function RichTextEditor({ content, onChange, placeholder }, ref) {
+    const t = useTranslations('components.editor');
     const [showTableMenu, setShowTableMenu] = useState(false);
     const [showMediaPicker, setShowMediaPicker] = useState(false);
 
@@ -76,7 +78,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
           heading: { levels: [1, 2, 3] },
         }),
         Placeholder.configure({
-          placeholder: placeholder || '开始写作...',
+          placeholder: placeholder || t('placeholder'),
         }),
         Link.configure({
           openOnClick: false,
@@ -165,7 +167,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
 
     const toggleLink = () => {
       const previousUrl = editor.getAttributes('link').href;
-      const url = window.prompt('输入链接地址', previousUrl);
+      const url = window.prompt(t('promptLink'), previousUrl);
       if (url === null) return;
       if (url === '') {
         editor.chain().focus().extendMarkRange('link').unsetLink().run();
@@ -179,13 +181,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
     };
 
     const insertYoutube = () => {
-      const url = window.prompt('输入 YouTube 视频链接');
+      const url = window.prompt(t('promptYoutube'));
       if (!url) return;
       editor.chain().focus().setYoutubeVideo({ src: url }).run();
     };
 
     const setTextColor = () => {
-      const color = window.prompt('输入颜色值（如 #ff0000 或 red）', editor.getAttributes('textStyle').color || '');
+      const color = window.prompt(t('promptColor'), editor.getAttributes('textStyle').color || '');
       if (color === null) return;
       if (color === '') {
         editor.chain().focus().unsetColor().run();

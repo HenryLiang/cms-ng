@@ -1,2 +1,134 @@
 {
+  "backToDashboard": "Back to Dashboard",
+  "language": {
+    "label": "Content language",
+    "simplifiedChinese": "Simplified Chinese",
+    "traditionalChineseHk": "Traditional Chinese (HK)",
+    "traditionalChineseCantonese": "Traditional Chinese (Cantonese)",
+    "english": "English"
+  },
+  "list": {
+    "title": "Story Hub",
+    "recordHot": "Add Trending Topic",
+    "aiSuggest": "AI Story Suggestions",
+    "externalSources": "External Sources",
+    "deleteConfirm": "Delete this trending topic?",
+    "sourceUnavailable": "This source is temporarily unavailable. Please try again later.",
+    "importedTitle": "Imported Topics",
+    "unadoptedCount": "{count} unadopted",
+    "unadoptedOnlyTitle": "Show only unadopted topics",
+    "unadopted": "Unadopted",
+    "emptyUnadopted": "No unadopted topics",
+    "emptyAll": "No imported topics yet",
+    "emptyHint": "Import from an external source, or click 'Add Trending Topic' on the left to create one",
+    "pageIndicator": "Page {page}/{totalPages}",
+    "sort": {
+      "heat": "By Heat",
+      "recent": "Most Recent"
+    },
+    "form": {
+      "titlePlaceholder": "Topic title",
+      "descriptionPlaceholder": "Description (optional)",
+      "sourcePlaceholder": "Source (optional)",
+      "heat": "Heat",
+      "submit": "Create"
+    }
+  },
+  "topic": {
+    "heat": "Heat {score}",
+    "source": "Source: {source}",
+    "description": "Description",
+    "suggestedAngles": "Suggested Angles",
+    "adopt": "Create Story in One Click",
+    "viewStory": "View the Created Story",
+    "status": {
+      "adopted": "Adopted",
+      "open": "Open"
+    }
+  },
+  "aiSuggestions": {
+    "title": "AI Story Suggestions",
+    "empty": "No suggestions right now. Please try again later.",
+    "adopt": "Adopt"
+  },
+  "source": {
+    "load": "Load",
+    "manualRefreshHint": "Click 'Refresh' to fetch the latest data",
+    "fillParamsHint": "Fill in the parameters above, then load",
+    "emptyHint": "No data right now. Please try again later.",
+    "yearAd": "{year}",
+    "yearBc": "{year} BC",
+    "relatedArticles": "Related Entries",
+    "import": "Import",
+    "pageSummary": "{total} items, page {page}/{totalPages}"
+  },
+  "emptyState": {
+    "hint": "Select a topic from the imported list on the right to view details, or get personalized story suggestions from AI",
+    "getSuggestions": "Get AI Story Suggestions"
+  },
+  "detail": {
+    "errors": {
+      "forbidden": "You do not have permission to access this story",
+      "notFound": "Story not found",
+      "server": "Server error. Please try again later.",
+      "generic": "Failed to load. Please try again later."
+    },
+    "deleteConfirm": "Delete this story? Related articles will also be deleted.",
+    "deleteTooltip": "Delete story",
+    "articleTitlePrompt": "Enter the article title:",
+    "descriptionPlaceholder": "Story description...",
+    "anglePlaceholder": "Reporting angle...",
+    "angle": "Angle: {angle}",
+    "authorStyle": {
+      "default": "Default Style",
+      "availableHint": "Author style: the selected author's writing style will be applied to the generated draft",
+      "unavailableHint": "No author style data detected; the default generation mode will be used"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "WRITING": "Writing",
+      "AI_OPTIMIZING": "AI Optimizing",
+      "PENDING_REVIEW": "Pending Review",
+      "IN_REVIEW": "In Review",
+      "REVISION": "Revision Requested",
+      "APPROVED": "Approved",
+      "PUBLISHED": "Published",
+      "ARCHIVED": "Archived"
+    },
+    "articlesTitle": "Related Articles",
+    "createArticle": "New Article",
+    "noSubtitle": "No subtitle",
+    "version": "Version {version}",
+    "noArticles": "No articles yet",
+    "createFirstArticle": "Create your first article ->"
+  },
+  "research": {
+    "title": "AI Research Kit",
+    "subtitle": "Generates structured background material from the story details",
+    "generate": "Generate Research Kit",
+    "failed": "Research kit generation failed. Please try again later."
+  },
+  "draft": {
+    "instructionPlaceholder": "Special requirements for the draft, e.g., focus on livelihood angles, add expert opinions, keep it under 2,000 words...",
+    "failed": "Draft generation failed. Please try again later."
+  },
+  "form": {
+    "title": "New Story",
+    "subtitle": "Create a new story pitch",
+    "titleLabel": "Story Title",
+    "titlePlaceholder": "e.g., Impact analysis of Hong Kong's new housing policy",
+    "descriptionLabel": "Story Description",
+    "descriptionPlaceholder": "Briefly describe the background and direction of the story...",
+    "angleLabel": "Reporting Angle",
+    "anglePlaceholder": "e.g., Start from the livelihood impact",
+    "priorityLabel": "Priority",
+    "priority": {
+      "normal": "Normal",
+      "important": "Important",
+      "urgent": "Urgent"
+    },
+    "deadlineLabel": "Deadline",
+    "submit": "Create Story",
+    "failed": "Failed to create"
+  }
 }

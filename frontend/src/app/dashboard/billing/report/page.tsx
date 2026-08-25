@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   TrendingUp,
   TrendingDown,
@@ -9,22 +10,14 @@ import {
   Users,
 } from 'lucide-react';
 import { getReport, type BillingReport } from '@/lib/billing-api';
+import { getTransactionTypeLabel } from '@/lib/transaction-labels';
 import { Card, PageHeader } from '@/components/ui';
 
-const typeLabels: Record<string, string> = {
-  TOP_UP: '充值',
-  AI_LLM: 'AI调用',
-  AI_IMAGE: '图片生成',
-  PUBLISH: '发布',
-  AUTO_PUBLISH: '自动发布',
-  REFUND: '退款',
-  ADJUSTMENT: '调整',
-};
-
-const categoryLabels: Record<string, string> = {
-  AI: 'AI 服务',
-  PUBLISHING: '发布服务',
-  OTHER: '其他',
+// BillingCategory -> billing.shared.categoryLabels 词典 key(未知类别回退显示原始枚举值)
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  AI: 'shared.categoryLabels.AI',
+  PUBLISHING: 'shared.categoryLabels.PUBLISHING',
+  OTHER: 'shared.categoryLabels.OTHER',
 };
 
 function getDefaultDates() {
@@ -37,6 +30,8 @@ function getDefaultDates() {
 }
 
 export default function ReportPage() {
+  const t = useTranslations('billing');
+  const tCommon = useTranslations('common');
   const defaults = getDefaultDates();
   const [startDate, setStartDate] = useState(defaults.start);
   const [endDate, setEndDate] = useState(defaults.end);
@@ -68,15 +63,15 @@ export default function ReportPage() {
   return (
     <div className="h-full p-8">
       <PageHeader
-        title="消费报表"
-        subtitle="查看平台消费统计和用户消费排行"
+        title={t('report.title')}
+        subtitle={t('report.subtitle')}
       />
 
       {/* Date Range Picker */}
       <Card className="mb-6 p-4">
         <div className="flex items-end gap-4">
           <div>
-            <label className="block text-xs font-medium text-foreground mb-1">开始日期</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t('shared.startDate')}</label>
             <input
               type="date"
               value={startDate}
@@ -85,7 +80,7 @@ export default function ReportPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-foreground mb-1">结束日期</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t('shared.endDate')}</label>
             <input
               type="date"
               value={endDate}
@@ -102,7 +97,7 @@ export default function ReportPage() {
         </div>
       ) : !report ? (
         <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">
-          <p className="text-muted">暂无数据</p>
+          <p className="text-muted">{tCommon('state.empty')}</p>
         </div>
       ) : (
         <>
@@ -111,7 +106,7 @@ export default function ReportPage() {
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs text-muted">总收入</span>
+                <span className="text-xs text-muted">{t('report.totalRevenue')}</span>
               </div>
               <div className="tnum text-2xl font-semibold text-emerald-600">
                 ¥{report.totalRevenue.toFixed(2)}
@@ -120,7 +115,7 @@ export default function ReportPage() {
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingDown className="h-4 w-4 text-red-500" />
-                <span className="text-xs text-muted">总消费</span>
+                <span className="text-xs text-muted">{t('report.totalConsumption')}</span>
               </div>
               <div className="tnum text-2xl font-semibold text-red-600">
                 ¥{report.totalConsumption.toFixed(2)}
@@ -129,7 +124,7 @@ export default function ReportPage() {
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-muted">净变化</span>
+                <span className="text-xs text-muted">{t('report.netChange')}</span>
               </div>
               <div
                 className={`tnum text-2xl font-semibold ${

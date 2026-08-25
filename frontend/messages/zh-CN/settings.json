@@ -1,2 +1,69 @@
 {
+  "title": "系统设置",
+  "subtitle": "管理系统级开关",
+  "tabs": {
+    "registration": "注册设置",
+    "features": "功能开放管理"
+  },
+  "states": {
+    "open": "开放",
+    "closed": "关闭"
+  },
+  "registration": {
+    "title": "注册功能",
+    "description": "控制是否允许新用户注册。关闭后注册页将显示「注册已关闭」提示，已注册用户的登录不受影响。",
+    "currentStatus": "当前状态：",
+    "openAction": "开放注册",
+    "closeAction": "关闭注册",
+    "reasonLabel": "切换原因（可选，审计用）",
+    "reasonPlaceholder": "例如：正式上线前收口 / 维护期间临时关闭",
+    "reset": "重置",
+    "loadFailed": "加载注册状态失败",
+    "opened": "已开放注册",
+    "closedMessage": "已关闭注册",
+    "saveFailed": "保存失败"
+  },
+  "features": {
+    "loadFailed": "加载功能开放状态失败",
+    "updateFailed": "更新功能状态失败",
+    "openedMessage": "{label}已开放",
+    "closedMessage": "{label}已关闭",
+    "loading": "加载功能状态中…",
+    "warning": "功能关闭后，左侧一级入口会隐藏，直接调用对应接口也会被拦截；自动发布后台任务和支付回调不受影响。",
+    "protected": "受保护",
+    "enableWithLabel": "开放{label}",
+    "disableWithLabel": "关闭{label}",
+    "confirmEnable": "确认开放",
+    "confirmDisable": "确认关闭",
+    "enableDescription": "开放后，符合角色权限的用户将重新看到并可访问该入口。",
+    "disableDescription": "关闭后，该入口会从左侧导航隐藏，直接访问也会被拦截。",
+    "reasonPlaceholderOptional": "请输入变更原因（可选）",
+    "reasonPlaceholderRequired": "请输入关闭原因（必填）",
+    "confirmAria": "确认功能状态变更",
+    "lastAction": "最近操作：{state}",
+    "operator": "操作人：{name}",
+    "operationTime": "操作时间：{time}",
+    "operationReason": "操作原因：{reason}",
+    "noReason": "未填写原因",
+    "systemOperator": "系统",
+    "groups": {
+      "workspace": "工作区",
+      "automation": "自动化",
+      "system": "系统"
+    },
+    "videoCapability": {
+      "label": "服务能力：",
+      "available": "可用（{provider}）",
+      "providerFallback": "已配置",
+      "unavailable": "不可用（未配置 Provider）"
+    },
+    "audit": {
+      "loadFailed": "加载审计记录失败",
+      "title": "{label}审计记录",
+      "viewAria": "查看{label}审计记录",
+      "limitHint": "最多显示最近 100 条记录",
+      "closeAria": "关闭审计记录",
+      "empty": "暂无变更记录"
+    }
+  }
 }

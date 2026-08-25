@@ -1,2 +1,30 @@
 {
+  "title": "审核台",
+  "list": {
+    "queueCount": "待审核稿件 {count} 篇",
+    "unknownAuthor": "未知作者",
+    "empty": "暂无待审核稿件"
+  },
+  "story": "选题：{title}",
+  "detail": {
+    "selectPrompt": "请选择左侧稿件进行审核",
+    "author": "作者：{name}",
+    "content": "正文内容",
+    "excerpt": "摘要",
+    "aiReviewTitle": "AI 预审报告",
+    "aiReviewPlaceholder": "AI 预审功能开发中，将自动检测事实性错误、法律风险和优化建议。"
+  },
+  "comment": {
+    "title": "审核意见",
+    "placeholder": "填写审核意见（退回修改时必须填写）…",
+    "requiredAlert": "退回修改需要填写审核意见"
+  },
+  "actions": {
+    "approve": "审核通过",
+    "sendBack": "退回修改"
+  },
+  "errors": {
+    "loadQueue": "加载审核队列失败",
+    "loadDetail": "加载稿件详情失败"
+  }
 }

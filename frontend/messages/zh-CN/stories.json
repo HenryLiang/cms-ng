@@ -1,2 +1,134 @@
 {
+  "backToDashboard": "返回工作台",
+  "language": {
+    "label": "内容语言",
+    "simplifiedChinese": "简体中文",
+    "traditionalChineseHk": "繁体中文（香港）",
+    "traditionalChineseCantonese": "繁体中文（粤语）",
+    "english": "English"
+  },
+  "list": {
+    "title": "选题中心",
+    "recordHot": "录入热点",
+    "aiSuggest": "AI 推荐选题",
+    "externalSources": "外部数据源",
+    "deleteConfirm": "确定删除这个热点？",
+    "sourceUnavailable": "数据源暂时不可用，请稍后重试",
+    "importedTitle": "已录入热点",
+    "unadoptedCount": "未采纳 {count} 条",
+    "unadoptedOnlyTitle": "只看未采纳的热点",
+    "unadopted": "未采纳",
+    "emptyUnadopted": "暂无未采纳热点",
+    "emptyAll": "暂无已录入热点",
+    "emptyHint": "从外部数据源导入，或点击左侧「录入热点」创建",
+    "pageIndicator": "第 {page}/{totalPages} 页",
+    "sort": {
+      "heat": "热度优先",
+      "recent": "最近录入"
+    },
+    "form": {
+      "titlePlaceholder": "热点标题",
+      "descriptionPlaceholder": "描述（可选）",
+      "sourcePlaceholder": "来源（可选）",
+      "heat": "热度",
+      "submit": "创建"
+    }
+  },
+  "topic": {
+    "heat": "热度 {score}",
+    "source": "来源：{source}",
+    "description": "描述",
+    "suggestedAngles": "建议角度",
+    "adopt": "一键创建选题",
+    "viewStory": "查看已创建的选题",
+    "status": {
+      "adopted": "已采纳",
+      "open": "开放中"
+    }
+  },
+  "aiSuggestions": {
+    "title": "AI 选题推荐",
+    "empty": "暂无推荐，请稍后重试",
+    "adopt": "采纳"
+  },
+  "source": {
+    "load": "加载",
+    "manualRefreshHint": "点击「刷新」获取最新数据",
+    "fillParamsHint": "请填写上方参数后加载",
+    "emptyHint": "暂无数据，请稍后重试",
+    "yearAd": "{year}年",
+    "yearBc": "公元前{year}年",
+    "relatedArticles": "相关词条",
+    "import": "导入系统",
+    "pageSummary": "共 {total} 条，第 {page}/{totalPages} 页"
+  },
+  "emptyState": {
+    "hint": "从右侧已录入清单选择一个热点查看详情，或使用 AI 获取个性化选题推荐",
+    "getSuggestions": "获取 AI 选题推荐"
+  },
+  "detail": {
+    "errors": {
+      "forbidden": "您没有权限访问此选题",
+      "notFound": "选题不存在",
+      "server": "服务器错误，请稍后重试",
+      "generic": "加载失败，请稍后重试"
+    },
+    "deleteConfirm": "确定要删除这个选题吗？相关稿件也会被删除。",
+    "deleteTooltip": "删除选题",
+    "articleTitlePrompt": "请输入稿件标题：",
+    "descriptionPlaceholder": "选题描述...",
+    "anglePlaceholder": "报道角度...",
+    "angle": "角度：{angle}",
+    "authorStyle": {
+      "default": "默认风格",
+      "availableHint": "作者风格：选中的作者文风将应用到生成的初稿",
+      "unavailableHint": "未检测到作者风格数据，将使用默认生成方式"
+    },
+    "status": {
+      "DRAFT": "选题中",
+      "WRITING": "采写中",
+      "AI_OPTIMIZING": "AI优化中",
+      "PENDING_REVIEW": "待审核",
+      "IN_REVIEW": "审核中",
+      "REVISION": "退回修改",
+      "APPROVED": "已通过",
+      "PUBLISHED": "已发布",
+      "ARCHIVED": "已归档"
+    },
+    "articlesTitle": "相关稿件",
+    "createArticle": "新建稿件",
+    "noSubtitle": "暂无副标题",
+    "version": "版本 {version}",
+    "noArticles": "暂无稿件",
+    "createFirstArticle": "创建第一篇稿件 ->"
+  },
+  "research": {
+    "title": "AI 资料搜集",
+    "subtitle": "基于选题信息生成结构化背景资料",
+    "generate": "生成资料包",
+    "failed": "资料搜集失败，请稍后重试"
+  },
+  "draft": {
+    "instructionPlaceholder": "对初稿的特殊要求，如：侧重民生角度、增加专家观点、控制字数在2000字以内...",
+    "failed": "初稿生成失败，请稍后重试"
+  },
+  "form": {
+    "title": "新建选题",
+    "subtitle": "创建一个新的报道选题",
+    "titleLabel": "选题标题",
+    "titlePlaceholder": "例如：香港楼市新政影响分析",
+    "descriptionLabel": "选题描述",
+    "descriptionPlaceholder": "简要描述选题的背景和方向...",
+    "angleLabel": "报道角度",
+    "anglePlaceholder": "例如：从民生影响角度切入",
+    "priorityLabel": "优先级",
+    "priority": {
+      "normal": "普通",
+      "important": "重要",
+      "urgent": "紧急"
+    },
+    "deadlineLabel": "截稿日期",
+    "submit": "创建选题",
+    "failed": "创建失败"
+  }
 }

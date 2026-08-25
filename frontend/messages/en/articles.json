@@ -1,2 +1,151 @@
 {
+  "list": {
+    "title": "Articles",
+    "subtitle": "Manage all the articles you have created",
+    "searchPlaceholder": "Search article titles or content",
+    "emptySearchTitle": "No matching articles found",
+    "emptyTitle": "No articles yet",
+    "emptySearchHint": "Try different keywords",
+    "emptyHint": "Start from a story and create your first article",
+    "goToStories": "Go to Story Center",
+    "columns": {
+      "title": "Title",
+      "story": "Story",
+      "status": "Status",
+      "language": "Language",
+      "updatedAt": "Updated"
+    },
+    "summary": "{total} articles · Page {page} of {totalPages}"
+  },
+  "language": {
+    "SIMPLIFIED_CHINESE": "Simplified Chinese",
+    "TRADITIONAL_CHINESE_HK": "Traditional Chinese (HK)",
+    "TRADITIONAL_CHINESE_CANTONESE": "Traditional Chinese (Cantonese)",
+    "ENGLISH": "English"
+  },
+  "editor": {
+    "loadErrorForbidden": "You do not have permission to access this article",
+    "loadErrorNotFound": "Article not found",
+    "loadErrorServer": "Server error, please try again later",
+    "loadErrorGeneric": "Failed to load, please try again later",
+    "deleteConfirm": "Delete this article? This cannot be undone.",
+    "rollbackConfirm": "Roll back to version v{version}? The current content will be overwritten.",
+    "saveSuccess": "Saved — current version v{version}",
+    "titlePlaceholder": "Article title",
+    "languageTooltip": "Content language",
+    "authorStyleTooltip": "Author style: the selected author's writing style applies to all generative and editing AI operations",
+    "authorStyleUnavailableTooltip": "No author style data detected; the default generation style will be used",
+    "defaultStyle": "Default style",
+    "metaLine": "v{version} · {wordCount} characters · Last saved {savedAt}",
+    "versionHistory": "Version history",
+    "submitForReview": "Submit for review",
+    "deleteTooltip": "Delete article",
+    "subtitlePlaceholder": "Subtitle (optional)",
+    "coverImageAlt": "Cover image",
+    "aiGenerate": "Generate with AI",
+    "pickFromMediaLibrary": "Choose from media library",
+    "uploading": "Uploading…",
+    "uploadImage": "Upload image",
+    "removeCover": "Remove cover",
+    "contentPlaceholder": "Start writing...",
+    "excerptHeading": "Excerpt",
+    "excerptPlaceholder": "Enter the article excerpt...",
+    "storyHeading": "Story",
+    "noStory": "No linked story",
+    "coverPreviewAlt": "Cover image preview"
+  },
+  "headlineLab": {
+    "title": "Headline Lab",
+    "empty": "No headline suggestions yet, please try again later",
+    "adopt": "Use"
+  },
+  "submitReview": {
+    "description": "Once submitted, the article enters pending review and an editor will review it.",
+    "editorLabel": "Assign a reviewing editor (optional)",
+    "autoAssign": "Auto-assign",
+    "confirm": "Confirm submission"
+  },
+  "versionHistory": {
+    "empty": "No version history",
+    "rollback": "Roll back"
+  },
+  "draftPreview": {
+    "title": "AI-Generated Draft",
+    "titleLabel": "Title",
+    "subtitleLabel": "Subtitle",
+    "contentLabel": "Content",
+    "insertAtEnd": "Insert at end",
+    "replaceContent": "Replace current content"
+  },
+  "aiMenu": {
+    "rewrite": "Rewrite",
+    "expand": "Expand",
+    "condense": "Condense",
+    "polish": "Polish",
+    "resultTitle": "AI Result",
+    "replace": "Replace",
+    "insert": "Insert"
+  },
+  "quickActions": {
+    "heading": "Quick actions",
+    "generateDraft": "AI Draft Generation",
+    "factCheck": "AI Fact Check",
+    "reviewReport": "AI Review Report",
+    "seoOptimize": "AI SEO Optimization",
+    "geoOptimize": "AI GEO Optimization",
+    "generateImage": "AI Image Generation",
+    "videoGenerate": "AI One-Click Video",
+    "revertToDraft": "Revert to draft"
+  },
+  "aiPanel": {
+    "draftFailed": "Draft generation failed, please try again later",
+    "factCheckFailed": "Fact check failed, please try again later",
+    "reviewReportFailed": "Review report generation failed, please try again later",
+    "seoFailed": "SEO analysis failed, please try again later",
+    "geoFailed": "GEO analysis failed, please try again later",
+    "unknownError": "Unknown error",
+    "imageFailed": "Image generation failed: {message}"
+  },
+  "aiChat": {
+    "expand": "Open AI Assistant",
+    "collapse": "Collapse AI Assistant",
+    "title": "AI Writing Assistant",
+    "emptyHint": "Ask the AI assistant for writing suggestions",
+    "inputPlaceholder": "Type a question...",
+    "quickPrompts": {
+      "angle": "Analyze reporting angles for this story",
+      "data": "Suggest supporting data",
+      "logic": "Check logical consistency"
+    }
+  },
+  "imageGen": {
+    "title": "AI Image Generation",
+    "styleLabel": "Style",
+    "styles": {
+      "news": "News photography",
+      "illustration": "Illustration",
+      "photo": "Realistic photo",
+      "social": "Social poster"
+    },
+    "ratioLabel": "Aspect ratio",
+    "ratios": {
+      "banner": "16:9 (article banner)",
+      "standard": "4:3 (standard)",
+      "square": "1:1 (social square)",
+      "xiaohongshu": "3:4 (Xiaohongshu)",
+      "stories": "9:16 (Stories)"
+    },
+    "sizeLabel": "Resolution",
+    "sizes": {
+      "fast": "2K (fast)",
+      "hd": "3K (HD)",
+      "uhd": "4K (Ultra HD)"
+    },
+    "extraPromptLabel": "Additional description (optional)",
+    "extraPromptPlaceholder": "E.g.: add the Hong Kong skyline at dusk...",
+    "generating": "Generating...",
+    "generate": "Generate image",
+    "regenerate": "Regenerate",
+    "done": "Done"
+  }
 }

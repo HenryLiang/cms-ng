@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
 import { updateUser, changePassword } from '@/lib/users-api';
 import { ContentLanguage } from '@cms-ng/shared';
@@ -8,21 +9,23 @@ import { UserRole } from '@cms-ng/shared';
 import { Save, Check, KeyRound } from 'lucide-react';
 import { Button, Card, PageHeader, Input } from '@/components/ui';
 
-const languageLabels: Record<ContentLanguage, string> = {
-  [ContentLanguage.SIMPLIFIED_CHINESE]: '简体中文',
-  [ContentLanguage.TRADITIONAL_CHINESE_HK]: '繁体中文（香港）',
-  [ContentLanguage.TRADITIONAL_CHINESE_CANTONESE]: '繁体中文（粤语）',
-  [ContentLanguage.ENGLISH]: 'English',
+// 角色/语言存词典 key(roles.* / languages.*),渲染处经 t() 解析
+const languageLabelKeys: Record<ContentLanguage, string> = {
+  [ContentLanguage.SIMPLIFIED_CHINESE]: 'simplifiedChinese',
+  [ContentLanguage.TRADITIONAL_CHINESE_HK]: 'traditionalChineseHk',
+  [ContentLanguage.TRADITIONAL_CHINESE_CANTONESE]: 'traditionalChineseCantonese',
+  [ContentLanguage.ENGLISH]: 'english',
 };
 
-const roleLabels: Record<UserRole, string> = {
-  [UserRole.REPORTER]: '记者',
-  [UserRole.EDITOR]: '编辑',
-  [UserRole.ADMIN]: '管理员',
-  [UserRole.SUPER_ADMIN]: '超级管理员',
+const roleLabelKeys: Record<UserRole, string> = {
+  [UserRole.REPORTER]: 'reporter',
+  [UserRole.EDITOR]: 'editor',
+  [UserRole.ADMIN]: 'admin',
+  [UserRole.SUPER_ADMIN]: 'superAdmin',
 };
 
 export default function ProfilePage() {
+  const t = useTranslations('profile');
   const { user, fetchUser } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -59,7 +62,7 @@ export default function ProfilePage() {
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error('Failed to update profile:', error);
-      alert('保存失败，请重试');
+      alert(t('form.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -69,24 +72,24 @@ export default function ProfilePage() {
     e.preventDefault();
     setPwdMessage(null);
     if (pwdForm.newPassword !== pwdForm.confirm) {
-      setPwdMessage({ type: 'error', text: '两次输入的新密码不一致' });
+      setPwdMessage({ type: 'error', text: t('passwordSection.mismatch') });
       return;
     }
     if (pwdForm.newPassword.length < 6) {
-      setPwdMessage({ type: 'error', text: '新密码至少 6 位' });
+      setPwdMessage({ type: 'error', text: t('passwordSection.tooShort') });
       return;
     }
     setPwdSaving(true);
     try {
       await changePassword(pwdForm.currentPassword, pwdForm.newPassword);
       setPwdForm({ currentPassword: '', newPassword: '', confirm: '' });
-      setPwdMessage({ type: 'success', text: '密码已修改' });
+      setPwdMessage({ type: 'success', text: t('passwordSection.success') });
     } catch (err: unknown) {
       const apiMsg =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setPwdMessage({ type: 'error', text: apiMsg || '修改失败，请检查当前密码是否正确' });
+      setPwdMessage({ type: 'error', text: apiMsg || t('passwordSection.failed') });
     } finally {
       setPwdSaving(false);
     }
@@ -102,14 +105,14 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <PageHeader title="个人资料" className="mb-8" />
+      <PageHeader title={t('title')} className="mb-8" />
 
       <Card className="p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Name */}
           <div>
             <label htmlFor="name" className="mb-2 block text-sm font-medium text-foreground">
-              姓名
+              {t('form.name')}
             </label>
             <Input
               id="name"
@@ -123,7 +126,7 @@ export default function ProfilePage() {
           {/* Email (read-only) */}
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-medium text-foreground">
-              邮箱
+              {t('form.email')}
             </label>
             <input
               id="email"
@@ -137,12 +140,14 @@ export default function ProfilePage() {
           {/* Role (read-only) */}
           <div>
             <label htmlFor="role" className="mb-2 block text-sm font-medium text-foreground">
-              角色
+              {t('form.role')}
             </label>
             <input
               id="role"
               type="text"
-              value={roleLabels[user.role] || user.role}
+              value={
+                user.role in roleLabelKeys ? t(`roles.${roleLabelKeys[user.role]}`) : user.role
+              }
               disabled
               className="w-full rounded-lg border border-line bg-surface-muted px-4 py-2.5 text-sm text-muted"
             />
@@ -151,21 +156,21 @@ export default function ProfilePage() {
           {/* Department */}
           <div>
             <label htmlFor="department" className="mb-2 block text-sm font-medium text-foreground">
-              部门
+              {t('form.department')}
             </label>
             <Input
               id="department"
               type="text"
               value={formData.department}
               onChange={(e) => handleChange('department', e.target.value)}
-              placeholder="请输入部门名称"
+              placeholder={t('form.departmentPlaceholder')}
             />
           </div>
 
           {/* Preferred Language */}
           <div>
             <label htmlFor="preferredLanguage" className="mb-2 block text-sm font-medium text-foreground">
-              语言偏好
+              {t('form.language')}
             </label>
             <select
               id="preferredLanguage"
@@ -173,14 +178,14 @@ export default function ProfilePage() {
               onChange={(e) => handleChange('preferredLanguage', e.target.value)}
               className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
-              {Object.entries(languageLabels).map(([value, label]) => (
+              {Object.entries(languageLabelKeys).map(([value, labelKey]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {t(`languages.${labelKey}`)}
                 </option>
               ))}
             </select>
             <p className="mt-1.5 text-xs text-muted">
-              该设置将用于 AI 内容生成和稿件创作的默认语言
+              {t('form.languageHint')}
             </p>
           </div>
 
@@ -188,21 +193,21 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4 pt-4">
             <Button type="submit" variant="primary" loading={isSaving}>
               {isSaving ? (
-                '保存中...'
+                t('form.saving')
               ) : saveSuccess ? (
                 <>
                   <Check className="h-4 w-4" />
-                  已保存
+                  {t('form.saved')}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  保存设置
+                  {t('form.submit')}
                 </>
               )}
             </Button>
             {saveSuccess && (
-              <span className="text-sm text-green-600">设置已保存</span>
+              <span className="text-sm text-green-600">{t('form.savedHint')}</span>
             )}
           </div>
         </form>
@@ -211,12 +216,12 @@ export default function ProfilePage() {
         <div className="mt-10 border-t border-line pt-8">
           <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-foreground">
             <KeyRound className="h-5 w-5" />
-            修改密码
+            {t('passwordSection.title')}
           </h2>
           <form onSubmit={handleChangePassword} className="space-y-6">
             <div>
               <label htmlFor="currentPassword" className="mb-2 block text-sm font-medium text-foreground">
-                当前密码
+                {t('passwordSection.current')}
               </label>
               <Input
                 id="currentPassword"
@@ -228,7 +233,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-foreground">
-                新密码
+                {t('passwordSection.new')}
               </label>
               <Input
                 id="newPassword"
@@ -238,11 +243,11 @@ export default function ProfilePage() {
                 minLength={6}
                 required
               />
-              <p className="mt-1.5 text-xs text-muted">至少 6 位</p>
+              <p className="mt-1.5 text-xs text-muted">{t('passwordSection.hint')}</p>
             </div>
             <div>
               <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-foreground">
-                确认新密码
+                {t('passwordSection.confirm')}
               </label>
               <Input
                 id="confirmPassword"
@@ -261,11 +266,11 @@ export default function ProfilePage() {
             <div className="pt-2">
               <Button type="submit" variant="primary" loading={pwdSaving}>
                 {pwdSaving ? (
-                  '修改中...'
+                  t('passwordSection.changing')
                 ) : (
                   <>
                     <KeyRound className="h-4 w-4" />
-                    修改密码
+                    {t('passwordSection.submit')}
                   </>
                 )}
               </Button>

@@ -1,2 +1,79 @@
 {
+  "title": "账号管理",
+  "subtitle": "创建账户、启用/禁用账户、查看账户消费情况",
+  "createButton": "新建账户",
+  "roles": {
+    "reporter": "记者",
+    "editor": "编辑",
+    "admin": "管理员",
+    "superAdmin": "超级管理员"
+  },
+  "languages": {
+    "simplifiedChinese": "简体中文",
+    "traditionalChineseHk": "繁体中文（香港）",
+    "traditionalChineseCantonese": "繁体中文（粤语）",
+    "english": "English"
+  },
+  "list": {
+    "loadFailed": "加载账户列表失败",
+    "empty": "暂无账户",
+    "enableSuccess": "已启用账户",
+    "disableSuccess": "已禁用账户",
+    "neverLoggedIn": "从未登录",
+    "statusActive": "启用",
+    "statusInactive": "禁用",
+    "columns": {
+      "name": "姓名",
+      "email": "邮箱",
+      "role": "角色",
+      "department": "部门",
+      "status": "状态",
+      "balance": "余额",
+      "createdAt": "创建时间",
+      "lastLogin": "最后登录",
+      "actions": "操作"
+    },
+    "actions": {
+      "enable": "启用",
+      "disable": "禁用",
+      "resetPassword": "重置密码",
+      "consumption": "消费"
+    }
+  },
+  "createForm": {
+    "title": "新建账户",
+    "email": "邮箱",
+    "name": "姓名",
+    "role": "角色",
+    "department": "部门（可选）",
+    "language": "语言偏好",
+    "initialPasswordNote": "创建后将生成一个随机初始密码，仅显示一次，请立即保存并交给用户。",
+    "submit": "创建",
+    "failed": "创建失败",
+    "successTitle": "账户创建成功"
+  },
+  "resetPwd": {
+    "confirmTitle": "重置密码",
+    "confirmMessage": "确认为 {name}（{email}）重置密码？将生成新的随机密码，原密码立即失效。",
+    "confirmAction": "重置",
+    "successTitle": "重置密码成功",
+    "failed": "重置密码失败"
+  },
+  "passwordResult": {
+    "notice": "该密码仅显示一次，请立即复制保存。关闭后无法再次查看。",
+    "saved": "我已保存"
+  },
+  "consumption": {
+    "title": "账户消费",
+    "loadFailed": "加载消费数据失败",
+    "userLine": "{name}（{email}）",
+    "currentBalance": "当前余额",
+    "totalSpent": "累计消费",
+    "totalTopUp": "累计充值",
+    "byCategory": "按类目分布",
+    "noConsumption": "暂无消费",
+    "recentTransactions": "最近流水",
+    "noTransactions": "暂无交易记录",
+    "pagination": "共 {total} 条，第 {page}/{totalPages} 页"
+  }
 }

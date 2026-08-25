@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Save, Pencil, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import {
   getBillingConfigs,
   updateBillingConfig,
@@ -9,13 +10,16 @@ import {
 } from '@/lib/billing-api';
 import { Badge, Button, Card, Input, PageHeader } from '@/components/ui';
 
-const categoryLabels: Record<string, string> = {
-  AI: 'AI 服务',
-  PUBLISHING: '发布服务',
-  OTHER: '其他',
+// BillingCategory -> billing.shared.categoryLabels 词典 key(未知类别回退显示原始枚举值)
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  AI: 'shared.categoryLabels.AI',
+  PUBLISHING: 'shared.categoryLabels.PUBLISHING',
+  OTHER: 'shared.categoryLabels.OTHER',
 };
 
 export default function BillingConfigPage() {
+  const t = useTranslations('billing');
+  const tCommon = useTranslations('common');
   const [configs, setConfigs] = useState<BillingConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -51,7 +55,7 @@ export default function BillingConfigPage() {
   async function handleSave(itemKey: string) {
     const price = parseFloat(editPrice);
     if (isNaN(price) || price < 0) {
-      alert('请输入有效的单价');
+      alert(t('config.invalidPrice'));
       return;
     }
 
@@ -64,7 +68,11 @@ export default function BillingConfigPage() {
       setEditingKey(null);
       await loadConfigs();
     } catch (err) {
-      alert(`保存失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      alert(
+        t('config.saveFailed', {
+          message: err instanceof Error ? err.message : t('shared.unknownError'),
+        }),
+      );
     } finally {
       setSaving(false);
     }
@@ -81,25 +89,25 @@ export default function BillingConfigPage() {
   return (
     <div className="h-full p-8">
       <PageHeader
-        title="计费配置"
-        subtitle="管理各服务项目的计费单价和启用状态"
+        title={t('config.title')}
+        subtitle={t('config.subtitle')}
       />
 
       <Card>
         {configs.length === 0 ? (
           <div className="m-4 rounded-lg border border-dashed border-line-strong p-12 text-center">
-            <p className="text-muted">暂无数据</p>
+            <p className="text-muted">{tCommon('state.empty')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
-                <th className="px-6 py-3 font-medium">名称</th>
-                <th className="px-6 py-3 font-medium">类别</th>
-                <th className="px-6 py-3 font-medium">计费单位</th>
-                <th className="px-6 py-3 font-medium text-right">单价 (¥)</th>
-                <th className="px-6 py-3 font-medium text-center">状态</th>
-                <th className="px-6 py-3 font-medium text-right">操作</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.name')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.category')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.unit')}</th>
+                <th className="px-6 py-3 font-medium text-right">{t('shared.table.unitPrice')}</th>
+                <th className="px-6 py-3 font-medium text-center">{t('shared.table.status')}</th>
+                <th className="px-6 py-3 font-medium text-right">{t('shared.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -112,7 +120,9 @@ export default function BillingConfigPage() {
                     </td>
                     <td className="px-6 py-3">
                       <Badge tone="neutral">
-                        {categoryLabels[config.category] || config.category}
+                        {CATEGORY_LABEL_KEYS[config.category]
+                          ? t(CATEGORY_LABEL_KEYS[config.category])
+                          : config.category}
                       </Badge>
                     </td>
                     <td className="px-6 py-3 text-muted">{config.unit}</td>
@@ -143,11 +153,11 @@ export default function BillingConfigPage() {
                               : 'bg-surface-muted text-muted hover:bg-surface-muted'
                           }`}
                         >
-                          {editActive ? '启用' : '禁用'}
+                          {editActive ? t('config.enabled') : t('config.disabled')}
                         </button>
                       ) : (
                         <Badge tone={config.isActive ? 'success' : 'neutral'}>
-                          {config.isActive ? '启用' : '禁用'}
+                          {config.isActive ? t('config.enabled') : t('config.disabled')}
                         </Badge>
                       )}
                     </td>
@@ -161,7 +171,7 @@ export default function BillingConfigPage() {
                             onClick={() => handleSave(config.itemKey)}
                           >
                             <Save className="h-3 w-3" />
-                            保存
+                            {tCommon('actions.save')}
                           </Button>
                           <Button
                             variant="secondary"
@@ -169,7 +179,7 @@ export default function BillingConfigPage() {
                             onClick={cancelEdit}
                           >
                             <X className="h-3 w-3" />
-                            取消
+                            {tCommon('actions.cancel')}
                           </Button>
                         </div>
                       ) : (
@@ -180,7 +190,7 @@ export default function BillingConfigPage() {
                           className="ml-auto"
                         >
                           <Pencil className="h-3 w-3" />
-                          编辑
+                          {tCommon('actions.edit')}
                         </Button>
                       )}
                     </td>

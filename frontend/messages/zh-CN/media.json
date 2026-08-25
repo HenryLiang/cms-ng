@@ -1,2 +1,65 @@
 {
+  "title": "媒体库",
+  "subtitlePre": "管理上传与 AI 生成的图片，共",
+  "subtitlePost": "项",
+  "uploadImage": "上传图片",
+  "closeUploadPanel": "关闭上传面板",
+  "searchPlaceholder": "搜索文件名 / 标签 / 描述",
+  "keywordChip": "关键词：{keyword}",
+  "clearKeyword": "清除关键词",
+  "tagChip": "标签：{tag}",
+  "clearTag": "清除标签",
+  "deleteConfirm": "确认删除该图片？COS 对象将一并删除，不可恢复。",
+  "videoLabel": "视频",
+  "source": {
+    "upload": "上传",
+    "aiGenerated": "AI 生成"
+  },
+  "tagging": {
+    "title": "AI 标签",
+    "inProgress": "打标中",
+    "inProgressTitle": "AI 打标中",
+    "inProgressEllipsis": "打标中…",
+    "failed": "打标失败",
+    "failedWithError": "打标失败:{error}",
+    "empty": "暂无 AI 标签",
+    "retag": "重新打标",
+    "retagTitle": "重新生成 AI 标签",
+    "retagDisabledTitle": "打标进行中,请稍后"
+  },
+  "outOfRange": {
+    "title": "当前页没有内容",
+    "descPre": "共",
+    "descPost": "项，页数可能已变化",
+    "backToFirst": "返回第 1 页"
+  },
+  "empty": {
+    "title": "媒体库还是空的",
+    "desc": "上传本地图片，或在稿件编辑器中让 AI 生成配图",
+    "filteredTitle": "没有找到匹配的图片",
+    "filteredDesc": "换个关键词或来源筛选试试",
+    "clearFilters": "清除筛选条件",
+    "uploadFirst": "上传第一张图片"
+  },
+  "grid": {
+    "filterByTagAria": "按标签 {tag} 筛选"
+  },
+  "pagination": {
+    "summary": "共 {total} 项 · 第 {page} / {totalPages} 页"
+  },
+  "detail": {
+    "dialogTitle": "图片详情",
+    "copyUrl": "复制 URL",
+    "fieldType": "类型",
+    "fieldDimensions": "尺寸",
+    "fieldSize": "大小",
+    "fieldDuration": "时长",
+    "durationSeconds": "{duration} 秒",
+    "fieldCreatedAt": "创建时间",
+    "fieldFileName": "文件名",
+    "editMeta": "编辑元信息",
+    "fieldTitle": "标题",
+    "altLabel": "Alt 替换文本（无障碍 + SEO）",
+    "tagsLabel": "标签（逗号分隔）"
+  }
 }

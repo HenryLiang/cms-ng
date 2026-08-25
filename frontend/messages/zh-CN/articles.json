@@ -1,2 +1,151 @@
 {
+  "list": {
+    "title": "稿件管理",
+    "subtitle": "管理你创建的所有稿件",
+    "searchPlaceholder": "搜索稿件标题或正文",
+    "emptySearchTitle": "没有找到匹配的稿件",
+    "emptyTitle": "还没有稿件",
+    "emptySearchHint": "请尝试其他关键词",
+    "emptyHint": "从选题开始，创建你的第一篇稿件",
+    "goToStories": "前往选题中心",
+    "columns": {
+      "title": "标题",
+      "story": "所属选题",
+      "status": "状态",
+      "language": "语言",
+      "updatedAt": "更新时间"
+    },
+    "summary": "共 {total} 篇 · 第 {page} / {totalPages} 页"
+  },
+  "language": {
+    "SIMPLIFIED_CHINESE": "简体中文",
+    "TRADITIONAL_CHINESE_HK": "繁体中文（香港）",
+    "TRADITIONAL_CHINESE_CANTONESE": "繁体中文（粤语）",
+    "ENGLISH": "English"
+  },
+  "editor": {
+    "loadErrorForbidden": "您没有权限访问此稿件",
+    "loadErrorNotFound": "稿件不存在",
+    "loadErrorServer": "服务器错误，请稍后重试",
+    "loadErrorGeneric": "加载失败，请稍后重试",
+    "deleteConfirm": "确定要删除这篇稿件吗？此操作不可恢复。",
+    "rollbackConfirm": "确定要回滚到版本 v{version} 吗？当前内容将被覆盖。",
+    "saveSuccess": "保存成功，当前版本 v{version}",
+    "titlePlaceholder": "稿件标题",
+    "languageTooltip": "内容语言",
+    "authorStyleTooltip": "作者风格：选中的作者文风将应用到所有生成/编辑类 AI 操作",
+    "authorStyleUnavailableTooltip": "未检测到作者风格数据，将使用默认生成方式",
+    "defaultStyle": "默认风格",
+    "metaLine": "版本 {version} · {wordCount} 字 · 最后保存 {savedAt}",
+    "versionHistory": "版本历史",
+    "submitForReview": "提交审核",
+    "deleteTooltip": "删除稿件",
+    "subtitlePlaceholder": "副标题（可选）",
+    "coverImageAlt": "封面图",
+    "aiGenerate": "AI 生成",
+    "pickFromMediaLibrary": "从媒体库选择",
+    "uploading": "上传中…",
+    "uploadImage": "上传图片",
+    "removeCover": "移除封面",
+    "contentPlaceholder": "开始写作...",
+    "excerptHeading": "摘要",
+    "excerptPlaceholder": "输入稿件摘要...",
+    "storyHeading": "所属选题",
+    "noStory": "无关联选题",
+    "coverPreviewAlt": "封面图预览"
+  },
+  "headlineLab": {
+    "title": "标题实验室",
+    "empty": "暂无标题建议，请稍后重试",
+    "adopt": "采用"
+  },
+  "submitReview": {
+    "description": "提交后稿件将进入待审核状态，编辑将进行审核。",
+    "editorLabel": "选择审核编辑（可选）",
+    "autoAssign": "自动分配",
+    "confirm": "确认提交"
+  },
+  "versionHistory": {
+    "empty": "暂无版本历史",
+    "rollback": "回滚"
+  },
+  "draftPreview": {
+    "title": "AI 生成初稿",
+    "titleLabel": "标题",
+    "subtitleLabel": "副标题",
+    "contentLabel": "正文",
+    "insertAtEnd": "插入到末尾",
+    "replaceContent": "替换当前内容"
+  },
+  "aiMenu": {
+    "rewrite": "改写",
+    "expand": "扩写",
+    "condense": "精简",
+    "polish": "润色",
+    "resultTitle": "AI 处理结果",
+    "replace": "替换",
+    "insert": "插入"
+  },
+  "quickActions": {
+    "heading": "快速操作",
+    "generateDraft": "AI 生成初稿",
+    "factCheck": "AI 事实核查",
+    "reviewReport": "AI 预审报告",
+    "seoOptimize": "AI SEO优化",
+    "geoOptimize": "AI GEO优化",
+    "generateImage": "AI 生成配图",
+    "videoGenerate": "AI 一键成片",
+    "revertToDraft": "退回草稿"
+  },
+  "aiPanel": {
+    "draftFailed": "初稿生成失败，请稍后重试",
+    "factCheckFailed": "事实核查失败，请稍后重试",
+    "reviewReportFailed": "预审报告生成失败，请稍后重试",
+    "seoFailed": "SEO 分析失败，请稍后重试",
+    "geoFailed": "GEO 分析失败，请稍后重试",
+    "unknownError": "未知错误",
+    "imageFailed": "图片生成失败：{message}"
+  },
+  "aiChat": {
+    "expand": "打开 AI 助手",
+    "collapse": "收起 AI 助手",
+    "title": "AI 创作助手",
+    "emptyHint": "向 AI 助手提问，获取写作建议",
+    "inputPlaceholder": "输入问题...",
+    "quickPrompts": {
+      "angle": "分析这个选题的报道角度",
+      "data": "补充数据支撑建议",
+      "logic": "检查逻辑一致性"
+    }
+  },
+  "imageGen": {
+    "title": "AI 生成配图",
+    "styleLabel": "风格",
+    "styles": {
+      "news": "新闻摄影",
+      "illustration": "插画",
+      "photo": "写实照片",
+      "social": "社媒海报"
+    },
+    "ratioLabel": "比例",
+    "ratios": {
+      "banner": "16:9 (文章横幅)",
+      "standard": "4:3 (标准)",
+      "square": "1:1 (社媒方形)",
+      "xiaohongshu": "3:4 (小红书)",
+      "stories": "9:16 (Stories)"
+    },
+    "sizeLabel": "分辨率",
+    "sizes": {
+      "fast": "2K（快速）",
+      "hd": "3K（高清）",
+      "uhd": "4K（超清）"
+    },
+    "extraPromptLabel": "额外描述（可选）",
+    "extraPromptPlaceholder": "例如：加入香港天际线背景，黄昏时分...",
+    "generating": "生成中...",
+    "generate": "生成配图",
+    "regenerate": "重新生成",
+    "done": "完成"
+  }
 }

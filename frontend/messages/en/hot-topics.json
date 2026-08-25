@@ -1,2 +1,20 @@
 {
+  "title": "Hot Topics",
+  "tabs": {
+    "hottest": "Top",
+    "realtime": "Live"
+  },
+  "actions": {
+    "refreshAll": "Refresh All"
+  },
+  "list": {
+    "noSources": "No hot topic sources available. Make sure NEWSNOW_ENABLED is enabled on the backend."
+  },
+  "card": {
+    "fetchFailed": "Failed to load",
+    "updatedAt": "Updated {time}",
+    "refreshSource": "Refresh {label}",
+    "unavailable": "Source temporarily unavailable",
+    "unavailableRetry": "Source temporarily unavailable, please try again later"
+  }
 }
