@@ -15,6 +15,9 @@
     "updatedAt": "{time}更新",
     "refreshSource": "刷新{label}",
     "unavailable": "数据源暂时不可用",
-    "unavailableRetry": "数据源暂时不可用，请稍后重试"
+    "unavailableRetry": "数据源暂时不可用，请稍后重试",
+    "loading": "加载中…",
+    "retry": "重试",
+    "emptyData": "暂无数据"
   }
 }

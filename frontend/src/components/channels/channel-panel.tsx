@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { Platform, PublishStatus } from '@cms-ng/shared';
 import {
   getPlatforms,
@@ -20,6 +21,7 @@ interface ChannelPanelProps {
 }
 
 export default function ChannelPanel({ articleId }: ChannelPanelProps) {
+  const t = useTranslations('panels.channelPanel');
   const [platforms, setPlatforms] = useState<PlatformMetadata[]>([]);
   const [publishes, setPublishes] = useState<PlatformPublish[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +66,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
   };
 
   const handleDelete = async (publishId: string) => {
-    if (!confirm('确定要删除此平台的适配内容吗？')) return;
+    if (!confirm(t('deleteConfirm'))) return;
     try {
       await deletePublish(articleId, publishId);
       setPublishes((prev) => prev.filter((p) => p.id !== publishId));
@@ -119,7 +121,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">平台分发</h3>
+        <h3 className="text-sm font-medium text-foreground">{t('title')}</h3>
         <Share2 className="h-4 w-4 text-subtle" />
       </div>
 
@@ -187,7 +189,7 @@ export default function ChannelPanel({ articleId }: ChannelPanelProps) {
 
       {publishes.length === 0 && (
         <p className="mt-4 text-center text-xs text-subtle">
-          选择上方平台，一键生成适配内容
+          {t('emptyHint')}
         </p>
       )}
     </div>

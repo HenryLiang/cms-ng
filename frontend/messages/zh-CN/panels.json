@@ -13,6 +13,8 @@
     "tabPeople": "关键人物",
     "tabData": "核心数据",
     "tabOpinions": "各方观点",
+    "tabWikipedia": "Wikipedia",
+    "tabWikipediaError": "Wikipedia ⚠️",
     "source": "来源：{source}",
     "emptyTimeline": "暂无时间线数据",
     "emptyPeople": "暂无人物数据",

@@ -7,6 +7,7 @@ import {
   Smartphone,
   Building2,
 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
 import {
   getTopUpRecords,
@@ -18,27 +19,23 @@ import { getUsers } from '@/lib/users-api';
 import type { User } from '@/types/auth';
 import { Badge, Button, Card, Input, PageHeader } from '@/components/ui';
 
-const packages = [
-  { name: '试用包', amount: 100, bonus: 0 },
-  { name: '基础包', amount: 500, bonus: 25 },
-  { name: '专业包', amount: 2000, bonus: 200 },
-  { name: '机构包', amount: 10000, bonus: 1500 },
+const PACKAGE_DEFS = [
+  { key: 'trial', amount: 100, bonus: 0 },
+  { key: 'basic', amount: 500, bonus: 25 },
+  { key: 'pro', amount: 2000, bonus: 200 },
+  { key: 'enterprise', amount: 10000, bonus: 1500 },
 ];
 
-const paymentMethods = [
-  { id: 'alipay', label: '支付宝', icon: Smartphone },
-  { id: 'wechat', label: '微信支付', icon: Smartphone },
-  { id: 'manual', label: '手动充值', icon: Building2 },
+const PAYMENT_METHODS = [
+  { id: 'alipay', key: 'alipay', icon: Smartphone },
+  { id: 'wechat', key: 'wechat', icon: Smartphone },
+  { id: 'manual', key: 'manual', icon: Building2 },
 ];
-
-const statusLabels: Record<string, string> = {
-  PENDING: '待支付',
-  COMPLETED: '已完成',
-  FAILED: '失败',
-  REFUNDED: '已退款',
-};
 
 export default function TopUpPage() {
+  const t = useTranslations('billing');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
   const user = useAuthStore((s) => s.user);
   const isAdmin = useAuthStore((s) => s.isAdmin());
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
@@ -55,7 +52,7 @@ export default function TopUpPage() {
   // otherwise they get a 403 toast on page load (api.ts reports all non-401 errors).
   useEffect(() => {
     if (!isAdmin) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 非管理员直接结束 loading
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- non-admin ends loading directly
       setLoading(false);
       return;
     }
@@ -67,7 +64,7 @@ export default function TopUpPage() {
   // but if role/payment state ever disagree, fall back to a visible method.
   useEffect(() => {
     if (!isAdmin && paymentMethod === 'manual') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 防御性回退支付方式
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- defensive payment method fallback
       setPaymentMethod('alipay');
     }
   }, [isAdmin, paymentMethod]);
@@ -76,7 +73,7 @@ export default function TopUpPage() {
   useEffect(() => {
     if (!isAdmin || paymentMethod !== 'manual' || users.length > 0) return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:setUsersLoading 同步触发
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount:setUsersLoading triggers synchronously
     setUsersLoading(true);
     getUsers()
       .then((data) => {
@@ -104,7 +101,7 @@ export default function TopUpPage() {
 
   function getSelectedAmount(): number {
     if (selectedPackage !== null) {
-      return packages[selectedPackage].amount;
+      return PACKAGE_DEFS[selectedPackage].amount;
     }
     const custom = parseFloat(customAmount);
     const minAmount = paymentMethod === 'manual' ? 0.01 : 10;
@@ -115,44 +112,46 @@ export default function TopUpPage() {
     const amount = getSelectedAmount();
     const minAmount = paymentMethod === 'manual' ? 0.01 : 10;
     if (amount <= 0) {
-      alert(`请选择或输入充值金额（最低 ¥${minAmount}）`);
+      alert(t('topUp.invalidAmount', { minAmount }));
       return;
     }
     if (paymentMethod === 'manual' && !targetUserId) {
-      alert('请选择充值目标用户');
+      alert(t('topUp.selectTargetUser'));
       return;
     }
     if (!user?.id) {
-      alert('用户信息未加载，请刷新页面');
+      alert(t('topUp.userNotLoaded'));
       return;
     }
 
     setSubmitting(true);
     try {
       if (paymentMethod === 'manual') {
-        // 管理员手动充值:为所选目标账户充值,绕过支付通道
         const target = users.find((u) => u.id === targetUserId);
         await manualTopUp({
           targetUserId,
           amount,
-          reason: `管理员手动充值${target ? `（${target.name}）` : ''}`,
+          reason: target
+            ? t('topUp.manualReason', { name: target.name })
+            : t('topUp.manualReasonNoTarget'),
         });
-        alert(`充值成功！¥${amount.toFixed(2)} 已到账${target ? `（${target.name}）` : ''}`);
+        alert(
+          target
+            ? t('topUp.successAlertWithTarget', { amount: amount.toFixed(2), name: target.name })
+            : t('topUp.successAlert', { amount: amount.toFixed(2) }),
+        );
         setSelectedPackage(null);
         setCustomAmount('');
         setTargetUserId('');
         await loadRecords();
       } else if (paymentMethod === 'alipay') {
-        // 支付宝:后端创建订单,返回支付 URL,前端跳转
         const { paymentUrl } = await createOnlineTopUp({
           amount,
           paymentMethod: 'ALIPAY',
         });
-        // 跳转后页面生命周期结束,不要 reset 状态
         window.location.href = paymentUrl;
         return;
       } else if (paymentMethod === 'wechat') {
-        // 微信支付:后端返回二维码 URL,新窗口打开
         const { qrCodeUrl } = await createOnlineTopUp({
           amount,
           paymentMethod: 'WECHAT_PAY',
@@ -160,16 +159,19 @@ export default function TopUpPage() {
         if (qrCodeUrl) {
           window.open(qrCodeUrl, '_blank', 'width=420,height=420');
         }
-        alert('请用微信扫描二维码完成支付,支付成功后将自动到账');
+        alert(t('topUp.wechatScanHint'));
         await loadRecords();
       }
     } catch (err) {
-      alert(`充值失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      alert(
+        t('topUp.failedAlert', {
+          message: err instanceof Error ? err.message : t('shared.unknownError'),
+        }),
+      );
     } finally {
       if (paymentMethod !== 'alipay') {
         setSubmitting(false);
       }
-      // alipay 分支跳转后,本页会被销毁,无需 reset
     }
   }
 
@@ -184,15 +186,15 @@ export default function TopUpPage() {
   return (
     <div className="h-full p-8">
       <PageHeader
-        title="充值"
-        subtitle="为账户充值以使用 AI 和发布功能"
+        title={t('topUp.title')}
+        subtitle={t('topUp.subtitle')}
       />
 
       {/* Package Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {packages.map((pkg, idx) => (
+        {PACKAGE_DEFS.map((pkg, idx) => (
           <button
-            key={pkg.name}
+            key={pkg.key}
             onClick={() => {
               setSelectedPackage(idx);
               setCustomAmount('');
@@ -208,11 +210,11 @@ export default function TopUpPage() {
                 <Check className="h-4 w-4 text-brand" />
               </div>
             )}
-            <p className="text-xs text-muted">{pkg.name}</p>
+            <p className="text-xs text-muted">{t(`topUp.packages.${pkg.key}`)}</p>
             <p className="tnum mt-1 text-xl font-semibold text-foreground">¥{pkg.amount.toLocaleString()}</p>
             {pkg.bonus > 0 && paymentMethod !== 'manual' && (
               <p className="mt-1 text-xs font-medium text-emerald-600">
-                赠送 ¥{pkg.bonus}
+                {t('topUp.bonus', { amount: pkg.bonus })}
               </p>
             )}
           </button>
@@ -221,7 +223,7 @@ export default function TopUpPage() {
 
       {/* Custom Amount */}
       <div className="mb-6 max-w-md">
-        <label className="block text-xs font-medium text-foreground mb-1">自定义金额</label>
+        <label className="block text-xs font-medium text-foreground mb-1">{t('topUp.customAmount')}</label>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted">¥</span>
           <Input
@@ -232,16 +234,16 @@ export default function TopUpPage() {
               setCustomAmount(e.target.value);
               setSelectedPackage(null);
             }}
-            placeholder={paymentMethod === 'manual' ? '最低 ¥0.01' : '最低 ¥10'}
+            placeholder={paymentMethod === 'manual' ? t('topUp.minAmountManual') : t('topUp.minAmountOnline')}
           />
         </div>
       </div>
 
       {/* Payment Method */}
       <div className="mb-6">
-        <label className="block text-xs font-medium text-foreground mb-2">支付方式</label>
+        <label className="block text-xs font-medium text-foreground mb-2">{t('topUp.paymentMethodLabel')}</label>
         <div className="flex gap-3">
-          {paymentMethods
+          {PAYMENT_METHODS
             .filter((m) => m.id !== 'manual' || isAdmin)
             .map((method) => {
               const Icon = method.icon;
@@ -256,7 +258,7 @@ export default function TopUpPage() {
                   }`}
                 >
                   <Icon className="h-4 w-4" />
-                  {method.label}
+                  {t(`topUp.paymentMethods.${method.key}`)}
                 </button>
               );
             })}
@@ -267,7 +269,7 @@ export default function TopUpPage() {
       {paymentMethod === 'manual' && (
         <div className="mb-6 max-w-md">
           <label htmlFor="target-user" className="block text-xs font-medium text-foreground mb-1">
-            充值目标用户
+            {t('topUp.targetUserLabel')}
           </label>
           <select
             id="target-user"
@@ -276,15 +278,15 @@ export default function TopUpPage() {
             disabled={usersLoading}
             className="w-full rounded-lg border border-line bg-surface p-2.5 text-sm text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
           >
-            <option value="">{usersLoading ? '加载中…' : '请选择用户'}</option>
+            <option value="">{usersLoading ? tCommon('state.loading') : t('topUp.selectUserPlaceholder')}</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.name}（{u.email}）
+                {t('topUp.userOption', { name: u.name, email: u.email })}
               </option>
             ))}
           </select>
           {users.length === 0 && !usersLoading && (
-            <p className="mt-1 text-xs text-amber-600">未找到可充值的用户</p>
+            <p className="mt-1 text-xs text-amber-600">{t('topUp.noUsersFound')}</p>
           )}
         </div>
       )}
@@ -298,7 +300,7 @@ export default function TopUpPage() {
           className="px-8 py-3"
         >
           <CreditCard className="h-4 w-4" />
-          确认充值 {getSelectedAmount() > 0 && `¥${getSelectedAmount().toFixed(2)}`}
+          {t('topUp.confirmButton')} {getSelectedAmount() > 0 && `¥${getSelectedAmount().toFixed(2)}`}
         </Button>
       </div>
 
@@ -306,30 +308,30 @@ export default function TopUpPage() {
       {isAdmin && (
       <Card>
         <div className="border-b border-line px-6 py-4">
-          <h2 className="text-sm font-semibold text-foreground">充值记录</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('topUp.recordsTitle')}</h2>
         </div>
 
         {records.length === 0 ? (
           <div className="m-4 rounded-lg border border-dashed border-line-strong p-12 text-center">
-            <p className="text-muted">暂无数据</p>
+            <p className="text-muted">{tCommon('state.empty')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
-                <th className="px-6 py-3 font-medium">时间</th>
-                <th className="px-6 py-3 font-medium">用户</th>
-                <th className="px-6 py-3 font-medium">金额</th>
-                <th className="px-6 py-3 font-medium">到账</th>
-                <th className="px-6 py-3 font-medium">方式</th>
-                <th className="px-6 py-3 font-medium">状态</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.time')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.user')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.amount')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.credited')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.method')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {records.map((record) => (
                 <tr key={record.id} className="transition hover:bg-surface-muted/50">
                   <td className="tnum px-6 py-3 text-muted">
-                    {new Date(record.createdAt).toLocaleString('zh-CN')}
+                    {new Date(record.createdAt).toLocaleString(locale)}
                   </td>
                   <td className="px-6 py-3 text-foreground">{record.user.name}</td>
                   <td className="tnum px-6 py-3 font-medium text-foreground">
@@ -339,7 +341,7 @@ export default function TopUpPage() {
                     +¥{(record.creditsAdded + record.bonusCredits).toFixed(2)}
                   </td>
                   <td className="px-6 py-3 text-muted">
-                    {record.paymentMethod === 'MANUAL' ? '手动' : record.paymentMethod}
+                    {record.paymentMethod === 'MANUAL' ? t('topUp.manualMethod') : record.paymentMethod}
                   </td>
                   <td className="px-6 py-3">
                     <Badge
@@ -351,7 +353,7 @@ export default function TopUpPage() {
                           : 'danger'
                       }
                     >
-                      {statusLabels[record.status] || record.status}
+                      {t(`topUp.status.${record.status}`)}
                     </Badge>
                   </td>
                 </tr>

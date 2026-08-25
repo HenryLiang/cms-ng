@@ -31,6 +31,7 @@
     "byCategory": "分类消费",
     "byType": "按类型明细",
     "topUsers": "消费排行 Top 10",
+    "rank": "#",
     "username": "用户名",
     "spentAmount": "消费金额"
   },
@@ -72,13 +73,24 @@
     "noUsersFound": "未找到可充值的用户",
     "confirmButton": "确认充值",
     "recordsTitle": "充值记录",
-    "manualMethod": "手动"
+    "manualMethod": "手动",
+    "manualReason": "管理员手动充值（{name}）",
+    "manualReasonNoTarget": "管理员手动充值"
   },
   "transactions": {
     "title": "消费记录",
     "subtitle": "查看所有交易流水和消费明细",
     "totalSpent": "总支出",
-    "pageInfo": "共 {total} 条，第 {page}/{totalPages} 页"
+    "pageInfo": "共 {total} 条，第 {page}/{totalPages} 页",
+    "typeOptions": {
+      "all": "全部",
+      "AI_LLM": "AI调用",
+      "AI_IMAGE": "图片生成",
+      "PUBLISH": "发布",
+      "AUTO_PUBLISH": "自动发布",
+      "TOP_UP": "充值",
+      "REFUND": "退款"
+    }
   },
   "balanceCard": {
     "title": "账户余额",

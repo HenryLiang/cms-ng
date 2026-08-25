@@ -20,7 +20,7 @@ import components from './components.json';
 import panels from './panels.json';
 import lib from './lib.json';
 
-export default {
+const messages = {
   common,
   meta,
   auth,
@@ -40,3 +40,5 @@ export default {
   panels,
   lib,
 };
+
+export default messages;

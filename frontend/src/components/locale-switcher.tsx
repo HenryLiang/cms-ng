@@ -14,6 +14,7 @@ export default function LocaleSwitcher({ compact = false }: { compact?: boolean 
   const locale = useLocale();
   const t = useTranslations('components');
   const [open, setOpen] = useState(false);
+  const [pendingLocale, setPendingLocale] = useState<Locale | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,13 +26,18 @@ export default function LocaleSwitcher({ compact = false }: { compact?: boolean 
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
+  useEffect(() => {
+    if (!pendingLocale || pendingLocale === locale) return;
+    document.cookie = `${LOCALE_COOKIE}=${pendingLocale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; samesite=lax`;
+    location.reload();
+  }, [pendingLocale, locale]);
+
   function switchTo(next: Locale) {
     if (next === locale) {
       setOpen(false);
       return;
     }
-    document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; samesite=lax`;
-    location.reload();
+    setPendingLocale(next);
   }
 
   return (

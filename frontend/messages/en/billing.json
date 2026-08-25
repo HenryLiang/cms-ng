@@ -31,6 +31,7 @@
     "byCategory": "Spending by category",
     "byType": "Breakdown by type",
     "topUsers": "Top 10 Spenders",
+    "rank": "#",
     "username": "Username",
     "spentAmount": "Amount spent"
   },
@@ -72,13 +73,24 @@
     "noUsersFound": "No users available for top-up",
     "confirmButton": "Confirm top-up",
     "recordsTitle": "Top-up records",
-    "manualMethod": "Manual"
+    "manualMethod": "Manual",
+    "manualReason": "Manual top-up by admin ({name})",
+    "manualReasonNoTarget": "Manual top-up by admin"
   },
   "transactions": {
     "title": "Spending Records",
     "subtitle": "View all transactions and spending details",
     "totalSpent": "Total spent",
-    "pageInfo": "{total} items, page {page} of {totalPages}"
+    "pageInfo": "{total} items, page {page} of {totalPages}",
+    "typeOptions": {
+      "all": "All",
+      "AI_LLM": "AI call",
+      "AI_IMAGE": "Image generation",
+      "PUBLISH": "Publish",
+      "AUTO_PUBLISH": "Auto-publish",
+      "TOP_UP": "Top-up",
+      "REFUND": "Refund"
+    }
   },
   "balanceCard": {
     "title": "Account balance",

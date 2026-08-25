@@ -10,15 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { getReport, type BillingReport } from '@/lib/billing-api';
-import { getTransactionTypeLabel } from '@/lib/transaction-labels';
 import { Card, PageHeader } from '@/components/ui';
-
-// BillingCategory -> billing.shared.categoryLabels 词典 key(未知类别回退显示原始枚举值)
-const CATEGORY_LABEL_KEYS: Record<string, string> = {
-  AI: 'shared.categoryLabels.AI',
-  PUBLISHING: 'shared.categoryLabels.PUBLISHING',
-  OTHER: 'shared.categoryLabels.OTHER',
-};
 
 function getDefaultDates() {
   const end = new Date();
@@ -37,6 +29,23 @@ export default function ReportPage() {
   const [endDate, setEndDate] = useState(defaults.end);
   const [report, setReport] = useState<BillingReport | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const categoryLabels: Record<string, string> = {
+    AI: t('shared.categoryLabels.AI'),
+    PUBLISHING: t('shared.categoryLabels.PUBLISHING'),
+    OTHER: t('shared.categoryLabels.OTHER'),
+  };
+
+  const typeLabels: Record<string, string> = {
+    TOP_UP: t('transaction.type.TOP_UP'),
+    AI_LLM: t('transaction.type.AI_LLM'),
+    AI_IMAGE: t('transaction.type.AI_IMAGE'),
+    PUBLISH: t('transaction.type.PUBLISH'),
+    AUTO_PUBLISH: t('transaction.type.AUTO_PUBLISH'),
+    DATA_FETCH: t('transaction.type.DATA_FETCH'),
+    REFUND: t('transaction.type.REFUND'),
+    ADJUSTMENT: t('transaction.type.ADJUSTMENT'),
+  };
 
   async function loadReport() {
     setLoading(true);
@@ -141,11 +150,11 @@ export default function ReportPage() {
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="h-4 w-4 text-muted" />
-                <h2 className="text-sm font-semibold text-foreground">分类消费</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('report.byCategory')}</h2>
               </div>
 
               {Object.keys(report.byCategory).length === 0 ? (
-                <p className="text-sm text-muted">暂无数据</p>
+                <p className="text-sm text-muted">{tCommon('state.empty')}</p>
               ) : (
                 <div className="space-y-3">
                   {Object.entries(report.byCategory)
@@ -157,7 +166,7 @@ export default function ReportPage() {
                         <div key={cat}>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-foreground">
-                              {categoryLabels[cat] || cat}
+                              {categoryLabels[cat] ?? cat}
                             </span>
                             <span className="tnum text-sm font-medium text-foreground">
                               ¥{amount.toFixed(2)}
@@ -178,7 +187,7 @@ export default function ReportPage() {
               {/* Type breakdown sub-section */}
               {Object.keys(report.byType).length > 0 && (
                 <div className="mt-6 pt-4 border-t border-line">
-                  <p className="text-xs font-medium text-muted mb-3">按类型明细</p>
+                  <p className="text-xs font-medium text-muted mb-3">{t('report.byType')}</p>
                   <div className="space-y-2">
                     {Object.entries(report.byType)
                       .sort(([, a], [, b]) => b - a)
@@ -201,18 +210,18 @@ export default function ReportPage() {
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Users className="h-4 w-4 text-muted" />
-                <h2 className="text-sm font-semibold text-foreground">消费排行 Top 10</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('report.topUsers')}</h2>
               </div>
 
               {report.topUsers.length === 0 ? (
-                <p className="text-sm text-muted">暂无数据</p>
+                <p className="text-sm text-muted">{tCommon('state.empty')}</p>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
-                      <th className="pb-2 font-medium">#</th>
-                      <th className="pb-2 font-medium">用户名</th>
-                      <th className="pb-2 font-medium text-right">消费金额</th>
+                      <th className="pb-2 font-medium">{t('report.rank')}</th>
+                      <th className="pb-2 font-medium">{t('report.username')}</th>
+                      <th className="pb-2 font-medium text-right">{t('report.spentAmount')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">

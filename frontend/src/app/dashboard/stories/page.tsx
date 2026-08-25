@@ -1098,21 +1098,22 @@ function NewsSourcePanel({
 }
 
 function EmptyState({ onGetSuggestions }: { onGetSuggestions: () => void }) {
+  const t = useTranslations('stories');
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
       <div className="rounded-full bg-surface-muted p-4 mb-4">
         <Lightbulb className="h-8 w-8 text-subtle" />
       </div>
-      <h3 className="text-lg font-medium text-foreground">选题中心</h3>
+      <h3 className="text-lg font-medium text-foreground">{t('list.title')}</h3>
       <p className="mt-2 text-sm text-muted max-w-sm">
-        从右侧已录入清单选择一个热点查看详情，或使用 AI 获取个性化选题推荐
+        {t('emptyState.hint')}
       </p>
       <button
         onClick={onGetSuggestions}
         className="mt-4 flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100"
       >
         <Sparkles className="h-4 w-4" />
-        获取 AI 选题推荐
+        {t('emptyState.getSuggestions')}
       </button>
     </div>
   );

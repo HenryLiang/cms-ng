@@ -116,5 +116,31 @@
     "aiTag": "AI auto-tag",
     "removeTagAria": "Remove tag {tag}",
     "placeholder": "Type a tag and press Enter"
+  },
+  "mediaPicker": {
+    "title": "Select {mediaType}",
+    "source": {
+      "all": "All",
+      "upload": "Upload",
+      "aiGenerated": "AI generated"
+    },
+    "type": {
+      "image": "image",
+      "video": "video",
+      "audio": "audio"
+    },
+    "searchPlaceholder": "Search file name / alt / prompt (Enter)",
+    "search": "Search",
+    "upload": "Upload",
+    "emptyImage": "No images yet. Click Upload to add one.",
+    "emptyOther": "No {mediaType} assets in the library. You can paste a URL instead.",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "languageBadge": {
+    "zh": "CN",
+    "zhHk": "HK",
+    "yue": "Cant",
+    "en": "EN"
   }
 }

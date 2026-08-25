@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Wallet, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { getBalance, type BalanceInfo, type BillingTransaction } from '@/lib/billing-api';
 import { Card, buttonClasses } from '@/components/ui';
@@ -32,6 +33,7 @@ function TransactionAmount({ amount, type }: { amount: number; type: string }) {
 }
 
 export default function BalanceCard() {
+  const t = useTranslations('billing.balanceCard');
   const [info, setInfo] = useState<BalanceInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +45,14 @@ export default function BalanceCard() {
         const data = await getBalance();
         if (!cancelled) setInfo(data);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : '加载失败');
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     fetch();
     return () => { cancelled = true; };
-  }, []);
+  }, [t]);
 
   if (loading) {
     return (
@@ -65,7 +67,7 @@ export default function BalanceCard() {
   if (error || !info) {
     return (
       <Card className="p-4">
-        <p className="text-sm text-red-500">{error ?? '无法加载余额信息'}</p>
+        <p className="text-sm text-red-500">{error ?? t('unavailable')}</p>
       </Card>
     );
   }
@@ -78,13 +80,13 @@ export default function BalanceCard() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Wallet className="h-5 w-5 text-muted" />
-          <span className="text-sm font-medium text-foreground">账户余额</span>
+          <span className="text-sm font-medium text-foreground">{t('title')}</span>
         </div>
         <Link
           href="/dashboard/billing/top-up"
           className={buttonClasses({ variant: 'primary', size: 'sm' })}
         >
-          充值
+          {t('topUp')}
         </Link>
       </div>
 
@@ -94,7 +96,7 @@ export default function BalanceCard() {
         {isLowBalance && (
           <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
             <AlertTriangle className="h-3.5 w-3.5" />
-            <span>余额低于预警阈值 {formatCurrency(info.alertThreshold!)}</span>
+            <span>{t('lowBalanceWarning', { threshold: formatCurrency(info.alertThreshold!) })}</span>
           </div>
         )}
       </div>
@@ -102,7 +104,7 @@ export default function BalanceCard() {
       {/* Recent Transactions */}
       {info.recentTransactions.length > 0 && (
         <div className="border-t border-line pt-3">
-          <p className="mb-2 text-xs font-medium text-muted">最近交易</p>
+          <p className="mb-2 text-xs font-medium text-muted">{t('recentTransactions')}</p>
           <div className="space-y-2">
             {info.recentTransactions.slice(0, 3).map((tx: BillingTransaction) => (
               <div key={tx.id} className="flex items-center justify-between">

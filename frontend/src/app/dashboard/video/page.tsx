@@ -810,7 +810,7 @@ export default function VideoStudioPage() {
                           onClick={() => void onRetry(job.id)}
                         >
                           <RefreshCw className={`h-4 w-4 ${actingId === job.id ? 'animate-spin' : ''}`} />
-                          重试
+                          {tCommon('actions.retry')}
                         </Button>
                       )}
                     </div>
@@ -831,11 +831,11 @@ export default function VideoStudioPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={job.lastFrameUrl}
-                        alt="尾帧"
+                        alt={t('list.lastFrameAlt')}
                         className="h-14 w-auto rounded-md ring-1 ring-line"
                       />
                       <p className="text-[11px] text-subtle">
-                        尾帧已入媒体库,可作为下一段的首帧(续拍链)
+                        {t('list.lastFrameHint')}
                       </p>
                     </div>
                   )}
@@ -855,7 +855,9 @@ export default function VideoStudioPage() {
         }
         title={
           pickerIndex !== null
-            ? `选择${REFERENCE_ROLE_LABEL[references[pickerIndex]?.role ?? 'reference_image']}素材`
+            ? t('picker.title', {
+                role: t(`refRole.${references[pickerIndex]?.role ?? 'reference_image'}`),
+              })
             : undefined
         }
         onPick={(asset) => {

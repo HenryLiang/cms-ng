@@ -2,16 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TopicSourceDefinition } from '@cms-ng/shared';
+import { useTranslations } from 'next-intl';
 import { getTopicSources, getTopicSourceItems } from '@/lib/topic-api';
 import { Button, PageHeader } from '@/components/ui';
 import { HotBoardCard, type HotBoardState } from '@/components/hot-topics/hot-board-card';
 
 type HotTab = 'hottest' | 'realtime';
-
-const TABS: { key: HotTab; label: string }[] = [
-  { key: 'hottest', label: '最热' },
-  { key: 'realtime', label: '实时' },
-];
 
 /** 单卡条目数上限(与后端 MAX_ITEMS_PER_SOURCE 一致)。 */
 const BOARD_LIMIT = 30;
@@ -23,6 +19,14 @@ const BOARD_LIMIT = 30;
  * - 报错 toast 由 axios 拦截器全局处理,这里只落本地状态
  */
 export default function HotTopicsPage() {
+  const t = useTranslations('hotTopics');
+  const TABS: { key: HotTab; label: string }[] = useMemo(
+    () => [
+      { key: 'hottest', label: t('tabs.hottest') },
+      { key: 'realtime', label: t('tabs.realtime') },
+    ],
+    [t],
+  );
   const [sources, setSources] = useState<TopicSourceDefinition[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [tab, setTab] = useState<HotTab>('hottest');
@@ -66,14 +70,14 @@ export default function HotTopicsPage() {
         [sourceId]: {
           items: prev[sourceId]?.items ?? [],
           status: 'unavailable',
-          warnings: ['数据源暂时不可用，请稍后重试'],
+          warnings: [t('card.unavailableRetry')],
           fetchedAt: prev[sourceId]?.fetchedAt,
           loading: false,
           loaded: true,
         },
       }));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,14 +117,14 @@ export default function HotTopicsPage() {
   return (
     <div className="mx-auto max-w-7xl p-6">
       <PageHeader
-        title="实时热点"
+        title={t('title')}
         actions={
           <Button
             variant="secondary"
             loading={anyLoading}
             onClick={refreshAll}
           >
-            刷新全部
+            {t('actions.refreshAll')}
           </Button>
         }
       />
@@ -149,7 +153,7 @@ export default function HotTopicsPage() {
       ) : !sources.length ? (
         <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
           <p className="text-sm text-muted">
-            没有可用的实时热点源。请确认后端 NEWSNOW_ENABLED 已开启。
+            {t('list.noSources')}
           </p>
         </div>
       ) : (

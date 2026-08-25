@@ -1,4 +1,7 @@
+'use client';
+
 import { X, TrendingUp, Check } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { SEOResult } from '@/lib/article-api';
 import { Button, Badge } from '@/components/ui';
 
@@ -9,6 +12,7 @@ interface SEOPanelProps {
 }
 
 export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProps) {
+  const t = useTranslations('panels.seo');
   const scoreColor = (score: number) =>
     score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-red-600';
 
@@ -16,13 +20,13 @@ export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProp
     score >= 80 ? 'bg-emerald-50' : score >= 60 ? 'bg-amber-50' : 'bg-red-50';
 
   const priorityLabel = (p: string) =>
-    p === 'high' ? '高' : p === 'medium' ? '中' : '低';
+    p === 'high' ? t('priorityHigh') : p === 'medium' ? t('priorityMedium') : t('priorityLow');
 
   const priorityTone = (p: string): 'danger' | 'warning' | 'info' =>
     p === 'high' ? 'danger' : p === 'medium' ? 'warning' : 'info';
 
   const volumeLabel = (v: string) =>
-    v === 'high' ? '高' : v === 'medium' ? '中' : '低';
+    v === 'high' ? t('volumeHigh') : v === 'medium' ? t('volumeMedium') : t('volumeLow');
 
   const volumeTone = (v: string): 'success' | 'warning' | 'neutral' =>
     v === 'high' ? 'success' : v === 'medium' ? 'warning' : 'neutral';
@@ -32,7 +36,7 @@ export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProp
       <div className="flex items-center justify-between border-b border-emerald-100 px-3 py-2">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-emerald-600" />
-          <span className="text-sm font-medium text-foreground">SEO 优化分析</span>
+          <span className="text-sm font-medium text-foreground">{t('title')}</span>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-3.5 w-3.5" />
@@ -45,35 +49,35 @@ export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProp
             <span className={`text-2xl font-bold ${scoreColor(result.overallScore)}`}>
               {result.overallScore}
             </span>
-            <span className="text-xs text-muted">SEO 评分</span>
+            <span className="text-xs text-muted">{t('seoScore')}</span>
           </div>
           <div className={`flex flex-col items-center justify-center rounded-lg ${scoreBg(result.readabilityScore)} px-4 py-2`}>
             <span className={`text-2xl font-bold ${scoreColor(result.readabilityScore)}`}>
               {result.readabilityScore}
             </span>
-            <span className="text-xs text-muted">可读性</span>
+            <span className="text-xs text-muted">{t('readability')}</span>
           </div>
         </div>
 
         {/* Optimized Titles */}
         {result.optimizedTitle.length > 0 && (
           <div>
-            <h4 className="text-xs font-medium text-muted mb-1.5">优化标题建议</h4>
+            <h4 className="text-xs font-medium text-muted mb-1.5">{t('optimizedTitles')}</h4>
             <div className="space-y-2">
-              {result.optimizedTitle.map((t, i) => (
+              {result.optimizedTitle.map((item, i) => (
                 <div
                   key={i}
                   className="flex items-start justify-between gap-2 rounded-md border border-line p-2"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{t.title}</p>
-                    <p className="text-xs text-muted mt-0.5">{t.reasoning}</p>
+                    <p className="text-sm font-medium text-foreground">{item.title}</p>
+                    <p className="text-xs text-muted mt-0.5">{item.reasoning}</p>
                   </div>
                   <Button
                     variant="primary"
                     size="sm"
                     className="shrink-0"
-                    onClick={() => onApplyTitle(t.title)}
+                    onClick={() => onApplyTitle(item.title)}
                   >
                     <Check className="h-3 w-3" />
                   </Button>
@@ -86,7 +90,7 @@ export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProp
         {/* Meta Description */}
         {result.metaDescription && (
           <div>
-            <h4 className="text-xs font-medium text-muted mb-1">建议元描述</h4>
+            <h4 className="text-xs font-medium text-muted mb-1">{t('metaDescription')}</h4>
             <p className="text-xs text-foreground bg-canvas rounded-md p-2 leading-relaxed">
               {result.metaDescription}
             </p>
@@ -96,7 +100,7 @@ export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProp
         {/* Keywords */}
         {result.keywords.length > 0 && (
           <div>
-            <h4 className="text-xs font-medium text-muted mb-1.5">核心关键词</h4>
+            <h4 className="text-xs font-medium text-muted mb-1.5">{t('coreKeywords')}</h4>
             <div className="flex flex-wrap gap-1.5">
               {result.keywords.map((k, i) => (
                 <Badge key={i} tone={volumeTone(k.searchVolume)} className="gap-1">
@@ -111,7 +115,7 @@ export default function SEOPanel({ result, onClose, onApplyTitle }: SEOPanelProp
         {/* Suggestions */}
         {result.suggestions.length > 0 && (
           <div>
-            <h4 className="text-xs font-medium text-muted mb-1.5">优化建议</h4>
+            <h4 className="text-xs font-medium text-muted mb-1.5">{t('suggestions')}</h4>
             <div className="space-y-2">
               {result.suggestions.map((s, i) => (
                 <div key={i} className="rounded-md border border-line p-2">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { getReviewQueue, submitReview } from '@/lib/review-api';
 import { getArticle } from '@/lib/article-api';
 import { CheckCircle, XCircle, FileText, User, Clock } from 'lucide-react';
@@ -12,6 +13,8 @@ interface ReviewArticle extends Article {
 }
 
 export default function ReviewPage() {
+  const t = useTranslations('review');
+  const tc = useTranslations('common');
   const [articles, setArticles] = useState<ReviewArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<ReviewArticle | null>(null);
@@ -34,7 +37,7 @@ export default function ReviewPage() {
         handleSelect(data[0]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载审核队列失败');
+      setError(err instanceof Error ? err.message : t('errors.loadQueue'));
     } finally {
       setLoading(false);
     }
@@ -60,7 +63,7 @@ export default function ReviewPage() {
     } catch (err) {
       if (seq !== selectSeqRef.current) return;
       setArticleDetail(null);
-      setError(err instanceof Error ? err.message : '加载稿件详情失败');
+      setError(err instanceof Error ? err.message : t('errors.loadDetail'));
     } finally {
       // Only the latest selection owns the loading flag.
       if (seq === selectSeqRef.current) {
@@ -72,7 +75,7 @@ export default function ReviewPage() {
   async function handleDecision(decision: 'APPROVE' | 'REVISION') {
     if (!selectedArticle) return;
     if (decision === 'REVISION' && !comment.trim()) {
-      alert('退回修改需要填写审核意见');
+      alert(t('comment.requiredAlert'));
       return;
     }
     setSubmitting(true);
@@ -100,7 +103,7 @@ export default function ReviewPage() {
         <div className="text-center">
           <p className="text-sm text-red-600">{error}</p>
           <Button variant="ghost" className="mt-3" onClick={() => loadQueue()}>
-            重试
+            {tc('actions.retry')}
           </Button>
         </div>
       </div>
@@ -112,9 +115,9 @@ export default function ReviewPage() {
       {/* 左：稿件列表 */}
       <div className="w-80 shrink-0 overflow-y-auto border-r border-line bg-surface">
         <div className="border-b border-line p-4">
-          <h1 className="text-base font-semibold">审核台</h1>
+          <h1 className="text-base font-semibold">{t('title')}</h1>
           <p className="mt-0.5 text-sm text-muted">
-            待审核稿件 <span className="tnum">{articles.length}</span> 篇
+            {t('list.queueCount', { count: articles.length })}
           </p>
         </div>
         <div className="divide-y divide-line">
@@ -140,18 +143,18 @@ export default function ReviewPage() {
                 <div className="mt-2 flex items-center gap-3 text-xs text-muted">
                   <span className="flex items-center gap-1">
                     <User className="h-3 w-3" />
-                    {article.author?.name || '未知作者'}
+                    {article.author?.name || t('list.unknownAuthor')}
                   </span>
                   <StatusBadge status={article.status} />
                 </div>
                 {article.story && (
-                  <p className="mt-1 truncate text-xs text-subtle">选题：{article.story.title}</p>
+                  <p className="mt-1 truncate text-xs text-subtle">{t('story', { title: article.story.title })}</p>
                 )}
               </button>
             );
           })}
           {articles.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted">暂无待审核稿件</div>
+            <div className="p-8 text-center text-sm text-muted">{t('list.empty')}</div>
           )}
         </div>
       </div>
@@ -160,7 +163,7 @@ export default function ReviewPage() {
       <div className="flex-1 overflow-y-auto bg-canvas p-6">
         {!selectedArticle && (
           <div className="flex h-full items-center justify-center text-sm text-subtle">
-            请选择左侧稿件进行审核
+            {t('detail.selectPrompt')}
           </div>
         )}
 
@@ -188,19 +191,19 @@ export default function ReviewPage() {
               <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted">
                 <span className="flex items-center gap-1">
                   <User className="h-4 w-4" />
-                  作者：{articleDetail.author?.name ?? '-'}
+                  {t('detail.author', { name: articleDetail.author?.name ?? '-' })}
                 </span>
                 <span className="flex items-center gap-1 tnum">
                   <Clock className="h-4 w-4" />v{articleDetail.version}
                 </span>
-                {articleDetail.story && <span>选题：{articleDetail.story.title}</span>}
+                {articleDetail.story && <span>{t('story', { title: articleDetail.story.title })}</span>}
               </div>
             </Card>
 
             {/* 正文 */}
             <Card className="p-6">
               <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-subtle">
-                正文内容
+                {t('detail.content')}
               </h3>
               <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                 {articleDetail.content}
@@ -211,7 +214,7 @@ export default function ReviewPage() {
             {articleDetail.excerpt && (
               <Card className="p-6">
                 <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-subtle">
-                  摘要
+                  {t('detail.excerpt')}
                 </h3>
                 <p className="text-sm text-muted">{articleDetail.excerpt}</p>
               </Card>
@@ -220,20 +223,20 @@ export default function ReviewPage() {
             {/* AI 预审占位 */}
             <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted p-6">
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-subtle">
-                AI 预审报告
+                {t('detail.aiReviewTitle')}
               </h3>
               <p className="text-sm text-subtle">
-                AI 预审功能开发中，将自动检测事实性错误、法律风险和优化建议。
+                {t('detail.aiReviewPlaceholder')}
               </p>
             </div>
 
             {/* 审核操作 */}
             <Card className="p-6">
-              <h3 className="mb-4 text-sm font-semibold">审核意见</h3>
+              <h3 className="mb-4 text-sm font-semibold">{t('comment.title')}</h3>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="填写审核意见（退回修改时必须填写）…"
+                placeholder={t('comment.placeholder')}
                 className="w-full rounded-lg border border-line bg-surface p-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                 rows={4}
               />
@@ -244,7 +247,7 @@ export default function ReviewPage() {
                   loading={submitting}
                 >
                   <CheckCircle className="h-4 w-4" />
-                  审核通过
+                  {t('actions.approve')}
                 </Button>
                 <Button
                   variant="danger"
@@ -252,7 +255,7 @@ export default function ReviewPage() {
                   loading={submitting}
                 >
                   <XCircle className="h-4 w-4" />
-                  退回修改
+                  {t('actions.sendBack')}
                 </Button>
               </div>
             </Card>

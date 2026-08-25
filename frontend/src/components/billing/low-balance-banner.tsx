@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { AlertTriangle, X } from 'lucide-react';
 import { getBalance } from '@/lib/billing-api';
 
 export default function LowBalanceBanner() {
+  const t = useTranslations('billing.lowBalanceBanner');
   const [dismissed, setDismissed] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [threshold, setThreshold] = useState<number | null>(null);
@@ -38,9 +40,9 @@ export default function LowBalanceBanner() {
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-orange-600" />
         <span className="text-sm text-orange-800">
-          <span className="font-medium">余额不足</span>
+          <span className="font-medium">{t('title')}</span>
           <span className="mx-1.5">·</span>
-          <span>当前余额 ¥{balance.toFixed(2)}，低于预警阈值 ¥{threshold.toFixed(2)}</span>
+          <span>{t('detail', { balance: balance.toFixed(2), threshold: threshold.toFixed(2) })}</span>
         </span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -48,7 +50,7 @@ export default function LowBalanceBanner() {
           href="/dashboard/billing/top-up"
           className="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700 transition-colors"
         >
-          立即充值
+          {t('topUpNow')}
         </Link>
         <button
           onClick={() => setDismissed(true)}

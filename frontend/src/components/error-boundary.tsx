@@ -2,6 +2,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button, Card, buttonClasses } from '@/components/ui';
 
@@ -13,6 +14,36 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean;
+}
+
+function ErrorFallback({ onReload }: { onReload: () => void }) {
+  const t = useTranslations('components');
+  return (
+    <div
+      role="alert"
+      className="flex h-full min-h-[60vh] items-center justify-center p-8"
+    >
+      <Card className="max-w-md p-6 text-center">
+        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-amber-600" />
+        <h2 className="text-lg font-semibold text-foreground">{t('errorBoundary.title')}</h2>
+        <p className="mt-2 text-sm text-muted">
+          {t('errorBoundary.description')}
+        </p>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button type="button" variant="primary" onClick={onReload}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            {t('errorBoundary.reload')}
+          </Button>
+          <Link
+            href="/dashboard"
+            className={buttonClasses({ variant: 'secondary' })}
+          >
+            {t('errorBoundary.backToDashboard')}
+          </Link>
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -38,32 +69,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
-      return (
-        <div
-          role="alert"
-          className="flex h-full min-h-[60vh] items-center justify-center p-8"
-        >
-          <Card className="max-w-md p-6 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-amber-600" />
-            <h2 className="text-lg font-semibold text-foreground">页面出现了一些问题</h2>
-            <p className="mt-2 text-sm text-muted">
-              请尝试刷新页面，或返回工作台继续操作。
-            </p>
-            <div className="mt-4 flex justify-center gap-2">
-              <Button type="button" variant="primary" onClick={this.handleReload}>
-                <RotateCcw className="h-3.5 w-3.5" />
-                重新加载
-              </Button>
-              <Link
-                href="/dashboard"
-                className={buttonClasses({ variant: 'secondary' })}
-              >
-                返回工作台
-              </Link>
-            </div>
-          </Card>
-        </div>
-      );
+      return <ErrorFallback onReload={this.handleReload} />;
     }
     return this.props.children;
   }

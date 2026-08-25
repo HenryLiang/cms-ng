@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Bell,
   CheckCheck,
@@ -26,16 +27,20 @@ import {
 const REFRESH_INTERVAL_MS = 30_000;
 const POPUP_DURATION_MS = 2_000;
 
-function formatRelativeTime(value: string): string {
+function formatRelativeTime(
+  value: string,
+  locale: string,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   const elapsedMs = Date.now() - new Date(value).getTime();
   const minutes = Math.max(0, Math.floor(elapsedMs / 60_000));
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 1) return t('notificationBell.justNow');
+  if (minutes < 60) return t('notificationBell.minutesAgo', { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('notificationBell.hoursAgo', { hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} 天前`;
-  return new Intl.DateTimeFormat("zh-CN", {
+  if (days < 7) return t('notificationBell.daysAgo', { days });
+  return new Intl.DateTimeFormat(locale, {
     month: "numeric",
     day: "numeric",
   }).format(new Date(value));
@@ -64,6 +69,7 @@ function NotificationPopup({
   item: NotificationItem;
   onOpen: () => void;
 }) {
+  const t = useTranslations('components');
   const content = (
     <>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted ring-1 ring-line/80">
@@ -71,7 +77,7 @@ function NotificationPopup({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-600">
-          新消息
+          {t('notificationBell.newMessage')}
         </span>
         <span className="mt-0.5 block truncate text-sm font-semibold text-foreground">
           {item.title}
@@ -86,7 +92,7 @@ function NotificationPopup({
   return (
     <div
       role="status"
-      aria-label={`新通知：${item.title}`}
+      aria-label={t('notificationBell.newNotificationAria', { title: item.title })}
       className="notification-popup absolute right-0 top-12 z-[70] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line/90 bg-surface/95 shadow-2xl shadow-slate-950/15 backdrop-blur"
     >
       {item.actionUrl ? (
@@ -115,6 +121,8 @@ function NotificationPopup({
 }
 
 export default function NotificationBell() {
+  const t = useTranslations('components');
+  const locale = useLocale();
   const rootRef = useRef<HTMLDivElement>(null);
   const mutationVersion = useRef(0);
   const seenNotificationIds = useRef<Set<string> | null>(null);
@@ -236,8 +244,8 @@ export default function NotificationBell() {
   };
 
   const triggerLabel = unreadCount
-    ? `通知，${unreadCount} 条未读`
-    : "通知，无未读消息";
+    ? t('notificationBell.triggerUnread', { count: unreadCount })
+    : t('notificationBell.triggerNoUnread');
 
   return (
     <div ref={rootRef} className="relative">
@@ -274,14 +282,14 @@ export default function NotificationBell() {
       {open && (
         <section
           role="dialog"
-          aria-label="通知中心"
+          aria-label={t('notificationBell.dialogAria')}
           className="absolute right-0 top-11 z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-line bg-surface shadow-2xl shadow-slate-950/15"
         >
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">通知</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t('notificationBell.title')}</h2>
               <p className="mt-0.5 text-xs text-subtle">
-                {unreadCount ? `${unreadCount} 条未读消息` : "已全部读完"}
+                {unreadCount ? t('notificationBell.unreadCount', { count: unreadCount }) : t('notificationBell.allRead')}
               </p>
             </div>
             <button
@@ -291,7 +299,7 @@ export default function NotificationBell() {
               className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-cyan-600 transition hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:text-subtle"
             >
               <CheckCheck className="h-3.5 w-3.5" />
-              全部已读
+              {t('notificationBell.markAllRead')}
             </button>
           </div>
 
@@ -302,12 +310,12 @@ export default function NotificationBell() {
               </div>
             ) : loadFailed && items.length === 0 ? (
               <div className="px-6 py-10 text-center text-sm text-subtle">
-                通知加载失败，请稍后重试
+                {t('notificationBell.loadFailed')}
               </div>
             ) : items.length === 0 ? (
               <div className="px-6 py-10 text-center">
                 <Bell className="mx-auto h-7 w-7 text-subtle/60" />
-                <p className="mt-2 text-sm text-subtle">暂时没有通知</p>
+                <p className="mt-2 text-sm text-subtle">{t('notificationBell.empty')}</p>
               </div>
             ) : (
               items.map((item) => {
@@ -329,7 +337,7 @@ export default function NotificationBell() {
                         {item.message}
                       </span>
                       <span className="mt-1.5 block text-[11px] text-subtle">
-                        {formatRelativeTime(item.createdAt)}
+                        {formatRelativeTime(item.createdAt, locale, t)}
                       </span>
                     </span>
                   </>

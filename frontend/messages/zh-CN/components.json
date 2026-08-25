@@ -116,5 +116,31 @@
     "aiTag": "AI 一键打标",
     "removeTagAria": "删除标签 {tag}",
     "placeholder": "输入标签后按回车"
+  },
+  "mediaPicker": {
+    "title": "选择{mediaType}",
+    "source": {
+      "all": "全部",
+      "upload": "上传",
+      "aiGenerated": "AI 生成"
+    },
+    "type": {
+      "image": "图片",
+      "video": "视频",
+      "audio": "音频"
+    },
+    "searchPlaceholder": "搜索文件名/alt/prompt（回车）",
+    "search": "搜索",
+    "upload": "上传",
+    "emptyImage": "暂无图片，点击「上传」添加",
+    "emptyOther": "媒体库暂无{mediaType}素材，可改用手填 URL",
+    "cancel": "取消",
+    "confirm": "确认选择"
+  },
+  "languageBadge": {
+    "zh": "简",
+    "zhHk": "繁",
+    "yue": "粤",
+    "en": "EN"
   }
 }

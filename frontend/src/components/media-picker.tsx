@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   getMediaAssets,
   type MediaAsset,
@@ -31,14 +32,6 @@ interface MediaPickerProps {
 
 const PAGE_SIZE = 24;
 
-const SOURCE_FILTERS: { value: MediaSource | ''; label: string }[] = [
-  { value: '', label: '全部' },
-  { value: MediaSource.UPLOAD, label: '上传' },
-  { value: MediaSource.AI_GENERATED, label: 'AI 生成' },
-];
-
-const MIME_LABEL = { image: '图片', video: '视频', audio: '音频' } as const;
-
 /**
  * 媒体选择器：Modal 内浏览媒体库、回车搜索、内嵌上传、翻页，选中后回调。
  * 用于文章封面选择、TipTap 正文插图、视频参考素材(mimePrefix=video)等场景。
@@ -51,6 +44,14 @@ export function MediaPicker({
   mimePrefix = 'image',
   title,
 }: MediaPickerProps) {
+  const t = useTranslations('components');
+  const sourceFilters: { value: MediaSource | ''; label: string }[] = [
+    { value: '', label: t('mediaPicker.source.all') },
+    { value: MediaSource.UPLOAD, label: t('mediaPicker.source.upload') },
+    { value: MediaSource.AI_GENERATED, label: t('mediaPicker.source.aiGenerated') },
+  ];
+  const typeLabel = t(`mediaPicker.type.${mimePrefix}`);
+
   const [items, setItems] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -122,7 +123,7 @@ export function MediaPicker({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">
-            {title ?? `选择${MIME_LABEL[mimePrefix]}`}
+            {title ?? t('mediaPicker.title', { mediaType: typeLabel })}
           </h2>
           <button onClick={onClose} className="text-subtle hover:text-foreground">
             <X className="h-5 w-5" />
@@ -132,7 +133,7 @@ export function MediaPicker({
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2">
           <div className="flex items-center gap-1 rounded-lg bg-surface-muted p-0.5">
-            {SOURCE_FILTERS.map((f) => (
+            {sourceFilters.map((f) => (
               <button
                 key={f.value}
                 onClick={() => {
@@ -155,12 +156,12 @@ export function MediaPicker({
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-              placeholder="搜索文件名/alt/prompt（回车）"
+              placeholder={t('mediaPicker.searchPlaceholder')}
               className="w-full rounded-lg border border-line-strong bg-surface py-1.5 pl-8 pr-3 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </div>
           <Button variant="secondary" size="sm" onClick={onSearch}>
-            搜索
+            {t('mediaPicker.search')}
           </Button>
           {mimePrefix === 'image' && (
             <Button
@@ -169,7 +170,7 @@ export function MediaPicker({
               onClick={() => setShowUpload((v) => !v)}
             >
               <Upload className="h-3.5 w-3.5" />
-              上传
+              {t('mediaPicker.upload')}
             </Button>
           )}
         </div>
@@ -193,8 +194,8 @@ export function MediaPicker({
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-sm text-subtle">
               {mimePrefix === 'image'
-                ? '暂无图片，点击「上传」添加'
-                : `媒体库暂无${MIME_LABEL[mimePrefix]}素材，可改用手填 URL`}
+                ? t('mediaPicker.emptyImage')
+                : t('mediaPicker.emptyOther', { mediaType: typeLabel })}
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
@@ -269,10 +270,10 @@ export function MediaPicker({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onClose}>
-              取消
+              {t('mediaPicker.cancel')}
             </Button>
             <Button variant="primary" onClick={confirm} disabled={!selectedId}>
-              确认选择
+              {t('mediaPicker.confirm')}
             </Button>
           </div>
         </div>

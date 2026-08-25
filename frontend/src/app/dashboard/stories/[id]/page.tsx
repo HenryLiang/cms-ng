@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   getStory,
@@ -33,6 +34,8 @@ export default function StoryDetailPage() {
   const params = useParams();
   const storyId = params.id as string;
   const { user } = useAuthStore();
+  const t = useTranslations('stories');
+  const tc = useTranslations('common');
 
   const [story, setStory] = useState<Story | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -105,13 +108,13 @@ export default function StoryDetailPage() {
               ?.message
           : undefined;
       if (status === 403) {
-        setLoadError(apiMsg || '您没有权限访问此选题');
+        setLoadError(apiMsg || t('detail.errors.forbidden'));
       } else if (status === 404) {
-        setLoadError('选题不存在');
+        setLoadError(t('detail.errors.notFound'));
       } else if (status && status >= 500) {
-        setLoadError('服务器错误，请稍后重试');
+        setLoadError(t('detail.errors.server'));
       } else {
-        setLoadError(apiMsg || '加载失败，请稍后重试');
+        setLoadError(apiMsg || t('detail.errors.generic'));
       }
       setStory(null);
     } finally {
@@ -131,13 +134,13 @@ export default function StoryDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm('确定要删除这个选题吗？相关稿件也会被删除。')) return;
+    if (!confirm(t('detail.deleteConfirm'))) return;
     await deleteStory(storyId);
     router.push('/dashboard');
   }
 
   async function handleCreateArticle() {
-    const title = prompt('请输入稿件标题：');
+    const title = prompt(t('detail.articleTitlePrompt'));
     if (!title) return;
     await createArticle({
       storyId,
@@ -160,7 +163,7 @@ export default function StoryDetailPage() {
           ? (err as { response?: { data?: { message?: string } } }).response?.data
               ?.message
           : undefined;
-      alert(apiMsg || '资料搜集失败，请稍后重试');
+      alert(apiMsg || t('research.failed'));
     } finally {
       setResearchLoading(false);
     }
@@ -178,7 +181,7 @@ export default function StoryDetailPage() {
           ? (err as { response?: { data?: { message?: string } } }).response?.data
               ?.message
           : undefined;
-      alert(apiMsg || '初稿生成失败，请稍后重试');
+      alert(apiMsg || t('draft.failed'));
       setDraftLoading(false);
     }
   }
@@ -202,21 +205,21 @@ export default function StoryDetailPage() {
   if (!story) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-muted">{loadError ?? '选题不存在'}</p>
+        <p className="text-muted">{loadError ?? t('detail.errors.notFound')}</p>
       </div>
     );
   }
 
   const statusLabels: Record<string, string> = {
-    DRAFT: '选题中',
-    WRITING: '采写中',
-    AI_OPTIMIZING: 'AI优化中',
-    PENDING_REVIEW: '待审核',
-    IN_REVIEW: '审核中',
-    REVISION: '退回修改',
-    APPROVED: '已通过',
-    PUBLISHED: '已发布',
-    ARCHIVED: '已归档',
+    DRAFT: t('detail.status.DRAFT'),
+    WRITING: t('detail.status.WRITING'),
+    AI_OPTIMIZING: t('detail.status.AI_OPTIMIZING'),
+    PENDING_REVIEW: t('detail.status.PENDING_REVIEW'),
+    IN_REVIEW: t('detail.status.IN_REVIEW'),
+    REVISION: t('detail.status.REVISION'),
+    APPROVED: t('detail.status.APPROVED'),
+    PUBLISHED: t('detail.status.PUBLISHED'),
+    ARCHIVED: t('detail.status.ARCHIVED'),
   };
 
   return (
@@ -227,7 +230,7 @@ export default function StoryDetailPage() {
           className="mb-6 inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回工作台
+          {t('backToDashboard')}
         </Link>
 
         <div className="mb-6 flex items-start justify-between">
@@ -245,7 +248,7 @@ export default function StoryDetailPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                   className="w-full text-sm text-muted bg-transparent border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                  placeholder="选题描述..."
+                  placeholder={t('detail.descriptionPlaceholder')}
                 />
                 <div className="flex gap-3">
                   <input
@@ -253,7 +256,7 @@ export default function StoryDetailPage() {
                     value={angle}
                     onChange={(e) => setAngle(e.target.value)}
                     className="flex-1 text-sm bg-transparent border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                    placeholder="报道角度..."
+                    placeholder={t('detail.anglePlaceholder')}
                   />
                   <select
                     value={status}
@@ -277,12 +280,12 @@ export default function StoryDetailPage() {
                     value={contentLanguage}
                     onChange={(e) => setContentLanguage(e.target.value as ContentLanguage)}
                     className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                    title="内容语言"
+                    title={t('language.label')}
                   >
-                    <option value={ContentLanguage.SIMPLIFIED_CHINESE}>简体中文</option>
-                    <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>繁体中文（香港）</option>
-                    <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>繁体中文（粤语）</option>
-                    <option value={ContentLanguage.ENGLISH}>English</option>
+                    <option value={ContentLanguage.SIMPLIFIED_CHINESE}>{t('language.simplifiedChinese')}</option>
+                    <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>{t('language.traditionalChineseHk')}</option>
+                    <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>{t('language.traditionalChineseCantonese')}</option>
+                    <option value={ContentLanguage.ENGLISH}>{t('language.english')}</option>
                   </select>
                   <select
                     value={authorSlug}
@@ -291,11 +294,11 @@ export default function StoryDetailPage() {
                     className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
                     title={
                       authorsAvailable
-                        ? '作者风格：选中的作者文风将应用到生成的初稿'
-                        : '未检测到作者风格数据，将使用默认生成方式'
+                        ? t('detail.authorStyle.availableHint')
+                        : t('detail.authorStyle.unavailableHint')
                     }
                   >
-                    <option value="">默认风格</option>
+                    <option value="">{t('detail.authorStyle.default')}</option>
                     {authors.map((a) => (
                       <option key={a.slug} value={a.slug}>
                         {a.name}
@@ -307,7 +310,7 @@ export default function StoryDetailPage() {
                   <p className="mt-2 text-sm text-muted">{story.description}</p>
                 )}
                 {story.angle && (
-                  <p className="mt-1 text-sm text-muted">角度：{story.angle}</p>
+                  <p className="mt-1 text-sm text-muted">{t('detail.angle', { angle: story.angle })}</p>
                 )}
               </>
             )}
@@ -322,14 +325,14 @@ export default function StoryDetailPage() {
                   onClick={handleSave}
                 >
                   {!saving && <Save className="h-4 w-4" />}
-                  保存
+                  {tc('actions.save')}
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => setIsEditing(false)}
                 >
-                  取消
+                  {tc('actions.cancel')}
                 </Button>
               </>
             ) : (
@@ -339,12 +342,12 @@ export default function StoryDetailPage() {
                   size="sm"
                   onClick={() => setIsEditing(true)}
                 >
-                  编辑
+                  {tc('actions.edit')}
                 </Button>
                 <button
                   onClick={handleDelete}
                   className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                  title="删除选题"
+                  title={t('detail.deleteTooltip')}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -371,7 +374,7 @@ export default function StoryDetailPage() {
               onChange={(e) => setDraftInstruction(e.target.value)}
               rows={2}
               className="w-full text-sm text-muted bg-surface border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-              placeholder="对初稿的特殊要求，如：侧重民生角度、增加专家观点、控制字数在2000字以内..."
+              placeholder={t('draft.instructionPlaceholder')}
             />
           </div>
         )}
@@ -380,8 +383,8 @@ export default function StoryDetailPage() {
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-muted" />
-                <h2 className="text-sm font-medium text-foreground">AI 资料搜集</h2>
-                <span className="text-xs text-subtle">基于选题信息生成结构化背景资料</span>
+                <h2 className="text-sm font-medium text-foreground">{t('research.title')}</h2>
+                <span className="text-xs text-subtle">{t('research.subtitle')}</span>
               </div>
               <Button
                 variant="primary"
@@ -393,17 +396,17 @@ export default function StoryDetailPage() {
                 }}
               >
                 {!researchLoading && <BookOpen className="h-4 w-4" />}
-                生成资料包
+                {t('research.generate')}
               </Button>
             </div>
           </Card>
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-foreground">相关稿件</h2>
+          <h2 className="text-lg font-medium text-foreground">{t('detail.articlesTitle')}</h2>
           <Button variant="primary" size="sm" onClick={handleCreateArticle}>
             <Plus className="h-4 w-4" />
-            新建稿件
+            {t('detail.createArticle')}
           </Button>
         </div>
 
@@ -418,7 +421,7 @@ export default function StoryDetailPage() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-medium text-foreground truncate">{article.title}</h3>
                 <p className="text-xs text-muted">
-                  {article.subtitle || '暂无副标题'} · 版本 {article.version}
+                  {article.subtitle || t('detail.noSubtitle')} · {t('detail.version', { version: article.version })}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -439,12 +442,12 @@ export default function StoryDetailPage() {
           ))}
           {articles.length === 0 && (
             <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
-              <p className="text-sm text-muted">暂无稿件</p>
+              <p className="text-sm text-muted">{t('detail.noArticles')}</p>
               <button
                 onClick={handleCreateArticle}
                 className="mt-2 text-sm font-medium text-foreground hover:underline"
               >
-                创建第一篇稿件 -&gt;
+                {t('detail.createFirstArticle')}
               </button>
             </div>
           )}

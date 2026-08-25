@@ -15,6 +15,9 @@
     "updatedAt": "Updated {time}",
     "refreshSource": "Refresh {label}",
     "unavailable": "Source temporarily unavailable",
-    "unavailableRetry": "Source temporarily unavailable, please try again later"
+    "unavailableRetry": "Source temporarily unavailable, please try again later",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "emptyData": "No data"
   }
 }
