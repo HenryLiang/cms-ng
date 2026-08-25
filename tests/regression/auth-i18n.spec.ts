@@ -171,7 +171,7 @@ test.describe('AUTH §9.1 login & register', () => {
     } finally { await r.dispose(); }
   });
 
-  test('TC-AUTH-004 POST /auth/register new email returns accessToken and user; preferredLanguage defaults to TRADITIONAL_CHINESE_HK', async () => {
+  test('TC-AUTH-004 POST /auth/register new email returns accessToken and user; preferredLanguage defaults to SIMPLIFIED_CHINESE', async () => {
     const newEmail = `qa-auth-new-${SUFFIX}@01.com`;
     const r = await pwRequest.newContext({ baseURL: QA_API });
     try {
@@ -183,11 +183,11 @@ test.describe('AUTH §9.1 login & register', () => {
       const body = await res.json();
       expect(body.accessToken).toMatch(/^eyJ/);
       expect(body.user.email).toBe(newEmail);
-      // preferredLanguage is not in register response select, but DB column default is TRADITIONAL_CHINESE_HK
+      // preferredLanguage is not in register response select, but DB column default is SIMPLIFIED_CHINESE
       // and /auth/me confirms it.
       const me = await r.get('/auth/me', { headers: { Authorization: `Bearer ${body.accessToken}` } });
       const meBody = await me.json();
-      expect(meBody.preferredLanguage).toBe('TRADITIONAL_CHINESE_HK');
+      expect(meBody.preferredLanguage).toBe('SIMPLIFIED_CHINESE');
     } finally { await r.dispose(); }
   });
 
@@ -600,14 +600,14 @@ test.describe('I18N §7 fallback chain (dto ?? user.preferredLanguage ?? default
     expect(article!.contentLanguage).toBe('ENGLISH');
   });
 
-  test('TC-I18N-FB3 REPORTER (pref=null, reporter-none) creates story → falls back to TRADITIONAL_CHINESE_HK', async () => {
+  test('TC-I18N-FB3 REPORTER (pref=null, reporter-none) creates story → falls back to SIMPLIFIED_CHINESE', async () => {
     const { token } = await loginByApi('reporter-none');
     const r = await pwRequest.newContext({ baseURL: QA_API });
     try {
       // Sanity: the user has no preferredLanguage set
       const meRes = await r.get('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
       const me = await meRes.json();
-      // preferredLanguage may be null or TRADITIONAL_CHINESE_HK depending on DB default
+      // preferredLanguage is pinned to null by seed-qa-accounts (persona 'none')
       const res = await r.post('/stories', {
         headers: { Authorization: `Bearer ${token}` },
         data: { title: `qa-i18n-fb-none-${SUFFIX}` },
@@ -615,8 +615,8 @@ test.describe('I18N §7 fallback chain (dto ?? user.preferredLanguage ?? default
       expect(res.status()).toBeGreaterThanOrEqual(200);
       expect(res.status()).toBeLessThan(300);
       const body = await res.json();
-      // We expect the fallback chain to land on TRADITIONAL_CHINESE_HK
-      expect(body.contentLanguage).toBe('TRADITIONAL_CHINESE_HK');
+      // We expect the fallback chain to land on SIMPLIFIED_CHINESE (app-level default)
+      expect(body.contentLanguage).toBe('SIMPLIFIED_CHINESE');
       trackStory(body.id);
       void me;
     } finally { await r.dispose(); }

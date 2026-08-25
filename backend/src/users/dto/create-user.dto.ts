@@ -47,7 +47,7 @@ export class CreateUserDto {
   @ApiProperty({
     description: 'Preferred content language for the user',
     enum: ContentLanguage,
-    example: ContentLanguage.TRADITIONAL_CHINESE_HK,
+    example: ContentLanguage.SIMPLIFIED_CHINESE,
     required: false,
   })
   @IsEnum(ContentLanguage)

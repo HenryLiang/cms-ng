@@ -55,7 +55,7 @@ export default function StoryDetailPage() {
   const [description, setDescription] = useState('');
   const [angle, setAngle] = useState('');
   const [status, setStatus] = useState<Story['status']>('DRAFT');
-  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.SIMPLIFIED_CHINESE);
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [authorSlug, setAuthorSlug] = useState('');
   const [authorsAvailable, setAuthorsAvailable] = useState(true);

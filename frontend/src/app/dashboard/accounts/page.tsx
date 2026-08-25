@@ -288,7 +288,7 @@ function CreateAccountModal({
     name: '',
     role: UserRole.REPORTER as UserRole,
     department: '',
-    preferredLanguage: ContentLanguage.TRADITIONAL_CHINESE_HK as ContentLanguage,
+    preferredLanguage: ContentLanguage.SIMPLIFIED_CHINESE as ContentLanguage,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

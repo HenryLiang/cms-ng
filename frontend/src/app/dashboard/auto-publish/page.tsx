@@ -282,7 +282,7 @@ function CreateTaskForm({
   const [useTrending, setUseTrending] = useState(true);
   const [style, setStyle] = useState('news_brief');
   const [maxLength, setMaxLength] = useState(800);
-  const [language, setLanguage] = useState('TRADITIONAL_CHINESE_HK');
+  const [language, setLanguage] = useState('SIMPLIFIED_CHINESE');
   // Author-style persona for auto-published drafts. '' = default generation.
   const [authorSlug, setAuthorSlug] = useState('');
   const [authors, setAuthors] = useState<{ slug: string; name: string }[]>([]);

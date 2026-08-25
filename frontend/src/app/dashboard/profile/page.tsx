@@ -29,7 +29,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     department: user?.department || '',
-    preferredLanguage: user?.preferredLanguage || ContentLanguage.TRADITIONAL_CHINESE_HK,
+    preferredLanguage: user?.preferredLanguage || ContentLanguage.SIMPLIFIED_CHINESE,
   });
 
   // 修改密码

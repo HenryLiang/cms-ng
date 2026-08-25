@@ -90,7 +90,7 @@ export default function ArticleEditorPage() {
   const [content, setContent] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.SIMPLIFIED_CHINESE);
   // Author-style persona selector. authorSlug='' means "use default generation".
   // Loaded once on mount from GET /authors; degrades gracefully when no data on disk.
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);

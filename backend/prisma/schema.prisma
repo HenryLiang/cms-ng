@@ -16,7 +16,7 @@ model User {
   role              UserRole         @default(REPORTER)
   department        String?
   expertise         String           @default("[]")
-  preferredLanguage ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
+  preferredLanguage ContentLanguage? @default(SIMPLIFIED_CHINESE)
   isActive          Boolean          @default(true)
   balance           Decimal          @default(0) @db.Decimal(12, 4)
   lastLoginAt       DateTime?
@@ -51,7 +51,7 @@ model Story {
   status          ArticleStatus    @default(DRAFT)
   priority        Int              @default(0)
   tags            String           @default("[]") @db.VarChar(1000)
-  contentLanguage ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
+  contentLanguage ContentLanguage? @default(SIMPLIFIED_CHINESE)
   deadline        DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -78,7 +78,7 @@ model Article {
   coverImage       String?
   aiGeneratedParts String           @default("[]")
   version          Int              @default(1)
-  contentLanguage  ContentLanguage? @default(TRADITIONAL_CHINESE_HK)
+  contentLanguage  ContentLanguage? @default(SIMPLIFIED_CHINESE)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   publishedAt      DateTime?
