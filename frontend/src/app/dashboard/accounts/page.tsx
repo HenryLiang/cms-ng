@@ -14,7 +14,11 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { UserRole, ContentLanguage } from '@cms-ng/shared';
+import {
+  UserRole,
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+} from '@cms-ng/shared';
 import { User } from '@/types/auth';
 import {
   getUsers,
@@ -298,7 +302,7 @@ function CreateAccountModal({
     name: '',
     role: UserRole.REPORTER as UserRole,
     department: '',
-    preferredLanguage: ContentLanguage.SIMPLIFIED_CHINESE as ContentLanguage,
+    preferredLanguage: DEFAULT_CONTENT_LANGUAGE as ContentLanguage,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

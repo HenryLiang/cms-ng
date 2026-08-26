@@ -15,7 +15,6 @@ import {
 } from '@/lib/story-api';
 import { getArticles, createArticle, type Article } from '@/lib/article-api';
 import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
-import { useAuthStore } from '@/store/auth-store';
 import {
   ArrowLeft,
   Plus,
@@ -27,6 +26,7 @@ import {
 import {
   ArticleGenre,
   ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
   DEFAULT_DRAFT_WORD_COUNT,
   MAX_DRAFT_WORD_COUNT,
   MIN_DRAFT_WORD_COUNT,
@@ -40,7 +40,6 @@ export default function StoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const storyId = params.id as string;
-  const { user } = useAuthStore();
   const t = useTranslations('stories');
   const tc = useTranslations('common');
 
@@ -71,7 +70,9 @@ export default function StoryDetailPage() {
   const [description, setDescription] = useState('');
   const [angle, setAngle] = useState('');
   const [status, setStatus] = useState<Story['status']>('DRAFT');
-  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.SIMPLIFIED_CHINESE);
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(
+    DEFAULT_CONTENT_LANGUAGE,
+  );
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [authorSlug, setAuthorSlug] = useState('');
   const [authorsAvailable, setAuthorsAvailable] = useState(true);
@@ -159,7 +160,7 @@ export default function StoryDetailPage() {
       storyId,
       title,
       content: '',
-      contentLanguage: user?.preferredLanguage,
+      contentLanguage,
     });
     await loadData();
   }

@@ -295,6 +295,24 @@ describe('AIService', () => {
 
       expect(result.length).toBeGreaterThan(0);
       expect(result[0].title).toContain('Article');
+      expect(result[1].title).toContain('背后原因令人震惊');
+      expect(result[1].title).not.toContain('背後');
+    });
+
+    it('should localize fallback headlines for an explicitly selected language', async () => {
+      mockChatProvider.chatCompletion.mockRejectedValue(new Error('Fail'));
+
+      const traditional = await service.generateHeadlines(
+        'user-id',
+        'article-id',
+        {
+          title: '稿件',
+          content: '正文',
+          language: 'TRADITIONAL_CHINESE_HK' as any,
+        },
+      );
+
+      expect(traditional[1].title).toContain('背後原因令人震驚');
     });
   });
 
@@ -385,6 +403,27 @@ describe('AIService', () => {
   });
 
   describe('generateDraft', () => {
+    it('should instruct the model to use Simplified Chinese by default', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            title: '简体初稿',
+            content: '<p>简体内容</p>',
+          }),
+        ),
+      );
+
+      await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+      });
+
+      const systemMessage =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[0].content;
+      expect(systemMessage).toContain('请用简体中文回答');
+      expect(systemMessage).not.toContain('请用繁体中文回答');
+    });
+
     it('should return parsed draft on success', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse(
@@ -420,7 +459,7 @@ describe('AIService', () => {
       });
 
       expect(result.title).toBe('Current Title');
-      expect(result.content).toContain('暫時不可用');
+      expect(result.content).toContain('暂时不可用');
       expect(result.tags).toEqual(['Story Title']);
       expect(prisma.aIOperation.create).toHaveBeenCalled();
     });
@@ -486,13 +525,13 @@ describe('AIService', () => {
 
       const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
       const prompt = callArgs[0].messages[1].content;
-      expect(prompt).toContain('【事件時間線】');
-      expect(prompt).toContain('2024-01-01：Event 1（來源：Source 1）');
-      expect(prompt).toContain('【關鍵人物】');
+      expect(prompt).toContain('【事件时间线】');
+      expect(prompt).toContain('2024-01-01：Event 1（来源：Source 1）');
+      expect(prompt).toContain('【关键人物】');
       expect(prompt).toContain('Person A（Role A）：Background A');
-      expect(prompt).toContain('【核心數據】');
-      expect(prompt).toContain('Label 1：Value 1（來源：Source 1）');
-      expect(prompt).toContain('【各方觀點】');
+      expect(prompt).toContain('【核心数据】');
+      expect(prompt).toContain('Label 1：Value 1（来源：Source 1）');
+      expect(prompt).toContain('【各方观点】');
       expect(prompt).toContain('Source A（Stance A）：Viewpoint A');
       expect(prompt).toContain(
         '注意：背景资料中已包含多方信息，请在行文中自然引用，不要整段搬运。',
@@ -522,10 +561,10 @@ describe('AIService', () => {
 
       const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
       const prompt = callArgs[0].messages[1].content;
-      expect(prompt).not.toContain('【事件時間線】');
-      expect(prompt).not.toContain('【核心數據】');
-      expect(prompt).not.toContain('【各方觀點】');
-      expect(prompt).toContain('【關鍵人物】');
+      expect(prompt).not.toContain('【事件时间线】');
+      expect(prompt).not.toContain('【核心数据】');
+      expect(prompt).not.toContain('【各方观点】');
+      expect(prompt).toContain('【关键人物】');
     });
 
     it('should use instruction in prompt when provided', async () => {
@@ -1261,7 +1300,7 @@ describe('AIService', () => {
               { keyword: 'K2', searchVolume: 'high' },
             ],
             suggestions: [
-              { category: 'C1', priority: null, suggestion: 'S1' },
+              { category: null, priority: null, suggestion: 'S1' },
               { category: 'C2', priority: 'low', suggestion: 'S2' },
             ],
           }),
@@ -1275,6 +1314,7 @@ describe('AIService', () => {
 
       expect(result.keywords[0].searchVolume).toBe('medium');
       expect(result.keywords[1].searchVolume).toBe('high');
+      expect(result.suggestions[0].category).toBe('综合');
       expect(result.suggestions[0].priority).toBe('medium');
       expect(result.suggestions[1].priority).toBe('low');
     });
@@ -1397,6 +1437,30 @@ describe('AIService', () => {
       prompt =
         mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
       expect(prompt).toContain('英语媒体');
+    });
+
+    it('should use the Simplified Chinese SEO context by default', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            readabilityScore: 70,
+            optimizedTitle: [],
+            keywords: [],
+            suggestions: [],
+          }),
+        ),
+      );
+
+      await service.optimizeSEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      const prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('中国内地媒体');
+      expect(prompt).not.toContain('繁简体中文搜索习惯');
     });
   });
 
@@ -1744,6 +1808,33 @@ describe('AIService', () => {
       prompt =
         mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
       expect(prompt).toContain('英语 AI 搜索');
+    });
+
+    it('should use the Simplified Chinese GEO context by default', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            overallScore: 70,
+            citationScore: 70,
+            answerReadinessScore: 70,
+            optimizedSummary: '',
+            suggestedQuestions: [],
+            keyStatements: [],
+            entities: [],
+            suggestions: [],
+          }),
+        ),
+      );
+
+      await service.optimizeGEO('user-id', 'article-id', {
+        title: 'Test',
+        content: 'Content',
+      });
+
+      const prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('中国内地 AI 搜索');
+      expect(prompt).not.toContain('繁简体中文语境');
     });
   });
 
@@ -2378,7 +2469,7 @@ describe('AIService', () => {
 
       const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
       const prompt = callArgs[0].messages[1].content;
-      expect(prompt).toContain('【Wikipedia 參考資料】');
+      expect(prompt).toContain('【Wikipedia 参考资料】');
       expect(prompt).toContain('香港房屋政策');
       expect(prompt).toContain('https://zh.wikipedia.org/wiki/香港房屋政策');
       expect(prompt).toContain('充分利用 Wikipedia 参考资料');

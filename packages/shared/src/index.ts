@@ -218,6 +218,8 @@ export enum ContentLanguage {
   ENGLISH = 'ENGLISH',
 }
 
+export const DEFAULT_CONTENT_LANGUAGE = ContentLanguage.SIMPLIFIED_CHINESE;
+
 // ===== AI 初稿文体 =====
 export enum ArticleGenre {
   STRAIGHT_NEWS = 'STRAIGHT_NEWS',

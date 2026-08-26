@@ -15,6 +15,8 @@ import {
   PlatformMetadata,
   TransactionType,
   BillingCategory,
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
 } from '@cms-ng/shared';
 import { PlatformRegistry } from './platforms/platform-registry';
 import { PLATFORM_METADATA } from './platforms/constants';
@@ -126,6 +128,9 @@ export class ChannelsService {
             content: prompt,
           },
         ],
+        language:
+          (article.contentLanguage as ContentLanguage | null) ??
+          DEFAULT_CONTENT_LANGUAGE,
       });
 
       // Guard against AI service returning fallback error messages

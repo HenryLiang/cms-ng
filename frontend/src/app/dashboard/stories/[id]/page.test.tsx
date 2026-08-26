@@ -135,6 +135,51 @@ describe('StoryDetailPage - error handling for getStory', () => {
 });
 
 describe('StoryDetailPage - draft preferences', () => {
+  it('generates drafts in Simplified Chinese when a story has no saved language', async () => {
+    const researchKit = {
+      timeline: [{ date: '2026-08-26', event: '旧资料' }],
+      people: [],
+      data: [],
+      opinions: [],
+    };
+    vi.mocked(storyApi.getStory).mockResolvedValue({
+      id: 'story-1',
+      title: '旧选题',
+      status: 'DRAFT',
+      priority: 1,
+      tags: [],
+      reporterId: 'u1',
+      createdAt: '2026-08-26T00:00:00.000Z',
+      updatedAt: '2026-08-26T00:00:00.000Z',
+    });
+    vi.mocked(articleApi.getArticles).mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    });
+    vi.mocked(storyApi.generateResearchKit).mockResolvedValue(researchKit);
+    vi.mocked(storyApi.generateDraftFromResearchKit).mockResolvedValue({
+      article: { id: 'article-1', title: '初稿' },
+    });
+
+    render(<StoryDetailPage />);
+
+    await screen.findByText('旧选题');
+    fireEvent.click(screen.getByRole('button', { name: '生成资料包' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: '按所选文体生成初稿' }),
+    );
+
+    await waitFor(() => {
+      expect(storyApi.generateDraftFromResearchKit).toHaveBeenCalledWith(
+        'story-1',
+        researchKit,
+        expect.objectContaining({
+          language: ContentLanguage.SIMPLIFIED_CHINESE,
+        }),
+      );
+    });
+  });
+
   it('lets the user choose a genre and enter the target word count', async () => {
     const researchKit = {
       timeline: [{ date: '2026-08-26', event: '政策发布' }],

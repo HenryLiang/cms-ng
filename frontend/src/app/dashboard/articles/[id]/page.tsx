@@ -37,7 +37,10 @@ import {
   type ArticleStatus,
 } from '@/lib/article-api';
 import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
-import { ContentLanguage } from '@cms-ng/shared';
+import {
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+} from '@cms-ng/shared';
 import { getEditors } from '@/lib/users-api';
 import { uploadMedia } from '@/lib/media-api';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
@@ -94,7 +97,9 @@ export default function ArticleEditorPage() {
   const [content, setContent] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.SIMPLIFIED_CHINESE);
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(
+    DEFAULT_CONTENT_LANGUAGE,
+  );
   // Author-style persona selector. authorSlug='' means "use default generation".
   // Loaded once on mount from GET /authors; degrades gracefully when no data on disk.
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);

@@ -70,6 +70,25 @@ describe('StoriesService', () => {
   });
 
   describe('create', () => {
+    it('should default new stories to Simplified Chinese', async () => {
+      prisma.user.findUnique.mockResolvedValue({ preferredLanguage: null });
+      prisma.story.create.mockResolvedValue(
+        mockStory({ contentLanguage: 'SIMPLIFIED_CHINESE' }),
+      );
+
+      await service.create('user-id', {
+        title: 'Test Story',
+        description: 'Desc',
+      });
+
+      expect(prisma.story.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          contentLanguage: 'SIMPLIFIED_CHINESE',
+        }),
+        include: expect.any(Object),
+      });
+    });
+
     it('should create story with serialized tags', async () => {
       prisma.story.create.mockResolvedValue(mockStory({ tags: '["tag1"]' }));
 
@@ -434,6 +453,31 @@ describe('StoriesService', () => {
   });
 
   describe('generateResearchKit', () => {
+    it('should inherit the saved story language when none is requested', async () => {
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({
+          tags: '[]',
+          contentLanguage: 'TRADITIONAL_CHINESE_HK',
+        }),
+      );
+      const aiService = (service as never).aiService;
+      aiService.generateResearchKit.mockResolvedValue({
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      });
+
+      await service.generateResearchKit('user-id', 'story-id');
+
+      expect(aiService.generateResearchKit).toHaveBeenCalledWith(
+        'user-id',
+        expect.objectContaining({
+          language: 'TRADITIONAL_CHINESE_HK',
+        }),
+      );
+    });
+
     it('should return research kit for existing story', async () => {
       prisma.story.findUnique.mockResolvedValue(
         mockStory({ tags: '["tag1"]' }),
@@ -564,6 +608,43 @@ describe('StoriesService', () => {
   });
 
   describe('generateDraftFromResearchKit', () => {
+    it('should use the story language for both generation and the saved article', async () => {
+      prisma.story.findUnique.mockResolvedValue(
+        mockStory({
+          tags: '[]',
+          contentLanguage: 'SIMPLIFIED_CHINESE',
+        }),
+      );
+      const aiService = (service as never).aiService;
+      aiService.generateDraft.mockResolvedValue({
+        title: '简体初稿',
+        content: '<p>简体内容</p>',
+      });
+      const articlesService = (service as never).articlesService;
+      articlesService.create.mockResolvedValue({ id: 'article-id' });
+      prisma.story.update.mockResolvedValue(mockStory({ status: 'WRITING' }));
+
+      await service.generateDraftFromResearchKit(
+        'user-id',
+        'story-id',
+        {} as never,
+      );
+
+      expect(aiService.generateDraft).toHaveBeenCalledWith(
+        'user-id',
+        undefined,
+        expect.objectContaining({
+          language: 'SIMPLIFIED_CHINESE',
+        }),
+      );
+      expect(articlesService.create).toHaveBeenCalledWith(
+        'user-id',
+        expect.objectContaining({
+          contentLanguage: 'SIMPLIFIED_CHINESE',
+        }),
+      );
+    });
+
     it('should generate draft, create article, and update story status', async () => {
       prisma.story.findUnique.mockResolvedValue(
         mockStory({ tags: '["politics"]' }),
@@ -613,6 +694,8 @@ describe('StoriesService', () => {
           storyTags: ['politics'],
           instruction: 'instruction',
           researchKit,
+          language: 'SIMPLIFIED_CHINESE',
+          authorSlug: undefined,
           genre: ArticleGenre.IN_DEPTH_REPORT,
           targetWordCount: 2600,
         },
@@ -624,6 +707,7 @@ describe('StoriesService', () => {
         content: '<p>Draft content</p>',
         status: 'WRITING',
         tags: ['香港', '选举'],
+        contentLanguage: 'SIMPLIFIED_CHINESE',
       });
       expect(prisma.story.update).toHaveBeenCalledWith({
         where: { id: 'story-id' },
