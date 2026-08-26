@@ -11,8 +11,12 @@ import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { FindAllStoriesDto } from './dto/find-all-stories.dto';
 import {
+  ArticleGenre,
   ArticleStatus,
   ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+  DEFAULT_DRAFT_WORD_COUNT,
+  type DraftGenerationPreferences,
   isAdminRole,
   isEditorRole,
   UserRole,
@@ -38,7 +42,7 @@ export class StoriesService {
     const contentLanguage =
       dto.contentLanguage ??
       user?.preferredLanguage ??
-      ContentLanguage.SIMPLIFIED_CHINESE;
+      DEFAULT_CONTENT_LANGUAGE;
 
     const story = await this.prisma.story.create({
       data: {
@@ -262,7 +266,10 @@ export class StoriesService {
       storyDescription: story.description || undefined,
       storyAngle: story.angle || undefined,
       storyTags: tags,
-      language,
+      language:
+        language ??
+        (story.contentLanguage as ContentLanguage | null) ??
+        DEFAULT_CONTENT_LANGUAGE,
     });
   }
 
@@ -270,9 +277,7 @@ export class StoriesService {
     userId: string,
     storyId: string,
     researchKit: ResearchKitResult,
-    instruction?: string,
-    language?: ContentLanguage,
-    authorSlug?: string,
+    preferences: DraftGenerationPreferences = {},
   ) {
     const story = await this.prisma.story.findUnique({
       where: { id: storyId },
@@ -280,6 +285,10 @@ export class StoriesService {
     if (!story) throw new NotFoundException('Story not found');
 
     const tags = safeJsonParse<string[]>(story.tags, []);
+    const contentLanguage =
+      preferences.language ??
+      (story.contentLanguage as ContentLanguage | null) ??
+      DEFAULT_CONTENT_LANGUAGE;
 
     // 1. Generate draft using AI with research kit
     const draft = await this.aiService.generateDraft(userId, undefined, {
@@ -287,10 +296,12 @@ export class StoriesService {
       storyDescription: story.description || undefined,
       storyAngle: story.angle || undefined,
       storyTags: tags,
-      instruction,
+      instruction: preferences.instruction,
       researchKit,
-      language,
-      authorSlug,
+      language: contentLanguage,
+      authorSlug: preferences.authorSlug,
+      genre: preferences.genre ?? ArticleGenre.STRAIGHT_NEWS,
+      targetWordCount: preferences.targetWordCount ?? DEFAULT_DRAFT_WORD_COUNT,
     });
 
     // 2. Create article from draft
@@ -301,6 +312,7 @@ export class StoriesService {
       content: draft.content,
       status: ArticleStatus.WRITING,
       tags: draft.tags,
+      contentLanguage,
     });
 
     // 3. Update story status to WRITING

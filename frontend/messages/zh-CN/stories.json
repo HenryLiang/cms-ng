@@ -109,8 +109,8 @@
     "failed": "资料搜集失败，请稍后重试"
   },
   "draft": {
-    "instructionPlaceholder": "对初稿的特殊要求，如：侧重民生角度、增加专家观点、控制字数在2000字以内...",
-    "failed": "初稿生成失败，请稍后重试"
+    "failed": "初稿生成失败，请稍后重试",
+    "wordCountInvalid": "请输入 {min}–{max} 之间的整数。"
   },
   "form": {
     "title": "新建选题",

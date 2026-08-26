@@ -97,6 +97,55 @@ describe('ArticlesService', () => {
   });
 
   describe('create', () => {
+    it('should inherit the parent story language when none is requested', async () => {
+      prisma.story.findUnique.mockResolvedValue({
+        id: 'story-id',
+        contentLanguage: 'ENGLISH',
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        preferredLanguage: 'SIMPLIFIED_CHINESE',
+      });
+      prisma.article.create.mockResolvedValue(
+        mockArticle({ contentLanguage: 'ENGLISH' }),
+      );
+      prisma.articleVersion.create.mockResolvedValue({ id: 'version-id' });
+
+      await service.create('author-id', {
+        storyId: 'story-id',
+        title: 'Test Article',
+        content: 'Content',
+      });
+
+      expect(prisma.article.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          contentLanguage: 'ENGLISH',
+        }),
+        include: expect.any(Object),
+      });
+    });
+
+    it('should default new articles to Simplified Chinese', async () => {
+      prisma.story.findUnique.mockResolvedValue({ id: 'story-id' });
+      prisma.user.findUnique.mockResolvedValue({ preferredLanguage: null });
+      prisma.article.create.mockResolvedValue(
+        mockArticle({ contentLanguage: 'SIMPLIFIED_CHINESE' }),
+      );
+      prisma.articleVersion.create.mockResolvedValue({ id: 'version-id' });
+
+      await service.create('author-id', {
+        storyId: 'story-id',
+        title: 'Test Article',
+        content: 'Content',
+      });
+
+      expect(prisma.article.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          contentLanguage: 'SIMPLIFIED_CHINESE',
+        }),
+        include: expect.any(Object),
+      });
+    });
+
     it('should create article and first version snapshot', async () => {
       prisma.story.findUnique.mockResolvedValue({ id: 'story-id' });
       prisma.article.create.mockResolvedValue(mockArticle());
@@ -468,6 +517,9 @@ describe('ArticlesService', () => {
     });
 
     it('aiRewrite should call aiService.rewriteText', async () => {
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ contentLanguage: 'TRADITIONAL_CHINESE_HK' }),
+      );
       aiService.rewriteText.mockResolvedValue('Rewritten');
 
       const result = await service.aiRewrite('article-id', mockUser, {
@@ -478,7 +530,7 @@ describe('ArticlesService', () => {
         'author-id',
         'article-id',
         expect.any(Object),
-        undefined,
+        'TRADITIONAL_CHINESE_HK',
       );
       expect(result.result).toBe('Rewritten');
     });

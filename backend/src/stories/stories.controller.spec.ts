@@ -288,6 +288,8 @@ describe('StoriesController', () => {
       const dto = {
         researchKit: { timeline: [], people: [], data: [], opinions: [] },
         instruction: '侧重民生角度',
+        genre: 'IN_DEPTH_REPORT' as const,
+        targetWordCount: 2600,
       };
       const result = await controller.generateDraftFromResearchKit(
         'story-id',
@@ -303,9 +305,13 @@ describe('StoriesController', () => {
         'user-id',
         'story-id',
         dto.researchKit,
-        dto.instruction,
-        undefined,
-        undefined,
+        {
+          instruction: dto.instruction,
+          language: undefined,
+          authorSlug: undefined,
+          genre: dto.genre,
+          targetWordCount: dto.targetWordCount,
+        },
       );
       expect(result.article.id).toBe('article-id');
     });
@@ -329,9 +335,13 @@ describe('StoriesController', () => {
         'user-id',
         'story-id',
         dto.researchKit,
-        undefined,
-        undefined,
-        undefined,
+        {
+          instruction: undefined,
+          language: undefined,
+          authorSlug: undefined,
+          genre: undefined,
+          targetWordCount: undefined,
+        },
       );
       expect(result.article.id).toBe('article-id');
     });

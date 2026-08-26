@@ -39,7 +39,7 @@ Instagram 文案要求：
   "title": "帖子标题（60字以内）",
   "content": "Instagram 文案内容",
   "excerpt": "可选的简短描述",
-  "tags": ["#標籤1", "#標籤2"]
+  "tags": ["#标签1", "#标签2"]
 }`;
   }
 

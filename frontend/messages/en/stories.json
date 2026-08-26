@@ -109,8 +109,8 @@
     "failed": "Research kit generation failed. Please try again later."
   },
   "draft": {
-    "instructionPlaceholder": "Special requirements for the draft, e.g., focus on livelihood angles, add expert opinions, keep it under 2,000 words...",
-    "failed": "Draft generation failed. Please try again later."
+    "failed": "Draft generation failed. Please try again later.",
+    "wordCountInvalid": "Enter an integer between {min} and {max}."
   },
   "form": {
     "title": "New Story",

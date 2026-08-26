@@ -16,6 +16,10 @@ import {
   type CreateTaskInput,
 } from '@/lib/auto-publish-api';
 import { getAuthors } from '@/lib/authors-api';
+import {
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+} from '@cms-ng/shared';
 import { Button, Card, PageHeader, Badge, Input } from '@/components/ui';
 import {
   Plus,
@@ -288,7 +292,7 @@ function CreateTaskForm({
   const [useTrending, setUseTrending] = useState(true);
   const [style, setStyle] = useState('news_brief');
   const [maxLength, setMaxLength] = useState(800);
-  const [language, setLanguage] = useState('SIMPLIFIED_CHINESE');
+  const [language, setLanguage] = useState(DEFAULT_CONTENT_LANGUAGE);
   // Author-style persona for auto-published drafts. '' = default generation.
   const [authorSlug, setAuthorSlug] = useState('');
   const [authors, setAuthors] = useState<{ slug: string; name: string }[]>([]);
@@ -451,7 +455,9 @@ function CreateTaskForm({
           <label className="block text-xs font-medium text-foreground mb-1">{t('form.language')}</label>
           <select
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
+            onChange={(e) =>
+              setLanguage(e.target.value as ContentLanguage)
+            }
             className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
           >
             <option value="TRADITIONAL_CHINESE_HK">{t('language.TRADITIONAL_CHINESE_HK')}</option>

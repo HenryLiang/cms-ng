@@ -20,6 +20,7 @@ import {
   ArticleStatus,
   UserRole,
   ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
   isAdminRole,
   isEditorRole,
 } from '@cms-ng/shared';
@@ -140,8 +141,9 @@ export class ArticlesService {
     });
     const contentLanguage =
       dto.contentLanguage ??
+      (story.contentLanguage as ContentLanguage | null) ??
       user?.preferredLanguage ??
-      ContentLanguage.SIMPLIFIED_CHINESE;
+      DEFAULT_CONTENT_LANGUAGE;
 
     const article = await this.prisma.article.create({
       data: serializeArticleInput({
@@ -500,7 +502,7 @@ export class ArticlesService {
     user: { userId: string; role: string },
     dto: RewriteTextDto,
   ) {
-    await this.verifyAccess(id, user);
+    const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.rewriteText(
       user.userId,
       id,
@@ -510,7 +512,7 @@ export class ArticlesService {
         style: dto.style,
         authorSlug: dto.authorSlug,
       },
-      dto.language,
+      this.resolveContentLanguage(dto.language, article.contentLanguage),
     );
     return { result };
   }
@@ -520,11 +522,14 @@ export class ArticlesService {
     user: { userId: string; role: string },
     dto: ExpandTextDto,
   ) {
-    await this.verifyAccess(id, user);
+    const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.expandText(user.userId, id, {
       text: dto.text,
       instruction: dto.instruction,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
     return { result };
@@ -535,11 +540,14 @@ export class ArticlesService {
     user: { userId: string; role: string },
     dto: CondenseTextDto,
   ) {
-    await this.verifyAccess(id, user);
+    const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.condenseText(user.userId, id, {
       text: dto.text,
       maxLength: dto.maxLength,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
     return { result };
@@ -550,10 +558,13 @@ export class ArticlesService {
     user: { userId: string; role: string },
     dto: PolishTextDto,
   ) {
-    await this.verifyAccess(id, user);
+    const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.polishText(user.userId, id, {
       text: dto.text,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
     return { result };
@@ -570,7 +581,10 @@ export class ArticlesService {
       subtitle: article.subtitle || undefined,
       content: article.content,
       count: dto.count,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
     return { headlines: result };
@@ -586,7 +600,10 @@ export class ArticlesService {
       title: article.title,
       content: article.content,
       maxLength: dto.maxLength,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
     return { excerpt: result };
@@ -604,7 +621,10 @@ export class ArticlesService {
       {
         title: dto.title?.trim() || article.title,
         content: dto.content ?? article.content,
-        language: dto.language ?? (article.contentLanguage as ContentLanguage),
+        language: this.resolveContentLanguage(
+          dto.language,
+          article.contentLanguage,
+        ),
       },
     );
 
@@ -657,7 +677,10 @@ export class ArticlesService {
         subtitle: article.subtitle || undefined,
         content: article.content,
       },
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
     return { reply: result };
@@ -685,7 +708,10 @@ export class ArticlesService {
       currentTitle: article.title,
       currentSubtitle: article.subtitle || undefined,
       instruction: dto.instruction,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage ?? story.contentLanguage,
+      ),
       authorSlug: dto.authorSlug,
     });
 
@@ -702,7 +728,10 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
     });
     return result;
   }
@@ -717,7 +746,10 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
     });
     return result;
   }
@@ -732,7 +764,10 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
     });
     return result;
   }
@@ -747,7 +782,10 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: dto.language,
+      language: this.resolveContentLanguage(
+        dto.language,
+        article.contentLanguage,
+      ),
     });
     return result;
   }
@@ -792,6 +830,17 @@ export class ArticlesService {
         story: { select: { id: true, title: true } },
       },
     });
+  }
+
+  private resolveContentLanguage(
+    requested: ContentLanguage | undefined,
+    stored: unknown,
+  ): ContentLanguage {
+    return (
+      requested ??
+      (stored as ContentLanguage | null | undefined) ??
+      DEFAULT_CONTENT_LANGUAGE
+    );
   }
 
   async getVersions(articleId: string) {
