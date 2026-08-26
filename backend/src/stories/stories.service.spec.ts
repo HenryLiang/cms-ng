@@ -10,6 +10,7 @@ import { AIService } from '../ai/ai.service';
 import { ArticlesService } from '../articles/articles.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ArticleGenre } from '@cms-ng/shared';
 
 describe('StoriesService', () => {
   let service: StoriesService;
@@ -592,7 +593,11 @@ describe('StoriesService', () => {
         'user-id',
         'story-id',
         researchKit,
-        'instruction',
+        {
+          instruction: 'instruction',
+          genre: ArticleGenre.IN_DEPTH_REPORT,
+          targetWordCount: 2600,
+        },
       );
 
       expect(prisma.story.findUnique).toHaveBeenCalledWith({
@@ -608,6 +613,8 @@ describe('StoriesService', () => {
           storyTags: ['politics'],
           instruction: 'instruction',
           researchKit,
+          genre: ArticleGenre.IN_DEPTH_REPORT,
+          targetWordCount: 2600,
         },
       );
       expect(articlesService.create).toHaveBeenCalledWith('user-id', {
@@ -713,6 +720,8 @@ describe('StoriesService', () => {
         undefined,
         expect.objectContaining({
           instruction: undefined,
+          genre: ArticleGenre.STRAIGHT_NEWS,
+          targetWordCount: 1500,
         }),
       );
     });

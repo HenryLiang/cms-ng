@@ -108,9 +108,13 @@ export class StoriesController {
       user.userId,
       id,
       dto.researchKit,
-      dto.instruction,
-      dto.language,
-      dto.authorSlug,
+      {
+        instruction: dto.instruction,
+        language: dto.language,
+        authorSlug: dto.authorSlug,
+        genre: dto.genre,
+        targetWordCount: dto.targetWordCount,
+      },
     );
     return { article };
   }

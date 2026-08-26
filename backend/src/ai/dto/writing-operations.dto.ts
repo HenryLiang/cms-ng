@@ -1,4 +1,4 @@
-import { ContentLanguage } from '@cms-ng/shared';
+import { ArticleGenre, ContentLanguage } from '@cms-ng/shared';
 
 export interface RewriteTextInput {
   text: string;
@@ -82,18 +82,23 @@ export interface ChatInput {
   authorSlug?: string;
 }
 
-export interface GenerateDraftInput {
+export interface DraftGenerationPreferences {
+  instruction?: string;
+  language?: ContentLanguage;
+  genre?: ArticleGenre;
+  targetWordCount?: number;
+  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
+  authorSlug?: string;
+}
+
+export interface GenerateDraftInput extends DraftGenerationPreferences {
   storyTitle: string;
   storyDescription?: string;
   storyAngle?: string;
   storyTags: string[];
   currentTitle?: string;
   currentSubtitle?: string;
-  instruction?: string;
   researchKit?: ResearchKitResult;
-  language?: ContentLanguage;
-  /** Optional author persona slug. See RewriteTextInput.authorSlug. */
-  authorSlug?: string;
 }
 
 export interface DraftResult {

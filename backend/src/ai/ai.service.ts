@@ -77,6 +77,10 @@ import {
 import { PromptLoader } from './prompts/prompt-loader';
 import { AIOperationLogger } from '../common/ai-operation-logger';
 import { AuthorStyleService } from '../authors/author-style.service';
+import {
+  buildArticleGenreInstruction,
+  DEFAULT_DRAFT_WORD_COUNT,
+} from './prompts/article-genre.prompt';
 
 /**
  * Module-level safety bounds for the image-fetch path in `uploadToStorage`.
@@ -770,6 +774,10 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
     input: GenerateDraftInput,
   ): Promise<DraftResult> {
     const language = input.language;
+    const targetWordCount = input.targetWordCount ?? DEFAULT_DRAFT_WORD_COUNT;
+    const genreInstruction = input.genre
+      ? buildArticleGenreInstruction(input.genre, targetWordCount)
+      : '';
 
     const tagsStr = input.storyTags.join(', ') || '未指定';
 
@@ -846,13 +854,15 @@ ${input.currentSubtitle ? '当前副标题（可参考）：' + input.currentSub
 ${input.instruction ? '额外要求：' + input.instruction : ''}
 ${researchKitSection ? '\n【已搜集背景資料】\n\n' + researchKitSection : ''}
 
-写作要点：
-- 标题要像一个编辑拟的，不是 AI 生成的。可以直接抛观点、制造反差或提炼最尖锐的细节
-- 导语别绕弯子，第一句话就把最有新闻价值的信息端出来
+${genreInstruction}
+
+通用编辑要求：
+- 标题要像一个编辑拟的，不是 AI 生成的，并与所选文体的功能一致
+- 开篇严格服从所选文体结构，同时尽快让读者理解报道对象与核心价值
 - 行文节奏要像真人：有的段落两三百字铺陈细节，有的段落一句话收住制造停顿感
 - 背景资料里的数据、引语、时间线是素材，要穿插进叙述里，不是用「据了解」「资料显示」生硬地丢上去
 - 观点和事实要分明，但不需要每句话都标「谁说了什么」
-- 结尾要有收束感，可以是一个反问、一个展望、一个数据，或者干脆一段干净利落的陈述
+- 结尾必须完成所选文体规定的收束功能，不机械总结全文
 ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在行文中自然引用，不要整段搬运。\n' : ''}
 格式要求：
 1. 正文使用 HTML 格式，仅使用以下标签：p, h2, h3, ul, ol, li, blockquote, strong, em
@@ -884,7 +894,7 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
           messages: [
             {
               role: 'system',
-              content: `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
+              content: `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n- 用户指定的文体定义、结构、特点和篇幅是最高写作约束\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 开篇按所选文体完成其功能，避免套话开头\n- 判断和态度的强度必须符合所选文体，事实稿不得写成评论\n- 禁止使用 AI 高频词汇和句式：「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
             },
             { role: 'user', content: prompt },
           ],

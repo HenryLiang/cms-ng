@@ -20,6 +20,7 @@ import { BillingService } from '../billing/billing.service';
 import { AIOperationLogger } from '../common/ai-operation-logger';
 import { AuthorStyleService } from '../authors/author-style.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ArticleGenre } from '@cms-ng/shared';
 
 /** Shared mock for AuthorStyleService. Returns '' (no persona) so the system
  *  prompts in these tests are unchanged — author-style injection is opt-in via
@@ -546,6 +547,32 @@ describe('AIService', () => {
       const callArgs = mockChatProvider.chatCompletion.mock.calls[0];
       const prompt = callArgs[0].messages[1].content;
       expect(prompt).toContain('额外要求：侧重民生角度');
+    });
+
+    it('should apply the selected genre and freely entered target length', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            title: '深度稿',
+            content: '<p>Content</p>',
+          }),
+        ),
+      );
+
+      await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+        genre: ArticleGenre.IN_DEPTH_REPORT,
+        targetWordCount: 3200,
+      });
+
+      const prompt =
+        mockChatProvider.chatCompletion.mock.calls[0][0].messages[1].content;
+      expect(prompt).toContain('文体类型：深度报道');
+      expect(prompt).toContain('结构要求：');
+      expect(prompt).toContain('证据链');
+      expect(prompt).toContain('写作特点：');
+      expect(prompt).toContain('目标篇幅：约 3200 字');
     });
 
     it('should sanitize HTML in draft content', async () => {

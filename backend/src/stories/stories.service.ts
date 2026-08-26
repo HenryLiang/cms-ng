@@ -11,13 +11,18 @@ import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { FindAllStoriesDto } from './dto/find-all-stories.dto';
 import {
+  ArticleGenre,
   ArticleStatus,
   ContentLanguage,
+  DEFAULT_DRAFT_WORD_COUNT,
   isAdminRole,
   isEditorRole,
   UserRole,
 } from '@cms-ng/shared';
-import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
+import {
+  type DraftGenerationPreferences,
+  ResearchKitResult,
+} from '../ai/dto/writing-operations.dto';
 import { safeJsonParse } from '../common/json.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -270,9 +275,7 @@ export class StoriesService {
     userId: string,
     storyId: string,
     researchKit: ResearchKitResult,
-    instruction?: string,
-    language?: ContentLanguage,
-    authorSlug?: string,
+    preferences: DraftGenerationPreferences = {},
   ) {
     const story = await this.prisma.story.findUnique({
       where: { id: storyId },
@@ -287,10 +290,12 @@ export class StoriesService {
       storyDescription: story.description || undefined,
       storyAngle: story.angle || undefined,
       storyTags: tags,
-      instruction,
+      instruction: preferences.instruction,
       researchKit,
-      language,
-      authorSlug,
+      language: preferences.language,
+      authorSlug: preferences.authorSlug,
+      genre: preferences.genre ?? ArticleGenre.STRAIGHT_NEWS,
+      targetWordCount: preferences.targetWordCount ?? DEFAULT_DRAFT_WORD_COUNT,
     });
 
     // 2. Create article from draft

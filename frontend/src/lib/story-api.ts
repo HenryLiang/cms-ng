@@ -1,5 +1,5 @@
 import { api } from './api';
-import { ContentLanguage } from '@cms-ng/shared';
+import { ArticleGenre, ContentLanguage } from '@cms-ng/shared';
 
 type ArticleStatus = 'DRAFT' | 'WRITING' | 'AI_OPTIMIZING' | 'PENDING_REVIEW' | 'IN_REVIEW' | 'REVISION' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -101,6 +101,14 @@ export interface ResearchKitResult {
   wikipediaStatus?: 'ok' | 'no_results' | 'api_error';
 }
 
+export interface DraftGenerationOptions {
+  instruction?: string;
+  language?: ContentLanguage;
+  authorSlug?: string;
+  genre?: ArticleGenre;
+  targetWordCount?: number;
+}
+
 export async function generateResearchKit(storyId: string, language?: ContentLanguage): Promise<ResearchKitResult> {
   const res = await api.post(`/stories/${storyId}/research`, {}, { params: { language } });
   return res.data;
@@ -109,10 +117,11 @@ export async function generateResearchKit(storyId: string, language?: ContentLan
 export async function generateDraftFromResearchKit(
   storyId: string,
   researchKit: ResearchKitResult,
-  instruction?: string,
-  language?: ContentLanguage,
-  authorSlug?: string,
+  options: DraftGenerationOptions = {},
 ): Promise<{ article: { id: string; title: string } }> {
-  const res = await api.post(`/stories/${storyId}/draft`, { researchKit, instruction, language, authorSlug });
+  const res = await api.post(`/stories/${storyId}/draft`, {
+    researchKit,
+    ...options,
+  });
   return res.data;
 }
