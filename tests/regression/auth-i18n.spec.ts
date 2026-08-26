@@ -123,9 +123,11 @@ function trackArticle(id: string) { createdArticleIds.push(id); }
 
 test.afterAll(async () => {
   const { token } = await loginByApi('admin');
-  for (const id of createdArticleIds) await deleteArticle(token, id);
-  for (const id of createdStoryIds) await deleteStory(token, id);
-});
+  await Promise.all([
+    ...createdArticleIds.map((id) => deleteArticle(token, id)),
+    ...createdStoryIds.map((id) => deleteStory(token, id)),
+  ]);
+}, { timeout: 120_000 });
 
 // =============================================================
 // §9.1 Login & Register — TC-AUTH-001 ~ TC-AUTH-005
@@ -248,14 +250,20 @@ test.describe('AUTH §9.2 token validation', () => {
     } finally { await r.dispose(); }
   });
 
-  test('TC-AUTH-009b /auth/refresh endpoint is NOT implemented (GAP)', async () => {
-    // The §9.3 plan expects a /auth/refresh endpoint for token rotation.
-    // The current AuthController only exposes register/login/me. Record as a known gap.
+  test('TC-AUTH-009b /auth/refresh endpoint refreshes valid tokens and rejects bad ones', async () => {
+    // issue #49 added POST /auth/refresh. It returns 400 for missing/short tokens
+    // and re-issues a new access token for a valid existing token.
     const r = await pwRequest.newContext({ baseURL: QA_API });
     try {
-      const res = await r.post('/auth/refresh', { data: {} });
-      // 404 confirms the route is not registered
-      expect([404, 405]).toContain(res.status());
+      const bad = await r.post('/auth/refresh', { data: {} });
+      expect(bad.status()).toBe(400);
+
+      const { token } = await loginByApi('admin');
+      const good = await r.post('/auth/refresh', { data: { token } });
+      expect(good.status()).toBe(200);
+      const body = await good.json();
+      expect(body.accessToken).toBeDefined();
+      expect(typeof body.accessToken).toBe('string');
     } finally { await r.dispose(); }
   });
 
@@ -677,15 +685,11 @@ test.describe('I18N §7.2 cross-module', () => {
     expect(fetched.contentLanguage).toBe('ENGLISH');
   });
 
-  test('TC-I18N-033 BUG: auto-publish contentConfig.language accepts invalid enum', async () => {
-    // Product bug: backend/src/auto-publish/dto/create-task.dto.ts:42 declares
-    // contentConfig.language as a plain @IsString() with no ContentLanguage enum
-    // validator. The DTO therefore accepts garbage language codes that will be
-    // propagated to AI providers. The test documents the (buggy) current behaviour
-    // by asserting the API accepts INVALID_LANG. See report — risk: P1.
+  test('TC-I18N-033 auto-publish contentConfig.language rejects invalid enum', async () => {
+    // contentConfig.language is now validated against the ContentLanguage enum,
+    // so an invalid language code must be rejected with 400.
     const { token } = await loginByApi('admin');
     const r = await pwRequest.newContext({ baseURL: QA_API });
-    let createdTaskId: string | null = null;
     try {
       const res = await r.post('/auto-publish/tasks', {
         headers: { Authorization: `Bearer ${token}` },
@@ -701,18 +705,8 @@ test.describe('I18N §7.2 cross-module', () => {
           retryConfig: { maxRetries: 0, retryDelayMs: 1000 },
         },
       });
-      // Bug: API returns 201 (creates the bad task). We document & cleanup.
-      expect([200, 201]).toContain(res.status());
-      if (res.ok()) {
-        const body = await res.json();
-        createdTaskId = body.id;
-      }
+      expect(res.status()).toBe(400);
     } finally {
-      if (createdTaskId) {
-        await r.delete(`/auto-publish/tasks/${createdTaskId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
       await r.dispose();
     }
   });
@@ -724,12 +718,15 @@ test.describe('I18N §7.2 cross-module', () => {
 test.describe('I18N §7 frontend list page language badge', () => {
   test('TC-I18N-LIST stories list page renders language badges for stories with contentLanguage', async ({ browser }) => {
     // Seed: an English story
-    const { token: enToken, userId: enId, email: enEmail } = await loginByApi('reporter-en');
+    const { token: enToken, userId: enId, email: enEmail, role: enRole, name: enName } = await loginByApi('reporter-en');
     const created = await createStoryViaApi(enToken, {
       title: `qa-i18n-list-en-${SUFFIX}`,
       contentLanguage: 'ENGLISH',
     });
+    expect(created).not.toBeNull();
     trackStory(created!.id);
+    // Touch the story so it appears at the top of the workbench's recent list.
+    await patchStory(enToken, created!.id, { description: `touch-${Date.now()}` });
 
     const ctx = await browser.newContext({ baseURL: 'http://localhost:3000' });
     await ctx.route('**://localhost:3001/**', async (route) => {
@@ -737,13 +734,13 @@ test.describe('I18N §7 frontend list page language badge', () => {
       return route.continue({ url: original.replace('localhost:3001', 'localhost:3002') });
     });
     const page = await ctx.newPage();
-    await page.addInitScript(({ token, userId, email }) => {
+    await page.addInitScript(({ token, userId, email, role, name }) => {
       localStorage.setItem('accessToken', token);
       localStorage.setItem('auth-storage', JSON.stringify({
-        state: { token, user: { id: userId, email }, isAuthenticated: true, _hasHydrated: true },
+        state: { token, user: { id: userId, email, role, name }, isAuthenticated: true, _hasHydrated: true },
         version: 0,
       }));
-    }, { token: enToken, userId: enId, email: enEmail });
+    }, { token: enToken, userId: enId, email: enEmail, role: enRole, name: enName });
 
     await page.goto('/dashboard');
     await page.waitForLoadState('domcontentloaded');
@@ -756,11 +753,12 @@ test.describe('I18N §7 frontend list page language badge', () => {
   });
 
   test('TC-I18N-DETAIL article detail page shows contentLanguage field for an article created with EN', async ({ browser }) => {
-    const { token, userId, email } = await loginByApi('reporter-en');
+    const { token, userId, email, role, name } = await loginByApi('reporter-en');
     const story = await createStoryViaApi(token, {
       title: `qa-i18n-detail-story-${SUFFIX}`,
       contentLanguage: 'ENGLISH',
     });
+    expect(story).not.toBeNull();
     trackStory(story!.id);
     const article = await createArticleViaApi(token, {
       storyId: story!.id,
@@ -768,6 +766,7 @@ test.describe('I18N §7 frontend list page language badge', () => {
       content: '<p>EN body</p>',
       contentLanguage: 'ENGLISH',
     });
+    expect(article).not.toBeNull();
     trackArticle(article!.id);
 
     const ctx = await browser.newContext({ baseURL: 'http://localhost:3000' });
@@ -776,20 +775,22 @@ test.describe('I18N §7 frontend list page language badge', () => {
       return route.continue({ url: original.replace('localhost:3001', 'localhost:3002') });
     });
     const page = await ctx.newPage();
-    await page.addInitScript(({ token, userId, email }) => {
+    await page.addInitScript(({ token, userId, email, role, name }) => {
       localStorage.setItem('accessToken', token);
       localStorage.setItem('auth-storage', JSON.stringify({
-        state: { token, user: { id: userId, email }, isAuthenticated: true, _hasHydrated: true },
+        state: { token, user: { id: userId, email, role, name }, isAuthenticated: true, _hasHydrated: true },
         version: 0,
       }));
-    }, { token, userId, email });
+    }, { token, userId, email, role, name });
 
     await page.goto(`/dashboard/articles/${article!.id}`);
     await page.waitForLoadState('domcontentloaded');
-    // The title is bound to an <input value={title}>. Wait for it to populate
-    // by selecting on its value attribute, not on text content.
-    const titleInput = page.locator(`input[value*="qa-i18n-detail-article-${SUFFIX}"]`).first();
+    // Wait for the editor to finish loading (spinner disappears and title input is rendered).
+    const titleInput = page.locator('input[type="text"]').first();
     await titleInput.waitFor({ state: 'attached', timeout: 20_000 });
+    await expect(titleInput).toHaveValue(new RegExp(`qa-i18n-detail-article-${SUFFIX}`), { timeout: 20_000 });
+    // The content-language dropdown should reflect the article's explicit ENGLISH value.
+    await expect(page.locator('select', { has: page.locator('option[value="ENGLISH"]') }).first()).toHaveValue('ENGLISH', { timeout: 20_000 });
     await page.screenshot({ path: 'tests/regression/screenshots/i18n-detail-article.png', fullPage: true });
     await ctx.close();
   });

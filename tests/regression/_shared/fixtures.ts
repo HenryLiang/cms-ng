@@ -35,7 +35,7 @@ export const QA_API = 'http://localhost:3002';
  * Acquire a JWT by hitting the QA backend directly.
  * Faster and more deterministic than driving the login form.
  */
-export async function loginByApi(role: Role): Promise<{ token: string; userId: string; email: string }> {
+export async function loginByApi(role: Role): Promise<{ token: string; userId: string; email: string; role: string; name: string }> {
   const ctx = await pwRequest.newContext({ baseURL: QA_API });
   const res = await ctx.post('/auth/login', { data: ACCOUNTS[role] });
   if (!res.ok()) {
@@ -43,7 +43,7 @@ export async function loginByApi(role: Role): Promise<{ token: string; userId: s
   }
   const body = await res.json();
   await ctx.dispose();
-  return { token: body.accessToken, userId: body.user.id, email: body.user.email };
+  return { token: body.accessToken, userId: body.user.id, email: body.user.email, role: body.user.role, name: body.user.name };
 }
 
 type Fixtures = {
@@ -81,18 +81,18 @@ export const test = base.extend<Fixtures>({
     const page = await ctx.newPage();
 
     if (roleAnnotation && ACCOUNTS[roleAnnotation as Role]) {
-      const { token, userId, email } = await loginByApi(roleAnnotation as Role);
+      const { token, userId, email, role, name } = await loginByApi(roleAnnotation as Role);
       // Seed JWT into localStorage before any app code runs.
       // Keys match frontend/src/store/auth-store.ts: name='auth-storage' + 'accessToken' raw key.
-      await page.addInitScript(({ token, userId, email }) => {
+      await page.addInitScript(({ token, userId, email, role, name }) => {
         try {
           localStorage.setItem('accessToken', token);
           localStorage.setItem('auth-storage', JSON.stringify({
-            state: { token, user: { id: userId, email }, isAuthenticated: true, _hasHydrated: true },
+            state: { token, user: { id: userId, email, role, name }, isAuthenticated: true, _hasHydrated: true },
             version: 0,
           }));
         } catch {}
-      }, { token, userId, email });
+      }, { token, userId, email, role, name });
     }
 
     await use(page);

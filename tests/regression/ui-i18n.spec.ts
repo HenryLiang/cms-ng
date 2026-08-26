@@ -61,7 +61,7 @@ test.describe('UI i18n locale switching', () => {
 
   test('english persists into the dashboard for an authenticated user', async ({ browser }) => {
     // Login via API on the QA backend, seed JWT, set NEXT_LOCALE=en before load.
-    const { token, userId, email } = await (async () => {
+    const { token, userId, email, role, name } = await (async () => {
       const { loginByApi } = await import('./_shared/fixtures');
       return loginByApi('admin');
     })();
@@ -74,13 +74,13 @@ test.describe('UI i18n locale switching', () => {
       { name: 'NEXT_LOCALE', value: 'en', url: 'http://localhost:3000' },
     ]);
     const page = await ctx.newPage();
-    await page.addInitScript(({ token, userId, email }) => {
+    await page.addInitScript(({ token, userId, email, role, name }) => {
       localStorage.setItem('accessToken', token);
       localStorage.setItem('auth-storage', JSON.stringify({
-        state: { token, user: { id: userId, email }, isAuthenticated: true, _hasHydrated: true },
+        state: { token, user: { id: userId, email, role, name }, isAuthenticated: true, _hasHydrated: true },
         version: 0,
       }));
-    }, { token, userId, email });
+    }, { token, userId, email, role, name });
 
     await page.goto('/dashboard');
     await page.waitForLoadState('domcontentloaded');
