@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Wallet,
   TrendingDown,
@@ -19,21 +20,11 @@ import {
   type BalanceInfo,
   type BillingTransaction,
 } from '@/lib/billing-api';
+import { getTransactionTypeLabel } from '@/lib/transaction-labels';
 import { Badge, Card, PageHeader } from '@/components/ui';
 
-const typeLabels: Record<string, string> = {
-  TOP_UP: '充值',
-  AI_LLM: 'AI调用',
-  AI_IMAGE: '图片生成',
-  PUBLISH: '发布',
-  AUTO_PUBLISH: '自动发布',
-  REFUND: '退款',
-  ADJUSTMENT: '调整',
-};
-
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('zh-CN', {
+function formatDate(dateStr: string, locale: string): string {
+  return new Date(dateStr).toLocaleString(locale, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -42,6 +33,9 @@ function formatDate(dateStr: string): string {
 }
 
 export default function BillingPage() {
+  const t = useTranslations('billing');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const paymentResult = searchParams.get('payment'); // 'success' | 'failed' | null
   const tradeStatus = searchParams.get('trade_status');
@@ -118,8 +112,8 @@ export default function BillingPage() {
   return (
     <div className="h-full p-8">
       <PageHeader
-        title="计费中心"
-        subtitle="管理账户余额、查看消费记录和充值历史"
+        title={t('overview.title')}
+        subtitle={t('overview.subtitle')}
       />
 
       {/* 支付宝支付返回横幅 */}
@@ -130,10 +124,14 @@ export default function BillingPage() {
         >
           <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-emerald-900">支付成功！</p>
+            <p className="text-sm font-medium text-emerald-900">{t('overview.paymentSuccessTitle')}</p>
             <p className="mt-0.5 text-xs text-emerald-700">
-              积分将在 1-3 秒内到账。
-              {outTradeNo && <span className="ml-1 text-emerald-600">订单号: {outTradeNo}</span>}
+              {t('overview.paymentSuccessHint')}
+              {outTradeNo && (
+                <span className="ml-1 text-emerald-600">
+                  {t('overview.orderNo', { orderNo: outTradeNo })}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -142,12 +140,16 @@ export default function BillingPage() {
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-900">支付未完成</p>
+            <p className="text-sm font-medium text-amber-900">{t('overview.paymentFailedTitle')}</p>
             <p className="mt-0.5 text-xs text-amber-700">
               {tradeStatus && tradeStatus !== 'WAIT_BUYER_PAY'
-                ? `交易状态: ${tradeStatus}`
-                : '请重新发起充值或联系客服。'}
-              {outTradeNo && <span className="ml-1 text-amber-600">订单号: {outTradeNo}</span>}
+                ? t('overview.paymentTradeStatus', { status: tradeStatus })
+                : t('overview.paymentFailedHint')}
+              {outTradeNo && (
+                <span className="ml-1 text-amber-600">
+                  {t('overview.orderNo', { orderNo: outTradeNo })}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -163,7 +165,7 @@ export default function BillingPage() {
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="h-4 w-4 text-red-500" />
-            <span className="text-xs text-muted">本月消费</span>
+            <span className="text-xs text-muted">{t('overview.monthSpent')}</span>
           </div>
           <div className="tnum text-2xl font-semibold text-foreground">
             ¥{monthSpent.toFixed(2)}
@@ -172,7 +174,7 @@ export default function BillingPage() {
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <CreditCard className="h-4 w-4 text-emerald-500" />
-            <span className="text-xs text-muted">充值总额</span>
+            <span className="text-xs text-muted">{t('overview.totalTopUps')}</span>
           </div>
           <div className="tnum text-2xl font-semibold text-foreground">
             ¥{totalTopUps.toFixed(2)}
@@ -181,7 +183,7 @@ export default function BillingPage() {
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="h-4 w-4 text-blue-500" />
-            <span className="text-xs text-muted">当前余额</span>
+            <span className="text-xs text-muted">{t('overview.currentBalance')}</span>
           </div>
           <div className="tnum text-2xl font-semibold text-foreground">
             ¥{(balance?.balance ?? 0).toFixed(2)}
@@ -194,39 +196,39 @@ export default function BillingPage() {
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div className="flex items-center gap-2">
             <Receipt className="h-4 w-4 text-muted" />
-            <h2 className="text-sm font-semibold text-foreground">最近交易</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('overview.recentTransactions')}</h2>
           </div>
           <Link
             href="/dashboard/billing/transactions"
             className="flex items-center gap-1 text-xs font-medium text-muted hover:text-foreground"
           >
-            查看全部
+            {t('overview.viewAll')}
             <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
 
         {transactions.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-muted">暂无数据</p>
+            <p className="text-muted">{tCommon('state.empty')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
-                <th className="px-6 py-3 font-medium">时间</th>
-                <th className="px-6 py-3 font-medium">类型</th>
-                <th className="px-6 py-3 font-medium">描述</th>
-                <th className="px-6 py-3 font-medium text-right">金额</th>
-                <th className="px-6 py-3 font-medium text-right">余额</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.time')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.type')}</th>
+                <th className="px-6 py-3 font-medium">{t('shared.table.description')}</th>
+                <th className="px-6 py-3 font-medium text-right">{t('shared.table.amount')}</th>
+                <th className="px-6 py-3 font-medium text-right">{t('shared.table.balance')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {transactions.map((tx) => (
                 <tr key={tx.id} className="transition hover:bg-surface-muted/50">
-                  <td className="tnum px-6 py-3 text-muted">{formatDate(tx.createdAt)}</td>
+                  <td className="tnum px-6 py-3 text-muted">{formatDate(tx.createdAt, locale)}</td>
                   <td className="px-6 py-3">
                     <Badge tone="neutral">
-                      {typeLabels[tx.type] || tx.type}
+                      {getTransactionTypeLabel(tx.type)}
                     </Badge>
                   </td>
                   <td className="px-6 py-3 text-foreground">{tx.description}</td>

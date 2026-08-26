@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -12,4 +13,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@cms-ng/shared'],
 };
 
-export default nextConfig;
+// next-intl 插件:约定读取 ./src/i18n/request.ts(无 URL 路由,cookie 驱动)
+const withNextIntl = createNextIntlPlugin();
+
+export default withNextIntl(nextConfig);

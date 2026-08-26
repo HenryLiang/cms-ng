@@ -1,0 +1,148 @@
+{
+  "overview": {
+    "title": "Billing Center",
+    "subtitle": "Manage your balance, spending records and top-up history",
+    "paymentSuccessTitle": "Payment successful!",
+    "paymentSuccessHint": "Credits will arrive within 1-3 seconds.",
+    "paymentFailedTitle": "Payment not completed",
+    "paymentTradeStatus": "Trade status: {status}",
+    "paymentFailedHint": "Please try the top-up again or contact support.",
+    "orderNo": "Order No.: {orderNo}",
+    "monthSpent": "Spent this month",
+    "totalTopUps": "Total top-ups",
+    "currentBalance": "Current balance",
+    "recentTransactions": "Recent transactions",
+    "viewAll": "View all"
+  },
+  "config": {
+    "title": "Billing Configuration",
+    "subtitle": "Manage unit prices and activation status for each service item",
+    "invalidPrice": "Please enter a valid unit price",
+    "saveFailed": "Save failed: {message}",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "report": {
+    "title": "Spending Report",
+    "subtitle": "View platform spending statistics and user spending rankings",
+    "totalRevenue": "Total revenue",
+    "totalConsumption": "Total spending",
+    "netChange": "Net change",
+    "byCategory": "Spending by category",
+    "byType": "Breakdown by type",
+    "topUsers": "Top 10 Spenders",
+    "rank": "#",
+    "username": "Username",
+    "spentAmount": "Amount spent"
+  },
+  "topUp": {
+    "title": "Top Up",
+    "subtitle": "Top up your account to use AI and publishing features",
+    "packages": {
+      "trial": "Trial Pack",
+      "basic": "Basic Pack",
+      "pro": "Pro Pack",
+      "enterprise": "Enterprise Pack"
+    },
+    "paymentMethods": {
+      "alipay": "Alipay",
+      "wechat": "WeChat Pay",
+      "manual": "Manual top-up"
+    },
+    "status": {
+      "PENDING": "Pending",
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "REFUNDED": "Refunded"
+    },
+    "invalidAmount": "Please select or enter a top-up amount (minimum ¥{minAmount})",
+    "selectTargetUser": "Please select a target user for the top-up",
+    "userNotLoaded": "User info not loaded, please refresh the page",
+    "successAlert": "Top-up successful! ¥{amount} credited",
+    "successAlertWithTarget": "Top-up successful! ¥{amount} credited ({name})",
+    "failedAlert": "Top-up failed: {message}",
+    "wechatScanHint": "Please scan the QR code with WeChat to complete the payment; credits will arrive automatically once paid",
+    "bonus": "Bonus ¥{amount}",
+    "customAmount": "Custom amount",
+    "minAmountManual": "Min ¥0.01",
+    "minAmountOnline": "Min ¥10",
+    "paymentMethodLabel": "Payment method",
+    "targetUserLabel": "Top-up target user",
+    "selectUserPlaceholder": "Select a user",
+    "userOption": "{name} ({email})",
+    "noUsersFound": "No users available for top-up",
+    "confirmButton": "Confirm top-up",
+    "recordsTitle": "Top-up records",
+    "manualMethod": "Manual",
+    "manualReason": "Manual top-up by admin ({name})",
+    "manualReasonNoTarget": "Manual top-up by admin"
+  },
+  "transactions": {
+    "title": "Spending Records",
+    "subtitle": "View all transactions and spending details",
+    "totalSpent": "Total spent",
+    "pageInfo": "{total} items, page {page} of {totalPages}",
+    "typeOptions": {
+      "all": "All",
+      "AI_LLM": "AI call",
+      "AI_IMAGE": "Image generation",
+      "PUBLISH": "Publish",
+      "AUTO_PUBLISH": "Auto-publish",
+      "TOP_UP": "Top-up",
+      "REFUND": "Refund"
+    }
+  },
+  "balanceCard": {
+    "title": "Account balance",
+    "topUp": "Top up",
+    "lowBalanceWarning": "Balance is below the alert threshold {threshold}",
+    "recentTransactions": "Recent transactions",
+    "loadFailed": "Failed to load",
+    "unavailable": "Unable to load balance information"
+  },
+  "costEstimator": {
+    "title": "Cost estimate",
+    "estimating": "Estimating cost…",
+    "estimateFailed": "Cost estimation failed",
+    "unavailable": "Unable to retrieve cost estimate",
+    "sufficient": "Sufficient balance",
+    "insufficient": "Insufficient balance",
+    "item": "Item",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "subtotal": "Subtotal",
+    "currentBalance": "Current balance {balance}",
+    "estimatedCost": "Estimated cost {cost}"
+  },
+  "lowBalanceBanner": {
+    "title": "Insufficient balance",
+    "detail": "Current balance ¥{balance}, below the alert threshold of ¥{threshold}",
+    "topUpNow": "Top up now"
+  },
+  "shared": {
+    "unknownError": "Unknown error",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "table": {
+      "time": "Time",
+      "type": "Type",
+      "description": "Description",
+      "amount": "Amount",
+      "balance": "Balance",
+      "name": "Name",
+      "category": "Category",
+      "unit": "Billing unit",
+      "unitPrice": "Unit price (¥)",
+      "status": "Status",
+      "actions": "Actions",
+      "user": "User",
+      "credited": "Credited",
+      "method": "Method"
+    },
+    "categoryLabels": {
+      "AI": "AI services",
+      "PUBLISHING": "Publishing services",
+      "OTHER": "Other"
+    }
+  }
+}

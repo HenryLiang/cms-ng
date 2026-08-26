@@ -1,4 +1,7 @@
+'use client';
+
 import { ClipboardCheck, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { ReviewReportResult } from '@/lib/article-api';
 
 export default function ReviewReportPanel({
@@ -8,6 +11,7 @@ export default function ReviewReportPanel({
   result: ReviewReportResult;
   onClose: () => void;
 }) {
+  const t = useTranslations('panels.reviewReport');
   // 评分色（测试断言 text-emerald-600/amber-600/red-600，保留）
   const scoreColor =
     result.overallScore >= 80 ? 'text-emerald-600' : result.overallScore >= 60 ? 'text-amber-600' : 'text-red-600';
@@ -18,9 +22,9 @@ export default function ReviewReportPanel({
 
   // 优先级徽章（测试断言 text+bg 类，保留）
   const priorityConfig = {
-    high: { label: '高', color: 'text-red-600 bg-red-50 border-red-200' },
-    medium: { label: '中', color: 'text-amber-600 bg-amber-50 border-amber-200' },
-    low: { label: '低', color: 'text-zinc-600 bg-zinc-50 border-zinc-200' },
+    high: { label: t('priorityHigh'), color: 'text-red-600 bg-red-50 border-red-200' },
+    medium: { label: t('priorityMedium'), color: 'text-amber-600 bg-amber-50 border-amber-200' },
+    low: { label: t('priorityLow'), color: 'text-zinc-600 bg-zinc-50 border-zinc-200' },
   };
 
   return (
@@ -28,7 +32,7 @@ export default function ReviewReportPanel({
       <div className="flex items-center justify-between border-b border-blue-100 px-3 py-2">
         <div className="flex items-center gap-1.5">
           <ClipboardCheck className="h-4 w-4 text-blue-600" />
-          <span className="text-xs font-medium text-blue-900">AI 预审报告</span>
+          <span className="text-xs font-medium text-blue-900">{t('title')}</span>
         </div>
         <button onClick={onClose} className="text-subtle transition-colors hover:text-foreground">
           <X className="h-3.5 w-3.5" />
@@ -38,7 +42,7 @@ export default function ReviewReportPanel({
         {/* Overall Score */}
         <div className={`rounded-lg ${scoreBg} p-4 text-center`}>
           <p className={`text-4xl font-bold ${scoreColor}`}>{result.overallScore}</p>
-          <p className="mt-1 text-xs text-muted">综合评分 / 100</p>
+          <p className="mt-1 text-xs text-muted">{t('overallScore')}</p>
         </div>
 
         {/* Summary */}
@@ -47,7 +51,7 @@ export default function ReviewReportPanel({
         {/* Dimensions */}
         {result.dimensions.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-xs font-medium text-foreground">维度评分</h4>
+            <h4 className="text-xs font-medium text-foreground">{t('dimensions')}</h4>
             {result.dimensions.map((dim, i) => (
               <div key={i}>
                 <div className="mb-1 flex items-center justify-between text-xs">
@@ -72,7 +76,7 @@ export default function ReviewReportPanel({
         {/* Suggestions */}
         {result.suggestions.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-xs font-medium text-foreground">改进建议</h4>
+            <h4 className="text-xs font-medium text-foreground">{t('suggestions')}</h4>
             {result.suggestions.map((s, i) => {
               const cfg = priorityConfig[s.priority];
               return (

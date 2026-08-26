@@ -1,0 +1,23 @@
+{
+  "title": "实时热点",
+  "tabs": {
+    "hottest": "最热",
+    "realtime": "实时"
+  },
+  "actions": {
+    "refreshAll": "刷新全部"
+  },
+  "list": {
+    "noSources": "没有可用的实时热点源。请确认后端 NEWSNOW_ENABLED 已开启。"
+  },
+  "card": {
+    "fetchFailed": "获取失败",
+    "updatedAt": "{time}更新",
+    "refreshSource": "刷新{label}",
+    "unavailable": "数据源暂时不可用",
+    "unavailableRetry": "数据源暂时不可用，请稍后重试",
+    "loading": "加载中…",
+    "retry": "重试",
+    "emptyData": "暂无数据"
+  }
+}

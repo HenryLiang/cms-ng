@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Platform, PublishStatus } from '@cms-ng/shared';
 import { type PlatformPublish } from '@/lib/channel-api';
 import { Globe, Share2, Camera, MessageSquare, MessageCircle, MonitorSmartphone, BookOpen, Play, Bell, Copy, Check, ExternalLink, RefreshCw, Trash2, Loader2, Upload } from 'lucide-react';
@@ -19,19 +20,6 @@ const PLATFORM_ICONS: Record<Platform, React.ReactNode> = {
   [Platform.WORDPRESS]: <Globe className="h-4 w-4" />,
 };
 
-const PLATFORM_NAMES: Record<Platform, string> = {
-  [Platform.WEBSITE]: '官网/APP',
-  [Platform.FACEBOOK]: 'Facebook',
-  [Platform.INSTAGRAM]: 'Instagram',
-  [Platform.X]: 'X / Twitter',
-  [Platform.THREADS]: 'Threads',
-  [Platform.LINKEDIN]: 'LinkedIn',
-  [Platform.XIAOHONGSHU]: '小红书',
-  [Platform.YOUTUBE]: 'YouTube',
-  [Platform.PUSH]: '即时推送',
-  [Platform.WORDPRESS]: 'WordPress',
-};
-
 const STATUS_COLORS: Record<PublishStatus, string> = {
   [PublishStatus.DRAFT]: 'bg-surface-muted text-muted',
   [PublishStatus.GENERATING]: 'bg-purple-100 text-purple-700',
@@ -39,15 +27,6 @@ const STATUS_COLORS: Record<PublishStatus, string> = {
   [PublishStatus.SCHEDULED]: 'bg-blue-100 text-blue-700',
   [PublishStatus.PUBLISHED]: 'bg-emerald-100 text-emerald-700',
   [PublishStatus.FAILED]: 'bg-red-100 text-red-700',
-};
-
-const STATUS_LABELS: Record<PublishStatus, string> = {
-  [PublishStatus.DRAFT]: '待生成',
-  [PublishStatus.GENERATING]: '生成中',
-  [PublishStatus.READY]: '已就绪',
-  [PublishStatus.SCHEDULED]: '已排程',
-  [PublishStatus.PUBLISHED]: '已发布',
-  [PublishStatus.FAILED]: '失败',
 };
 
 interface PlatformPreviewProps {
@@ -61,7 +40,36 @@ interface PlatformPreviewProps {
 }
 
 export default function PlatformPreview({ publish, onRegenerate, onDelete, onMarkPublished, onPublishWordPress, publishing, regenerating }: PlatformPreviewProps) {
+  const t = useTranslations('panels.platformPreview');
   const [copied, setCopied] = useState(false);
+
+  const platformKey = (p: Platform) => {
+    switch (p) {
+      case Platform.WEBSITE: return 'platformWebsite';
+      case Platform.FACEBOOK: return 'platformFacebook';
+      case Platform.INSTAGRAM: return 'platformInstagram';
+      case Platform.X: return 'platformX';
+      case Platform.THREADS: return 'platformThreads';
+      case Platform.LINKEDIN: return 'platformLinkedin';
+      case Platform.XIAOHONGSHU: return 'platformXiaohongshu';
+      case Platform.YOUTUBE: return 'platformYoutube';
+      case Platform.PUSH: return 'platformPush';
+      case Platform.WORDPRESS: return 'platformWordpress';
+      default: return 'platformWebsite';
+    }
+  };
+
+  const statusKey = (s: PublishStatus) => {
+    switch (s) {
+      case PublishStatus.DRAFT: return 'statusDraft';
+      case PublishStatus.GENERATING: return 'statusGenerating';
+      case PublishStatus.READY: return 'statusReady';
+      case PublishStatus.SCHEDULED: return 'statusScheduled';
+      case PublishStatus.PUBLISHED: return 'statusPublished';
+      case PublishStatus.FAILED: return 'statusFailed';
+      default: return 'statusDraft';
+    }
+  };
 
   const handleCopy = async () => {
     const text = `${publish.adaptedTitle || ''}\n\n${publish.adaptedContent || ''}`;
@@ -76,9 +84,9 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-muted">{PLATFORM_ICONS[publish.platform]}</span>
-          <span className="text-sm font-medium text-foreground">{PLATFORM_NAMES[publish.platform]}</span>
+          <span className="text-sm font-medium text-foreground">{t(platformKey(publish.platform))}</span>
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[publish.status]}`}>
-            {STATUS_LABELS[publish.status]}
+            {t(statusKey(publish.status))}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -86,7 +94,7 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
             <button
               onClick={handleCopy}
               className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-foreground"
-              title="复制内容"
+              title={t('copyContent')}
             >
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
@@ -95,14 +103,14 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
             onClick={onRegenerate}
             disabled={regenerating}
             className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-foreground disabled:opacity-50"
-            title="重新生成"
+            title={t('regenerate')}
           >
             {regenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           </button>
           <button
             onClick={onDelete}
             className="rounded-md p-1.5 text-muted hover:bg-red-50 hover:text-red-600"
-            title="删除"
+            title={t('delete')}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -114,12 +122,12 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
         {publish.status === PublishStatus.GENERATING ? (
           <div className="flex items-center justify-center py-6">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
-            <span className="ml-2 text-sm text-muted">AI 改写中...</span>
+            <span className="ml-2 text-sm text-muted">{t('aiRewriting')}</span>
           </div>
         ) : publish.status === PublishStatus.FAILED ? (
           <div className="text-sm text-red-600 py-2">
-            <p className="font-medium">生成失败</p>
-            <p className="text-muted mt-1">{publish.notes || '请重试'}</p>
+            <p className="font-medium">{t('generateFailed')}</p>
+            <p className="text-muted mt-1">{publish.notes || t('pleaseRetry')}</p>
           </div>
         ) : publish.adaptedTitle || publish.adaptedContent ? (
           <div className="space-y-2">
@@ -149,7 +157,7 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
                   className="w-full"
                 >
                   {!publishing && <Upload className="h-3.5 w-3.5" />}
-                  发布到 WordPress
+                  {t('publishToWordPress')}
                 </Button>
                 <Button
                   variant="secondary"
@@ -158,10 +166,10 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
                   className="w-full"
                 >
                   {!publishing && <ExternalLink className="h-3.5 w-3.5" />}
-                  存为草稿
+                  {t('saveAsDraft')}
                 </Button>
                 <p className="text-center text-xs text-subtle">
-                  通过 WordPress REST API 自动发布
+                  {t('wordpressApiNote')}
                 </p>
               </div>
             ) : publish.status === PublishStatus.READY ? (
@@ -172,10 +180,10 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
                   className="w-full"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  标记为已发布（人工）
+                  {t('markPublished')}
                 </Button>
                 <p className="mt-1 text-center text-xs text-subtle">
-                  复制上方内容到对应平台发布，然后点击标记
+                  {t('markPublishedHint')}
                 </p>
               </div>
             ) : null}
@@ -188,13 +196,13 @@ export default function PlatformPreview({ publish, onRegenerate, onDelete, onMar
                   className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  查看已发布内容
+                  {t('viewPublished')}
                 </a>
               </div>
             )}
           </div>
         ) : (
-          <p className="text-sm text-subtle py-2">点击重新生成以创建适配内容</p>
+          <p className="text-sm text-subtle py-2">{t('emptyHint')}</p>
         )}
       </div>
     </Card>

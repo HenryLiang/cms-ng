@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import {
   Clapperboard,
@@ -34,19 +35,6 @@ import {
 } from '@/lib/video-api';
 import { useToastStore } from '@/store/toast-store';
 
-const STATUS_META: Record<VideoJobStatus, { label: string; tone: StatusTone }> = {
-  [VideoJobStatus.PENDING]: { label: '排队中', tone: 'neutral' },
-  [VideoJobStatus.SCRIPTING]: { label: '脚本生成中', tone: 'info' },
-  [VideoJobStatus.STORYBOARDING]: { label: '分镜设计中', tone: 'info' },
-  [VideoJobStatus.ASSETS_GENERATING]: { label: '视频生成中', tone: 'brand' },
-  [VideoJobStatus.VOICE_SYNTHESIZING]: { label: '配音合成中', tone: 'info' },
-  [VideoJobStatus.COMPOSING]: { label: '合成中', tone: 'info' },
-  [VideoJobStatus.UPLOADING]: { label: '转存入库中', tone: 'info' },
-  [VideoJobStatus.SUCCEEDED]: { label: '已完成', tone: 'success' },
-  [VideoJobStatus.FAILED]: { label: '失败', tone: 'danger' },
-  [VideoJobStatus.CANCELLED]: { label: '已取消', tone: 'neutral' },
-};
-
 const ACTIVE_STATUSES: VideoJobStatus[] = [
   VideoJobStatus.PENDING,
   VideoJobStatus.SCRIPTING,
@@ -56,20 +44,6 @@ const ACTIVE_STATUSES: VideoJobStatus[] = [
   VideoJobStatus.COMPOSING,
   VideoJobStatus.UPLOADING,
 ];
-
-const PROVIDER_LABEL: Record<string, string> = {
-  volcengine: '火山引擎 Seedance',
-  minimax: 'MiniMax Hailuo',
-};
-
-/** 参考物角色中文标签(可用角色由 capability.references.roles gating) */
-const REFERENCE_ROLE_LABEL: Record<VideoReferenceRole, string> = {
-  first_frame: '首帧',
-  last_frame: '尾帧',
-  reference_image: '参考图',
-  reference_video: '参考视频',
-  reference_audio: '参考音频',
-};
 
 /** 帧角色(与 reference_* 参考角色互斥,Ark 实测两种生成模式不可混合) */
 const FRAME_ROLES: VideoReferenceRole[] = ['first_frame', 'last_frame'];
@@ -100,26 +74,28 @@ function MetaChip({ children }: { children: React.ReactNode }) {
   );
 }
 
-const SCENE_STATUS_META: Record<string, { label: string; className: string }> = {
-  pending: { label: '待生成', className: 'bg-surface-muted text-muted' },
-  submitted: { label: '生成中', className: 'bg-blue-50 text-blue-600' },
-  done: { label: '素材就绪', className: 'bg-emerald-50 text-emerald-600' },
-  failed: { label: '失败', className: 'bg-red-50 text-red-600' },
-};
-
 /** L2(稿件成片)任务的脚本/分镜进度明细 */
 function L2JobDetail({ job }: { job: VideoGenerationJobVo }) {
+  const t = useTranslations('video');
+  /** 分镜单镜状态角标文案(i18n 词典驱动) */
+  const sceneStatusMeta: Record<string, { label: string; className: string }> = {
+    pending: { label: t('sceneStatus.pending'), className: 'bg-surface-muted text-muted' },
+    submitted: { label: t('sceneStatus.submitted'), className: 'bg-blue-50 text-blue-600' },
+    done: { label: t('sceneStatus.done'), className: 'bg-emerald-50 text-emerald-600' },
+    failed: { label: t('sceneStatus.failed'), className: 'bg-red-50 text-red-600' },
+  };
   const storyboard = parseStoryboardVo(job.storyboard);
   return (
     <details className="mt-3 rounded-lg border border-line bg-surface-muted/40 px-3 py-2">
       <summary className="cursor-pointer select-none text-xs font-medium text-muted">
-        脚本与分镜{storyboard ? `(${storyboard.scenes.length} 镜)` : ''}
-        {job.ttsProvider === 'none' && ' · 无配音'}
-        {job.ttsProvider === 'native' && ' · 原生音频配音'}
+        {t('detail.scriptAndStoryboard')}
+        {storyboard ? `(${t('detail.sceneCount', { count: storyboard.scenes.length })})` : ''}
+        {job.ttsProvider === 'none' && ` · ${t('detail.noVoiceover')}`}
+        {job.ttsProvider === 'native' && ` · ${t('detail.nativeVoiceover')}`}
       </summary>
       {job.script && (
         <div className="mt-2">
-          <p className="text-[11px] font-medium text-subtle">口播脚本</p>
+          <p className="text-[11px] font-medium text-subtle">{t('detail.voiceoverScript')}</p>
           <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground">
             {job.script}
           </p>
@@ -128,14 +104,14 @@ function L2JobDetail({ job }: { job: VideoGenerationJobVo }) {
       {storyboard && (
         <ol className="mt-2 space-y-1.5 border-t border-line pt-2">
           {storyboard.scenes.map((s) => {
-            const chip = s.asset ? SCENE_STATUS_META[s.asset.status] : null;
+            const chip = s.asset ? sceneStatusMeta[s.asset.status] : null;
             return (
               <li key={s.index} className="flex items-start gap-2 text-xs">
                 <span className="tnum mt-0.5 shrink-0 text-subtle">{s.index + 1}.</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground">{s.narration}</p>
                   <p className="mt-0.5 line-clamp-1 text-subtle">
-                    {s.visual.type === 'video' ? '视频片段' : '图片'} · {s.visual.prompt}
+                    {s.visual.type === 'video' ? t('detail.visualVideo') : t('detail.visualImage')} · {s.visual.prompt}
                   </p>
                 </div>
                 <span className="flex shrink-0 items-center gap-1">
@@ -155,6 +131,9 @@ function L2JobDetail({ job }: { job: VideoGenerationJobVo }) {
 }
 
 export default function VideoStudioPage() {
+  const t = useTranslations('video');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
   const toast = useToastStore((s) => s.show);
   const searchParams = useSearchParams();
   const [capability, setCapability] = useState<VideoCapability | null>(null);
@@ -302,8 +281,8 @@ export default function VideoStudioPage() {
         type: 'success',
         message:
           mode === VideoGenerationMode.ARTICLE_TO_VIDEO
-            ? '成片任务已创建:脚本 → 分镜 → 素材 → 合成,全程需要几分钟'
-            : '视频任务已创建,生成需要几分钟',
+            ? t('toast.finalCutCreated')
+            : t('toast.clipCreated'),
       });
       await refresh();
     } catch (err) {
@@ -317,7 +296,7 @@ export default function VideoStudioPage() {
     setActingId(id);
     try {
       await retryVideoJob(id);
-      toast({ type: 'success', message: '已重新提交' });
+      toast({ type: 'success', message: t('toast.resubmitted') });
       await refresh();
     } catch (err) {
       reportApiError(err);
@@ -330,7 +309,7 @@ export default function VideoStudioPage() {
     setActingId(id);
     try {
       await cancelVideoJob(id);
-      toast({ type: 'success', message: '已取消' });
+      toast({ type: 'success', message: t('toast.cancelled') });
       await refresh();
     } catch (err) {
       reportApiError(err);
@@ -373,6 +352,32 @@ export default function VideoStudioPage() {
   const removeReference = (i: number) =>
     setReferences((rows) => rows.filter((_, idx) => idx !== i));
 
+  // 词典驱动的文案映射(状态/引擎/参考物角色;未知值回退原始枚举)
+  const statusMeta: Record<VideoJobStatus, { label: string; tone: StatusTone }> = {
+    [VideoJobStatus.PENDING]: { label: t('status.pending'), tone: 'neutral' },
+    [VideoJobStatus.SCRIPTING]: { label: t('status.scripting'), tone: 'info' },
+    [VideoJobStatus.STORYBOARDING]: { label: t('status.storyboarding'), tone: 'info' },
+    [VideoJobStatus.ASSETS_GENERATING]: { label: t('status.assetsGenerating'), tone: 'brand' },
+    [VideoJobStatus.VOICE_SYNTHESIZING]: { label: t('status.voiceSynthesizing'), tone: 'info' },
+    [VideoJobStatus.COMPOSING]: { label: t('status.composing'), tone: 'info' },
+    [VideoJobStatus.UPLOADING]: { label: t('status.uploading'), tone: 'info' },
+    [VideoJobStatus.SUCCEEDED]: { label: t('status.succeeded'), tone: 'success' },
+    [VideoJobStatus.FAILED]: { label: t('status.failed'), tone: 'danger' },
+    [VideoJobStatus.CANCELLED]: { label: t('status.cancelled'), tone: 'neutral' },
+  };
+  const providerLabel: Record<string, string> = {
+    volcengine: t('provider.volcengine'),
+    minimax: t('provider.minimax'),
+  };
+  /** 参考物角色标签(可用角色由 capability.references.roles gating) */
+  const referenceRoleLabel: Record<VideoReferenceRole, string> = {
+    first_frame: t('refRole.firstFrame'),
+    last_frame: t('refRole.lastFrame'),
+    reference_image: t('refRole.referenceImage'),
+    reference_video: t('refRole.referenceVideo'),
+    reference_audio: t('refRole.referenceAudio'),
+  };
+
   if (!capabilityLoaded) {
     return (
       <div className="flex h-40 items-center justify-center">
@@ -384,14 +389,14 @@ export default function VideoStudioPage() {
   if (!capability?.enabled) {
     return (
       <div className="mx-auto max-w-5xl">
-        <PageHeader title="视频创作" subtitle="AI 文生视频" />
+        <PageHeader title={t('title')} subtitle={t('subtitleDisabled')} />
         <Card className="flex flex-col items-center px-5 py-16 text-center">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
             <Clapperboard className="h-5 w-5 text-subtle" />
           </div>
-          <p className="text-sm font-medium text-foreground">文生视频功能未启用</p>
+          <p className="text-sm font-medium text-foreground">{t('disabled.title')}</p>
           <p className="mt-1 text-xs text-muted">
-            请联系管理员配置 VIDEO_GENERATION_ENABLED 与 VIDEO_CLIP_PROVIDER(火山引擎 / MiniMax)
+            {t('disabled.desc')}
           </p>
         </Card>
       </div>
@@ -401,8 +406,10 @@ export default function VideoStudioPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="视频创作"
-        subtitle={`文生视频 · 当前引擎:${PROVIDER_LABEL[capability.provider ?? ''] ?? capability.provider}`}
+        title={t('title')}
+        subtitle={t('subtitle', {
+          provider: providerLabel[capability.provider ?? ''] ?? capability.provider,
+        })}
       />
 
       {/* 新建任务 */}
@@ -412,8 +419,8 @@ export default function VideoStudioPage() {
             <Clapperboard className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-foreground">新建视频任务</h2>
-            <p className="text-xs text-muted">文生片段生成短视频;稿件成片将整篇稿件自动合成为带配音字幕的成片</p>
+            <h2 className="text-sm font-semibold text-foreground">{t('form.title')}</h2>
+            <p className="text-xs text-muted">{t('form.desc')}</p>
           </div>
         </div>
 
@@ -428,20 +435,20 @@ export default function VideoStudioPage() {
                 : 'text-muted hover:text-foreground'
             }`}
           >
-            文生片段
+            {t('form.tabTextToClip')}
           </button>
           <button
             type="button"
             onClick={() => capability.l2 && setMode(VideoGenerationMode.ARTICLE_TO_VIDEO)}
             disabled={!capability.l2}
-            title={capability.l2 ? undefined : '稿件成片未启用:需要 VIDEO_RENDER_ENABLED=true 且配置图片生成服务'}
+            title={capability.l2 ? undefined : t('form.l2DisabledTitle')}
             className={`rounded-t-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
               mode === VideoGenerationMode.ARTICLE_TO_VIDEO
                 ? 'border-b-2 border-brand text-brand'
                 : 'text-muted hover:text-foreground'
             }`}
           >
-            稿件一键成片
+            {t('form.tabArticleToVideo')}
           </button>
         </div>
 
@@ -449,7 +456,7 @@ export default function VideoStudioPage() {
           <form onSubmit={onSubmit} className="space-y-4 p-5">
             <div>
               <label htmlFor="video-prompt" className="mb-1.5 block text-xs font-medium text-muted">
-                画面描述
+                {t('form.promptLabel')}
               </label>
               <textarea
                 id="video-prompt"
@@ -457,13 +464,13 @@ export default function VideoStudioPage() {
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
                 maxLength={2000}
-                placeholder="例:一只柴犬在樱花树下奔跑,慢镜头,电影感"
+                placeholder={t('form.promptPlaceholder')}
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
               />
             </div>
             <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
               <div>
-                <label htmlFor="video-duration" className="mb-1.5 block text-xs font-medium text-muted">时长</label>
+                <label htmlFor="video-duration" className="mb-1.5 block text-xs font-medium text-muted">{t('form.durationLabel')}</label>
                 {capability?.duration?.mode === 'free' ? (
                   <input
                     id="video-duration"
@@ -494,7 +501,7 @@ export default function VideoStudioPage() {
                   >
                     {(capability?.duration?.allowed ?? [6, 10]).map((d) => (
                       <option key={d} value={d}>
-                        {d} 秒
+                        {t('form.durationSeconds', { seconds: d })}
                       </option>
                     ))}
                   </select>
@@ -506,7 +513,7 @@ export default function VideoStudioPage() {
                 )}
               </div>
               <div>
-                <label htmlFor="video-resolution" className="mb-1.5 block text-xs font-medium text-muted">分辨率</label>
+                <label htmlFor="video-resolution" className="mb-1.5 block text-xs font-medium text-muted">{t('form.resolutionLabel')}</label>
                 <select
                   id="video-resolution"
                   value={resolution}
@@ -518,16 +525,16 @@ export default function VideoStudioPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="video-ratio" className="mb-1.5 block text-xs font-medium text-muted">画幅</label>
+                <label htmlFor="video-ratio" className="mb-1.5 block text-xs font-medium text-muted">{t('form.aspectRatioLabel')}</label>
                 <select
                   id="video-ratio"
                   value={aspectRatio}
                   onChange={(e) => setAspectRatio(e.target.value as '16:9' | '9:16' | '1:1')}
                   className={SELECT_CLASS}
                 >
-                  <option value="9:16">竖屏 9:16</option>
-                  <option value="16:9">横屏 16:9</option>
-                  <option value="1:1">方形 1:1</option>
+                  <option value="9:16">{t('form.aspectPortrait')}</option>
+                  <option value="16:9">{t('form.aspectLandscape')}</option>
+                  <option value="1:1">{t('form.aspectSquare')}</option>
                 </select>
               </div>
               {capability?.nativeAudio && (
@@ -538,12 +545,12 @@ export default function VideoStudioPage() {
                     onChange={(e) => setGenerateAudio(e.target.checked)}
                     className="h-3.5 w-3.5 accent-brand"
                   />
-                  原生音频(Seedance 有声生成)
+                  {t('form.nativeAudioLabel')}
                 </label>
               )}
               <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!prompt.trim()}>
                 {!submitting && <Sparkles className="h-4 w-4" />}
-                生成视频
+                {t('form.submitClip')}
               </Button>
             </div>
 
@@ -552,7 +559,7 @@ export default function VideoStudioPage() {
               <div className="rounded-lg border border-line bg-surface-muted/40 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-xs font-medium text-muted">
-                    参考素材(可选)
+                    {t('refs.title')}
                   </p>
                   <Button
                     type="button"
@@ -561,21 +568,19 @@ export default function VideoStudioPage() {
                     onClick={addReference}
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    添加
+                    {t('refs.add')}
                   </Button>
                 </div>
                 {references.length === 0 ? (
                   <p className="text-[11px] text-subtle">
-                    {frameExclusive
-                      ? '首帧/尾帧定妆、参考图保持主体一致、参考视频沿用运镜、参考音频作配乐;音频须搭配图或视频;帧(首/尾帧)与参考(图/视频/音频)两种模式不可混用'
-                      : '首帧/尾帧定妆、参考图保持主体一致、参考视频沿用运镜、参考音频作配乐;音频须搭配图或视频'}
+                    {frameExclusive ? t('refs.hintExclusive') : t('refs.hint')}
                   </p>
                 ) : (
                   <div className="space-y-2">
                     {references.map((ref, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <select
-                          aria-label={`参考角色 ${i + 1}`}
+                          aria-label={t('refs.roleAria', { index: i + 1 })}
                           value={ref.role}
                           onChange={(e) =>
                             updateReference(i, {
@@ -586,24 +591,24 @@ export default function VideoStudioPage() {
                         >
                           {allowedRolesFor(references, i).map((role) => (
                             <option key={role} value={role}>
-                              {REFERENCE_ROLE_LABEL[role]}
+                              {referenceRoleLabel[role]}
                             </option>
                           ))}
                         </select>
                         <input
-                          aria-label={`参考素材 URL ${i + 1}`}
+                          aria-label={t('refs.urlAria', { index: i + 1 })}
                           value={ref.url}
                           onChange={(e) =>
                             updateReference(i, { url: e.target.value })
                           }
-                          placeholder="https://…(媒体库 COS 地址或外链)"
+                          placeholder={t('refs.urlPlaceholder')}
                           className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
                         />
                         <Button
                           type="button"
                           variant="secondary"
                           size="sm"
-                          title="从媒体库选择"
+                          title={t('refs.pickFromLibrary')}
                           onClick={() => setPickerIndex(i)}
                         >
                           <Library className="h-3.5 w-3.5" />
@@ -612,7 +617,7 @@ export default function VideoStudioPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          title="移除"
+                          title={t('refs.remove')}
                           onClick={() => removeReference(i)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -630,14 +635,14 @@ export default function VideoStudioPage() {
                 {capability?.seed && (
                   <div className="flex items-center gap-1.5">
                     <label htmlFor="video-seed" className="text-xs text-muted">
-                      种子
+                      {t('options.seedLabel')}
                     </label>
                     <input
                       id="video-seed"
                       value={seedInput}
                       onChange={(e) => setSeedInput(e.target.value)}
                       inputMode="numeric"
-                      placeholder="可空"
+                      placeholder={t('options.seedPlaceholder')}
                       className="h-8 w-24 rounded-lg border border-line bg-surface px-2 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
                     />
                   </div>
@@ -650,7 +655,7 @@ export default function VideoStudioPage() {
                       onChange={(e) => setDraft(e.target.checked)}
                       className="h-3.5 w-3.5 accent-brand"
                     />
-                    打样模式(更快更便宜,质量低)
+                    {t('options.draftLabel')}
                   </label>
                 )}
                 {capability?.returnLastFrame && (
@@ -661,7 +666,7 @@ export default function VideoStudioPage() {
                       onChange={(e) => setReturnLastFrame(e.target.checked)}
                       className="h-3.5 w-3.5 accent-brand"
                     />
-                    返回尾帧(续拍链)
+                    {t('options.returnLastFrameLabel')}
                   </label>
                 )}
               </div>
@@ -671,7 +676,7 @@ export default function VideoStudioPage() {
           <form onSubmit={onSubmit} className="space-y-4 p-5">
             <div>
               <label htmlFor="video-article" className="mb-1.5 block text-xs font-medium text-muted">
-                选择稿件
+                {t('articleForm.label')}
               </label>
               <select
                 id="video-article"
@@ -679,7 +684,7 @@ export default function VideoStudioPage() {
                 onChange={(e) => setArticleId(e.target.value)}
                 className={`${SELECT_CLASS} w-full`}
               >
-                <option value="">请选择要成片的稿件…</option>
+                <option value="">{t('articleForm.placeholder')}</option>
                 {articles.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.title}
@@ -687,31 +692,31 @@ export default function VideoStudioPage() {
                 ))}
               </select>
               <p className="mt-1.5 text-xs text-subtle">
-                AI 将自动完成:口播脚本 → 分镜设计 → 逐镜素材(图片/视频片段)→ 配音字幕 → 合成入库
+                {t('articleForm.pipelineHint')}
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
               <div>
-                <label htmlFor="video-ratio-l2" className="mb-1.5 block text-xs font-medium text-muted">画幅</label>
+                <label htmlFor="video-ratio-l2" className="mb-1.5 block text-xs font-medium text-muted">{t('form.aspectRatioLabel')}</label>
                 <select
                   id="video-ratio-l2"
                   value={aspectRatio}
                   onChange={(e) => setAspectRatio(e.target.value as '16:9' | '9:16' | '1:1')}
                   className={SELECT_CLASS}
                 >
-                  <option value="9:16">竖屏 9:16</option>
-                  <option value="16:9">横屏 16:9</option>
-                  <option value="1:1">方形 1:1</option>
+                  <option value="9:16">{t('form.aspectPortrait')}</option>
+                  <option value="16:9">{t('form.aspectLandscape')}</option>
+                  <option value="1:1">{t('form.aspectSquare')}</option>
                 </select>
               </div>
               {capability.nativeAudio ? (
-                <p className="text-xs text-muted">使用视频模型原生音频生成配音(Seedance 2.x)</p>
+                <p className="text-xs text-muted">{t('articleForm.nativeAudioHint')}</p>
               ) : (
-                <p className="text-xs text-amber-600">当前视频模型不支持原生音频,成片将无配音(仅字幕)</p>
+                <p className="text-xs text-amber-600">{t('articleForm.noNativeAudioHint')}</p>
               )}
               <Button type="submit" size="sm" className="ml-auto h-9" loading={submitting} disabled={!articleId}>
                 {!submitting && <FileText className="h-4 w-4" />}
-                一键成片
+                {t('articleForm.submit')}
               </Button>
             </div>
           </form>
@@ -728,14 +733,14 @@ export default function VideoStudioPage() {
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
             <Film className="h-5 w-5 text-subtle" />
           </div>
-          <p className="text-sm font-medium text-foreground">还没有视频任务</p>
-          <p className="mt-1 text-xs text-muted">从上方输入画面描述,生成第一个视频片段</p>
+          <p className="text-sm font-medium text-foreground">{t('list.emptyTitle')}</p>
+          <p className="mt-1 text-xs text-muted">{t('list.emptyDesc')}</p>
         </Card>
       ) : (
         <div>
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-foreground">任务列表</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t('list.title')}</h2>
               <span className="tnum rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
                 {total}
               </span>
@@ -743,13 +748,13 @@ export default function VideoStudioPage() {
             {hasActive && (
               <span className="inline-flex items-center gap-1.5 text-xs text-muted">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                进行中 · 每 5 秒自动刷新
+                {t('list.activeHint', { seconds: POLL_INTERVAL_MS / 1000 })}
               </span>
             )}
           </div>
           <div className="space-y-3">
             {jobs.map((job) => {
-              const meta = STATUS_META[job.status] ?? { label: job.status, tone: 'neutral' as StatusTone };
+              const meta = statusMeta[job.status] ?? { label: job.status, tone: 'neutral' as StatusTone };
               const isActive = ACTIVE_STATUSES.includes(job.status);
               return (
                 <Card key={job.id} className="p-4">
@@ -761,7 +766,7 @@ export default function VideoStudioPage() {
                           {meta.label}
                         </Badge>
                         {job.mode === VideoGenerationMode.ARTICLE_TO_VIDEO ? (
-                          <MetaChip>稿件成片</MetaChip>
+                          <MetaChip>{t('list.modeFinalCut')}</MetaChip>
                         ) : (
                           <>
                             <MetaChip>{job.durationSec ?? '-'}s</MetaChip>
@@ -770,7 +775,7 @@ export default function VideoStudioPage() {
                         )}
                         <MetaChip>{job.aspectRatio ?? '-'}</MetaChip>
                         {job.costEstimate != null && (
-                          <MetaChip>预估 ¥{job.costEstimate}</MetaChip>
+                          <MetaChip>{t('list.costEstimate', { cost: job.costEstimate })}</MetaChip>
                         )}
                       </div>
                       <p className="mt-2 line-clamp-2 text-sm text-foreground">{job.prompt}</p>
@@ -780,7 +785,7 @@ export default function VideoStudioPage() {
                         </div>
                       )}
                       <p className="tnum mt-2 text-[11px] text-subtle">
-                        {new Date(job.createdAt).toLocaleString('zh-CN')}
+                        {new Date(job.createdAt).toLocaleString(locale)}
                       </p>
                       {job.mode === VideoGenerationMode.ARTICLE_TO_VIDEO &&
                         (job.script || job.storyboard) && <L2JobDetail job={job} />}
@@ -794,7 +799,7 @@ export default function VideoStudioPage() {
                           onClick={() => void onCancel(job.id)}
                         >
                           <XCircle className="h-4 w-4" />
-                          取消
+                          {tCommon('actions.cancel')}
                         </Button>
                       )}
                       {job.status === VideoJobStatus.FAILED && (
@@ -805,7 +810,7 @@ export default function VideoStudioPage() {
                           onClick={() => void onRetry(job.id)}
                         >
                           <RefreshCw className={`h-4 w-4 ${actingId === job.id ? 'animate-spin' : ''}`} />
-                          重试
+                          {tCommon('actions.retry')}
                         </Button>
                       )}
                     </div>
@@ -826,11 +831,11 @@ export default function VideoStudioPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={job.lastFrameUrl}
-                        alt="尾帧"
+                        alt={t('list.lastFrameAlt')}
                         className="h-14 w-auto rounded-md ring-1 ring-line"
                       />
                       <p className="text-[11px] text-subtle">
-                        尾帧已入媒体库,可作为下一段的首帧(续拍链)
+                        {t('list.lastFrameHint')}
                       </p>
                     </div>
                   )}
@@ -850,7 +855,9 @@ export default function VideoStudioPage() {
         }
         title={
           pickerIndex !== null
-            ? `选择${REFERENCE_ROLE_LABEL[references[pickerIndex]?.role ?? 'reference_image']}素材`
+            ? t('picker.title', {
+                role: t(`refRole.${references[pickerIndex]?.role ?? 'reference_image'}`),
+              })
             : undefined
         }
         onPick={(asset) => {

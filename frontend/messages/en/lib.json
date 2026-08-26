@@ -1,0 +1,56 @@
+{
+  "articleStatus": {
+    "draft": "Draft",
+    "writing": "Writing",
+    "aiOptimizing": "AI optimizing",
+    "pendingReview": "Pending review",
+    "inReview": "In review",
+    "revision": "Sent back",
+    "approved": "Approved",
+    "published": "Published",
+    "archived": "Archived",
+    "pipelineFailed": "Publish failed",
+    "autoPublished": "Auto-published",
+    "unknown": "Unknown"
+  },
+  "transaction": {
+    "type": {
+      "TOP_UP": "Top-up",
+      "AI_LLM": "AI call",
+      "AI_IMAGE": "Image generation",
+      "PUBLISH": "Publish",
+      "AUTO_PUBLISH": "Auto-publish",
+      "DATA_FETCH": "Data fetch",
+      "REFUND": "Refund",
+      "ADJUSTMENT": "Adjustment"
+    },
+    "category": {
+      "AI": "AI usage",
+      "PUBLISHING": "Publishing",
+      "OTHER": "Other"
+    }
+  },
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{count} min ago",
+    "hoursAgo": "{count} h ago",
+    "yesterdayAt": "yesterday {time}",
+    "monthDay": "{month}/{day}"
+  },
+  "apiError": {
+    "network": "Network error, please check your connection",
+    "server": "Server error, please try again later",
+    "forbidden": "You do not have permission to do this",
+    "notFound": "Resource not found",
+    "requestFailed": "Request failed"
+  },
+  "media": {
+    "uploadFailed": "Upload failed"
+  },
+  "systemFeatures": {
+    "apiError": "System feature API error"
+  },
+  "notifications": {
+    "apiError": "Notification API error"
+  }
+}

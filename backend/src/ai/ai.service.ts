@@ -289,7 +289,7 @@ export class AIService {
       [ContentLanguage.ENGLISH]:
         'Please answer in English, using British/American journalistic style: objective, concise, professional',
     };
-    return map[language ?? ContentLanguage.TRADITIONAL_CHINESE_HK];
+    return map[language ?? ContentLanguage.SIMPLIFIED_CHINESE];
   }
 
   /**

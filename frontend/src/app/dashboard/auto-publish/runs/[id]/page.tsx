@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   getRun,
   withdrawArticle,
@@ -35,20 +36,24 @@ const PIPELINE_STEPS = [
   'notification',
 ];
 
-const PIPELINE_STEP_LABELS: Record<string, string> = {
-  billing_check: '计费',
-  'topic-collection': '选题',
-  research: '调研',
-  'article-generation': '写作',
-  'article-save': '保存',
-  'image-generation': '配图',
-  publish: '发布',
-  notification: '通知',
+// Pipeline step -> dictionary key (autoPublish.run.steps.*)
+const PIPELINE_STEP_LABEL_KEYS: Record<string, string> = {
+  billing_check: 'run.steps.billingCheck',
+  'topic-collection': 'run.steps.topicCollection',
+  research: 'run.steps.research',
+  'article-generation': 'run.steps.articleGeneration',
+  'article-save': 'run.steps.articleSave',
+  'image-generation': 'run.steps.imageGeneration',
+  publish: 'run.steps.publish',
+  notification: 'run.steps.notification',
 };
 
 export default function RunDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const t = useTranslations('autoPublish');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const [run, setRun] = useState<AutoPublishRun | null>(null);
   const [articles, setArticles] = useState<AutoPublishArticle[]>([]);
@@ -72,7 +77,7 @@ export default function RunDetailPage() {
   }, [id]);
 
   async function handleWithdraw(articleId: string) {
-    if (!confirm('确定从 WordPress 撤回这篇文章？')) return;
+    if (!confirm(t('run.withdrawConfirm'))) return;
     setActionId(articleId);
     try {
       await withdrawArticle(articleId);
@@ -86,7 +91,7 @@ export default function RunDetailPage() {
     setActionId(articleId);
     try {
       await retryArticle(articleId);
-      alert('重试已触发');
+      alert(t('run.retryTriggered'));
       setTimeout(loadData, 2000);
     } finally {
       setActionId(null);
@@ -103,7 +108,7 @@ export default function RunDetailPage() {
 
   if (!run) {
     return (
-      <div className="p-8 text-center text-muted">运行记录不存在</div>
+      <div className="p-8 text-center text-muted">{t('run.notFound')}</div>
     );
   }
 
@@ -114,29 +119,29 @@ export default function RunDetailPage() {
         className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        返回任务详情
+        {t('run.back')}
       </Link>
 
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-foreground">
-          运行详情 - {run.taskName}
+          {t('run.title', { name: run.taskName ?? '' })}
         </h1>
         <div className="mt-2 flex items-center gap-4 text-sm text-muted">
           <RunStatusBadge status={run.status} />
           <span>
-            {run.triggerType === 'MANUAL' ? '手动触发' : '定时触发'}
+            {run.triggerType === 'MANUAL' ? t('trigger.MANUAL') : t('trigger.SCHEDULED')}
           </span>
-          <span className="tnum">{new Date(run.startedAt).toLocaleString('zh-HK')}</span>
+          <span className="tnum">{new Date(run.startedAt).toLocaleString(locale)}</span>
           {run.completedAt && (
             <span className="tnum">
-              耗时:{' '}
-              {Math.round(
-                (new Date(run.completedAt).getTime() -
-                  new Date(run.startedAt).getTime()) /
-                  1000,
-              )}
-              秒
+              {t('run.duration', {
+                seconds: Math.round(
+                  (new Date(run.completedAt).getTime() -
+                    new Date(run.startedAt).getTime()) /
+                    1000,
+                ),
+              })}
             </span>
           )}
         </div>
@@ -148,26 +153,26 @@ export default function RunDetailPage() {
           <div className="text-2xl font-semibold text-foreground tnum">
             {run.totalArticles}
           </div>
-          <div className="text-xs text-muted">计划</div>
+          <div className="text-xs text-muted">{t('run.planned')}</div>
         </Card>
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
           <div className="text-2xl font-semibold text-emerald-600 tnum">
             {run.successCount}
           </div>
-          <div className="text-xs text-emerald-600">成功</div>
+          <div className="text-xs text-emerald-600">{t('run.success')}</div>
         </div>
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
           <div className="text-2xl font-semibold text-red-600 tnum">
             {run.failedCount}
           </div>
-          <div className="text-xs text-red-600">失败</div>
+          <div className="text-xs text-red-600">{t('run.failed')}</div>
         </div>
       </div>
 
       {/* Error Log */}
       {run.errorLog && run.errorLog.length > 0 && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 mb-6">
-          <h3 className="text-sm font-medium text-red-700 mb-2">错误日志</h3>
+          <h3 className="text-sm font-medium text-red-700 mb-2">{t('run.errorLog')}</h3>
           <ul className="space-y-1">
             {run.errorLog.map((err, i) => (
               <li key={i} className="text-sm text-red-600">
@@ -181,7 +186,7 @@ export default function RunDetailPage() {
       {/* Articles */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">
-          文章追踪 (<span className="tnum">{articles.length}</span>)
+          {t('run.articleTracking')} (<span className="tnum">{articles.length}</span>)
         </h2>
         <div className="space-y-3">
           {articles.map((article) => (
@@ -191,13 +196,12 @@ export default function RunDetailPage() {
                   <div className="flex items-center gap-2">
                     <ArticleStatusIcon status={article.status} />
                     <span className="text-sm font-medium text-foreground">
-                      {article.topic || '未选题'}
+                      {article.topic || t('run.noTopic')}
                     </span>
                   </div>
                   {article.errorMessage && (
                     <p className="mt-1 text-xs text-red-500">
-                      失败于 {article.failedStep}:{' '}
-                      {article.errorMessage}
+                      {t('run.failedAt', { step: article.failedStep ?? '', message: article.errorMessage ?? '' })}
                     </p>
                   )}
                 </div>
@@ -213,7 +217,7 @@ export default function RunDetailPage() {
                       ) : (
                         <Undo2 className="h-3 w-3" />
                       )}
-                      撤回
+                      {t('run.withdraw')}
                     </button>
                   )}
                   {article.status === 'FAILED' && (
@@ -227,7 +231,7 @@ export default function RunDetailPage() {
                       ) : (
                         <RefreshCw className="h-3 w-3" />
                       )}
-                      重试
+                      {tCommon('actions.retry')}
                     </button>
                   )}
                 </div>
@@ -256,9 +260,10 @@ export default function RunDetailPage() {
                   // Get duration from trace if available
                   const traceEntry = article.executionTrace?.find((t) => t.step === step);
                   const duration = traceEntry ? `${(traceEntry.durationMs / 1000).toFixed(1)}s` : undefined;
+                  const stepLabel = t(PIPELINE_STEP_LABEL_KEYS[step]);
 
                   return (
-                    <div key={step} className="flex flex-col items-center flex-1" title={`${PIPELINE_STEP_LABELS[step]}${duration ? ` (${duration})` : ''}`}>
+                    <div key={step} className="flex flex-col items-center flex-1" title={`${stepLabel}${duration ? ` (${duration})` : ''}`}>
                       <div
                         className={`h-1.5 w-full rounded-full transition-colors ${
                           isFailed
@@ -281,7 +286,7 @@ export default function RunDetailPage() {
                                 : 'text-subtle'
                         }`}
                       >
-                        {PIPELINE_STEP_LABELS[step]}
+                        {stepLabel}
                       </span>
                     </div>
                   );
@@ -300,7 +305,7 @@ export default function RunDetailPage() {
                     ) : (
                       <ChevronRight className="h-3 w-3" />
                     )}
-                    {expandedArticle === article.id ? '收起执行详情' : '查看执行详情'}
+                    {expandedArticle === article.id ? t('run.collapseTrace') : t('run.expandTrace')}
                     {article.totalDurationMs != null && (
                       <span className="ml-1 text-subtle tnum">
                         ({(article.totalDurationMs / 1000).toFixed(1)}s)
@@ -323,7 +328,7 @@ export default function RunDetailPage() {
 
           {articles.length === 0 && (
             <div className="rounded-lg border border-dashed border-line-strong p-8 text-center text-muted text-sm">
-              暂无文章记录
+              {t('run.noArticles')}
             </div>
           )}
         </div>
@@ -346,11 +351,12 @@ function ArticleStatusIcon({ status }: { status: string }) {
 }
 
 function RunStatusBadge({ status }: { status: string }) {
+  const t = useTranslations('autoPublish');
   const map: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
-    COMPLETED: { label: '完成', tone: 'success' },
-    PARTIAL: { label: '部分成功', tone: 'warning' },
-    FAILED: { label: '失败', tone: 'danger' },
-    RUNNING: { label: '运行中', tone: 'info' },
+    COMPLETED: { label: t('status.COMPLETED'), tone: 'success' },
+    PARTIAL: { label: t('status.PARTIAL'), tone: 'warning' },
+    FAILED: { label: t('status.FAILED'), tone: 'danger' },
+    RUNNING: { label: t('status.RUNNING'), tone: 'info' },
   };
   const config = map[status] || { label: status, tone: 'neutral' as const };
   return <Badge tone={config.tone}>{config.label}</Badge>;

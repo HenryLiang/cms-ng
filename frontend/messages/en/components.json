@@ -1,0 +1,146 @@
+{
+  "localeSwitcher": {
+    "label": "Switch language"
+  },
+  "editor": {
+    "placeholder": "Start writing...",
+    "promptLink": "Enter link URL",
+    "promptYoutube": "Enter YouTube video URL",
+    "promptColor": "Enter a color value (e.g. #ff0000 or red)",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "highlight": "Highlight",
+    "textColor": "Text color",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "bulletList": "Bullet list",
+    "orderedList": "Ordered list",
+    "quote": "Quote",
+    "alignLeft": "Align left",
+    "alignCenter": "Align center",
+    "alignRight": "Align right",
+    "alignJustify": "Justify",
+    "insertLink": "Insert link",
+    "insertImage": "Insert image",
+    "insertYoutube": "Insert YouTube video",
+    "table": "Table",
+    "insertTable": "Insert 3x3 table",
+    "addColumnBefore": "Insert column before",
+    "addColumnAfter": "Insert column after",
+    "deleteColumn": "Delete column",
+    "addRowBefore": "Insert row before",
+    "addRowAfter": "Insert row after",
+    "deleteRow": "Delete row",
+    "deleteTable": "Delete table",
+    "undo": "Undo",
+    "redo": "Redo",
+    "charCount": "{chars} characters / {words} words"
+  },
+  "trace": {
+    "steps": {
+      "billingCheck": "Billing check",
+      "topicCollection": "Topic collection",
+      "research": "Research",
+      "articleGeneration": "Article generation",
+      "articleSave": "Article save",
+      "imageGeneration": "Cover image",
+      "publish": "Publishing",
+      "notification": "Notification"
+    },
+    "dataSources": "Data sources",
+    "fixedKeywords": "Fixed keywords",
+    "trendingTopics": "Trending topics",
+    "itemCount": "{count}",
+    "filterFunnel": "Filter funnel",
+    "funnelRaw": "Raw {count}",
+    "funnelFiltered": "Filtered {count}",
+    "funnelDeduped": "Deduped {count}",
+    "funnelSelected": "Selected 1",
+    "timeline": "Timeline",
+    "people": "People",
+    "dataPoints": "Data points",
+    "opinions": "Opinions",
+    "hideFullResearch": "Hide full research data",
+    "showFullResearch": "View full research data",
+    "billingDisabled": "Billing is disabled; check skipped",
+    "currentBalance": "Current balance",
+    "estimatedCost": "Estimated cost",
+    "decisionLog": "Decision log",
+    "metadata": "Metadata",
+    "errorInfo": "Error details",
+    "empty": "No execution trace data",
+    "totalDuration": "Total duration: {duration}"
+  },
+  "notificationBell": {
+    "justNow": "Just now",
+    "minutesAgo": "{minutes} min ago",
+    "hoursAgo": "{hours} hr ago",
+    "daysAgo": "{days} d ago",
+    "newMessage": "New",
+    "newNotificationAria": "New notification: {title}",
+    "triggerUnread": "Notifications, {count} unread",
+    "triggerNoUnread": "Notifications, no unread",
+    "dialogAria": "Notification center",
+    "title": "Notifications",
+    "unreadCount": "{count} unread",
+    "allRead": "All caught up",
+    "markAllRead": "Mark all read",
+    "loadFailed": "Failed to load notifications. Please try again later.",
+    "empty": "No notifications yet"
+  },
+  "uploader": {
+    "unsupportedType": "Unsupported file type: {name} (only jpg/png/webp/gif)",
+    "fileTooLarge": "File too large: {name} (max 10MB)",
+    "uploadFailed": "Upload failed. Please try again.",
+    "uploading": "Uploading…",
+    "dropHint": "Click, drag, or paste images here",
+    "formatHint": "Supports jpg/png/webp/gif, up to 10MB per file"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "Try reloading the page, or go back to the dashboard.",
+    "reload": "Reload",
+    "backToDashboard": "Back to dashboard"
+  },
+  "toast": {
+    "regionAria": "Notifications",
+    "dismissAria": "Dismiss notification"
+  },
+  "featureUnavailable": {
+    "title": "This feature is currently unavailable",
+    "description": "This feature has been disabled by the super administrator. Please contact the super administrator if you need access."
+  },
+  "tagsEditor": {
+    "title": "Article tags",
+    "aiTag": "AI auto-tag",
+    "removeTagAria": "Remove tag {tag}",
+    "placeholder": "Type a tag and press Enter"
+  },
+  "mediaPicker": {
+    "title": "Select {mediaType}",
+    "source": {
+      "all": "All",
+      "upload": "Upload",
+      "aiGenerated": "AI generated"
+    },
+    "type": {
+      "image": "image",
+      "video": "video",
+      "audio": "audio"
+    },
+    "searchPlaceholder": "Search file name / alt / prompt (Enter)",
+    "search": "Search",
+    "upload": "Upload",
+    "emptyImage": "No images yet. Click Upload to add one.",
+    "emptyOther": "No {mediaType} assets in the library. You can paste a URL instead.",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "languageBadge": {
+    "zh": "CN",
+    "zhHk": "HK",
+    "yue": "Cant",
+    "en": "EN"
+  }
+}

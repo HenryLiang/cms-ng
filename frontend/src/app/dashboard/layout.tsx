@@ -32,50 +32,54 @@ import ToastHost from '@/components/toast-host';
 import ErrorBoundary from '@/components/error-boundary';
 import { FeatureUnavailable } from '@/components/feature-unavailable';
 import NotificationBell from '@/components/notification-bell';
+import LocaleSwitcher from '@/components/locale-switcher';
+import { useTranslations } from 'next-intl';
 
 interface NavItem {
   href: string;
-  label: string;
+  // 存词典 key 而非文案,渲染处经 t() 解析
+  labelKey: string;
   icon: LucideIcon;
   feature: SystemFeature;
   badge?: number;
 }
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+const NAV_GROUPS: { labelKey: string; items: NavItem[] }[] = [
   {
-    label: '工作区',
+    labelKey: 'nav.workspace',
     items: [
-      { href: '/dashboard', label: '工作台', icon: LayoutDashboard, feature: SystemFeature.WORKBENCH },
-      { href: '/dashboard/articles', label: '稿件管理', icon: FileText, feature: SystemFeature.ARTICLES },
-      { href: '/dashboard/media', label: '媒体库', icon: Images, feature: SystemFeature.MEDIA },
+      { href: '/dashboard', labelKey: 'nav.workbench', icon: LayoutDashboard, feature: SystemFeature.WORKBENCH },
+      { href: '/dashboard/articles', labelKey: 'nav.articles', icon: FileText, feature: SystemFeature.ARTICLES },
+      { href: '/dashboard/media', labelKey: 'nav.media', icon: Images, feature: SystemFeature.MEDIA },
       // 文生视频(PRD: docs/PRD-text-to-video.md);能力关闭时由 videoEnabled 过滤隐藏
-      { href: '/dashboard/video', label: '视频创作', icon: Clapperboard, feature: SystemFeature.VIDEO },
-      { href: '/dashboard/review', label: '审核台', icon: ClipboardCheck, feature: SystemFeature.REVIEW },
-      { href: '/dashboard/stories', label: '选题中心', icon: Lightbulb, feature: SystemFeature.STORIES },
-      { href: '/dashboard/hot-topics', label: '实时热点', icon: Radar, feature: SystemFeature.HOT_TOPICS },
+      { href: '/dashboard/video', labelKey: 'nav.video', icon: Clapperboard, feature: SystemFeature.VIDEO },
+      { href: '/dashboard/review', labelKey: 'nav.review', icon: ClipboardCheck, feature: SystemFeature.REVIEW },
+      { href: '/dashboard/stories', labelKey: 'nav.stories', icon: Lightbulb, feature: SystemFeature.STORIES },
+      { href: '/dashboard/hot-topics', labelKey: 'nav.hotTopics', icon: Radar, feature: SystemFeature.HOT_TOPICS },
     ],
   },
   {
-    label: '自动化',
+    labelKey: 'nav.automation',
     items: [
-      { href: '/dashboard/auto-publish', label: '自动发布', icon: Zap, feature: SystemFeature.AUTO_PUBLISH },
-      { href: '/dashboard/billing', label: '计费管理', icon: Wallet, feature: SystemFeature.BILLING },
+      { href: '/dashboard/auto-publish', labelKey: 'nav.autoPublish', icon: Zap, feature: SystemFeature.AUTO_PUBLISH },
+      { href: '/dashboard/billing', labelKey: 'nav.billing', icon: Wallet, feature: SystemFeature.BILLING },
     ],
   },
   {
-    label: '系统',
+    labelKey: 'nav.system',
     items: [
-      { href: '/dashboard/accounts', label: '账号管理', icon: Users, feature: SystemFeature.ACCOUNTS },
-      { href: '/dashboard/settings', label: '系统设置', icon: Settings, feature: SystemFeature.SETTINGS },
+      { href: '/dashboard/accounts', labelKey: 'nav.accounts', icon: Users, feature: SystemFeature.ACCOUNTS },
+      { href: '/dashboard/settings', labelKey: 'nav.settings', icon: Settings, feature: SystemFeature.SETTINGS },
     ],
   },
 ];
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  [UserRole.REPORTER]: '记者',
-  [UserRole.EDITOR]: '编辑',
-  [UserRole.ADMIN]: '管理员',
-  [UserRole.SUPER_ADMIN]: '超级管理员',
+// 角色中文标签走 dashboard.roles 词典;ROLE_CODES 徽章保持英文不翻
+const ROLE_LABEL_KEYS: Record<UserRole, string> = {
+  [UserRole.REPORTER]: 'roles.reporter',
+  [UserRole.EDITOR]: 'roles.editor',
+  [UserRole.ADMIN]: 'roles.admin',
+  [UserRole.SUPER_ADMIN]: 'roles.superAdmin',
 };
 
 const ROLE_CODES: Record<UserRole, string> = {
@@ -96,6 +100,8 @@ function isItemActive(pathname: string | null, href: string) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   useProtectedRoute();
   useRoleGuard();
+  const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
   const { user, logout } = useAuthStore();
   const isLoading = useAuthStore((state) => state.isLoading);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
@@ -104,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useSystemFeaturesStore();
 
   const role = user?.role as UserRole | undefined;
-  const roleLabel = role ? ROLE_LABELS[role] : '';
+  const roleLabel = role ? t(ROLE_LABEL_KEYS[role]) : '';
   const roleCode = role ? ROLE_CODES[role] : '';
 
   // 文生视频能力探测:功能关闭(未配置 provider)时隐藏导航入口
@@ -165,9 +171,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* 导航 */}
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
           {visibleGroups.map((group) => (
-            <div key={group.label}>
+            <div key={group.labelKey}>
               <div className="px-3 pb-1.5 pt-4 text-[10px] font-medium uppercase tracking-wider text-sidebar-muted/70">
-                {group.label}
+                {t(group.labelKey)}
               </div>
               {group.items.map((item) => {
                 const Icon = item.icon;
@@ -186,7 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-cyan-400" />
                     )}
                     <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : ''}`} />
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 );
               })}
@@ -223,7 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 logout();
               }}
               className="rounded-lg p-1.5 text-sidebar-muted transition-colors hover:bg-sidebar-elevated hover:text-white"
-              title="退出登录"
+              title={t('userCard.logout')}
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -237,7 +243,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface/80 px-6 backdrop-blur">
           <div className="flex items-center gap-2 text-sm">
             <LayoutDashboard className="h-4 w-4 text-subtle" />
-            <span className="text-muted">{activeItem?.label ?? (profileActive ? '个人资料' : '工作台')}</span>
+            <span className="text-muted">
+              {activeItem ? t(activeItem.labelKey) : profileActive ? t('nav.profile') : t('nav.workbench')}
+            </span>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {/* 全局搜索（视觉占位，后续接入全局检索） */}
@@ -245,15 +253,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
               <input
                 className="h-9 w-64 rounded-lg border border-line bg-surface pl-8 pr-12 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-                placeholder="搜索稿件、选题…"
+                placeholder={t('header.searchPlaceholder')}
               />
               <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-line bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-subtle">
                 ⌘K
               </kbd>
             </div>
-            <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:bg-surface-muted hover:text-foreground" title="筛选">
+            <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:bg-surface-muted hover:text-foreground" title={tCommon('actions.filter')}>
               <SlidersHorizontal className="h-4 w-4" />
             </button>
+            <LocaleSwitcher />
             <NotificationBell />
             <Link
               href="/dashboard/profile"

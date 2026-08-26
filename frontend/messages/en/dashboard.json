@@ -1,0 +1,59 @@
+{
+  "nav": {
+    "workspace": "Workspace",
+    "automation": "Automation",
+    "system": "System",
+    "workbench": "Workbench",
+    "articles": "Articles",
+    "media": "Media",
+    "video": "Video",
+    "review": "Review",
+    "stories": "Stories",
+    "hotTopics": "Hot Topics",
+    "autoPublish": "Auto-Publish",
+    "billing": "Billing",
+    "accounts": "Accounts",
+    "settings": "Settings",
+    "profile": "Profile"
+  },
+  "roles": {
+    "reporter": "Reporter",
+    "editor": "Editor",
+    "admin": "Admin",
+    "superAdmin": "Super Admin"
+  },
+  "header": {
+    "searchPlaceholder": "Search articles, stories…"
+  },
+  "userCard": {
+    "logout": "Log out"
+  },
+  "pipeline": {
+    "draft": "Drafting",
+    "writing": "Writing",
+    "pendingReview": "In Review",
+    "published": "Published"
+  },
+  "home": {
+    "welcomeBack": "Welcome back, {name}",
+    "subtitle": "Manage stories and articles end to end",
+    "newStory": "New Story",
+    "recentStories": "Recent Stories",
+    "viewAll": "View all",
+    "emptyTitle": "No stories yet",
+    "emptyDescription": "Create your first story to get started",
+    "storiesDisabledSubtitle": "View your creative workspace",
+    "storiesDisabledTitle": "Stories are currently unavailable",
+    "storiesDisabledDescription": "Story stats and recent stories are hidden on the workbench.",
+    "table": {
+      "story": "Story",
+      "status": "Status",
+      "language": "Language",
+      "articles": "Articles",
+      "updatedAt": "Updated"
+    },
+    "actions": "Actions",
+    "viewDetails": "View details",
+    "moveTo": "Move to"
+  }
+}

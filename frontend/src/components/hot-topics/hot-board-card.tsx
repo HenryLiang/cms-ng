@@ -11,6 +11,7 @@ import {
   Video,
   type LucideIcon,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { TopicCandidate, TopicSourceDefinition } from '@cms-ng/shared';
 import { formatRelativeTime } from '@/lib/relative-time';
 
@@ -56,6 +57,7 @@ export function HotBoardCard({
   onVisible,
   onRefresh,
 }: HotBoardCardProps) {
+  const t = useTranslations('hotTopics');
   const rootRef = useRef<HTMLDivElement>(null);
   const visibleFiredRef = useRef(false);
   const prevItemsRef = useRef<TopicCandidate[]>([]);
@@ -123,16 +125,16 @@ export function HotBoardCard({
         </h3>
         <span className="ml-auto shrink-0 text-xs text-subtle">
           {loading && !state?.loaded
-            ? '加载中…'
+            ? t('card.loading')
             : failed
-              ? '获取失败'
+              ? t('card.fetchFailed')
               : state?.fetchedAt
-                ? `${formatRelativeTime(state.fetchedAt)}更新`
+                ? t('card.updatedAt', { time: formatRelativeTime(state.fetchedAt) })
                 : ''}
         </span>
         <button
           type="button"
-          aria-label={`刷新${source.label}`}
+          aria-label={t('card.refreshSource', { label: source.label })}
           disabled={loading}
           onClick={() => onRefresh(source.id)}
           className="shrink-0 rounded-md p-1 text-subtle transition-colors hover:bg-surface-muted hover:text-foreground disabled:opacity-50"
@@ -151,19 +153,19 @@ export function HotBoardCard({
         ) : failed ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-sm text-muted">
-              {state.warnings[0] ?? '数据源暂时不可用'}
+              {state.warnings[0] ?? t('card.unavailable')}
             </p>
             <button
               type="button"
               onClick={() => onRefresh(source.id)}
               className="rounded-lg border border-line-strong px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-surface-muted"
             >
-              重试
+              {t('card.retry')}
             </button>
           </div>
         ) : !items.length ? (
           <div className="flex h-full items-center justify-center text-sm text-muted">
-            暂无数据
+            {t('card.emptyData')}
           </div>
         ) : (
           <>

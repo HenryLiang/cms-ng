@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   getArticle,
   updateArticle,
@@ -78,6 +79,9 @@ export default function ArticleEditorPage() {
   const router = useRouter();
   const params = useParams();
   const articleId = params.id as string;
+  const t = useTranslations('articles');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +94,7 @@ export default function ArticleEditorPage() {
   const [content, setContent] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.TRADITIONAL_CHINESE_HK);
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.SIMPLIFIED_CHINESE);
   // Author-style persona selector. authorSlug='' means "use default generation".
   // Loaded once on mount from GET /authors; degrades gracefully when no data on disk.
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
@@ -227,13 +231,13 @@ export default function ArticleEditorPage() {
               ?.message
           : undefined;
       if (status === 403) {
-        setLoadError(apiMsg || '您没有权限访问此稿件');
+        setLoadError(apiMsg || t('editor.loadErrorForbidden'));
       } else if (status === 404) {
-        setLoadError('稿件不存在');
+        setLoadError(t('editor.loadErrorNotFound'));
       } else if (status && status >= 500) {
-        setLoadError('服务器错误，请稍后重试');
+        setLoadError(t('editor.loadErrorServer'));
       } else {
-        setLoadError(apiMsg || '加载失败，请稍后重试');
+        setLoadError(apiMsg || t('editor.loadErrorGeneric'));
       }
       setArticle(null);
     } finally {
@@ -269,7 +273,7 @@ export default function ArticleEditorPage() {
   }
 
   async function handleDelete() {
-    if (!confirm('确定要删除这篇稿件吗？此操作不可恢复。')) return;
+    if (!confirm(t('editor.deleteConfirm'))) return;
     await deleteArticle(articleId);
     router.push('/dashboard/articles');
   }
@@ -314,7 +318,7 @@ export default function ArticleEditorPage() {
   }
 
   async function handleRollback(version: number) {
-    if (!confirm(`确定要回滚到版本 v${version} 吗？当前内容将被覆盖。`)) return;
+    if (!confirm(t('editor.rollbackConfirm', { version }))) return;
     setRollingBack(true);
     try {
       await rollbackArticle(articleId, version);
@@ -477,7 +481,7 @@ export default function ArticleEditorPage() {
       setDraftResult(result);
       setShowDraftPreview(true);
     } catch {
-      alert('初稿生成失败，请稍后重试');
+      alert(t('aiPanel.draftFailed'));
     } finally {
       setDraftLoading(false);
     }
@@ -507,7 +511,7 @@ export default function ArticleEditorPage() {
       setFactCheckResult(result);
       setShowFactCheck(true);
     } catch {
-      alert('事实核查失败，请稍后重试');
+      alert(t('aiPanel.factCheckFailed'));
     } finally {
       setFactCheckLoading(false);
     }
@@ -521,7 +525,7 @@ export default function ArticleEditorPage() {
       setReviewReportResult(result);
       setShowReviewReport(true);
     } catch {
-      alert('预审报告生成失败，请稍后重试');
+      alert(t('aiPanel.reviewReportFailed'));
     } finally {
       setReviewReportLoading(false);
     }
@@ -535,7 +539,7 @@ export default function ArticleEditorPage() {
       setSeoResult(result);
       setShowSEO(true);
     } catch {
-      alert('SEO 分析失败，请稍后重试');
+      alert(t('aiPanel.seoFailed'));
     } finally {
       setSeoLoading(false);
     }
@@ -549,7 +553,7 @@ export default function ArticleEditorPage() {
       setGeoResult(result);
       setShowGEO(true);
     } catch {
-      alert('GEO 分析失败，请稍后重试');
+      alert(t('aiPanel.geoFailed'));
     } finally {
       setGeoLoading(false);
     }
@@ -574,9 +578,9 @@ export default function ArticleEditorPage() {
               ?.message
           : undefined;
       const errMsg = err instanceof Error ? err.message : undefined;
-      const msg = apiMsg || errMsg || '未知错误';
-      console.error('AI 配图生成失败:', msg, err);
-      alert(`图片生成失败：${msg}`);
+      const msg = apiMsg || errMsg || t('aiPanel.unknownError');
+      console.error('AI image generation failed:', msg, err);
+      alert(t('aiPanel.imageFailed', { message: msg }));
     } finally {
       setImageGenLoading(false);
     }
@@ -619,9 +623,9 @@ export default function ArticleEditorPage() {
   }
 
   const quickChatPrompts = [
-    '分析这个选题的报道角度',
-    '补充数据支撑建议',
-    '检查逻辑一致性',
+    t('aiChat.quickPrompts.angle'),
+    t('aiChat.quickPrompts.data'),
+    t('aiChat.quickPrompts.logic'),
   ];
 
   if (loading) {
@@ -635,7 +639,7 @@ export default function ArticleEditorPage() {
   if (!article) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted">{loadError ?? '稿件不存在'}</p>
+        <p className="text-sm text-muted">{loadError ?? t('editor.loadErrorNotFound')}</p>
       </div>
     );
   }
@@ -649,7 +653,7 @@ export default function ArticleEditorPage() {
         <div className="absolute top-16 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-2.5 shadow-lg transition-opacity duration-300">
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           <span className="text-sm font-medium text-emerald-800">
-            保存成功，当前版本 v{article.version}
+            {t('editor.saveSuccess', { version: article.version })}
           </span>
         </div>
       )}
@@ -667,32 +671,32 @@ export default function ArticleEditorPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="bg-transparent text-lg font-semibold text-foreground outline-none"
-                placeholder="稿件标题"
+                placeholder={t('editor.titlePlaceholder')}
               />
               <button
                 onClick={handleGenerateHeadlines}
                 disabled={headlinesLoading}
                 className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft px-2 py-1 text-xs font-medium text-brand-soft-text transition hover:brightness-95 disabled:opacity-50"
-                title="标题实验室"
+                title={t('headlineLab.title')}
               >
                 {headlinesLoading ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <Sparkles className="h-3 w-3" />
                 )}
-                标题实验室
+                {t('headlineLab.title')}
               </button>
               <StatusBadge status={article.status} />
               <select
                 value={contentLanguage}
                 onChange={(e) => setContentLanguage(e.target.value as ContentLanguage)}
                 className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-                title="内容语言"
+                title={t('editor.languageTooltip')}
               >
-                <option value={ContentLanguage.SIMPLIFIED_CHINESE}>简体中文</option>
-                <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>繁体中文（香港）</option>
-                <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>繁体中文（粤语）</option>
-                <option value={ContentLanguage.ENGLISH}>English</option>
+                <option value={ContentLanguage.SIMPLIFIED_CHINESE}>{t('language.SIMPLIFIED_CHINESE')}</option>
+                <option value={ContentLanguage.TRADITIONAL_CHINESE_HK}>{t('language.TRADITIONAL_CHINESE_HK')}</option>
+                <option value={ContentLanguage.TRADITIONAL_CHINESE_CANTONESE}>{t('language.TRADITIONAL_CHINESE_CANTONESE')}</option>
+                <option value={ContentLanguage.ENGLISH}>{t('language.ENGLISH')}</option>
               </select>
               <select
                 value={authorSlug}
@@ -701,11 +705,11 @@ export default function ArticleEditorPage() {
                 className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-medium text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
                 title={
                   authorsAvailable
-                    ? '作者风格：选中的作者文风将应用到所有生成/编辑类 AI 操作'
-                    : '未检测到作者风格数据，将使用默认生成方式'
+                    ? t('editor.authorStyleTooltip')
+                    : t('editor.authorStyleUnavailableTooltip')
                 }
               >
-                <option value="">默认风格</option>
+                <option value="">{t('editor.defaultStyle')}</option>
                 {authors.map((a) => (
                   <option key={a.slug} value={a.slug}>
                     {a.name}
@@ -714,27 +718,30 @@ export default function ArticleEditorPage() {
               </select>
             </div>
             <p className="mt-1 text-xs text-muted tnum">
-              版本 {article.version} · {wordCount} 字 · 最后保存{' '}
-              {new Date(article.updatedAt).toLocaleString('zh-CN')}
+              {t('editor.metaLine', {
+                version: article.version,
+                wordCount,
+                savedAt: new Date(article.updatedAt).toLocaleString(locale),
+              })}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={handleOpenVersions}>
             <History className="h-4 w-4" />
-            版本历史
+            {t('editor.versionHistory')}
           </Button>
           <Button variant="secondary" size="sm" loading={saving} onClick={() => handleSave()}>
-            保存
+            {tCommon('actions.save')}
           </Button>
           <Button variant="primary" size="sm" disabled={saving} onClick={handleOpenSubmitModal}>
             <Send className="h-4 w-4" />
-            提交审核
+            {t('editor.submitForReview')}
           </Button>
           <button
             onClick={handleDelete}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50"
-            title="删除稿件"
+            title={t('editor.deleteTooltip')}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -748,7 +755,7 @@ export default function ArticleEditorPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600" />
-                <h3 className="text-lg font-semibold">标题实验室</h3>
+                <h3 className="text-lg font-semibold">{t('headlineLab.title')}</h3>
               </div>
               <button onClick={() => setShowHeadlines(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
@@ -760,7 +767,7 @@ export default function ArticleEditorPage() {
               </div>
             ) : headlines.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
-                <p className="text-muted">暂无标题建议，请稍后重试</p>
+                <p className="text-muted">{t('headlineLab.empty')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -784,7 +791,7 @@ export default function ArticleEditorPage() {
                       onClick={() => applyHeadline(h.title)}
                       className="shrink-0"
                     >
-                      采用
+                      {t('headlineLab.adopt')}
                     </Button>
                   </div>
                 ))}
@@ -799,22 +806,22 @@ export default function ArticleEditorPage() {
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-20">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">提交审核</h3>
+              <h3 className="text-lg font-semibold">{t('editor.submitForReview')}</h3>
               <button onClick={() => setShowSubmitModal(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <p className="mb-4 text-sm text-muted">
-              提交后稿件将进入待审核状态，编辑将进行审核。
+              {t('submitReview.description')}
             </p>
             <div className="mb-4">
-              <label className="mb-2 block text-sm font-medium text-foreground">选择审核编辑（可选）</label>
+              <label className="mb-2 block text-sm font-medium text-foreground">{t('submitReview.editorLabel')}</label>
               <select
                 value={selectedEditor}
                 onChange={(e) => setSelectedEditor(e.target.value)}
                 className="w-full rounded-lg border border-line p-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               >
-                <option value="">自动分配</option>
+                <option value="">{t('submitReview.autoAssign')}</option>
                 {editors.map((editor) => (
                   <option key={editor.id} value={editor.id}>
                     {editor.name}
@@ -824,11 +831,11 @@ export default function ArticleEditorPage() {
             </div>
             <div className="flex gap-3 justify-end">
               <Button variant="secondary" onClick={() => setShowSubmitModal(false)}>
-                取消
+                {tCommon('actions.cancel')}
               </Button>
               <Button variant="primary" loading={submittingReview} onClick={handleConfirmSubmit}>
                 {!submittingReview && <Send className="h-4 w-4" />}
-                确认提交
+                {t('submitReview.confirm')}
               </Button>
             </div>
           </div>
@@ -842,7 +849,7 @@ export default function ArticleEditorPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <History className="h-5 w-5 text-muted" />
-                <h3 className="text-lg font-semibold">版本历史</h3>
+                <h3 className="text-lg font-semibold">{t('editor.versionHistory')}</h3>
               </div>
               <button onClick={() => setShowVersions(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
@@ -854,7 +861,7 @@ export default function ArticleEditorPage() {
               </div>
             ) : versions.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
-                <p className="text-muted">暂无版本历史</p>
+                <p className="text-muted">{t('versionHistory.empty')}</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -871,7 +878,7 @@ export default function ArticleEditorPage() {
                         <span className="text-sm font-medium text-foreground">{v.title}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted">
-                        {new Date(v.createdAt).toLocaleString('zh-CN')}
+                        {new Date(v.createdAt).toLocaleString(locale)}
                       </p>
                     </div>
                     {v.version !== article?.version && (
@@ -882,7 +889,7 @@ export default function ArticleEditorPage() {
                         disabled={rollingBack}
                       >
                         <RotateCcw className="h-3 w-3" />
-                        回滚
+                        {t('versionHistory.rollback')}
                       </Button>
                     )}
                   </div>
@@ -900,7 +907,7 @@ export default function ArticleEditorPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600" />
-                <h3 className="text-lg font-semibold">AI 生成初稿</h3>
+                <h3 className="text-lg font-semibold">{t('draftPreview.title')}</h3>
               </div>
               <button onClick={() => setShowDraftPreview(false)} className="text-subtle hover:text-foreground">
                 <X className="h-5 w-5" />
@@ -908,31 +915,31 @@ export default function ArticleEditorPage() {
             </div>
             <div className="flex-1 overflow-auto space-y-4 pr-2">
               <div>
-                <label className="text-xs font-medium text-muted">标题</label>
+                <label className="text-xs font-medium text-muted">{t('draftPreview.titleLabel')}</label>
                 <p className="text-base font-semibold text-foreground">{draftResult.title}</p>
               </div>
               {draftResult.subtitle && (
                 <div>
-                  <label className="text-xs font-medium text-muted">副标题</label>
+                  <label className="text-xs font-medium text-muted">{t('draftPreview.subtitleLabel')}</label>
                   <p className="text-base text-foreground">{draftResult.subtitle}</p>
                 </div>
               )}
               <div>
-                <label className="text-xs font-medium text-muted">正文</label>
+                <label className="text-xs font-medium text-muted">{t('draftPreview.contentLabel')}</label>
                 <DraftPreview content={draftResult.content} />
               </div>
             </div>
             <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-line">
               <Button variant="secondary" onClick={() => setShowDraftPreview(false)}>
-                取消
+                {tCommon('actions.cancel')}
               </Button>
               <Button variant="secondary" onClick={() => applyDraft('insert')}>
                 <Plus className="h-4 w-4" />
-                插入到末尾
+                {t('draftPreview.insertAtEnd')}
               </Button>
               <Button variant="primary" onClick={() => applyDraft('replace')}>
                 <Check className="h-4 w-4" />
-                替换当前内容
+                {t('draftPreview.replaceContent')}
               </Button>
             </div>
           </div>
@@ -948,7 +955,7 @@ export default function ArticleEditorPage() {
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               className="mb-4 w-full bg-transparent text-lg text-muted outline-none"
-              placeholder="副标题（可选）"
+              placeholder={t('editor.subtitlePlaceholder')}
             />
             {/* Cover Image */}
             {article?.coverImage ? (
@@ -959,7 +966,7 @@ export default function ArticleEditorPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element -- 外链 COS 封面图,用 img 务实(避免 next/image remotePatterns 配置) */}
                 <img
                   src={article.coverImage}
-                  alt="封面图"
+                  alt={t('editor.coverImageAlt')}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -967,15 +974,15 @@ export default function ArticleEditorPage() {
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => setShowImageGen(true)}>
                 <Sparkles className="h-3.5 w-3.5" />
-                AI 生成
+                {t('editor.aiGenerate')}
               </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowCoverPicker(true)}>
                 <ImageIcon className="h-3.5 w-3.5" />
-                从媒体库选择
+                {t('editor.pickFromMediaLibrary')}
               </Button>
               <label className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'cursor-pointer' })}>
                 <Upload className="h-3.5 w-3.5" />
-                {coverUploading ? '上传中…' : '上传图片'}
+                {coverUploading ? t('editor.uploading') : t('editor.uploadImage')}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
@@ -993,7 +1000,7 @@ export default function ArticleEditorPage() {
                   }
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
-                  移除封面
+                  {t('editor.removeCover')}
                 </button>
               )}
             </div>
@@ -1013,7 +1020,7 @@ export default function ArticleEditorPage() {
               ref={editorRef}
               content={content || ''}
               onChange={setContent}
-              placeholder="开始写作..."
+              placeholder={t('editor.contentPlaceholder')}
             />
           </div>
 
@@ -1030,25 +1037,25 @@ export default function ArticleEditorPage() {
                 >
                   <AIOperationButton
                     icon={<PenTool className="h-3.5 w-3.5" />}
-                    label="改写"
+                    label={t('aiMenu.rewrite')}
                     onClick={() => handleAIOperation('rewrite', 'serious')}
                   />
                   <div className="h-4 w-px bg-slate-700" />
                   <AIOperationButton
                     icon={<Plus className="h-3.5 w-3.5" />}
-                    label="扩写"
+                    label={t('aiMenu.expand')}
                     onClick={() => handleAIOperation('expand')}
                   />
                   <div className="h-4 w-px bg-slate-700" />
                   <AIOperationButton
                     icon={<Scissors className="h-3.5 w-3.5" />}
-                    label="精简"
+                    label={t('aiMenu.condense')}
                     onClick={() => handleAIOperation('condense')}
                   />
                   <div className="h-4 w-px bg-slate-700" />
                   <AIOperationButton
                     icon={<Wand2 className="h-3.5 w-3.5" />}
-                    label="润色"
+                    label={t('aiMenu.polish')}
                     onClick={() => handleAIOperation('polish')}
                   />
                 </div>
@@ -1061,7 +1068,7 @@ export default function ArticleEditorPage() {
                   }}
                 >
                   <div className="flex items-center justify-between border-b border-line px-3 py-2">
-                    <span className="text-xs font-medium text-muted">AI 处理结果</span>
+                    <span className="text-xs font-medium text-muted">{t('aiMenu.resultTitle')}</span>
                     <button onClick={() => setShowAIMenu(false)} className="text-subtle hover:text-foreground">
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -1084,7 +1091,7 @@ export default function ArticleEditorPage() {
                         className="flex-1"
                       >
                         <Check className="h-3 w-3" />
-                        替换
+                        {t('aiMenu.replace')}
                       </Button>
                       <Button
                         variant="secondary"
@@ -1093,10 +1100,10 @@ export default function ArticleEditorPage() {
                         className="flex-1"
                       >
                         <Plus className="h-3 w-3" />
-                        插入
+                        {t('aiMenu.insert')}
                       </Button>
                       <Button variant="secondary" size="sm" onClick={() => setShowAIMenu(false)}>
-                        取消
+                        {tCommon('actions.cancel')}
                       </Button>
                     </div>
                   )}
@@ -1119,7 +1126,7 @@ export default function ArticleEditorPage() {
             {/* Excerpt */}
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-foreground">摘要</h3>
+                <h3 className="text-sm font-medium text-foreground">{t('editor.excerptHeading')}</h3>
                 <button
                   onClick={handleGenerateExcerpt}
                   disabled={excerptLoading}
@@ -1130,7 +1137,7 @@ export default function ArticleEditorPage() {
                   ) : (
                     <Sparkles className="h-3 w-3" />
                   )}
-                  AI 生成
+                  {t('editor.aiGenerate')}
                 </button>
               </div>
               <textarea
@@ -1138,13 +1145,13 @@ export default function ArticleEditorPage() {
                 onChange={(e) => setExcerpt(e.target.value)}
                 rows={4}
                 className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-                placeholder="输入稿件摘要..."
+                placeholder={t('editor.excerptPlaceholder')}
               />
             </div>
 
             {/* Story */}
             <div>
-              <h3 className="text-sm font-medium text-foreground">所属选题</h3>
+              <h3 className="text-sm font-medium text-foreground">{t('editor.storyHeading')}</h3>
               {article.story ? (
                 <Link
                   href={`/dashboard/stories/${article.storyId}`}
@@ -1153,13 +1160,13 @@ export default function ArticleEditorPage() {
                   <p className="font-medium text-foreground">{article.story.title}</p>
                 </Link>
               ) : (
-                <p className="mt-2 text-sm text-muted">无关联选题</p>
+                <p className="mt-2 text-sm text-muted">{t('editor.noStory')}</p>
               )}
             </div>
 
             {/* Quick Actions */}
             <div>
-              <h3 className="text-sm font-medium text-foreground">快速操作</h3>
+              <h3 className="text-sm font-medium text-foreground">{t('quickActions.heading')}</h3>
               <div className="mt-2 space-y-2">
                 <button
                   onClick={handleGenerateDraft}
@@ -1171,7 +1178,7 @@ export default function ArticleEditorPage() {
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  AI 生成初稿
+                  {t('quickActions.generateDraft')}
                 </button>
                 <button
                   onClick={handleFactCheck}
@@ -1183,7 +1190,7 @@ export default function ArticleEditorPage() {
                   ) : (
                     <ShieldCheck className="h-4 w-4" />
                   )}
-                  AI 事实核查
+                  {t('quickActions.factCheck')}
                 </button>
                 <button
                   onClick={handleReviewReport}
@@ -1195,7 +1202,7 @@ export default function ArticleEditorPage() {
                   ) : (
                     <ClipboardCheck className="h-4 w-4" />
                   )}
-                  AI 预审报告
+                  {t('quickActions.reviewReport')}
                 </button>
                 <button
                   onClick={handleOptimizeSEO}
@@ -1207,7 +1214,7 @@ export default function ArticleEditorPage() {
                   ) : (
                     <TrendingUp className="h-4 w-4" />
                   )}
-                  AI SEO优化
+                  {t('quickActions.seoOptimize')}
                 </button>
                 <button
                   onClick={handleOptimizeGEO}
@@ -1219,7 +1226,7 @@ export default function ArticleEditorPage() {
                   ) : (
                     <Bot className="h-4 w-4" />
                   )}
-                  AI GEO优化
+                  {t('quickActions.geoOptimize')}
                 </button>
                 <button
                   onClick={() => setShowImageGen(true)}
@@ -1231,21 +1238,21 @@ export default function ArticleEditorPage() {
                   ) : (
                     <ImageIcon className="h-4 w-4" />
                   )}
-                  AI 生成配图
+                  {t('quickActions.generateImage')}
                 </button>
                 <Link
                   href={`/dashboard/video?mode=article&articleId=${article.id}`}
                   className="flex w-full items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-100"
                 >
                   <Clapperboard className="h-4 w-4" />
-                  AI 一键成片
+                  {t('quickActions.videoGenerate')}
                 </Link>
                 <button
                   onClick={() => handleSave('DRAFT')}
                   className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground hover:bg-surface-muted"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  退回草稿
+                  {t('quickActions.revertToDraft')}
                 </button>
               </div>
             </div>
@@ -1294,14 +1301,14 @@ export default function ArticleEditorPage() {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-purple-200 bg-purple-50 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100"
           >
             <MessageSquare className="h-4 w-4" />
-            {showChat ? '收起 AI 助手' : '打开 AI 助手'}
+            {showChat ? t('aiChat.collapse') : t('aiChat.expand')}
           </button>
 
           {/* AI Chat Panel */}
           {showChat && (
             <div className="mt-4 flex flex-col rounded-lg border border-line bg-surface overflow-hidden" style={{ height: '320px' }}>
               <div className="flex items-center justify-between border-b border-line px-3 py-2">
-                <span className="text-xs font-medium text-foreground">AI 创作助手</span>
+                <span className="text-xs font-medium text-foreground">{t('aiChat.title')}</span>
                 <button onClick={() => setShowChat(false)} className="text-subtle hover:text-foreground">
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -1309,7 +1316,7 @@ export default function ArticleEditorPage() {
               <div className="flex-1 overflow-auto p-3 space-y-3">
                 {chatMessages.length === 0 && (
                   <div className="text-center py-4">
-                    <p className="text-xs text-subtle mb-3">向 AI 助手提问，获取写作建议</p>
+                    <p className="text-xs text-subtle mb-3">{t('aiChat.emptyHint')}</p>
                     <div className="space-y-1.5">
                       {quickChatPrompts.map((prompt, i) => (
                         <button
@@ -1353,7 +1360,7 @@ export default function ArticleEditorPage() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-                  placeholder="输入问题..."
+                  placeholder={t('aiChat.inputPlaceholder')}
                   className="flex-1 rounded-md border border-line px-2 py-1.5 text-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
                 <button
@@ -1374,7 +1381,7 @@ export default function ArticleEditorPage() {
         <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/30 pt-10">
           <div className="w-full max-w-lg rounded-xl bg-surface p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">AI 生成配图</h3>
+              <h3 className="text-lg font-semibold">{t('imageGen.title')}</h3>
               <button
                 onClick={() => {
                   setShowImageGen(false);
@@ -1390,13 +1397,13 @@ export default function ArticleEditorPage() {
               <>
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">风格</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">{t('imageGen.styleLabel')}</label>
                     <div className="flex gap-2">
                       {[
-                        { key: 'news', label: '新闻摄影' },
-                        { key: 'illustration', label: '插画' },
-                        { key: 'photo', label: '写实照片' },
-                        { key: 'social', label: '社媒海报' },
+                        { key: 'news', label: t('imageGen.styles.news') },
+                        { key: 'illustration', label: t('imageGen.styles.illustration') },
+                        { key: 'photo', label: t('imageGen.styles.photo') },
+                        { key: 'social', label: t('imageGen.styles.social') },
                       ].map((s) => (
                         <button
                           key={s.key}
@@ -1413,37 +1420,37 @@ export default function ArticleEditorPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">比例</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">{t('imageGen.ratioLabel')}</label>
                     <select
                       value={imageGenRatio}
                       onChange={(e) => setImageGenRatio(e.target.value)}
                       className="w-full rounded-lg border border-line p-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                     >
-                      <option value="16:9">16:9 (文章横幅)</option>
-                      <option value="4:3">4:3 (标准)</option>
-                      <option value="1:1">1:1 (社媒方形)</option>
-                      <option value="3:4">3:4 (小红书)</option>
-                      <option value="9:16">9:16 (Stories)</option>
+                      <option value="16:9">{t('imageGen.ratios.banner')}</option>
+                      <option value="4:3">{t('imageGen.ratios.standard')}</option>
+                      <option value="1:1">{t('imageGen.ratios.square')}</option>
+                      <option value="3:4">{t('imageGen.ratios.xiaohongshu')}</option>
+                      <option value="9:16">{t('imageGen.ratios.stories')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">分辨率</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">{t('imageGen.sizeLabel')}</label>
                     <select
                       value={imageGenSize}
                       onChange={(e) => setImageGenSize(e.target.value as '2K' | '3K' | '4K')}
                       className="w-full rounded-lg border border-line p-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                     >
-                      <option value="2K">2K（快速）</option>
-                      <option value="3K">3K（高清）</option>
-                      <option value="4K">4K（超清）</option>
+                      <option value="2K">{t('imageGen.sizes.fast')}</option>
+                      <option value="3K">{t('imageGen.sizes.hd')}</option>
+                      <option value="4K">{t('imageGen.sizes.uhd')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">额外描述（可选）</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">{t('imageGen.extraPromptLabel')}</label>
                     <textarea
                       value={imageGenCustomPrompt}
                       onChange={(e) => setImageGenCustomPrompt(e.target.value)}
-                      placeholder="例如：加入香港天际线背景，黄昏时分..."
+                      placeholder={t('imageGen.extraPromptPlaceholder')}
                       rows={2}
                       className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                     />
@@ -1451,11 +1458,11 @@ export default function ArticleEditorPage() {
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
                   <Button variant="secondary" onClick={() => setShowImageGen(false)}>
-                    取消
+                    {tCommon('actions.cancel')}
                   </Button>
                   <Button variant="primary" loading={imageGenLoading} onClick={handleGenerateImage}>
                     {!imageGenLoading && <ImageIcon className="h-4 w-4" />}
-                    {imageGenLoading ? '生成中...' : '生成配图'}
+                    {imageGenLoading ? t('imageGen.generating') : t('imageGen.generate')}
                   </Button>
                 </div>
               </>
@@ -1465,7 +1472,7 @@ export default function ArticleEditorPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element -- 外链 COS 封面图,用 img 务实(避免 next/image remotePatterns 配置) */}
                   <img
                     src={imageGenResult.url}
-                    alt="AI 生成配图"
+                    alt={t('imageGen.title')}
                     className="w-full rounded-lg"
                   />
                 </div>
@@ -1474,7 +1481,7 @@ export default function ArticleEditorPage() {
                 </p>
                 <div className="mt-4 flex justify-end gap-3">
                   <Button variant="secondary" onClick={() => setImageGenResult(null)}>
-                    重新生成
+                    {t('imageGen.regenerate')}
                   </Button>
                   <Button
                     variant="primary"
@@ -1483,7 +1490,7 @@ export default function ArticleEditorPage() {
                       setImageGenResult(null);
                     }}
                   >
-                    完成
+                    {t('imageGen.done')}
                   </Button>
                 </div>
               </>
@@ -1508,7 +1515,7 @@ export default function ArticleEditorPage() {
             {/* eslint-disable-next-line @next/next/no-img-element -- 外链 COS 封面图预览,用 img 务实 */}
             <img
               src={article.coverImage}
-              alt="封面图预览"
+              alt={t('editor.coverPreviewAlt')}
               className="max-w-full max-h-[85vh] rounded-lg object-contain"
               onClick={(e) => e.stopPropagation()}
             />

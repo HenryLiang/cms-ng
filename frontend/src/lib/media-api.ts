@@ -1,6 +1,7 @@
 import { api } from './api';
 import { MediaSource, MediaStatus, MediaTagStatus } from '@cms-ng/shared';
 import type { PaginatedResponse } from './article-api';
+import { libT } from '@/i18n/client-dict';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -107,7 +108,7 @@ export async function uploadMedia(files: File[]): Promise<MediaAsset[]> {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}) as { message?: string });
-    const err = new Error(data?.message || '上传失败');
+    const err = new Error(data?.message || libT('media.uploadFailed'));
     (err as Error & { response?: unknown }).response = {
       status: res.status,
       data,

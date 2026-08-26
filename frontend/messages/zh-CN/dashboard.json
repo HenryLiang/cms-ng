@@ -1,0 +1,59 @@
+{
+  "nav": {
+    "workspace": "工作区",
+    "automation": "自动化",
+    "system": "系统",
+    "workbench": "工作台",
+    "articles": "稿件管理",
+    "media": "媒体库",
+    "video": "视频创作",
+    "review": "审核台",
+    "stories": "选题中心",
+    "hotTopics": "实时热点",
+    "autoPublish": "自动发布",
+    "billing": "计费管理",
+    "accounts": "账号管理",
+    "settings": "系统设置",
+    "profile": "个人资料"
+  },
+  "roles": {
+    "reporter": "记者",
+    "editor": "编辑",
+    "admin": "管理员",
+    "superAdmin": "超级管理员"
+  },
+  "header": {
+    "searchPlaceholder": "搜索稿件、选题…"
+  },
+  "userCard": {
+    "logout": "退出登录"
+  },
+  "pipeline": {
+    "draft": "选题中",
+    "writing": "采写中",
+    "pendingReview": "审核中",
+    "published": "已发布"
+  },
+  "home": {
+    "welcomeBack": "欢迎回来，{name}",
+    "subtitle": "管理选题与稿件的全流程",
+    "newStory": "新建选题",
+    "recentStories": "最近选题",
+    "viewAll": "查看全部",
+    "emptyTitle": "暂无选题",
+    "emptyDescription": "创建你的第一个选题，开始创作",
+    "storiesDisabledSubtitle": "查看你的创作工作区",
+    "storiesDisabledTitle": "选题功能当前未开放",
+    "storiesDisabledDescription": "工作台中的选题统计与最近选题已隐藏。",
+    "table": {
+      "story": "选题",
+      "status": "状态",
+      "language": "语言",
+      "articles": "稿件",
+      "updatedAt": "更新时间"
+    },
+    "actions": "操作",
+    "viewDetails": "查看详情",
+    "moveTo": "移动至"
+  }
+}

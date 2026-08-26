@@ -1,4 +1,7 @@
+'use client';
+
 import { X, ShieldCheck } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { FactCheckResult } from '@/lib/article-api';
 
 interface FactCheckPanelProps {
@@ -7,13 +10,14 @@ interface FactCheckPanelProps {
 }
 
 export default function FactCheckPanel({ result, onClose }: FactCheckPanelProps) {
+  const t = useTranslations('panels.factCheck');
   // 评分色（测试断言这些类，保留）
   const scoreColor =
     result.score >= 80 ? 'text-emerald-600' :
     result.score >= 50 ? 'text-amber-600' : 'text-red-600';
 
   const severityLabel = (s: string) =>
-    s === 'critical' ? '严重' : s === 'warning' ? '警告' : '提示';
+    s === 'critical' ? t('severityCritical') : s === 'warning' ? t('severityWarning') : t('severityInfo');
 
   // 严重度徽章色（测试断言这些类，保留）
   const severityBadgeClass = (s: string) =>
@@ -21,15 +25,15 @@ export default function FactCheckPanel({ result, onClose }: FactCheckPanelProps)
     s === 'warning' ? 'bg-amber-50 text-amber-700' :
     'bg-blue-50 text-blue-700';
 
-  const typeLabel = (t: string) => {
+  const typeLabel = (type: string) => {
     const map: Record<string, string> = {
-      fact: '事实',
-      inconsistency: '不一致',
-      dispute: '争议',
-      source_needed: '需核实',
-      risk: '风险',
+      fact: t('typeFact'),
+      inconsistency: t('typeInconsistency'),
+      dispute: t('typeDispute'),
+      source_needed: t('typeSourceNeeded'),
+      risk: t('typeRisk'),
     };
-    return map[t] ?? t;
+    return map[type] ?? type;
   };
 
   return (
@@ -37,7 +41,7 @@ export default function FactCheckPanel({ result, onClose }: FactCheckPanelProps)
       <div className="flex items-center justify-between border-b border-amber-100 px-3 py-2">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-amber-600" />
-          <span className="text-sm font-medium text-foreground">事实核查报告</span>
+          <span className="text-sm font-medium text-foreground">{t('title')}</span>
         </div>
         <button onClick={onClose} className="text-subtle transition-colors hover:text-foreground">
           <X className="h-3.5 w-3.5" />
@@ -48,7 +52,7 @@ export default function FactCheckPanel({ result, onClose }: FactCheckPanelProps)
           <div className={`text-2xl font-bold ${scoreColor}`}>
             {result.score}
           </div>
-          <div className="text-xs text-muted">可信度评分 / 100</div>
+          <div className="text-xs text-muted">{t('credibilityScore')}</div>
         </div>
         <p className="text-sm text-foreground">{result.summary}</p>
         {result.findings.length > 0 && (

@@ -141,7 +141,7 @@ export class ArticlesService {
     const contentLanguage =
       dto.contentLanguage ??
       user?.preferredLanguage ??
-      ContentLanguage.TRADITIONAL_CHINESE_HK;
+      ContentLanguage.SIMPLIFIED_CHINESE;
 
     const article = await this.prisma.article.create({
       data: serializeArticleInput({

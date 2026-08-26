@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BookOpen, X, Clock, Users, BarChart3, MessageSquare, Sparkles, Globe } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { ResearchKitResult } from '@/lib/story-api';
 import { Button, Card, Badge } from '@/components/ui';
 
@@ -20,6 +21,7 @@ export default function ResearchKitPanel({
   onGenerateDraft,
   draftLoading,
 }: ResearchKitPanelProps) {
+  const t = useTranslations('panels.researchKit');
   const [activeTab, setActiveTab] = useState<'timeline' | 'people' | 'data' | 'opinions' | 'wikipedia'>('timeline');
 
   const hasData = researchKit && (
@@ -33,13 +35,13 @@ export default function ResearchKitPanel({
   const hasWikipediaError = researchKit?.wikipediaStatus === 'api_error';
   const wikiEntryCount = researchKit?.wikipedia?.length ?? 0;
   const tabs = [
-    { key: 'timeline' as const, label: '事件时间线', icon: Clock, count: researchKit?.timeline.length ?? 0 },
-    { key: 'people' as const, label: '关键人物', icon: Users, count: researchKit?.people.length ?? 0 },
-    { key: 'data' as const, label: '核心数据', icon: BarChart3, count: researchKit?.data.length ?? 0 },
-    { key: 'opinions' as const, label: '各方观点', icon: MessageSquare, count: researchKit?.opinions.length ?? 0 },
+    { key: 'timeline' as const, label: t('tabTimeline'), icon: Clock, count: researchKit?.timeline.length ?? 0 },
+    { key: 'people' as const, label: t('tabPeople'), icon: Users, count: researchKit?.people.length ?? 0 },
+    { key: 'data' as const, label: t('tabData'), icon: BarChart3, count: researchKit?.data.length ?? 0 },
+    { key: 'opinions' as const, label: t('tabOpinions'), icon: MessageSquare, count: researchKit?.opinions.length ?? 0 },
     // Always show Wikipedia tab - even when empty or errored - so the
     // user can see the diagnostic message (wikipediaStatus).
-    { key: 'wikipedia' as const, label: hasWikipediaError ? 'Wikipedia ⚠️' : 'Wikipedia', icon: Globe, count: wikiEntryCount },
+    { key: 'wikipedia' as const, label: hasWikipediaError ? t('tabWikipediaError') : t('tabWikipedia'), icon: Globe, count: wikiEntryCount },
   ];
 
   return (
@@ -47,8 +49,8 @@ export default function ResearchKitPanel({
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-muted" />
-          <h2 className="text-sm font-medium text-foreground">AI 资料搜集</h2>
-          <span className="text-xs text-subtle">基于选题信息生成结构化背景资料</span>
+          <h2 className="text-sm font-medium text-foreground">{t('title')}</h2>
+          <span className="text-xs text-subtle">{t('subtitle')}</span>
         </div>
         <div className="flex items-center gap-2">
           {onGenerateDraft && hasData && (
@@ -59,7 +61,7 @@ export default function ResearchKitPanel({
               onClick={onGenerateDraft}
             >
               {!draftLoading && <Sparkles className="h-4 w-4" />}
-              {draftLoading ? '撰寫中...' : '基於資料生成初稿'}
+              {draftLoading ? t('generatingDraft') : t('generateDraft')}
             </Button>
           )}
           <Button
@@ -76,7 +78,7 @@ export default function ResearchKitPanel({
             onClick={onGenerate}
           >
             {!loading && <BookOpen className="h-4 w-4" />}
-            {loading ? '生成中...' : researchKit ? '重新生成' : '生成资料包'}
+            {loading ? t('generating') : researchKit ? t('regenerate') : t('generate')}
           </Button>
         </div>
       </div>
@@ -85,11 +87,11 @@ export default function ResearchKitPanel({
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
-            <span className="ml-2 text-sm text-muted">AI 正在搜集整理资料...</span>
+            <span className="ml-2 text-sm text-muted">{t('loading')}</span>
           </div>
         ) : !hasData ? (
           <div className="py-8 text-center">
-            <p className="text-sm text-muted">暂无资料，点击上方按钮生成</p>
+            <p className="text-sm text-muted">{t('empty')}</p>
           </div>
         ) : (
           <div>
@@ -128,13 +130,13 @@ export default function ResearchKitPanel({
                         <p className="text-xs font-medium text-muted">{item.date}</p>
                         <p className="text-sm text-foreground mt-0.5">{item.event}</p>
                         {item.source && (
-                          <p className="text-xs text-subtle mt-0.5">来源：{item.source}</p>
+                          <p className="text-xs text-subtle mt-0.5">{t('source', { source: item.source })}</p>
                         )}
                       </div>
                     </div>
                   ))}
                   {researchKit!.timeline.length === 0 && (
-                    <p className="text-sm text-subtle text-center py-4">暂无时间线数据</p>
+                    <p className="text-sm text-subtle text-center py-4">{t('emptyTimeline')}</p>
                   )}
                 </div>
               )}
@@ -151,7 +153,7 @@ export default function ResearchKitPanel({
                     </div>
                   ))}
                   {researchKit!.people.length === 0 && (
-                    <p className="text-sm text-subtle text-center py-4 col-span-2">暂无人物数据</p>
+                    <p className="text-sm text-subtle text-center py-4 col-span-2">{t('emptyPeople')}</p>
                   )}
                 </div>
               )}
@@ -166,14 +168,14 @@ export default function ResearchKitPanel({
                       <div>
                         <p className="text-sm font-medium text-foreground">{item.label}</p>
                         {item.source && (
-                          <p className="text-xs text-subtle mt-0.5">来源：{item.source}</p>
+                          <p className="text-xs text-subtle mt-0.5">{t('source', { source: item.source })}</p>
                         )}
                       </div>
                       <p className="text-sm font-semibold text-foreground">{item.value}</p>
                     </div>
                   ))}
                   {researchKit!.data.length === 0 && (
-                    <p className="text-sm text-subtle text-center py-4">暂无数据</p>
+                    <p className="text-sm text-subtle text-center py-4">{t('emptyData')}</p>
                   )}
                 </div>
               )}
@@ -192,7 +194,7 @@ export default function ResearchKitPanel({
                     </div>
                   ))}
                   {researchKit!.opinions.length === 0 && (
-                    <p className="text-sm text-subtle text-center py-4">暂无观点数据</p>
+                    <p className="text-sm text-subtle text-center py-4">{t('emptyOpinions')}</p>
                   )}
                 </div>
               )}
@@ -205,7 +207,7 @@ export default function ResearchKitPanel({
                         <Globe className="h-3.5 w-3.5 text-subtle" />
                         <span className="text-sm font-medium text-foreground">{entry.title}</span>
                         <Badge tone="neutral">
-                          {entry.language === 'zh' ? '中文' : 'English'}
+                          {entry.language === 'zh' ? t('langZh') : t('langEn')}
                         </Badge>
                       </div>
                       <p className="text-sm text-foreground leading-relaxed">{entry.extract}</p>
@@ -215,7 +217,7 @@ export default function ResearchKitPanel({
                         rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline mt-2 inline-block"
                       >
-                        查看原文 →
+                        {t('viewOriginal')}
                       </a>
                     </div>
                   ))}
@@ -223,16 +225,16 @@ export default function ResearchKitPanel({
                     <>
                       {researchKit!.wikipediaStatus === 'api_error' ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                          <p className="text-sm font-medium text-amber-800">Wikipedia 获取失败</p>
+                          <p className="text-sm font-medium text-amber-800">{t('wikiErrorTitle')}</p>
                           <p className="text-xs text-amber-600 mt-1">
-                            API 请求未成功（可能原因：代理未开启、网络不通、或 Wikipedia 限流）。系统已回退使用联网搜索结果。
+                            {t('wikiErrorDetail')}
                           </p>
                         </div>
                       ) : (
                         <p className="text-sm text-subtle text-center py-4">
                           {researchKit!.wikipediaStatus === 'no_results'
-                            ? 'Wikipedia 未找到相关词条'
-                            : '暂无 Wikipedia 资料'}
+                            ? t('wikiNoResults')
+                            : t('wikiEmpty')}
                         </p>
                       )}
                     </>

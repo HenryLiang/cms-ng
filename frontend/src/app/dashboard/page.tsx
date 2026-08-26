@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth-store';
 import { getStories, updateStory, type Story } from '@/lib/story-api';
@@ -21,14 +22,17 @@ import { SystemFeature } from '@cms-ng/shared';
 import { useSystemFeaturesStore } from '@/store/system-features-store';
 import { canUseFeature } from '@/lib/feature-access';
 
+// 存词典 key 而非文案,渲染处经 t() 解析
 const PIPELINE = [
-  { key: 'DRAFT', label: '选题中', icon: Clock },
-  { key: 'WRITING', label: '采写中', icon: FileText },
-  { key: 'PENDING_REVIEW', label: '审核中', icon: Send },
-  { key: 'PUBLISHED', label: '已发布', icon: CheckCircle },
+  { key: 'DRAFT', labelKey: 'pipeline.draft', icon: Clock },
+  { key: 'WRITING', labelKey: 'pipeline.writing', icon: FileText },
+  { key: 'PENDING_REVIEW', labelKey: 'pipeline.pendingReview', icon: Send },
+  { key: 'PUBLISHED', labelKey: 'pipeline.published', icon: CheckCircle },
 ] as const;
 
 export default function DashboardPage() {
+  const t = useTranslations('dashboard');
+  const locale = useLocale();
   const { user } = useAuthStore();
   const statuses = useSystemFeaturesStore((state) => state.statuses);
   const storiesEnabled = canUseFeature(
@@ -72,30 +76,30 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-7xl p-6">
         <div className="mb-5">
           <h1 className="text-xl font-semibold tracking-tight">
-            欢迎回来，{user?.name}
+            {t('home.welcomeBack', { name: user?.name ?? '' })}
           </h1>
-          <p className="mt-0.5 text-sm text-muted">查看你的创作工作区</p>
+          <p className="mt-0.5 text-sm text-muted">{t('home.storiesDisabledSubtitle')}</p>
         </div>
         <Card className="p-8 text-center">
-          <p className="text-sm font-medium">选题功能当前未开放</p>
+          <p className="text-sm font-medium">{t('home.storiesDisabledTitle')}</p>
           <p className="mt-1 text-xs text-muted">
-            工作台中的选题统计与最近选题已隐藏。
+            {t('home.storiesDisabledDescription')}
           </p>
         </Card>
       </div>
     );
   }
 
-  const stats: { label: string; count: number; icon: LucideIcon }[] = [
-    { label: '选题中', count: stories.filter((s) => s.status === 'DRAFT').length, icon: Clock },
-    { label: '采写中', count: stories.filter((s) => s.status === 'WRITING').length, icon: FileText },
+  const stats: { labelKey: string; count: number; icon: LucideIcon }[] = [
+    { labelKey: 'pipeline.draft', count: stories.filter((s) => s.status === 'DRAFT').length, icon: Clock },
+    { labelKey: 'pipeline.writing', count: stories.filter((s) => s.status === 'WRITING').length, icon: FileText },
     {
-      label: '审核中',
+      labelKey: 'pipeline.pendingReview',
       count: stories.filter((s) => s.status === 'PENDING_REVIEW' || s.status === 'IN_REVIEW').length,
       icon: Send,
     },
     {
-      label: '已发布',
+      labelKey: 'pipeline.published',
       count: stories.filter((s) => s.status === 'PUBLISHED').length,
       icon: CheckCircle,
     },
@@ -110,12 +114,12 @@ export default function DashboardPage() {
       {/* 页头 */}
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">欢迎回来，{user?.name}</h1>
-          <p className="mt-0.5 text-sm text-muted">管理选题与稿件的全流程</p>
+          <h1 className="text-xl font-semibold tracking-tight">{t('home.welcomeBack', { name: user?.name ?? '' })}</h1>
+          <p className="mt-0.5 text-sm text-muted">{t('home.subtitle')}</p>
         </div>
         <Link href="/dashboard/stories/new" className={buttonClasses({ variant: 'primary' })}>
           <Plus className="h-4 w-4" />
-          新建选题
+          {t('home.newStory')}
         </Link>
       </div>
 
@@ -124,13 +128,13 @@ export default function DashboardPage() {
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label} className="p-4">
+            <Card key={s.labelKey} className="p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft">
                   <Icon className="h-4 w-4 text-brand" />
                 </div>
                 <div>
-                  <div className="text-xs text-muted">{s.label}</div>
+                  <div className="text-xs text-muted">{t(s.labelKey)}</div>
                   <div className="tnum mt-0.5 text-xl font-semibold">{s.count}</div>
                 </div>
               </div>
@@ -143,7 +147,7 @@ export default function DashboardPage() {
       <Card>
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">最近选题</h3>
+            <h3 className="text-sm font-semibold">{t('home.recentStories')}</h3>
             <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
               {stories.length}
             </span>
@@ -152,7 +156,7 @@ export default function DashboardPage() {
             href="/dashboard/stories"
             className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
           >
-            查看全部 <ArrowRight className="h-3 w-3" />
+            {t('home.viewAll')} <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
 
@@ -161,14 +165,14 @@ export default function DashboardPage() {
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
               <FileText className="h-5 w-5 text-subtle" />
             </div>
-            <p className="text-sm font-medium">暂无选题</p>
-            <p className="mt-1 text-xs text-muted">创建你的第一个选题，开始创作</p>
+            <p className="text-sm font-medium">{t('home.emptyTitle')}</p>
+            <p className="mt-1 text-xs text-muted">{t('home.emptyDescription')}</p>
             <Link
               href="/dashboard/stories/new"
               className={buttonClasses({ variant: 'primary', size: 'sm', className: 'mt-4' })}
             >
               <Plus className="h-4 w-4" />
-              新建选题
+              {t('home.newStory')}
             </Link>
           </div>
         ) : (
@@ -176,11 +180,11 @@ export default function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
-                  <th className="px-5 py-2.5 font-medium">选题</th>
-                  <th className="px-5 py-2.5 font-medium">状态</th>
-                  <th className="px-5 py-2.5 font-medium">语言</th>
-                  <th className="px-5 py-2.5 font-medium">稿件</th>
-                  <th className="px-5 py-2.5 font-medium">更新时间</th>
+                  <th className="px-5 py-2.5 font-medium">{t('home.table.story')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('home.table.status')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('home.table.language')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('home.table.articles')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('home.table.updatedAt')}</th>
                   <th className="px-5 py-2.5" />
                 </tr>
               </thead>
@@ -212,7 +216,7 @@ export default function DashboardPage() {
                         {story._count?.articles ?? 0}
                       </td>
                       <td className="px-5 py-3 tnum text-xs text-subtle">
-                        {new Date(story.updatedAt).toLocaleDateString('zh-CN')}
+                        {new Date(story.updatedAt).toLocaleDateString(locale)}
                       </td>
                       <td className="px-5 py-3 text-right">
                         <div className="relative inline-block">
@@ -221,7 +225,7 @@ export default function DashboardPage() {
                               setMenuOpenId(menuOpenId === story.id ? null : story.id)
                             }
                             className="rounded-md p-1 text-subtle transition hover:bg-surface-muted hover:text-foreground"
-                            title="操作"
+                            title={t('home.actions')}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
@@ -236,19 +240,19 @@ export default function DashboardPage() {
                                   href={`/dashboard/stories/${story.id}`}
                                   className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted"
                                 >
-                                  查看详情
+                                  {t('home.viewDetails')}
                                 </Link>
                                 <div className="my-1 border-t border-line" />
                                 <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-subtle">
-                                  移动至
+                                  {t('home.moveTo')}
                                 </div>
-                                {targets.map((t) => (
+                                {targets.map((target) => (
                                   <button
-                                    key={t.key}
-                                    onClick={() => moveStory(story.id, t.key)}
+                                    key={target.key}
+                                    onClick={() => moveStory(story.id, target.key)}
                                     className="block w-full px-3 py-1.5 text-left text-sm text-muted hover:bg-surface-muted hover:text-foreground"
                                   >
-                                    {t.label}
+                                    {t(target.labelKey)}
                                   </button>
                                 ))}
                               </div>

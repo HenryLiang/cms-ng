@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { UploadCloud } from 'lucide-react';
 import { uploadMedia, type MediaAsset } from '@/lib/media-api';
 
@@ -23,6 +24,7 @@ export function ImageUploader({
   multiple = true,
   className,
 }: ImageUploaderProps) {
+  const t = useTranslations('components.uploader');
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -35,12 +37,12 @@ export function ImageUploader({
 
       const badType = files.find((f) => !ACCEPTED_MIME.includes(f.type));
       if (badType) {
-        setError(`不支持的文件类型：${badType.name}（仅 jpg/png/webp/gif）`);
+        setError(t('unsupportedType', { name: badType.name }));
         return;
       }
       const tooBig = files.find((f) => f.size > MAX_BYTES);
       if (tooBig) {
-        setError(`文件过大：${tooBig.name}（上限 10MB）`);
+        setError(t('fileTooLarge', { name: tooBig.name }));
         return;
       }
 
@@ -52,14 +54,14 @@ export function ImageUploader({
       } catch (e: unknown) {
         const msg =
           (e as { response?: { data?: { message?: string } } })?.response?.data
-            ?.message ?? '上传失败，请重试';
+            ?.message ?? t('uploadFailed');
         setError(msg);
       } finally {
         setUploading(false);
         if (inputRef.current) inputRef.current.value = '';
       }
     },
-    [onUploaded],
+    [onUploaded, t],
   );
 
   const onDrop = useCallback(
@@ -115,10 +117,10 @@ export function ImageUploader({
           <UploadCloud className="h-8 w-8 text-subtle" />
         )}
         <div className="text-sm font-medium text-foreground">
-          {uploading ? '上传中…' : '点击、拖拽或粘贴图片到此处'}
+          {uploading ? t('uploading') : t('dropHint')}
         </div>
         <div className="text-xs text-subtle">
-          支持 jpg/png/webp/gif，单文件 ≤ 10MB
+          {t('formatHint')}
         </div>
         <input
           ref={inputRef}

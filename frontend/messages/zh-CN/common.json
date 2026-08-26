@@ -1,0 +1,60 @@
+{
+  "actions": {
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "新建",
+    "submit": "提交",
+    "close": "关闭",
+    "back": "返回",
+    "retry": "重试",
+    "refresh": "刷新",
+    "search": "搜索",
+    "filter": "筛选",
+    "view": "查看",
+    "copy": "复制",
+    "copied": "已复制",
+    "download": "下载",
+    "upload": "上传",
+    "export": "导出",
+    "import": "导入",
+    "more": "更多"
+  },
+  "state": {
+    "loading": "加载中…",
+    "saving": "保存中…",
+    "submitting": "提交中…",
+    "deleting": "删除中…",
+    "empty": "暂无数据",
+    "all": "全部",
+    "yes": "是",
+    "no": "否",
+    "enabled": "已启用",
+    "disabled": "已停用"
+  },
+  "feedback": {
+    "success": "操作成功",
+    "failed": "操作失败",
+    "deleteConfirm": "确定删除吗？此操作不可撤销。",
+    "unsavedChanges": "有未保存的修改",
+    "networkError": "网络错误，请稍后重试"
+  },
+  "pagination": {
+    "prev": "上一页",
+    "next": "下一页",
+    "total": "共 {count} 条"
+  },
+  "form": {
+    "required": "必填项",
+    "invalidFormat": "格式不正确",
+    "searchPlaceholder": "搜索…"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{count} 分钟前",
+    "hoursAgo": "{count} 小时前",
+    "daysAgo": "{count} 天前"
+  }
+}

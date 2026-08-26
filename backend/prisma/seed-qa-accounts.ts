@@ -8,18 +8,25 @@
 // BEFORE PrismaClient is constructed, so we cannot rely on @prisma/client's
 // require-time .env autoload (adversarial review, round 2).
 import 'dotenv/config';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, ContentLanguage } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const PASSWORD = 'Test@2026';
 
-const ACCOUNTS: Array<{ email: string; name: string; role: UserRole }> = [
-  { email: 'qa-admin@01.com',          name: 'QA Admin',          role: UserRole.ADMIN },
-  { email: 'qa-editor@01.com',         name: 'QA Editor',         role: UserRole.EDITOR },
-  { email: 'qa-reporter-sc@01.com',    name: 'QA Reporter SC',    role: UserRole.REPORTER },
-  { email: 'qa-reporter-en@01.com',    name: 'QA Reporter EN',    role: UserRole.REPORTER },
-  { email: 'qa-reporter-hk@01.com',    name: 'QA Reporter HK',    role: UserRole.REPORTER },
-  { email: 'qa-reporter-none@01.com',  name: 'QA Reporter None',  role: UserRole.REPORTER },
+// preferredLanguage is per-persona so the i18n fallback-chain regression
+// (auth-i18n.spec.ts TC-I18N-FB*) is deterministic regardless of DB defaults.
+const ACCOUNTS: Array<{
+  email: string;
+  name: string;
+  role: UserRole;
+  preferredLanguage: ContentLanguage | null;
+}> = [
+  { email: 'qa-admin@01.com',          name: 'QA Admin',          role: UserRole.ADMIN,    preferredLanguage: ContentLanguage.SIMPLIFIED_CHINESE },
+  { email: 'qa-editor@01.com',         name: 'QA Editor',         role: UserRole.EDITOR,   preferredLanguage: ContentLanguage.SIMPLIFIED_CHINESE },
+  { email: 'qa-reporter-sc@01.com',    name: 'QA Reporter SC',    role: UserRole.REPORTER, preferredLanguage: ContentLanguage.SIMPLIFIED_CHINESE },
+  { email: 'qa-reporter-en@01.com',    name: 'QA Reporter EN',    role: UserRole.REPORTER, preferredLanguage: ContentLanguage.ENGLISH },
+  { email: 'qa-reporter-hk@01.com',    name: 'QA Reporter HK',    role: UserRole.REPORTER, preferredLanguage: ContentLanguage.TRADITIONAL_CHINESE_HK },
+  { email: 'qa-reporter-none@01.com',  name: 'QA Reporter None',  role: UserRole.REPORTER, preferredLanguage: null },
 ];
 
 async function main() {
@@ -55,14 +62,16 @@ async function main() {
   for (const acc of ACCOUNTS) {
     const u = await prisma.user.upsert({
       where: { email: acc.email },
-      update: { name: acc.name, role: acc.role, passwordHash, isActive: true },
+      // preferredLanguage in `update` too: re-running the seed normalizes
+      // drifted QA accounts back to the persona values.
+      update: { name: acc.name, role: acc.role, passwordHash, isActive: true, preferredLanguage: acc.preferredLanguage },
       create: {
         email: acc.email,
         name: acc.name,
         role: acc.role,
         passwordHash,
         isActive: true,
-        preferredLanguage: 'TRADITIONAL_CHINESE_HK',
+        preferredLanguage: acc.preferredLanguage,
       },
     });
     console.log(`  ✓ ${u.email.padEnd(28)} role=${u.role.padEnd(8)} id=${u.id}`);

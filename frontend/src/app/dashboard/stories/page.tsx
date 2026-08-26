@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   getTopics,
   createTopic,
@@ -61,6 +62,8 @@ const SOURCE_ICONS = {
 
 export default function StoryHubPage() {
   const router = useRouter();
+  const t = useTranslations('stories');
+  const tc = useTranslations('common');
   const [topics, setTopics] = useState<TrendingTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTopic, setSelectedTopic] = useState<TrendingTopic | null>(
@@ -152,7 +155,7 @@ export default function StoryHubPage() {
   }
 
   async function handleDeleteTopic(id: string) {
-    if (!confirm('确定删除这个热点？')) return;
+    if (!confirm(t('list.deleteConfirm'))) return;
     await deleteTopic(id);
     if (selectedTopic?.id === id) setSelectedTopic(null);
     const data = await loadTopics();
@@ -240,7 +243,7 @@ export default function StoryHubPage() {
       }
     } catch {
       setNewsSourceItems([]);
-      setNewsSourceWarnings(['数据源暂时不可用，请稍后重试']);
+      setNewsSourceWarnings([t('list.sourceUnavailable')]);
       setNewsPagination({ total: 0, totalPages: 1, limit: 10 });
     } finally {
       setNewsSourceLoading(false);
@@ -333,14 +336,14 @@ export default function StoryHubPage() {
       <div className="w-80 shrink-0 border-r border-line bg-surface overflow-auto">
         <div className="p-4 border-b border-line">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-foreground">选题中心</h1>
+            <h1 className="text-lg font-semibold text-foreground">{t('list.title')}</h1>
             <Button
               variant="primary"
               size="sm"
               onClick={() => setShowCreateForm(!showCreateForm)}
             >
               <Plus className="h-3 w-3" />
-              录入热点
+              {t('list.recordHot')}
             </Button>
           </div>
           <button
@@ -353,12 +356,12 @@ export default function StoryHubPage() {
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            AI 推荐选题
+            {t('list.aiSuggest')}
           </button>
 
           {/* 数据源标签切换 */}
           <div className="mt-3">
-            <p className="text-xs text-subtle mb-2">外部数据源</p>
+            <p className="text-xs text-subtle mb-2">{t('list.externalSources')}</p>
             <div className="flex flex-wrap gap-1.5">
               {sourceDefinitions.map((source) => {
                 const Icon = SOURCE_ICONS[source.icon] ?? Newspaper;
@@ -395,13 +398,13 @@ export default function StoryHubPage() {
             <input
               type="text"
               required
-              placeholder="热点标题"
+              placeholder={t('list.form.titlePlaceholder')}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <textarea
-              placeholder="描述（可选）"
+              placeholder={t('list.form.descriptionPlaceholder')}
               rows={2}
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
@@ -409,13 +412,13 @@ export default function StoryHubPage() {
             />
             <input
               type="text"
-              placeholder="来源（可选）"
+              placeholder={t('list.form.sourcePlaceholder')}
               value={newSource}
               onChange={(e) => setNewSource(e.target.value)}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted">热度</span>
+              <span className="text-xs text-muted">{t('list.form.heat')}</span>
               <input
                 type="range"
                 min={0}
@@ -435,7 +438,7 @@ export default function StoryHubPage() {
                 type="submit"
                 className="flex-1"
               >
-                创建
+                {t('list.form.submit')}
               </Button>
               <Button
                 variant="secondary"
@@ -443,7 +446,7 @@ export default function StoryHubPage() {
                 type="button"
                 onClick={() => setShowCreateForm(false)}
               >
-                取消
+                {tc('actions.cancel')}
               </Button>
             </div>
           </form>
@@ -509,10 +512,10 @@ export default function StoryHubPage() {
   );
 }
 
-const TOPIC_SORT_TABS: { key: TopicSortMode; label: string }[] = [
-  { key: 'heat', label: '热度优先' },
-  { key: 'recent', label: '最近录入' },
-];
+const TOPIC_SORT_TABS = [
+  { key: 'heat', labelKey: 'list.sort.heat' },
+  { key: 'recent', labelKey: 'list.sort.recent' },
+] as const;
 
 function ImportedTopicsPanel({
   topics,
@@ -541,20 +544,24 @@ function ImportedTopicsPanel({
   onSelect: (topic: TrendingTopic) => void;
   onDelete: (id: string) => void;
 }) {
+  const t = useTranslations('stories');
+  const tc = useTranslations('common');
   return (
     <div className="w-80 shrink-0 border-l border-line bg-surface flex flex-col">
       <div className="p-4 border-b border-line">
         <div className="flex items-center justify-between mb-3">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <Database className="h-4 w-4 text-cyan-600" />
-            已录入热点
+            {t('list.importedTitle')}
           </h2>
           <span className="text-xs text-subtle tnum">
-            {unadoptedOnly ? `未采纳 ${total} 条` : `共 ${total} 条`}
+            {unadoptedOnly
+              ? t('list.unadoptedCount', { count: total })
+              : tc('pagination.total', { count: total })}
           </span>
         </div>
         <div className="flex gap-1.5">
-          {TOPIC_SORT_TABS.map(({ key, label }) => (
+          {TOPIC_SORT_TABS.map(({ key, labelKey }) => (
             <button
               key={key}
               type="button"
@@ -565,14 +572,14 @@ function ImportedTopicsPanel({
                   : 'border border-line bg-surface text-muted hover:text-foreground'
               }`}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
           <button
             type="button"
             aria-pressed={unadoptedOnly}
             onClick={onToggleUnadopted}
-            title="只看未采纳的热点"
+            title={t('list.unadoptedOnlyTitle')}
             className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
               unadoptedOnly
                 ? 'bg-cyan-100 font-semibold text-cyan-700'
@@ -580,7 +587,7 @@ function ImportedTopicsPanel({
             }`}
           >
             {unadoptedOnly && <Check className="h-3 w-3" />}
-            未采纳
+            {t('list.unadopted')}
           </button>
         </div>
       </div>
@@ -610,7 +617,7 @@ function ImportedTopicsPanel({
                     {topic.heatScore}
                   </span>
                   {topic.status === 'ADOPTED' && (
-                    <Badge tone="success">已采纳</Badge>
+                    <Badge tone="success">{t('topic.status.adopted')}</Badge>
                   )}
                 </div>
                 <div className="mt-1.5 flex items-center gap-2 text-xs text-subtle">
@@ -637,11 +644,11 @@ function ImportedTopicsPanel({
         {total === 0 && (
           <div className="p-8 text-center">
             <p className="text-sm text-subtle">
-              {unadoptedOnly ? '暂无未采纳热点' : '暂无已录入热点'}
+              {unadoptedOnly ? t('list.emptyUnadopted') : t('list.emptyAll')}
             </p>
             {!unadoptedOnly && (
               <p className="mt-1 text-xs text-subtle">
-                从外部数据源导入，或点击左侧「录入热点」创建
+                {t('list.emptyHint')}
               </p>
             )}
           </div>
@@ -651,7 +658,7 @@ function ImportedTopicsPanel({
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-line px-4 py-3">
           <span className="text-xs text-muted tnum">
-            第 {page}/{totalPages} 页
+            {t('list.pageIndicator', { page, totalPages })}
           </span>
           <div className="flex items-center gap-1.5">
             <Button
@@ -661,7 +668,7 @@ function ImportedTopicsPanel({
               onClick={() => onPageChange(page - 1)}
             >
               <ChevronLeft className="h-4 w-4" />
-              上一页
+              {tc('pagination.prev')}
             </Button>
             <Button
               variant="secondary"
@@ -669,7 +676,7 @@ function ImportedTopicsPanel({
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              下一页
+              {tc('pagination.next')}
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -688,6 +695,7 @@ function TopicDetailPanel({
   onAdopt: () => void;
   adopting: boolean;
 }) {
+  const t = useTranslations('stories');
   return (
     <div className="max-w-2xl">
       <div className="flex items-start justify-between mb-4">
@@ -696,11 +704,11 @@ function TopicDetailPanel({
           <div className="mt-1 flex items-center gap-3 text-sm text-muted">
             <span className="flex items-center gap-1 tnum">
               <Flame className="h-4 w-4 text-orange-500" />
-              热度 {topic.heatScore}
+              {t('topic.heat', { score: topic.heatScore })}
             </span>
-            {topic.source && <span>来源：{topic.source}</span>}
+            {topic.source && <span>{t('topic.source', { source: topic.source })}</span>}
             <Badge tone={topic.status === 'ADOPTED' ? 'success' : 'info'}>
-              {topic.status === 'ADOPTED' ? '已采纳' : '开放中'}
+              {topic.status === 'ADOPTED' ? t('topic.status.adopted') : t('topic.status.open')}
             </Badge>
           </div>
         </div>
@@ -708,7 +716,7 @@ function TopicDetailPanel({
 
       {topic.description && (
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-foreground mb-2">描述</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">{t('topic.description')}</h3>
           <p className="text-sm text-muted leading-relaxed">
             {topic.description}
           </p>
@@ -717,7 +725,7 @@ function TopicDetailPanel({
 
       {topic.suggestedAngles && topic.suggestedAngles.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-foreground mb-2">建议角度</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">{t('topic.suggestedAngles')}</h3>
           <div className="space-y-2">
             {topic.suggestedAngles.map((angle, i) => (
               <div
@@ -739,7 +747,7 @@ function TopicDetailPanel({
           onClick={onAdopt}
         >
           {!adopting && <CheckCircle className="h-4 w-4" />}
-          一键创建选题
+          {t('topic.adopt')}
         </Button>
       )}
 
@@ -748,7 +756,7 @@ function TopicDetailPanel({
           href={`/dashboard/stories/${topic.adoptedStoryId}`}
           className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-6 py-3 text-sm font-medium text-foreground hover:bg-surface-muted"
         >
-          查看已创建的选题
+          {t('topic.viewStory')}
           <ArrowRight className="h-4 w-4" />
         </Link>
       )}
@@ -769,12 +777,13 @@ function AIRecommendationsPanel({
   adoptingId: string | null;
   onClose: () => void;
 }) {
+  const t = useTranslations('stories');
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-purple-600" />
-          <h2 className="text-xl font-semibold text-foreground">AI 选题推荐</h2>
+          <h2 className="text-xl font-semibold text-foreground">{t('aiSuggestions.title')}</h2>
         </div>
         <button onClick={onClose} className="text-subtle hover:text-foreground">
           <X className="h-5 w-5" />
@@ -787,7 +796,7 @@ function AIRecommendationsPanel({
         </div>
       ) : suggestions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
-          <p className="text-muted">暂无推荐，请稍后重试</p>
+          <p className="text-muted">{t('aiSuggestions.empty')}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -821,7 +830,7 @@ function AIRecommendationsPanel({
                   onClick={() => onAdopt(suggestion)}
                 >
                   {!(adoptingId === 'suggestion') && <Plus className="h-3 w-3" />}
-                  采纳
+                  {t('aiSuggestions.adopt')}
                 </Button>
               </div>
             </div>
@@ -861,6 +870,8 @@ function NewsSourcePanel({
   onParamChange: (key: string, value: string | number) => void;
   onRefresh: () => void;
 }) {
+  const t = useTranslations('stories');
+  const tc = useTranslations('common');
   const Icon = SOURCE_ICONS[source.icon] ?? Newspaper;
   const isThisDay = source.id === 'this-day';
 
@@ -940,7 +951,7 @@ function NewsSourcePanel({
           loading={loading}
           onClick={onRefresh}
         >
-          {source.autoFetch === false ? '加载' : '刷新'}
+          {source.autoFetch === false ? t('source.load') : tc('actions.refresh')}
         </Button>
       </div>
 
@@ -958,10 +969,10 @@ function NewsSourcePanel({
         <div className="rounded-lg border border-dashed border-line-strong p-8 text-center">
           <p className="text-muted">
             {source.manualRefresh
-              ? '点击「刷新」获取最新数据'
+              ? t('source.manualRefreshHint')
               : source.autoFetch === false
-                ? '请填写上方参数后加载'
-                : '暂无数据，请稍后重试'}
+                ? t('source.fillParamsHint')
+                : t('source.emptyHint')}
           </p>
         </div>
       ) : (
@@ -978,13 +989,13 @@ function NewsSourcePanel({
                       {item.title}
                     </h3>
                     <span className="rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-600 tnum">
-                      热度 {item.heatScore}
+                      {t('topic.heat', { score: item.heatScore })}
                     </span>
                     {isThisDay && item.year && (
                       <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
                         {item.year > 0
-                          ? `${item.year}年`
-                          : `公元前${Math.abs(item.year)}年`}
+                          ? t('source.yearAd', { year: item.year })
+                          : t('source.yearBc', { year: Math.abs(item.year) })}
                       </span>
                     )}
                     {isThisDay && item.type && (
@@ -1020,7 +1031,7 @@ function NewsSourcePanel({
                   )}
                   {isThisDay && item.articles && item.articles.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-xs text-subtle mb-1">相关词条</p>
+                      <p className="text-xs text-subtle mb-1">{t('source.relatedArticles')}</p>
                       <div className="flex flex-wrap gap-2">
                         {item.articles
                           .filter((a) => a.url)
@@ -1046,7 +1057,7 @@ function NewsSourcePanel({
                   onClick={() => onImport(item)}
                 >
                   <Plus className="h-3 w-3" />
-                  导入系统
+                  {t('source.import')}
                 </Button>
               </div>
             </div>
@@ -1058,7 +1069,7 @@ function NewsSourcePanel({
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
           <div className="text-sm text-muted tnum">
-            共 {total} 条，第 {page}/{totalPages} 页
+            {t('source.pageSummary', { total, page, totalPages })}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -1068,7 +1079,7 @@ function NewsSourcePanel({
               onClick={() => onPageChange(page - 1)}
             >
               <ChevronLeft className="h-4 w-4" />
-              上一页
+              {tc('pagination.prev')}
             </Button>
             <Button
               variant="secondary"
@@ -1076,7 +1087,7 @@ function NewsSourcePanel({
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              下一页
+              {tc('pagination.next')}
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -1087,21 +1098,22 @@ function NewsSourcePanel({
 }
 
 function EmptyState({ onGetSuggestions }: { onGetSuggestions: () => void }) {
+  const t = useTranslations('stories');
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
       <div className="rounded-full bg-surface-muted p-4 mb-4">
         <Lightbulb className="h-8 w-8 text-subtle" />
       </div>
-      <h3 className="text-lg font-medium text-foreground">选题中心</h3>
+      <h3 className="text-lg font-medium text-foreground">{t('list.title')}</h3>
       <p className="mt-2 text-sm text-muted max-w-sm">
-        从右侧已录入清单选择一个热点查看详情，或使用 AI 获取个性化选题推荐
+        {t('emptyState.hint')}
       </p>
       <button
         onClick={onGetSuggestions}
         className="mt-4 flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100"
       >
         <Sparkles className="h-4 w-4" />
-        获取 AI 选题推荐
+        {t('emptyState.getSuggestions')}
       </button>
     </div>
   );

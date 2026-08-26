@@ -1,0 +1,109 @@
+{
+  "title": "Video Studio",
+  "subtitle": "Text-to-video · Engine: {provider}",
+  "subtitleDisabled": "AI Text-to-Video",
+  "provider": {
+    "volcengine": "Volcengine Seedance",
+    "minimax": "MiniMax Hailuo"
+  },
+  "disabled": {
+    "title": "Text-to-video is not enabled",
+    "desc": "Please ask an administrator to configure VIDEO_GENERATION_ENABLED and VIDEO_CLIP_PROVIDER (Volcengine / MiniMax)"
+  },
+  "status": {
+    "pending": "Queued",
+    "scripting": "Generating script",
+    "storyboarding": "Designing storyboard",
+    "assetsGenerating": "Generating video",
+    "voiceSynthesizing": "Synthesizing voiceover",
+    "composing": "Compositing",
+    "uploading": "Transferring to library",
+    "succeeded": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "sceneStatus": {
+    "pending": "Pending",
+    "submitted": "Generating",
+    "done": "Asset ready",
+    "failed": "Failed"
+  },
+  "refRole": {
+    "firstFrame": "First frame",
+    "lastFrame": "Last frame",
+    "referenceImage": "Reference image",
+    "referenceVideo": "Reference video",
+    "referenceAudio": "Reference audio"
+  },
+  "detail": {
+    "scriptAndStoryboard": "Script & Storyboard",
+    "sceneCount": "{count} scenes",
+    "noVoiceover": "No voiceover",
+    "nativeVoiceover": "Native audio voiceover",
+    "voiceoverScript": "Voiceover Script",
+    "visualVideo": "Video clip",
+    "visualImage": "Image"
+  },
+  "form": {
+    "title": "New Video Job",
+    "desc": "Text-to-clip generates short videos; article-to-video automatically turns an entire article into a final cut with voiceover and subtitles",
+    "tabTextToClip": "Text to Clip",
+    "tabArticleToVideo": "Article to Final Cut",
+    "l2DisabledTitle": "Article-to-video is not enabled: requires VIDEO_RENDER_ENABLED=true and a configured image generation service",
+    "promptLabel": "Scene Description",
+    "promptPlaceholder": "e.g. A Shiba Inu running under a cherry blossom tree, slow motion, cinematic",
+    "durationLabel": "Duration",
+    "durationSeconds": "{seconds} sec",
+    "resolutionLabel": "Resolution",
+    "aspectRatioLabel": "Aspect Ratio",
+    "aspectPortrait": "Portrait 9:16",
+    "aspectLandscape": "Landscape 16:9",
+    "aspectSquare": "Square 1:1",
+    "nativeAudioLabel": "Native audio (Seedance sound generation)",
+    "submitClip": "Generate Video"
+  },
+  "refs": {
+    "title": "Reference Materials (optional)",
+    "add": "Add",
+    "hintExclusive": "First/last frames set the look, reference images keep the subject consistent, reference videos carry over camera movement, and reference audio serves as the soundtrack; audio must be paired with an image or video; frame (first/last) and reference (image/video/audio) modes cannot be mixed",
+    "hint": "First/last frames set the look, reference images keep the subject consistent, reference videos carry over camera movement, and reference audio serves as the soundtrack; audio must be paired with an image or video",
+    "roleAria": "Reference role {index}",
+    "urlAria": "Reference material URL {index}",
+    "urlPlaceholder": "https://…(media library COS address or external link)",
+    "pickFromLibrary": "Choose from Media Library",
+    "remove": "Remove"
+  },
+  "options": {
+    "seedLabel": "Seed",
+    "seedPlaceholder": "Optional",
+    "draftLabel": "Draft mode (faster and cheaper, lower quality)",
+    "returnLastFrameLabel": "Return last frame (for chaining)"
+  },
+  "articleForm": {
+    "label": "Select Article",
+    "placeholder": "Choose an article to turn into video…",
+    "pipelineHint": "AI will automatically complete: voiceover script → storyboard → per-scene assets (images/video clips) → voiceover & subtitles → compositing into the library",
+    "nativeAudioHint": "Uses the video model's native audio for voiceover (Seedance 2.x)",
+    "noNativeAudioHint": "The current video model does not support native audio; the final cut will have no voiceover (subtitles only)",
+    "submit": "Create Final Cut"
+  },
+  "toast": {
+    "finalCutCreated": "Final cut job created: script → storyboard → assets → compositing — the whole process takes a few minutes",
+    "clipCreated": "Video job created — generation takes a few minutes",
+    "resubmitted": "Resubmitted",
+    "cancelled": "Cancelled"
+  },
+  "list": {
+    "title": "Job List",
+    "emptyTitle": "No video jobs yet",
+    "emptyDesc": "Enter a scene description above to generate your first video clip",
+    "activeHint": "In progress · auto-refresh every {seconds}s",
+    "modeFinalCut": "Final Cut",
+    "costEstimate": "Est. ¥{cost}",
+    "lastFrameAlt": "Last frame",
+    "lastFrameHint": "The last frame has been saved to the Media Library and can be used as the first frame of the next clip (chaining)"
+  },
+  "picker": {
+    "title": "Select {role}"
+  }
+}

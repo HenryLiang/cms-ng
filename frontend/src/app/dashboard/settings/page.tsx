@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { History, LockKeyhole, Save, X } from "lucide-react";
 import { SystemFeature, UserRole } from "@cms-ng/shared";
 import { getRegistrationStatus, toggleRegistration } from "@/lib/auth-api";
@@ -19,10 +20,11 @@ import { Button, Card, PageHeader, Badge } from "@/components/ui";
 type SettingsTab = "registration" | "features";
 type PendingChange = { feature: SystemFeatureDetail; enabled: boolean };
 
-const GROUP_LABELS = {
-  WORKSPACE: "工作区",
-  AUTOMATION: "自动化",
-  SYSTEM: "系统",
+// 分组存词典 key(features.groups.*),渲染处经 t() 解析
+const GROUP_KEYS = {
+  WORKSPACE: "workspace",
+  AUTOMATION: "automation",
+  SYSTEM: "system",
 } as const;
 
 function apiMessage(error: unknown, fallback: string) {
@@ -36,6 +38,9 @@ function apiMessage(error: unknown, fallback: string) {
 }
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const locale = useLocale();
   const user = useAuthStore((state) => state.user);
   const setFeatureStatus = useSystemFeaturesStore((state) => state.setStatus);
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
@@ -71,8 +76,9 @@ export default function SettingsPage() {
         setRegistrationOpen(data.registrationOpen);
         setEditOpen(data.registrationOpen);
       })
-      .catch(() => setMessage({ type: "error", text: "加载注册状态失败" }))
+      .catch(() => setMessage({ type: "error", text: t("registration.loadFailed") }))
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-mount,t 仅为词典引用刻意不入 deps
   }, []);
 
   useEffect(() => {
@@ -89,7 +95,7 @@ export default function SettingsPage() {
       })
       .catch((error) => {
         if (!cancelled) {
-          setFeatureMessage(apiMessage(error, "加载功能开放状态失败"));
+          setFeatureMessage(apiMessage(error, t("features.loadFailed")));
         }
       })
       .finally(() => {
@@ -98,6 +104,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t 仅为词典引用刻意不入 deps
   }, [isSuperAdmin]);
 
   async function handleSave() {
@@ -112,10 +119,12 @@ export default function SettingsPage() {
       setReason("");
       setMessage({
         type: "success",
-        text: data.registrationOpen ? "已开放注册" : "已关闭注册",
+        text: data.registrationOpen
+          ? t("registration.opened")
+          : t("registration.closedMessage"),
       });
     } catch (error) {
-      setMessage({ type: "error", text: apiMessage(error, "保存失败") });
+      setMessage({ type: "error", text: apiMessage(error, t("registration.saveFailed")) });
     } finally {
       setSaving(false);
     }
@@ -136,12 +145,14 @@ export default function SettingsPage() {
       );
       setFeatureStatus(updated.key, updated.enabled);
       setFeatureMessage(
-        `${updated.label}已${updated.enabled ? "开放" : "关闭"}`,
+        updated.enabled
+          ? t("features.openedMessage", { label: updated.label })
+          : t("features.closedMessage", { label: updated.label }),
       );
       setPending(null);
       setChangeReason("");
     } catch (error) {
-      setFeatureMessage(apiMessage(error, "更新功能状态失败"));
+      setFeatureMessage(apiMessage(error, t("features.updateFailed")));
     } finally {
       setChanging(false);
     }
@@ -154,7 +165,7 @@ export default function SettingsPage() {
     try {
       setAudit(await getSystemFeatureAudit(feature.key));
     } catch (error) {
-      setFeatureMessage(apiMessage(error, "加载审计记录失败"));
+      setFeatureMessage(apiMessage(error, t("features.audit.loadFailed")));
     } finally {
       setAuditLoading(false);
     }
@@ -170,7 +181,7 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full p-8">
-      <PageHeader title="系统设置" subtitle="管理系统级开关" />
+      <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       <div className="mb-5 flex gap-2 border-b border-line">
         <button
@@ -182,7 +193,7 @@ export default function SettingsPage() {
               : "border-transparent text-muted"
           }`}
         >
-          注册设置
+          {t("tabs.registration")}
         </button>
         {isSuperAdmin && (
           <button
@@ -194,7 +205,7 @@ export default function SettingsPage() {
                 : "border-transparent text-muted"
             }`}
           >
-            功能开放管理
+            {t("tabs.features")}
           </button>
         )}
       </div>
@@ -234,17 +245,18 @@ export default function SettingsPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="确认功能状态变更"
+          aria-label={t("features.confirmAria")}
         >
           <Card className="w-full max-w-lg p-6">
             <h2 className="text-base font-semibold">
-              {pending.enabled ? "开放" : "关闭"}
-              {pending.feature.label}
+              {pending.enabled
+                ? t("features.enableWithLabel", { label: pending.feature.label })
+                : t("features.disableWithLabel", { label: pending.feature.label })}
             </h2>
             <p className="mt-2 text-sm text-muted">
               {pending.enabled
-                ? "开放后，符合角色权限的用户将重新看到并可访问该入口。"
-                : "关闭后，该入口会从左侧导航隐藏，直接访问也会被拦截。"}
+                ? t("features.enableDescription")
+                : t("features.disableDescription")}
             </p>
             <textarea
               value={changeReason}
@@ -252,8 +264,8 @@ export default function SettingsPage() {
               rows={3}
               placeholder={
                 pending.enabled
-                  ? "请输入变更原因（可选）"
-                  : "请输入关闭原因（必填）"
+                  ? t("features.reasonPlaceholderOptional")
+                  : t("features.reasonPlaceholderRequired")
               }
               className="mt-4 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand"
             />
@@ -263,7 +275,7 @@ export default function SettingsPage() {
                 onClick={() => setPending(null)}
                 disabled={changing}
               >
-                取消
+                {tCommon("actions.cancel")}
               </Button>
               <Button
                 variant={pending.enabled ? "primary" : "danger"}
@@ -271,7 +283,9 @@ export default function SettingsPage() {
                 disabled={!pending.enabled && !changeReason.trim()}
                 onClick={confirmFeatureChange}
               >
-                确认{pending.enabled ? "开放" : "关闭"}
+                {pending.enabled
+                  ? t("features.confirmEnable")
+                  : t("features.confirmDisable")}
               </Button>
             </div>
           </Card>
@@ -283,29 +297,31 @@ export default function SettingsPage() {
           className="fixed inset-0 z-50 flex justify-end bg-black/30"
           role="dialog"
           aria-modal="true"
-          aria-label={`${auditFeature.label}审计记录`}
+          aria-label={t("features.audit.title", { label: auditFeature.label })}
         >
           <div className="h-full w-full max-w-lg overflow-y-auto bg-surface p-6 shadow-pop">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="font-semibold">{auditFeature.label}审计记录</h2>
+                <h2 className="font-semibold">
+                  {t("features.audit.title", { label: auditFeature.label })}
+                </h2>
                 <p className="mt-1 text-xs text-muted">
-                  最多显示最近 100 条记录
+                  {t("features.audit.limitHint")}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setAuditFeature(null)}
-                aria-label="关闭审计记录"
+                aria-label={t("features.audit.closeAria")}
                 className="rounded-lg p-2 text-muted hover:bg-surface-muted"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             {auditLoading ? (
-              <p className="text-sm text-muted">加载中…</p>
+              <p className="text-sm text-muted">{tCommon("state.loading")}</p>
             ) : audit.length === 0 ? (
-              <p className="text-sm text-muted">暂无变更记录</p>
+              <p className="text-sm text-muted">{t("features.audit.empty")}</p>
             ) : (
               <div className="space-y-3">
                 {audit.map((item) => (
@@ -314,16 +330,18 @@ export default function SettingsPage() {
                     className="rounded-lg border border-line p-4"
                   >
                     <div className="flex items-center gap-2 text-sm font-medium">
-                      <span>{item.previousEnabled ? "开放" : "关闭"}</span>
-                      <span className="text-subtle">→</span>
-                      <span>{item.enabled ? "开放" : "关闭"}</span>
+                      <span>
+                        {item.previousEnabled ? t("states.open") : t("states.closed")}
+                      </span>
+                      <span className="text-subtle">-&gt;</span>
+                      <span>{item.enabled ? t("states.open") : t("states.closed")}</span>
                     </div>
                     <p className="mt-2 text-sm text-muted">
-                      {item.reason || "未填写原因"}
+                      {item.reason || t("features.noReason")}
                     </p>
                     <p className="mt-2 text-xs text-subtle">
-                      {item.operator?.name || "系统"} ·{" "}
-                      {new Date(item.createdAt).toLocaleString("zh-CN")}
+                      {item.operator?.name || t("features.systemOperator")} ·{" "}
+                      {new Date(item.createdAt).toLocaleString(locale)}
                     </p>
                   </div>
                 ))}
@@ -347,40 +365,48 @@ function RegistrationSettings(props: {
   onSave: () => void;
   onReset: () => void;
 }) {
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   return (
     <Card className="max-w-2xl space-y-6 p-6">
       <div>
-        <h2 className="text-base font-medium">注册功能</h2>
+        <h2 className="text-base font-medium">{t("registration.title")}</h2>
         <p className="mt-1 text-sm text-muted">
-          控制是否允许新用户注册。关闭后注册页将显示「注册已关闭」提示，已注册用户的登录不受影响。
+          {t("registration.description")}
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-sm text-muted">当前状态：</span>
+        <span className="text-sm text-muted">{t("registration.currentStatus")}</span>
         <Badge tone={props.registrationOpen ? "success" : "neutral"}>
-          {props.registrationOpen ? "开放" : "关闭"}
+          {props.registrationOpen ? t("states.open") : t("states.closed")}
         </Badge>
       </div>
       <div className="space-y-4 border-t border-line pt-4">
         <div className="flex items-center gap-3">
           <Switch
             enabled={props.editOpen}
-            label={props.editOpen ? "开放注册" : "关闭注册"}
+            label={
+              props.editOpen
+                ? t("registration.openAction")
+                : t("registration.closeAction")
+            }
             onClick={props.onToggle}
           />
           <span className="text-sm font-medium">
-            {props.editOpen ? "开放注册" : "关闭注册"}
+            {props.editOpen
+              ? t("registration.openAction")
+              : t("registration.closeAction")}
           </span>
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">
-            切换原因（可选，审计用）
+            {t("registration.reasonLabel")}
           </label>
           <textarea
             value={props.reason}
             onChange={(event) => props.onReason(event.target.value)}
             rows={2}
-            placeholder="例如：正式上线前收口 / 维护期间临时关闭"
+            placeholder={t("registration.reasonPlaceholder")}
             className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand"
           />
         </div>
@@ -398,14 +424,14 @@ function RegistrationSettings(props: {
         <div className="flex gap-3">
           <Button loading={props.saving} onClick={props.onSave}>
             {!props.saving && <Save className="h-4 w-4" />}
-            保存
+            {tCommon("actions.save")}
           </Button>
           <Button
             variant="secondary"
             disabled={props.saving}
             onClick={props.onReset}
           >
-            重置
+            {t("registration.reset")}
           </Button>
         </div>
       </div>
@@ -421,26 +447,28 @@ function FeatureSettings(props: {
   onChange: (feature: SystemFeatureDetail, enabled: boolean) => void;
   onAudit: (feature: SystemFeatureDetail) => void;
 }) {
+  const t = useTranslations("settings");
+  const locale = useLocale();
   if (props.loading)
-    return <p className="text-sm text-muted">加载功能状态中…</p>;
+    return <p className="text-sm text-muted">{t("features.loading")}</p>;
 
   return (
     <div className="max-w-4xl space-y-6">
       <Card className="border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-800">
-        功能关闭后，左侧一级入口会隐藏，直接调用对应接口也会被拦截；自动发布后台任务和支付回调不受影响。
+        {t("features.warning")}
       </Card>
       {props.message && (
         <div className="rounded-lg bg-brand-soft px-4 py-2.5 text-sm text-brand">
           {props.message}
         </div>
       )}
-      {Object.entries(GROUP_LABELS).map(([group, label]) => {
+      {Object.entries(GROUP_KEYS).map(([group, groupKey]) => {
         const items = props.features.filter((item) => item.group === group);
         if (items.length === 0) return null;
         return (
           <section key={group}>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-subtle">
-              {label}
+              {t(`features.groups.${groupKey}`)}
             </h2>
             <Card className="divide-y divide-line">
               {items.map((feature) => (
@@ -449,11 +477,11 @@ function FeatureSettings(props: {
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold">{feature.label}</h3>
                       <Badge tone={feature.enabled ? "success" : "neutral"}>
-                        {feature.enabled ? "开放" : "关闭"}
+                        {feature.enabled ? t("states.open") : t("states.closed")}
                       </Badge>
                       {!feature.configurable && (
                         <span className="inline-flex items-center gap-1 text-xs text-subtle">
-                          <LockKeyhole className="h-3 w-3" /> 受保护
+                          <LockKeyhole className="h-3 w-3" /> {t("features.protected")}
                         </span>
                       )}
                     </div>
@@ -462,10 +490,14 @@ function FeatureSettings(props: {
                     </p>
                     {feature.key === SystemFeature.VIDEO && (
                       <p className="mt-1 text-xs text-subtle">
-                        服务能力：
+                        {t("features.videoCapability.label")}
                         {props.videoCapability?.enabled
-                          ? `可用（${props.videoCapability.provider ?? "已配置"}）`
-                          : "不可用（未配置 Provider）"}
+                          ? t("features.videoCapability.available", {
+                              provider:
+                                props.videoCapability.provider ??
+                                t("features.videoCapability.providerFallback"),
+                            })
+                          : t("features.videoCapability.unavailable")}
                       </p>
                     )}
                     {feature.updatedAt &&
@@ -473,20 +505,32 @@ function FeatureSettings(props: {
                         <div className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-xs text-subtle">
                           <div className="flex flex-wrap gap-x-4 gap-y-1">
                             <span>
-                              最近操作：{feature.enabled ? "开放" : "关闭"}
+                              {t("features.lastAction", {
+                                state: feature.enabled
+                                  ? t("states.open")
+                                  : t("states.closed"),
+                              })}
                             </span>
                             <span>
-                              操作人：{feature.updatedBy?.name || "系统"}
+                              {t("features.operator", {
+                                name:
+                                  feature.updatedBy?.name ||
+                                  t("features.systemOperator"),
+                              })}
                             </span>
                             <span>
-                              操作时间：
-                              {new Date(feature.updatedAt).toLocaleString(
-                                "zh-CN",
-                              )}
+                              {t("features.operationTime", {
+                                time: new Date(feature.updatedAt).toLocaleString(
+                                  locale,
+                                ),
+                              })}
                             </span>
                           </div>
                           <p className="mt-1">
-                            操作原因：{feature.reason || "未填写原因"}
+                            {t("features.operationReason", {
+                              reason:
+                                feature.reason || t("features.noReason"),
+                            })}
                           </p>
                         </div>
                       )}
@@ -495,14 +539,19 @@ function FeatureSettings(props: {
                     type="button"
                     onClick={() => props.onAudit(feature)}
                     className="rounded-lg p-2 text-muted hover:bg-surface-muted"
-                    aria-label={`查看${feature.label}审计记录`}
+                    aria-label={t("features.audit.viewAria", { label: feature.label })}
                   >
                     <History className="h-4 w-4" />
                   </button>
                   <Switch
                     enabled={feature.enabled}
                     disabled={!feature.configurable}
-                    label={`${feature.enabled ? "关闭" : "开放"}${feature.label}`}
+                    label={t(
+                      feature.enabled
+                        ? "features.disableWithLabel"
+                        : "features.enableWithLabel",
+                      { label: feature.label },
+                    )}
                     onClick={() => props.onChange(feature, !feature.enabled)}
                   />
                 </div>

@@ -1,0 +1,109 @@
+{
+  "title": "视频创作",
+  "subtitle": "文生视频 · 当前引擎:{provider}",
+  "subtitleDisabled": "AI 文生视频",
+  "provider": {
+    "volcengine": "火山引擎 Seedance",
+    "minimax": "MiniMax Hailuo"
+  },
+  "disabled": {
+    "title": "文生视频功能未启用",
+    "desc": "请联系管理员配置 VIDEO_GENERATION_ENABLED 与 VIDEO_CLIP_PROVIDER(火山引擎 / MiniMax)"
+  },
+  "status": {
+    "pending": "排队中",
+    "scripting": "脚本生成中",
+    "storyboarding": "分镜设计中",
+    "assetsGenerating": "视频生成中",
+    "voiceSynthesizing": "配音合成中",
+    "composing": "合成中",
+    "uploading": "转存入库中",
+    "succeeded": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消"
+  },
+  "sceneStatus": {
+    "pending": "待生成",
+    "submitted": "生成中",
+    "done": "素材就绪",
+    "failed": "失败"
+  },
+  "refRole": {
+    "firstFrame": "首帧",
+    "lastFrame": "尾帧",
+    "referenceImage": "参考图",
+    "referenceVideo": "参考视频",
+    "referenceAudio": "参考音频"
+  },
+  "detail": {
+    "scriptAndStoryboard": "脚本与分镜",
+    "sceneCount": "{count} 镜",
+    "noVoiceover": "无配音",
+    "nativeVoiceover": "原生音频配音",
+    "voiceoverScript": "口播脚本",
+    "visualVideo": "视频片段",
+    "visualImage": "图片"
+  },
+  "form": {
+    "title": "新建视频任务",
+    "desc": "文生片段生成短视频;稿件成片将整篇稿件自动合成为带配音字幕的成片",
+    "tabTextToClip": "文生片段",
+    "tabArticleToVideo": "稿件一键成片",
+    "l2DisabledTitle": "稿件成片未启用:需要 VIDEO_RENDER_ENABLED=true 且配置图片生成服务",
+    "promptLabel": "画面描述",
+    "promptPlaceholder": "例:一只柴犬在樱花树下奔跑,慢镜头,电影感",
+    "durationLabel": "时长",
+    "durationSeconds": "{seconds} 秒",
+    "resolutionLabel": "分辨率",
+    "aspectRatioLabel": "画幅",
+    "aspectPortrait": "竖屏 9:16",
+    "aspectLandscape": "横屏 16:9",
+    "aspectSquare": "方形 1:1",
+    "nativeAudioLabel": "原生音频(Seedance 有声生成)",
+    "submitClip": "生成视频"
+  },
+  "refs": {
+    "title": "参考素材(可选)",
+    "add": "添加",
+    "hintExclusive": "首帧/尾帧定妆、参考图保持主体一致、参考视频沿用运镜、参考音频作配乐;音频须搭配图或视频;帧(首/尾帧)与参考(图/视频/音频)两种模式不可混用",
+    "hint": "首帧/尾帧定妆、参考图保持主体一致、参考视频沿用运镜、参考音频作配乐;音频须搭配图或视频",
+    "roleAria": "参考角色 {index}",
+    "urlAria": "参考素材 URL {index}",
+    "urlPlaceholder": "https://…(媒体库 COS 地址或外链)",
+    "pickFromLibrary": "从媒体库选择",
+    "remove": "移除"
+  },
+  "options": {
+    "seedLabel": "种子",
+    "seedPlaceholder": "可空",
+    "draftLabel": "打样模式(更快更便宜,质量低)",
+    "returnLastFrameLabel": "返回尾帧(续拍链)"
+  },
+  "articleForm": {
+    "label": "选择稿件",
+    "placeholder": "请选择要成片的稿件…",
+    "pipelineHint": "AI 将自动完成:口播脚本 → 分镜设计 → 逐镜素材(图片/视频片段)→ 配音字幕 → 合成入库",
+    "nativeAudioHint": "使用视频模型原生音频生成配音(Seedance 2.x)",
+    "noNativeAudioHint": "当前视频模型不支持原生音频,成片将无配音(仅字幕)",
+    "submit": "一键成片"
+  },
+  "toast": {
+    "finalCutCreated": "成片任务已创建:脚本 → 分镜 → 素材 → 合成,全程需要几分钟",
+    "clipCreated": "视频任务已创建,生成需要几分钟",
+    "resubmitted": "已重新提交",
+    "cancelled": "已取消"
+  },
+  "list": {
+    "title": "任务列表",
+    "emptyTitle": "还没有视频任务",
+    "emptyDesc": "从上方输入画面描述,生成第一个视频片段",
+    "activeHint": "进行中 · 每 {seconds} 秒自动刷新",
+    "modeFinalCut": "稿件成片",
+    "costEstimate": "预估 ¥{cost}",
+    "lastFrameAlt": "尾帧",
+    "lastFrameHint": "尾帧已入媒体库,可作为下一段的首帧(续拍链)"
+  },
+  "picker": {
+    "title": "选择{role}素材"
+  }
+}

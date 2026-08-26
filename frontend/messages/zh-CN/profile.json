@@ -1,0 +1,42 @@
+{
+  "title": "个人资料",
+  "roles": {
+    "reporter": "记者",
+    "editor": "编辑",
+    "admin": "管理员",
+    "superAdmin": "超级管理员"
+  },
+  "languages": {
+    "simplifiedChinese": "简体中文",
+    "traditionalChineseHk": "繁体中文（香港）",
+    "traditionalChineseCantonese": "繁体中文（粤语）",
+    "english": "English"
+  },
+  "form": {
+    "name": "姓名",
+    "email": "邮箱",
+    "role": "角色",
+    "department": "部门",
+    "departmentPlaceholder": "请输入部门名称",
+    "language": "语言偏好",
+    "languageHint": "该设置将用于 AI 内容生成和稿件创作的默认语言",
+    "saving": "保存中...",
+    "saved": "已保存",
+    "submit": "保存设置",
+    "savedHint": "设置已保存",
+    "saveFailed": "保存失败，请重试"
+  },
+  "passwordSection": {
+    "title": "修改密码",
+    "current": "当前密码",
+    "new": "新密码",
+    "hint": "至少 6 位",
+    "confirm": "确认新密码",
+    "mismatch": "两次输入的新密码不一致",
+    "tooShort": "新密码至少 6 位",
+    "success": "密码已修改",
+    "failed": "修改失败，请检查当前密码是否正确",
+    "changing": "修改中...",
+    "submit": "修改密码"
+  }
+}

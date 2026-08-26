@@ -38,6 +38,7 @@ import {
   Redo,
 } from 'lucide-react';
 import { forwardRef, useImperativeHandle, useEffect, useState, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { MediaPicker } from './media-picker';
 
 export interface RichTextEditorRef {
@@ -52,6 +53,7 @@ interface RichTextEditorProps {
 
 const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   function RichTextEditor({ content, onChange, placeholder }, ref) {
+    const t = useTranslations('components.editor');
     const [showTableMenu, setShowTableMenu] = useState(false);
     const [showMediaPicker, setShowMediaPicker] = useState(false);
 
@@ -76,7 +78,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
           heading: { levels: [1, 2, 3] },
         }),
         Placeholder.configure({
-          placeholder: placeholder || '开始写作...',
+          placeholder: placeholder || t('placeholder'),
         }),
         Link.configure({
           openOnClick: false,
@@ -165,7 +167,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
 
     const toggleLink = () => {
       const previousUrl = editor.getAttributes('link').href;
-      const url = window.prompt('输入链接地址', previousUrl);
+      const url = window.prompt(t('promptLink'), previousUrl);
       if (url === null) return;
       if (url === '') {
         editor.chain().focus().extendMarkRange('link').unsetLink().run();
@@ -179,13 +181,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
     };
 
     const insertYoutube = () => {
-      const url = window.prompt('输入 YouTube 视频链接');
+      const url = window.prompt(t('promptYoutube'));
       if (!url) return;
       editor.chain().focus().setYoutubeVideo({ src: url }).run();
     };
 
     const setTextColor = () => {
-      const color = window.prompt('输入颜色值（如 #ff0000 或 red）', editor.getAttributes('textStyle').color || '');
+      const color = window.prompt(t('promptColor'), editor.getAttributes('textStyle').color || '');
       if (color === null) return;
       if (color === '') {
         editor.chain().focus().unsetColor().run();
@@ -228,31 +230,31 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive('bold')}
             icon={<Bold className="h-4 w-4" />}
-            title="加粗"
+            title={t('bold')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             active={editor.isActive('italic')}
             icon={<Italic className="h-4 w-4" />}
-            title="斜体"
+            title={t('italic')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             active={editor.isActive('underline')}
             icon={<UnderlineIcon className="h-4 w-4" />}
-            title="下划线"
+            title={t('underline')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHighlight().run()}
             active={editor.isActive('highlight')}
             icon={<Highlighter className="h-4 w-4" />}
-            title="高亮"
+            title={t('highlight')}
           />
           <ToolbarButton
             onClick={setTextColor}
             active={editor.isActive('textStyle')}
             icon={<Palette className="h-4 w-4" />}
-            title="文字颜色"
+            title={t('textColor')}
           />
           <div className="mx-1 h-4 w-px bg-line" />
 
@@ -261,13 +263,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
             active={editor.isActive('heading', { level: 1 })}
             icon={<Heading1 className="h-4 w-4" />}
-            title="一级标题"
+            title={t('heading1')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
             active={editor.isActive('heading', { level: 2 })}
             icon={<Heading2 className="h-4 w-4" />}
-            title="二级标题"
+            title={t('heading2')}
           />
           <div className="mx-1 h-4 w-px bg-line" />
 
@@ -276,19 +278,19 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             onClick={() => editor.chain().focus().toggleBulletList().run()}
             active={editor.isActive('bulletList')}
             icon={<List className="h-4 w-4" />}
-            title="无序列表"
+            title={t('bulletList')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
             active={editor.isActive('orderedList')}
             icon={<ListOrdered className="h-4 w-4" />}
-            title="有序列表"
+            title={t('orderedList')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
             active={editor.isActive('blockquote')}
             icon={<Quote className="h-4 w-4" />}
-            title="引用"
+            title={t('quote')}
           />
           <div className="mx-1 h-4 w-px bg-line" />
 
@@ -297,25 +299,25 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             onClick={() => editor.chain().focus().setTextAlign('left').run()}
             active={editor.isActive({ textAlign: 'left' })}
             icon={<AlignLeft className="h-4 w-4" />}
-            title="左对齐"
+            title={t('alignLeft')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign('center').run()}
             active={editor.isActive({ textAlign: 'center' })}
             icon={<AlignCenter className="h-4 w-4" />}
-            title="居中对齐"
+            title={t('alignCenter')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign('right').run()}
             active={editor.isActive({ textAlign: 'right' })}
             icon={<AlignRight className="h-4 w-4" />}
-            title="右对齐"
+            title={t('alignRight')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign('justify').run()}
             active={editor.isActive({ textAlign: 'justify' })}
             icon={<AlignJustify className="h-4 w-4" />}
-            title="两端对齐"
+            title={t('alignJustify')}
           />
           <div className="mx-1 h-4 w-px bg-line" />
 
@@ -324,17 +326,17 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
             onClick={toggleLink}
             active={editor.isActive('link')}
             icon={<LinkIcon className="h-4 w-4" />}
-            title="插入链接"
+            title={t('insertLink')}
           />
           <ToolbarButton
             onClick={insertImage}
             icon={<ImagePlus className="h-4 w-4" />}
-            title="插入图片"
+            title={t('insertImage')}
           />
           <ToolbarButton
             onClick={insertYoutube}
             icon={<Video className="h-4 w-4" />}
-            title="插入 YouTube 视频"
+            title={t('insertYoutube')}
           />
           <div className="mx-1 h-4 w-px bg-line" />
 
@@ -344,7 +346,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
               onClick={() => setShowTableMenu(!showTableMenu)}
               active={editor.isActive('table')}
               icon={<TableIcon className="h-4 w-4" />}
-              title="表格"
+              title={t('table')}
             />
             {showTableMenu && (
               <div className="absolute top-full left-0 mt-1 z-50 rounded-lg border border-line bg-surface shadow-pop p-2 w-40">
@@ -356,7 +358,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
                   <TableIcon className="h-3.5 w-3.5" />
-                  插入 3x3 表格
+                  {t('insertTable')}
                 </button>
                 <button
                   onClick={() => {
@@ -365,7 +367,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
-                  在当前列前插入
+                  {t('addColumnBefore')}
                 </button>
                 <button
                   onClick={() => {
@@ -374,7 +376,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
-                  在当前列后插入
+                  {t('addColumnAfter')}
                 </button>
                 <button
                   onClick={() => {
@@ -383,7 +385,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
-                  删除当前列
+                  {t('deleteColumn')}
                 </button>
                 <button
                   onClick={() => {
@@ -392,7 +394,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
-                  在当前行前插入
+                  {t('addRowBefore')}
                 </button>
                 <button
                   onClick={() => {
@@ -401,7 +403,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
-                  在当前行后插入
+                  {t('addRowAfter')}
                 </button>
                 <button
                   onClick={() => {
@@ -410,7 +412,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-surface-muted"
                 >
-                  删除当前行
+                  {t('deleteRow')}
                 </button>
                 <div className="my-1 h-px bg-line" />
                 <button
@@ -421,7 +423,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  删除表格
+                  {t('deleteTable')}
                 </button>
               </div>
             )}
@@ -432,18 +434,18 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
             icon={<Undo className="h-4 w-4" />}
-            title="撤销"
+            title={t('undo')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().redo().run()}
             icon={<Redo className="h-4 w-4" />}
-            title="重做"
+            title={t('redo')}
           />
           <div className="mx-1 h-4 w-px bg-line" />
 
           {/* Character count */}
           <span className="text-xs text-subtle whitespace-nowrap">
-            {charCount} 字 / {wordCount} 词
+            {t('charCount', { chars: charCount, words: wordCount })}
           </span>
         </div>
 

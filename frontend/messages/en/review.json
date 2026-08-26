@@ -1,0 +1,30 @@
+{
+  "title": "Review",
+  "list": {
+    "queueCount": "{count} articles pending review",
+    "unknownAuthor": "Unknown author",
+    "empty": "No articles pending review"
+  },
+  "story": "Story: {title}",
+  "detail": {
+    "selectPrompt": "Select an article on the left to review",
+    "author": "Author: {name}",
+    "content": "Content",
+    "excerpt": "Excerpt",
+    "aiReviewTitle": "AI Pre-Review Report",
+    "aiReviewPlaceholder": "AI pre-review is under development. It will automatically detect factual errors, legal risks, and optimization suggestions."
+  },
+  "comment": {
+    "title": "Review Comment",
+    "placeholder": "Add a review comment (required when sending back for revision)…",
+    "requiredAlert": "A review comment is required when sending back for revision"
+  },
+  "actions": {
+    "approve": "Approve",
+    "sendBack": "Send Back"
+  },
+  "errors": {
+    "loadQueue": "Failed to load the review queue",
+    "loadDetail": "Failed to load the article"
+  }
+}

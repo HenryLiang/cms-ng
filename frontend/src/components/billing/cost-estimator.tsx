@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { estimateCost, type CostEstimate } from '@/lib/billing-api';
 import { Badge, Card } from '@/components/ui';
@@ -24,6 +25,7 @@ export default function CostEstimator({
   batchSize,
   articleId,
 }: CostEstimatorProps) {
+  const t = useTranslations('billing.costEstimator');
   const [estimate, setEstimate] = useState<CostEstimate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export default function CostEstimator({
         });
         if (!cancelled) setEstimate(data);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : '费用估算失败');
+        if (!cancelled) setError(err instanceof Error ? err.message : t('estimateFailed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -66,7 +68,7 @@ export default function CostEstimator({
       <Card className="p-4">
         <div className="flex items-center gap-2 text-sm text-muted">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
-          <span>正在估算费用…</span>
+          <span>{t('estimating')}</span>
         </div>
       </Card>
     );
@@ -75,7 +77,7 @@ export default function CostEstimator({
   if (error || !estimate) {
     return (
       <Card className="p-4">
-        <p className="text-sm text-red-500">{error ?? '无法获取费用估算'}</p>
+        <p className="text-sm text-red-500">{error ?? t('unavailable')}</p>
       </Card>
     );
   }
@@ -86,17 +88,17 @@ export default function CostEstimator({
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-muted" />
-          <span className="text-sm font-medium text-foreground">费用预估</span>
+          <span className="text-sm font-medium text-foreground">{t('title')}</span>
         </div>
         {estimate.sufficientBalance ? (
           <Badge tone="success" className="gap-1">
             <CheckCircle2 className="h-3 w-3" />
-            余额充足
+            {t('sufficient')}
           </Badge>
         ) : (
           <Badge tone="danger" className="gap-1">
             <AlertTriangle className="h-3 w-3" />
-            余额不足
+            {t('insufficient')}
           </Badge>
         )}
       </div>
@@ -106,10 +108,10 @@ export default function CostEstimator({
         <table className="mb-3 w-full text-sm">
           <thead>
             <tr className="border-b border-line text-left text-xs text-muted">
-              <th className="pb-1.5 font-medium">项目</th>
-              <th className="pb-1.5 text-right font-medium">数量</th>
-              <th className="pb-1.5 text-right font-medium">单价</th>
-              <th className="pb-1.5 text-right font-medium">小计</th>
+              <th className="pb-1.5 font-medium">{t('item')}</th>
+              <th className="pb-1.5 text-right font-medium">{t('quantity')}</th>
+              <th className="pb-1.5 text-right font-medium">{t('unitPrice')}</th>
+              <th className="pb-1.5 text-right font-medium">{t('subtotal')}</th>
             </tr>
           </thead>
           <tbody>
@@ -128,10 +130,10 @@ export default function CostEstimator({
       {/* Total */}
       <div className="flex items-center justify-between border-t border-line pt-2">
         <span className="text-sm text-muted">
-          当前余额 {formatCurrency(estimate.currentBalance)}
+          {t('currentBalance', { balance: formatCurrency(estimate.currentBalance) })}
         </span>
         <span className="text-sm font-bold text-foreground">
-          预估费用 {formatCurrency(estimate.estimatedCost)}
+          {t('estimatedCost', { cost: formatCurrency(estimate.estimatedCost) })}
         </span>
       </div>
     </Card>

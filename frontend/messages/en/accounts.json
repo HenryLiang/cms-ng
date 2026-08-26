@@ -1,0 +1,79 @@
+{
+  "title": "Accounts",
+  "subtitle": "Create accounts, enable or disable accounts, and review account usage",
+  "createButton": "New Account",
+  "roles": {
+    "reporter": "Reporter",
+    "editor": "Editor",
+    "admin": "Admin",
+    "superAdmin": "Super Admin"
+  },
+  "languages": {
+    "simplifiedChinese": "Simplified Chinese",
+    "traditionalChineseHk": "Traditional Chinese (HK)",
+    "traditionalChineseCantonese": "Traditional Chinese (Cantonese)",
+    "english": "English"
+  },
+  "list": {
+    "loadFailed": "Failed to load accounts",
+    "empty": "No accounts yet",
+    "enableSuccess": "Account enabled",
+    "disableSuccess": "Account disabled",
+    "neverLoggedIn": "Never logged in",
+    "statusActive": "Active",
+    "statusInactive": "Disabled",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "department": "Department",
+      "status": "Status",
+      "balance": "Balance",
+      "createdAt": "Created",
+      "lastLogin": "Last Login",
+      "actions": "Actions"
+    },
+    "actions": {
+      "enable": "Enable",
+      "disable": "Disable",
+      "resetPassword": "Reset Password",
+      "consumption": "Usage"
+    }
+  },
+  "createForm": {
+    "title": "New Account",
+    "email": "Email",
+    "name": "Name",
+    "role": "Role",
+    "department": "Department (optional)",
+    "language": "Preferred Language",
+    "initialPasswordNote": "A random initial password will be generated on creation. It is shown only once — save it immediately and share it with the user.",
+    "submit": "Create",
+    "failed": "Failed to create account",
+    "successTitle": "Account created"
+  },
+  "resetPwd": {
+    "confirmTitle": "Reset Password",
+    "confirmMessage": "Reset the password for {name} ({email})? A new random password will be generated and the current password stops working immediately.",
+    "confirmAction": "Reset",
+    "successTitle": "Password reset",
+    "failed": "Failed to reset password"
+  },
+  "passwordResult": {
+    "notice": "This password is shown only once. Copy and save it now — it cannot be viewed again after closing.",
+    "saved": "I have saved it"
+  },
+  "consumption": {
+    "title": "Account Usage",
+    "loadFailed": "Failed to load consumption data",
+    "userLine": "{name} ({email})",
+    "currentBalance": "Current Balance",
+    "totalSpent": "Total Spent",
+    "totalTopUp": "Total Top-up",
+    "byCategory": "By Category",
+    "noConsumption": "No consumption yet",
+    "recentTransactions": "Recent Transactions",
+    "noTransactions": "No transactions yet",
+    "pagination": "{total} items, page {page}/{totalPages}"
+  }
+}

@@ -38,7 +38,7 @@ export class StoriesService {
     const contentLanguage =
       dto.contentLanguage ??
       user?.preferredLanguage ??
-      ContentLanguage.TRADITIONAL_CHINESE_HK;
+      ContentLanguage.SIMPLIFIED_CHINESE;
 
     const story = await this.prisma.story.create({
       data: {

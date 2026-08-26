@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import { getArticles, type Article, type PaginatedMeta } from '@/lib/article-api';
 import { reportApiError } from '@/lib/api-error-toast';
 import { FileText, ChevronRight, Search } from 'lucide-react';
@@ -9,6 +10,9 @@ import LanguageBadge from '@/components/language-badge';
 import { PageHeader, Card, StatusBadge } from '@/components/ui';
 
 export default function ArticlesPage() {
+  const t = useTranslations('articles');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
   const [articles, setArticles] = useState<Article[]>([]);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +54,7 @@ export default function ArticlesPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <PageHeader title="稿件管理" subtitle="管理你创建的所有稿件" />
+      <PageHeader title={t('list.title')} subtitle={t('list.subtitle')} />
 
       <Card>
         <form
@@ -64,7 +68,7 @@ export default function ArticlesPage() {
               value={searchInput}
               maxLength={200}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="搜索稿件标题或正文"
+              placeholder={t('list.searchPlaceholder')}
               className="h-9 w-full rounded-lg border border-line-strong bg-surface pl-9 pr-3 text-sm text-foreground outline-none transition placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
@@ -73,7 +77,7 @@ export default function ArticlesPage() {
             disabled={loading}
             className="h-9 rounded-lg bg-brand px-4 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            搜索
+            {tCommon('actions.search')}
           </button>
         </form>
 
@@ -87,17 +91,17 @@ export default function ArticlesPage() {
               <FileText className="h-5 w-5 text-subtle" />
             </div>
             <p className="text-sm font-medium">
-              {activeSearch ? '没有找到匹配的稿件' : '还没有稿件'}
+              {activeSearch ? t('list.emptySearchTitle') : t('list.emptyTitle')}
             </p>
             <p className="mt-1 text-xs text-muted">
-              {activeSearch ? '请尝试其他关键词' : '从选题开始，创建你的第一篇稿件'}
+              {activeSearch ? t('list.emptySearchHint') : t('list.emptyHint')}
             </p>
             {!activeSearch && (
               <Link
                 href="/dashboard/stories"
                 className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
               >
-                前往选题中心 <ChevronRight className="h-3.5 w-3.5" />
+                {t('list.goToStories')} <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             )}
           </div>
@@ -106,11 +110,11 @@ export default function ArticlesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-subtle">
-                  <th className="px-5 py-2.5 font-medium">标题</th>
-                  <th className="px-5 py-2.5 font-medium">所属选题</th>
-                  <th className="px-5 py-2.5 font-medium">状态</th>
-                  <th className="px-5 py-2.5 font-medium">语言</th>
-                  <th className="px-5 py-2.5 font-medium">更新时间</th>
+                  <th className="px-5 py-2.5 font-medium">{t('list.columns.title')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('list.columns.story')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('list.columns.status')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('list.columns.language')}</th>
+                  <th className="px-5 py-2.5 font-medium">{t('list.columns.updatedAt')}</th>
                   <th className="px-5 py-2.5" />
                 </tr>
               </thead>
@@ -136,13 +140,13 @@ export default function ArticlesPage() {
                       <LanguageBadge language={article.contentLanguage} />
                     </td>
                     <td className="px-5 py-3 tnum text-xs text-subtle">
-                      {new Date(article.updatedAt).toLocaleDateString('zh-CN')}
+                      {new Date(article.updatedAt).toLocaleDateString(locale)}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <Link
                         href={`/dashboard/articles/${article.id}`}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md text-subtle transition hover:bg-surface-muted hover:text-foreground"
-                        title="编辑"
+                        title={tCommon('actions.edit')}
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Link>
@@ -156,7 +160,11 @@ export default function ArticlesPage() {
 
         {meta && articles.length > 0 && (
           <div className="border-t border-line px-5 py-3 text-xs text-muted tnum">
-            共 {meta.total} 篇 · 第 {meta.page} / {Math.max(meta.totalPages, 1)} 页
+            {t('list.summary', {
+              total: meta.total,
+              page: meta.page,
+              totalPages: Math.max(meta.totalPages, 1),
+            })}
           </div>
         )}
       </Card>

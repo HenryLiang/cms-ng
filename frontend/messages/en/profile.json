@@ -1,0 +1,42 @@
+{
+  "title": "Profile",
+  "roles": {
+    "reporter": "Reporter",
+    "editor": "Editor",
+    "admin": "Admin",
+    "superAdmin": "Super Admin"
+  },
+  "languages": {
+    "simplifiedChinese": "Simplified Chinese",
+    "traditionalChineseHk": "Traditional Chinese (HK)",
+    "traditionalChineseCantonese": "Traditional Chinese (Cantonese)",
+    "english": "English"
+  },
+  "form": {
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "department": "Department",
+    "departmentPlaceholder": "Enter department name",
+    "language": "Preferred Language",
+    "languageHint": "Used as the default language for AI content generation and article writing",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "submit": "Save Settings",
+    "savedHint": "Settings saved",
+    "saveFailed": "Failed to save, please try again"
+  },
+  "passwordSection": {
+    "title": "Change Password",
+    "current": "Current Password",
+    "new": "New Password",
+    "hint": "At least 6 characters",
+    "confirm": "Confirm New Password",
+    "mismatch": "The two new passwords do not match",
+    "tooShort": "New password must be at least 6 characters",
+    "success": "Password changed",
+    "failed": "Failed to change password. Please check that your current password is correct",
+    "changing": "Changing...",
+    "submit": "Change Password"
+  }
+}

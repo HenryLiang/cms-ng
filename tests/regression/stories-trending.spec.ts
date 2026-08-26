@@ -98,7 +98,7 @@ test.describe('STY-CRUD: Story 基础 CRUD', () => {
     expect(story.contentLanguage).toBe('TRADITIONAL_CHINESE_CANTONESE');
   });
 
-  test('TC-STY-004: reporter-none（无偏好）→ 兜底 TRADITIONAL_CHINESE_HK', async ({ api }) => {
+  test('TC-STY-004: reporter-none（无偏好）→ 兜底 SIMPLIFIED_CHINESE', async ({ api }) => {
     const { token } = await loginByApi('reporter-none');
     const title = storyTitle('reporter-none');
     const r = await api.post('/stories', {
@@ -107,7 +107,7 @@ test.describe('STY-CRUD: Story 基础 CRUD', () => {
     });
     expect(r.status()).toBe(201);
     const story = await r.json();
-    expect(story.contentLanguage).toBe('TRADITIONAL_CHINESE_HK');
+    expect(story.contentLanguage).toBe('SIMPLIFIED_CHINESE');
   });
 
   test('TC-STY-005: PATCH 更新 story（title/description/angle/priority/status）', async ({ api }) => {
