@@ -111,3 +111,4 @@ plans/
 
 # Local codebase knowledge graph (rebuilt per workspace)
 .codebase-memory/
+.ua/
