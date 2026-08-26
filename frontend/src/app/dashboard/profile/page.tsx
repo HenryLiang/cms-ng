@@ -4,8 +4,11 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
 import { updateUser, changePassword } from '@/lib/users-api';
-import { ContentLanguage } from '@cms-ng/shared';
-import { UserRole } from '@cms-ng/shared';
+import {
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+  UserRole,
+} from '@cms-ng/shared';
 import { Save, Check, KeyRound } from 'lucide-react';
 import { Button, Card, PageHeader, Input } from '@/components/ui';
 
@@ -32,7 +35,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     department: user?.department || '',
-    preferredLanguage: user?.preferredLanguage || ContentLanguage.SIMPLIFIED_CHINESE,
+    preferredLanguage: user?.preferredLanguage || DEFAULT_CONTENT_LANGUAGE,
   });
 
   // 修改密码

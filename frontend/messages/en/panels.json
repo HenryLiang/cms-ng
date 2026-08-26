@@ -140,5 +140,21 @@
     "title": "Channel distribution",
     "deleteConfirm": "Are you sure you want to delete the adapted content for this platform?",
     "emptyHint": "Select a platform above to generate adapted content"
+  },
+  "draftPreferences": {
+    "title": "AI Draft Settings",
+    "subtitle": "Genre defines the narrative task and structure; the target length is entered directly.",
+    "genreLabel": "Genre",
+    "wordCountLabel": "Target length",
+    "wordUnit": "words",
+    "wordCountHelp": "Any integer from {min} to {max}; English drafts are counted in words.",
+    "wordCountInvalid": "Enter an integer between {min} and {max}.",
+    "structureSummary": "View structure & writing characteristics",
+    "structureLabel": "Structure",
+    "characteristicsLabel": "Characteristics",
+    "instructionLabel": "Special requirements (optional)",
+    "instructionPlaceholder": "Add interview priorities, material constraints, or other special requirements (optional)",
+    "generating": "Writing...",
+    "generate": "Generate draft with selected genre"
   }
 }

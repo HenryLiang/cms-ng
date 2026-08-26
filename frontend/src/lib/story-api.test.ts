@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { api } from './api';
-import { generateResearchKit, type ResearchKitResult } from './story-api';
+import { ArticleGenre, ContentLanguage } from '@cms-ng/shared';
+import {
+  generateDraftFromResearchKit,
+  generateResearchKit,
+  type ResearchKitResult,
+} from './story-api';
 
 vi.mock('./api', () => ({
   api: {
@@ -40,6 +45,37 @@ describe('story-api', () => {
       vi.mocked(api.post).mockRejectedValue(new Error('Network error'));
 
       await expect(generateResearchKit('story-1')).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('generateDraftFromResearchKit', () => {
+    it('sends the selected genre and freely entered target length', async () => {
+      const researchKit: ResearchKitResult = {
+        timeline: [],
+        people: [],
+        data: [],
+        opinions: [],
+      };
+      vi.mocked(api.post).mockResolvedValue({
+        data: { article: { id: 'article-1', title: 'Draft' } },
+      });
+
+      await generateDraftFromResearchKit('story-1', researchKit, {
+        instruction: '突出政策影响',
+        language: ContentLanguage.SIMPLIFIED_CHINESE,
+        authorSlug: 'author-luxun',
+        genre: ArticleGenre.IN_DEPTH_REPORT,
+        targetWordCount: 2800,
+      });
+
+      expect(api.post).toHaveBeenCalledWith('/stories/story-1/draft', {
+        researchKit,
+        instruction: '突出政策影响',
+        language: ContentLanguage.SIMPLIFIED_CHINESE,
+        authorSlug: 'author-luxun',
+        genre: ArticleGenre.IN_DEPTH_REPORT,
+        targetWordCount: 2800,
+      });
     });
   });
 });

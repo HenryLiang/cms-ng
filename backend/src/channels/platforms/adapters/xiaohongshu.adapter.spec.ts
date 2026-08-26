@@ -46,6 +46,13 @@ describe('XiaohongshuAdapter', () => {
       expect(prompt).toContain('输出格式为 JSON');
     });
 
+    it('should use Simplified Chinese in its built-in examples', () => {
+      const prompt = adapter.getAdaptationPrompt(mockArticle);
+      expect(prompt).toContain('震惊！香港这件事竟然');
+      expect(prompt).toContain('你觉得呢？评论区告诉我');
+      expect(prompt).not.toContain('震驚！香港這件事竟然');
+    });
+
     it('should truncate long content', () => {
       const longContent = 'A'.repeat(5000);
       const prompt = adapter.getAdaptationPrompt({

@@ -113,6 +113,7 @@ describe('TrendingTopicsService', () => {
       name: 'Reporter',
       expertise: '["tech"]',
       department: 'News',
+      preferredLanguage: 'TRADITIONAL_CHINESE_HK',
     });
     prisma.trendingTopic.findMany.mockResolvedValue([{ title: 'AI' }]);
     aiService.generateStorySuggestions.mockResolvedValue([
@@ -123,6 +124,7 @@ describe('TrendingTopicsService', () => {
       'user-id',
       expect.objectContaining({ expertise: ['tech'] }),
       ['AI'],
+      'TRADITIONAL_CHINESE_HK',
     );
   });
 
@@ -130,6 +132,9 @@ describe('TrendingTopicsService', () => {
     prisma.trendingTopic.findUnique.mockResolvedValue(
       mockTopic({ suggestedAngles: '["Angle 1"]' }),
     );
+    prisma.user.findUnique.mockResolvedValue({
+      preferredLanguage: 'ENGLISH',
+    });
     prisma.story.create.mockResolvedValue({ id: 'story-id' });
     prisma.trendingTopic.update.mockResolvedValue(mockTopic());
     await expect(service.adoptTopic('topic-id', 'user-id')).resolves.toEqual({
@@ -140,6 +145,7 @@ describe('TrendingTopicsService', () => {
       data: expect.objectContaining({
         angle: 'Angle 1',
         reporterId: 'user-id',
+        contentLanguage: 'ENGLISH',
       }),
     });
   });
