@@ -1,6 +1,21 @@
-import { IsNotEmpty, IsOptional, IsString, IsIn } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { ContentLanguage } from '@cms-ng/shared';
+import {
+  ArticleGenre,
+  ContentLanguage,
+  DEFAULT_DRAFT_WORD_COUNT,
+  MAX_DRAFT_WORD_COUNT,
+  MIN_DRAFT_WORD_COUNT,
+} from '@cms-ng/shared';
 import type { ResearchKitResult } from '../../ai/dto/writing-operations.dto';
 
 export class GenerateDraftFromResearchKitDto {
@@ -45,4 +60,31 @@ export class GenerateDraftFromResearchKitDto {
   @IsOptional()
   @IsString()
   authorSlug?: string;
+
+  @ApiProperty({
+    description:
+      'Editorial genre used to structure and style the generated draft',
+    enum: ArticleGenre,
+    example: ArticleGenre.IN_DEPTH_REPORT,
+    required: false,
+    default: ArticleGenre.STRAIGHT_NEWS,
+  })
+  @IsOptional()
+  @IsEnum(ArticleGenre)
+  genre?: ArticleGenre;
+
+  @ApiProperty({
+    description:
+      'Freely entered target length. Chinese output is measured in characters; English output in words.',
+    example: DEFAULT_DRAFT_WORD_COUNT,
+    minimum: MIN_DRAFT_WORD_COUNT,
+    maximum: MAX_DRAFT_WORD_COUNT,
+    required: false,
+    default: DEFAULT_DRAFT_WORD_COUNT,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(MIN_DRAFT_WORD_COUNT)
+  @Max(MAX_DRAFT_WORD_COUNT)
+  targetWordCount?: number;
 }

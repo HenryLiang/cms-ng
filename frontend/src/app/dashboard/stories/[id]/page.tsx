@@ -15,7 +15,6 @@ import {
 } from '@/lib/story-api';
 import { getArticles, createArticle, type Article } from '@/lib/article-api';
 import { getAuthors, type AuthorSummary } from '@/lib/authors-api';
-import { useAuthStore } from '@/store/auth-store';
 import {
   ArrowLeft,
   Plus,
@@ -24,16 +23,23 @@ import {
   Save,
   BookOpen,
 } from 'lucide-react';
-import { ContentLanguage } from '@cms-ng/shared';
+import {
+  ArticleGenre,
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+  DEFAULT_DRAFT_WORD_COUNT,
+  MAX_DRAFT_WORD_COUNT,
+  MIN_DRAFT_WORD_COUNT,
+} from '@cms-ng/shared';
 import LanguageBadge from '@/components/language-badge';
 import ResearchKitPanel from '@/components/research-kit-panel';
+import DraftPreferencesPanel from '@/components/draft-preferences-panel';
 import { Button, Badge, Card } from '@/components/ui';
 
 export default function StoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const storyId = params.id as string;
-  const { user } = useAuthStore();
   const t = useTranslations('stories');
   const tc = useTranslations('common');
 
@@ -52,13 +58,21 @@ export default function StoryDetailPage() {
   // Draft generation state
   const [draftLoading, setDraftLoading] = useState(false);
   const [draftInstruction, setDraftInstruction] = useState('');
+  const [draftGenre, setDraftGenre] = useState<ArticleGenre>(
+    ArticleGenre.STRAIGHT_NEWS,
+  );
+  const [targetWordCount, setTargetWordCount] = useState(
+    String(DEFAULT_DRAFT_WORD_COUNT),
+  );
 
   // Edit form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [angle, setAngle] = useState('');
   const [status, setStatus] = useState<Story['status']>('DRAFT');
-  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(ContentLanguage.SIMPLIFIED_CHINESE);
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(
+    DEFAULT_CONTENT_LANGUAGE,
+  );
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [authorSlug, setAuthorSlug] = useState('');
   const [authorsAvailable, setAuthorsAvailable] = useState(true);
@@ -146,7 +160,7 @@ export default function StoryDetailPage() {
       storyId,
       title,
       content: '',
-      contentLanguage: user?.preferredLanguage,
+      contentLanguage,
     });
     await loadData();
   }
@@ -171,9 +185,33 @@ export default function StoryDetailPage() {
 
   async function handleGenerateDraft() {
     if (!researchKit) return;
+    const parsedWordCount = Number(targetWordCount);
+    if (
+      !Number.isInteger(parsedWordCount) ||
+      parsedWordCount < MIN_DRAFT_WORD_COUNT ||
+      parsedWordCount > MAX_DRAFT_WORD_COUNT
+    ) {
+      alert(
+        t('draft.wordCountInvalid', {
+          min: MIN_DRAFT_WORD_COUNT.toLocaleString(),
+          max: MAX_DRAFT_WORD_COUNT.toLocaleString(),
+        }),
+      );
+      return;
+    }
     setDraftLoading(true);
     try {
-      const { article } = await generateDraftFromResearchKit(storyId, researchKit, draftInstruction, contentLanguage, authorSlug);
+      const { article } = await generateDraftFromResearchKit(
+        storyId,
+        researchKit,
+        {
+          instruction: draftInstruction,
+          language: contentLanguage,
+          authorSlug,
+          genre: draftGenre,
+          targetWordCount: parsedWordCount,
+        },
+      );
       router.push(`/dashboard/articles/${article.id}`);
     } catch (err: unknown) {
       const apiMsg =
@@ -363,20 +401,19 @@ export default function StoryDetailPage() {
             loading={researchLoading}
             onGenerate={handleGenerateResearchKit}
             onClose={() => setShowResearchPanel(false)}
-            onGenerateDraft={handleGenerateDraft}
-            draftLoading={draftLoading}
           />
         )}
         {showResearchPanel && hasResearchData && (
-          <div className="mb-6">
-            <textarea
-              value={draftInstruction}
-              onChange={(e) => setDraftInstruction(e.target.value)}
-              rows={2}
-              className="w-full text-sm text-muted bg-surface border border-line rounded-lg px-3 py-2 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-              placeholder={t('draft.instructionPlaceholder')}
-            />
-          </div>
+          <DraftPreferencesPanel
+            genre={draftGenre}
+            targetWordCount={targetWordCount}
+            instruction={draftInstruction}
+            loading={draftLoading}
+            onGenreChange={setDraftGenre}
+            onTargetWordCountChange={setTargetWordCount}
+            onInstructionChange={setDraftInstruction}
+            onGenerate={handleGenerateDraft}
+          />
         )}
         {!showResearchPanel && (
           <Card className="mb-6">

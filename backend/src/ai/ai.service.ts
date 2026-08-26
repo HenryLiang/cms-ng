@@ -33,6 +33,7 @@ import {
 import { StorySuggestion } from './dto/story-suggestion.dto';
 import {
   ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
   TransactionType,
   BillingCategory,
   MediaSource,
@@ -77,6 +78,10 @@ import {
 import { PromptLoader } from './prompts/prompt-loader';
 import { AIOperationLogger } from '../common/ai-operation-logger';
 import { AuthorStyleService } from '../authors/author-style.service';
+import {
+  buildArticleGenreInstruction,
+  DEFAULT_DRAFT_WORD_COUNT,
+} from './prompts/article-genre.prompt';
 
 /**
  * Module-level safety bounds for the image-fetch path in `uploadToStorage`.
@@ -289,7 +294,7 @@ export class AIService {
       [ContentLanguage.ENGLISH]:
         'Please answer in English, using British/American journalistic style: objective, concise, professional',
     };
-    return map[language ?? ContentLanguage.SIMPLIFIED_CHINESE];
+    return map[language ?? DEFAULT_CONTENT_LANGUAGE];
   }
 
   /**
@@ -564,7 +569,7 @@ ${input.content.slice(0, 500)}
           tokensUsed: response.usage?.totalTokens,
         };
       },
-      fallback: this.getFallbackHeadlines(input.title),
+      fallback: this.getFallbackHeadlines(input.title, input.language),
       onSuccess: (aiOpId, tokensUsed) =>
         this.deductLLMBilling({
           userId,
@@ -770,6 +775,23 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
     input: GenerateDraftInput,
   ): Promise<DraftResult> {
     const language = input.language;
+    const targetWordCount = input.targetWordCount ?? DEFAULT_DRAFT_WORD_COUNT;
+    const genreInstruction = input.genre
+      ? buildArticleGenreInstruction(input.genre, targetWordCount)
+      : '';
+    const genreAwareUserRequirements = input.genre
+      ? `- 标题要像一个编辑拟的，不是 AI 生成的，并与所选文体的功能一致
+- 开篇严格服从所选文体结构，同时尽快让读者理解报道对象与核心价值
+- 结尾必须完成所选文体规定的收束功能，不机械总结全文`
+      : `- 标题要像一个编辑拟的，不是 AI 生成的。可以直接抛观点、制造反差或提炼最尖锐的细节
+- 导语别绕弯子，第一句话就把最有新闻价值的信息端出来
+- 结尾要有收束感，可以是一个反问、一个展望、一个数据，或者干脆一段干净利落的陈述`;
+    const genreAwareSystemPrinciples = input.genre
+      ? `- 用户指定的文体定义、结构、特点和篇幅是最高写作约束
+- 开篇按所选文体完成其功能，避免套话开头
+- 判断和态度的强度必须符合所选文体，事实稿不得写成评论`
+      : `- 导语直接抛出最有新闻价值的事实，避免套话开头
+- 适当让读者感受到记者的判断和态度，而非中立的复读机`;
 
     const tagsStr = input.storyTags.join(', ') || '未指定';
 
@@ -780,17 +802,17 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
       const lines: string[] = [];
 
       if (rk.timeline?.length) {
-        lines.push('【事件時間線】');
+        lines.push('【事件时间线】');
         rk.timeline.forEach((e) => {
           lines.push(
-            `- ${e.date}：${e.event}${e.source ? `（來源：${e.source}）` : ''}`,
+            `- ${e.date}：${e.event}${e.source ? `（来源：${e.source}）` : ''}`,
           );
         });
         lines.push('');
       }
 
       if (rk.people?.length) {
-        lines.push('【關鍵人物】');
+        lines.push('【关键人物】');
         rk.people.forEach((p) => {
           lines.push(
             `- ${p.name}（${p.role}）${p.background ? `：${p.background}` : ''}`,
@@ -800,17 +822,17 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
       }
 
       if (rk.data?.length) {
-        lines.push('【核心數據】');
+        lines.push('【核心数据】');
         rk.data.forEach((d) => {
           lines.push(
-            `- ${d.label}：${d.value}${d.source ? `（來源：${d.source}）` : ''}`,
+            `- ${d.label}：${d.value}${d.source ? `（来源：${d.source}）` : ''}`,
           );
         });
         lines.push('');
       }
 
       if (rk.opinions?.length) {
-        lines.push('【各方觀點】');
+        lines.push('【各方观点】');
         rk.opinions.forEach((o) => {
           lines.push(
             `- ${o.source}${o.stance ? `（${o.stance}）` : ''}：${o.viewpoint}`,
@@ -820,12 +842,12 @@ ${ctx.subtitle ? '副标题：' + ctx.subtitle : ''}
       }
 
       if (rk.wikipedia?.length) {
-        lines.push('【Wikipedia 參考資料】');
+        lines.push('【Wikipedia 参考资料】');
         rk.wikipedia.forEach((w) => {
           lines.push(
             `- ${w.title}（${w.language === 'zh' ? '中文' : '英文'}）：${w.extract}`,
           );
-          lines.push(`  來源：${w.url}`);
+          lines.push(`  来源：${w.url}`);
         });
         lines.push('');
       }
@@ -844,15 +866,15 @@ ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
 ${input.currentTitle ? '当前稿件标题（可参考）：' + input.currentTitle : ''}
 ${input.currentSubtitle ? '当前副标题（可参考）：' + input.currentSubtitle : ''}
 ${input.instruction ? '额外要求：' + input.instruction : ''}
-${researchKitSection ? '\n【已搜集背景資料】\n\n' + researchKitSection : ''}
+${researchKitSection ? '\n【已搜集背景资料】\n\n' + researchKitSection : ''}
 
-写作要点：
-- 标题要像一个编辑拟的，不是 AI 生成的。可以直接抛观点、制造反差或提炼最尖锐的细节
-- 导语别绕弯子，第一句话就把最有新闻价值的信息端出来
+${genreInstruction}
+
+通用编辑要求：
+${genreAwareUserRequirements}
 - 行文节奏要像真人：有的段落两三百字铺陈细节，有的段落一句话收住制造停顿感
 - 背景资料里的数据、引语、时间线是素材，要穿插进叙述里，不是用「据了解」「资料显示」生硬地丢上去
 - 观点和事实要分明，但不需要每句话都标「谁说了什么」
-- 结尾要有收束感，可以是一个反问、一个展望、一个数据，或者干脆一段干净利落的陈述
 ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在行文中自然引用，不要整段搬运。\n' : ''}
 格式要求：
 1. 正文使用 HTML 格式，仅使用以下标签：p, h2, h3, ul, ol, li, blockquote, strong, em
@@ -884,7 +906,7 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
           messages: [
             {
               role: 'system',
-              content: `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 导语直接抛出最有新闻价值的事实，避免套话开头\n- 适当让读者感受到记者的判断和态度，而非中立的复读机\n- 禁止使用 AI 高频词汇和句式：「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
+              content: `你是一名跑线多年、有独立判断力的新闻记者。你的稿子读起来要像人写的——没有 AI 味。${this.getLanguageInstruction(language)}。${authorPersona}输出必须是有效的 JSON 格式。\n\n写作原则：\n${genreAwareSystemPrinciples}\n- 能用一个词说清的，不要用一句话\n- 段落长短不一，长段落讲细节，短段落制造冲击力\n- 禁止使用 AI 高频词汇和句式：「值得注意的是」「由此可见」「毋庸置疑」「随着…的发展」「综上所述」「让我们」\n- 禁止每段用相同的开头句式，禁止过度使用「此外」「与此同时」连接段落`,
             },
             { role: 'user', content: prompt },
           ],
@@ -924,7 +946,7 @@ ${researchKitSection ? '\n注意：背景资料中已包含多方信息，请在
       fallback: {
         title: input.currentTitle || input.storyTitle,
         subtitle: '',
-        content: '<p>AI 初稿生成暫時不可用，請稍後重試。</p>',
+        content: '<p>AI 初稿生成暂时不可用，请稍后重试。</p>',
         tags: normalizeArticleTags(
           input.storyTags?.length ? input.storyTags : [input.storyTitle],
         ),
@@ -1383,18 +1405,18 @@ type 取值说明：
     const currentDateStr = now.toISOString().split('T')[0];
 
     const searchResults = searchSummary
-      ? `【联网搜索最新資訊】\n${searchSummary}\n`
+      ? `【联网搜索最新资讯】\n${searchSummary}\n`
       : '';
 
     // Build Wikipedia context section
     let wikipediaSection = '';
     if (wikipediaEntries.length > 0) {
-      const lines: string[] = ['【Wikipedia 參考資料】'];
+      const lines: string[] = ['【Wikipedia 参考资料】'];
       wikipediaEntries.forEach((entry) => {
         lines.push(
           `- ${entry.title}（${entry.language === 'zh' ? '中文' : '英文'}）：${entry.extract}`,
         );
-        lines.push(`  來源：${entry.url}`);
+        lines.push(`  来源：${entry.url}`);
       });
       lines.push('');
       wikipediaSection = lines.join('\n');
@@ -1407,7 +1429,7 @@ ${input.storyDescription ? '选题描述：' + input.storyDescription : ''}
 ${input.storyAngle ? '建议角度：' + input.storyAngle : ''}
 相关标签：${tagsStr}
 
-${searchResults}${wikipediaSection}请基于上述搜索結果和 Wikipedia 資料整理结构化资料包。
+${searchResults}${wikipediaSection}请基于上述搜索结果和 Wikipedia 资料整理结构化资料包。
 
 请从以下几个方面整理：
 1. 事件时间线：按时间顺序列出关键事件节点
@@ -1657,7 +1679,7 @@ priority 取值说明：
     articleId: string | undefined,
     input: OptimizeSEOInput,
   ): Promise<SEOResult> {
-    const language = input.language;
+    const language = input.language ?? DEFAULT_CONTENT_LANGUAGE;
 
     const seoContext =
       language === ContentLanguage.SIMPLIFIED_CHINESE
@@ -1665,6 +1687,13 @@ priority 取值说明：
         : language === ContentLanguage.ENGLISH
           ? '针对英语媒体场景，关键词需考虑英语搜索习惯'
           : '针对LC 传媒媒体场景，关键词需考虑繁简体中文搜索习惯';
+    const fallbackSuggestionCategory =
+      language === ContentLanguage.ENGLISH
+        ? 'General'
+        : language === ContentLanguage.TRADITIONAL_CHINESE_HK ||
+            language === ContentLanguage.TRADITIONAL_CHINESE_CANTONESE
+          ? '綜合'
+          : '综合';
 
     const prompt = `你是一位新闻媒体的 SEO 专家，每天琢磨标题怎么起才有流量。分析下面这篇稿子，给出优化建议。${seoContext}。\n\n稿件标题：${input.title}\n${input.subtitle ? '副标题：' + input.subtitle : ''}\n正文内容：\n${input.content.replace(/<[^>]+>/g, '').slice(0, 3000)}\n\n请输出以下 JSON 格式：\n{\n  "overallScore": 78,\n  "readabilityScore": 82,\n  "optimizedTitle": [\n    {\n      "title": "优化后的标题1",\n      "reasoning": "推荐理由"\n    }\n  ],\n  "metaDescription": "适合搜索引擎摘要的元描述，120字以内",\n  "keywords": [\n    {\n      "keyword": "核心关键词",\n      "searchVolume": "high"\n    }\n  ],\n  "suggestions": [\n    {\n      "category": "标题优化",\n      "priority": "high",\n      "suggestion": "具体优化建议"\n    }\n  ]\n}\n\n字段说明：\n- overallScore: 综合SEO评分（0-100）\n- readabilityScore: 可读性评分（0-100）\n- optimizedTitle: 优化后的标题选项，1-3个，每个包含标题和推荐理由\n- metaDescription: 建议的元描述，适合搜索引擎摘要，120字以内\n- keywords: 提取的核心关键词列表，每个包含关键词和搜索热度评估（high/medium/low）\n- suggestions: 具体优化建议列表，按优先级分类（high/medium/low）\n\npriority 取值说明：\n- high：重要问题，建议优先修改\n- medium：一般问题，建议考虑改进\n- low：轻微问题，可酌情优化\n\n注意：${this.getLanguageInstruction(language)}。optimizedTitle 中的标题应当多样化，使用不同角度或风格。keywords 应当包含目标读者常用的搜索词。`;
 
@@ -1738,7 +1767,7 @@ priority 取值说明：
           suggestions: Array.isArray(parsed.suggestions)
             ? parsed.suggestions
                 .map((s) => ({
-                  category: s.category || '綜合',
+                  category: s.category || fallbackSuggestionCategory,
                   priority:
                     s.priority && ['high', 'medium', 'low'].includes(s.priority)
                       ? s.priority
@@ -1780,7 +1809,7 @@ priority 取值说明：
     articleId: string | undefined,
     input: OptimizeGEOInput,
   ): Promise<GEOResult> {
-    const language = input.language;
+    const language = input.language ?? DEFAULT_CONTENT_LANGUAGE;
 
     const geoContext =
       language === ContentLanguage.SIMPLIFIED_CHINESE
@@ -1954,17 +1983,45 @@ priority 取值说明：
     });
   }
 
-  private getFallbackHeadlines(title: string): HeadlineOption[] {
+  private getFallbackHeadlines(
+    title: string,
+    language: ContentLanguage = DEFAULT_CONTENT_LANGUAGE,
+  ): HeadlineOption[] {
+    if (language === ContentLanguage.ENGLISH) {
+      return [
+        {
+          title: `${title}: An in-depth analysis`,
+          style: 'Analysis',
+          reasoning: 'Direct and suitable for an in-depth report',
+        },
+        {
+          title: `${title}: The surprising reasons behind it`,
+          style: 'Curiosity',
+          reasoning: 'Creates curiosity and encourages readers to continue',
+        },
+      ];
+    }
+
+    const useTraditionalChinese =
+      language === ContentLanguage.TRADITIONAL_CHINESE_HK ||
+      language === ContentLanguage.TRADITIONAL_CHINESE_CANTONESE;
+
     return [
       {
         title: `${title}：深入分析`,
-        style: '严肃版',
-        reasoning: '直接明了，适合深度报道',
+        style: useTraditionalChinese ? '嚴肅版' : '严肃版',
+        reasoning: useTraditionalChinese
+          ? '直接明瞭，適合深度報道'
+          : '直接明了，适合深度报道',
       },
       {
-        title: `${title}，背後原因令人震驚`,
-        style: '悬念版',
-        reasoning: '制造悬念，吸引点击',
+        title: useTraditionalChinese
+          ? `${title}，背後原因令人震驚`
+          : `${title}，背后原因令人震惊`,
+        style: useTraditionalChinese ? '懸念版' : '悬念版',
+        reasoning: useTraditionalChinese
+          ? '製造懸念，吸引點擊'
+          : '制造悬念，吸引点击',
       },
     ];
   }

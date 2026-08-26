@@ -85,7 +85,11 @@ describe('AccountsPage', () => {
 
     await waitFor(() => {
       expect(createUser).toHaveBeenCalledWith(
-        expect.objectContaining({ email: 'new@example.com', name: '新用户' }),
+        expect.objectContaining({
+          email: 'new@example.com',
+          name: '新用户',
+          preferredLanguage: 'SIMPLIFIED_CHINESE',
+        }),
       );
     });
     // one-time password shown

@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { isAdminRole, UserRole } from '@cms-ng/shared';
+import {
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+  isAdminRole,
+  UserRole,
+} from '@cms-ng/shared';
 import type { TrendingTopic as TrendingTopicRecord } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 import { safeJsonParse } from '../common/json.utils';
@@ -105,7 +110,12 @@ export class TrendingTopicsService {
   async generateAISuggestions(userId: string): Promise<StorySuggestion[]> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, expertise: true, department: true },
+      select: {
+        name: true,
+        expertise: true,
+        department: true,
+        preferredLanguage: true,
+      },
     });
     if (!user) throw new NotFoundException('User not found');
     const recentTopics = await this.prisma.trendingTopic.findMany({
@@ -122,6 +132,8 @@ export class TrendingTopicsService {
         department: user.department || undefined,
       },
       recentTopics.map((topic) => topic.title),
+      (user.preferredLanguage as ContentLanguage | null) ??
+        DEFAULT_CONTENT_LANGUAGE,
     );
   }
 
@@ -133,6 +145,10 @@ export class TrendingTopicsService {
     if (topic.status === 'ADOPTED') {
       throw new BadRequestException('Topic has already been adopted');
     }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferredLanguage: true },
+    });
     const story = await this.prisma.story.create({
       data: {
         title: topic.title,
@@ -143,6 +159,9 @@ export class TrendingTopicsService {
         status: 'DRAFT',
         priority: topic.heatScore >= 80 ? 2 : topic.heatScore >= 50 ? 1 : 0,
         tags: topic.tags,
+        contentLanguage:
+          (user?.preferredLanguage as ContentLanguage | null) ??
+          DEFAULT_CONTENT_LANGUAGE,
         reporterId: userId,
       },
     });

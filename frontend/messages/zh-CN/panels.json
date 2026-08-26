@@ -140,5 +140,21 @@
     "title": "平台分发",
     "deleteConfirm": "确定要删除此平台的适配内容吗？",
     "emptyHint": "选择上方平台，一键生成适配内容"
+  },
+  "draftPreferences": {
+    "title": "AI 初稿设置",
+    "subtitle": "文体决定文章的叙事任务和结构；目标字数由你直接输入。",
+    "genreLabel": "文体类型",
+    "wordCountLabel": "目标字数",
+    "wordUnit": "字",
+    "wordCountHelp": "可输入 {min}–{max} 的任意整数；英文稿按单词数计算。",
+    "wordCountInvalid": "请输入 {min}–{max} 之间的整数。",
+    "structureSummary": "查看结构与写作特点",
+    "structureLabel": "结构",
+    "characteristicsLabel": "特点",
+    "instructionLabel": "特殊要求（可选）",
+    "instructionPlaceholder": "补充采访重点、材料限制或其他特殊要求（可选）",
+    "generating": "撰写中...",
+    "generate": "按所选文体生成初稿"
   }
 }

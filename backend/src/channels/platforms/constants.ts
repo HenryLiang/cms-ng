@@ -22,7 +22,7 @@ export const PLATFORM_METADATA: Record<Platform, PlatformMetadata> = {
     supportsVideo: true,
     aspectRatios: ['1.91:1', '1:1'],
     styleGuide:
-      '提炼核心观点，增加互动引导语（如「你怎麼看？」「留言告訴我們」）。适当使用emoji增加亲和力。保持口语化但专业。',
+      '提炼核心观点，增加互动引导语（如「你怎么看？」「留言告诉我们」）。适当使用emoji增加亲和力。保持口语化但专业。',
   },
   [Platform.INSTAGRAM]: {
     key: Platform.INSTAGRAM,

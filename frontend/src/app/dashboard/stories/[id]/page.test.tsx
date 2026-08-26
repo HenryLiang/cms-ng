@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
+import { ArticleGenre, ContentLanguage } from '@cms-ng/shared';
 
 interface MockAuthState {
   user: { id: string; email: string; name: string; role: string; preferredLanguage: string };
@@ -59,7 +60,16 @@ vi.mock('@/lib/article-api', () => ({
 
 // Mock research-kit-panel so we don't pull in heavy child component tree
 vi.mock('@/components/research-kit-panel', () => ({
-  default: () => null,
+  default: ({
+    researchKit,
+    onGenerateDraft,
+  }: {
+    researchKit?: unknown;
+    onGenerateDraft?: () => void;
+  }) =>
+    researchKit && onGenerateDraft ? (
+      <button onClick={onGenerateDraft}>提交 AI 初稿</button>
+    ) : null,
 }));
 
 vi.mock('@/components/language-badge', () => ({
@@ -121,5 +131,114 @@ describe('StoryDetailPage - error handling for getStory', () => {
 
     // The 404 case legitimately maps to "选题不存在"
     expect(await screen.findByText('选题不存在')).toBeInTheDocument();
+  });
+});
+
+describe('StoryDetailPage - draft preferences', () => {
+  it('generates drafts in Simplified Chinese when a story has no saved language', async () => {
+    const researchKit = {
+      timeline: [{ date: '2026-08-26', event: '旧资料' }],
+      people: [],
+      data: [],
+      opinions: [],
+    };
+    vi.mocked(storyApi.getStory).mockResolvedValue({
+      id: 'story-1',
+      title: '旧选题',
+      status: 'DRAFT',
+      priority: 1,
+      tags: [],
+      reporterId: 'u1',
+      createdAt: '2026-08-26T00:00:00.000Z',
+      updatedAt: '2026-08-26T00:00:00.000Z',
+    });
+    vi.mocked(articleApi.getArticles).mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    });
+    vi.mocked(storyApi.generateResearchKit).mockResolvedValue(researchKit);
+    vi.mocked(storyApi.generateDraftFromResearchKit).mockResolvedValue({
+      article: { id: 'article-1', title: '初稿' },
+    });
+
+    render(<StoryDetailPage />);
+
+    await screen.findByText('旧选题');
+    fireEvent.click(screen.getByRole('button', { name: '生成资料包' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: '按所选文体生成初稿' }),
+    );
+
+    await waitFor(() => {
+      expect(storyApi.generateDraftFromResearchKit).toHaveBeenCalledWith(
+        'story-1',
+        researchKit,
+        expect.objectContaining({
+          language: ContentLanguage.SIMPLIFIED_CHINESE,
+        }),
+      );
+    });
+  });
+
+  it('lets the user choose a genre and enter the target word count', async () => {
+    const researchKit = {
+      timeline: [{ date: '2026-08-26', event: '政策发布' }],
+      people: [],
+      data: [],
+      opinions: [],
+    };
+    vi.mocked(storyApi.getStory).mockResolvedValue({
+      id: 'story-1',
+      title: '测试选题',
+      status: 'DRAFT',
+      priority: 1,
+      tags: [],
+      reporterId: 'u1',
+      contentLanguage: ContentLanguage.SIMPLIFIED_CHINESE,
+      createdAt: '2026-08-26T00:00:00.000Z',
+      updatedAt: '2026-08-26T00:00:00.000Z',
+    });
+    vi.mocked(articleApi.getArticles).mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    });
+    vi.mocked(storyApi.generateResearchKit).mockResolvedValue(researchKit);
+    vi.mocked(storyApi.generateDraftFromResearchKit).mockResolvedValue({
+      article: { id: 'article-1', title: '初稿' },
+    });
+
+    render(<StoryDetailPage />);
+
+    await screen.findByText('测试选题');
+    fireEvent.click(screen.getByRole('button', { name: '生成资料包' }));
+
+    const genreSelect = await screen.findByLabelText('文体类型');
+    fireEvent.change(genreSelect, {
+      target: { value: ArticleGenre.NEWS_COMMENTARY },
+    });
+    fireEvent.change(screen.getByLabelText('目标字数'), {
+      target: { value: '2300' },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText('补充采访重点、材料限制或其他特殊要求（可选）'),
+      { target: { value: '重点分析政策对基层执行的影响' } },
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: '按所选文体生成初稿' }),
+    );
+
+    await waitFor(() => {
+      expect(storyApi.generateDraftFromResearchKit).toHaveBeenCalledWith(
+        'story-1',
+        researchKit,
+        {
+          instruction: '重点分析政策对基层执行的影响',
+          language: ContentLanguage.SIMPLIFIED_CHINESE,
+          authorSlug: '',
+          genre: ArticleGenre.NEWS_COMMENTARY,
+          targetWordCount: 2300,
+        },
+      );
+    });
   });
 });

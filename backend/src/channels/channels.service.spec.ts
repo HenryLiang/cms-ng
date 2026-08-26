@@ -170,7 +170,9 @@ describe('ChannelsService', () => {
     });
 
     it('should generate adaptation for supported platform (Facebook)', async () => {
-      prisma.article.findUnique.mockResolvedValue(mockArticle());
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ contentLanguage: 'TRADITIONAL_CHINESE_HK' }),
+      );
       prisma.platformPublish.upsert.mockResolvedValue(
         mockPublish({ status: PublishStatus.GENERATING }),
       );
@@ -207,6 +209,7 @@ describe('ChannelsService', () => {
         'user-id',
         'article-id',
         expect.objectContaining({
+          language: 'TRADITIONAL_CHINESE_HK',
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'user',
