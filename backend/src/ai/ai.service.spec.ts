@@ -575,6 +575,26 @@ describe('AIService', () => {
       expect(prompt).toContain('目标篇幅：约 3200 字');
     });
 
+    it('should not reference an undefined selected genre for legacy callers', async () => {
+      mockChatProvider.chatCompletion.mockResolvedValue(
+        mockChatResponse(
+          JSON.stringify({
+            title: '普通初稿',
+            content: '<p>Content</p>',
+          }),
+        ),
+      );
+
+      await service.generateDraft('user-id', 'article-id', {
+        storyTitle: 'Story Title',
+        storyTags: [],
+      });
+
+      const request = mockChatProvider.chatCompletion.mock.calls[0][0];
+      expect(request.messages[0].content).not.toContain('所选文体');
+      expect(request.messages[1].content).not.toContain('所选文体');
+    });
+
     it('should sanitize HTML in draft content', async () => {
       mockChatProvider.chatCompletion.mockResolvedValue(
         mockChatResponse(

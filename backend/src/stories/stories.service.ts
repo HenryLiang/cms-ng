@@ -15,14 +15,12 @@ import {
   ArticleStatus,
   ContentLanguage,
   DEFAULT_DRAFT_WORD_COUNT,
+  type DraftGenerationPreferences,
   isAdminRole,
   isEditorRole,
   UserRole,
 } from '@cms-ng/shared';
-import {
-  type DraftGenerationPreferences,
-  ResearchKitResult,
-} from '../ai/dto/writing-operations.dto';
+import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 import { safeJsonParse } from '../common/json.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 

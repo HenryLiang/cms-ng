@@ -233,6 +233,14 @@ export const DEFAULT_DRAFT_WORD_COUNT = 1500;
 export const MIN_DRAFT_WORD_COUNT = 100;
 export const MAX_DRAFT_WORD_COUNT = 10000;
 
+export interface DraftGenerationPreferences {
+  instruction?: string;
+  language?: ContentLanguage;
+  authorSlug?: string;
+  genre?: ArticleGenre;
+  targetWordCount?: number;
+}
+
 export interface ArticleGenreProfile {
   value: ArticleGenre;
   label: string;
