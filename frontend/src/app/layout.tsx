@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { BrandProvider } from "@/components/brand-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +38,9 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-canvas text-foreground">
         <NextIntlClientProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <BrandProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </BrandProvider>
         </NextIntlClientProvider>
       </body>
     </html>
