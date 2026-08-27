@@ -1,28 +1,42 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrandPreset } from "@cms-ng/shared";
-import { updateBrandSettings } from "@/lib/brand-settings-api";
-import { useBrandStore } from "@/store/brand-store";
+import {
+  getBrandSettings,
+  updateBrandSettings,
+} from "@/lib/brand-settings-api";
 import BrandSettingsPanel from "./brand-settings-panel";
+import { BrandProvider } from "./brand-provider";
 
 vi.mock("@/lib/brand-settings-api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/brand-settings-api")>();
-  return { ...actual, updateBrandSettings: vi.fn() };
+  const actual =
+    await importOriginal<typeof import("@/lib/brand-settings-api")>();
+  return {
+    ...actual,
+    getBrandSettings: vi.fn(),
+    updateBrandSettings: vi.fn(),
+  };
 });
+
+const initialBrand = {
+  preset: BrandPreset.CMS_NG,
+  name: "01创作大脑",
+  logoUrl: "/brand-presets/cms-ng.svg",
+  isCustom: false,
+};
+
+function renderPanel() {
+  return render(
+    <BrandProvider initialBrand={initialBrand}>
+      <BrandSettingsPanel />
+    </BrandProvider>,
+  );
+}
 
 describe("BrandSettingsPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useBrandStore.setState({
-      brand: {
-        preset: BrandPreset.CMS_NG,
-        name: "01创作大脑",
-        logoUrl: "/brand-presets/cms-ng.svg",
-        isCustom: false,
-      },
-      isLoaded: true,
-      isLoading: false,
-    });
+    vi.mocked(getBrandSettings).mockResolvedValue(initialBrand);
   });
 
   it("switches to a built-in brand preset", async () => {
@@ -33,7 +47,7 @@ describe("BrandSettingsPanel", () => {
       isCustom: false,
     });
 
-    render(<BrandSettingsPanel />);
+    renderPanel();
     fireEvent.click(screen.getByRole("radio", { name: /智媒中枢/ }));
     fireEvent.click(screen.getByRole("button", { name: "保存品牌设置" }));
 
@@ -41,7 +55,10 @@ describe("BrandSettingsPanel", () => {
       expect(updateBrandSettings).toHaveBeenCalledWith({
         preset: BrandPreset.SMART_MEDIA_HUB,
       });
-      expect(useBrandStore.getState().brand.name).toBe("智媒中枢");
+      expect(screen.getByRole("radio", { name: "智媒中枢" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
     });
   });
 
@@ -54,7 +71,7 @@ describe("BrandSettingsPanel", () => {
     });
     const logo = new File(["image"], "logo.png", { type: "image/png" });
 
-    render(<BrandSettingsPanel />);
+    renderPanel();
     fireEvent.click(screen.getByRole("radio", { name: /自定义品牌/ }));
     fireEvent.change(screen.getByLabelText("系统名称"), {
       target: { value: "我的编辑部" },

@@ -10,13 +10,13 @@ import { getRegistrationStatus } from '@/lib/auth-api';
 import { Button, Input } from '@/components/ui';
 import LocaleSwitcher from '@/components/locale-switcher';
 import BrandLogo from '@/components/brand-logo';
-import { useBrandStore } from '@/store/brand-store';
+import { useBrand } from '@/components/brand-provider';
 
 export default function RegisterPage() {
   const router = useRouter();
   const register = useAuthStore((state) => state.register);
   const t = useTranslations('auth');
-  const brand = useBrandStore((state) => state.brand);
+  const { brand } = useBrand();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -139,7 +139,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="relative text-[11px] text-sidebar-muted">
-          © 2026 {brand.name} · AI CONTENT OS
+          {t('brand.copyrightWithName', { name: brand.name })}
         </div>
       </div>
 

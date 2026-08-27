@@ -24,13 +24,10 @@
       "invalidType": "仅支持 PNG、JPG 或 WebP 图片",
       "tooLarge": "Logo 图片不能超过 2 MB"
     },
-    "loading": "加载品牌设置中…",
     "save": "保存品牌设置",
     "reset": "重置",
     "saved": "品牌设置已保存并全局生效",
-    "saveFailed": "保存品牌设置失败",
-    "lastUpdated": "最近由 {name} 于 {time} 更新",
-    "systemOperator": "系统"
+    "saveFailed": "保存品牌设置失败"
   },
   "states": {
     "open": "开放",

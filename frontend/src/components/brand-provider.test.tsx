@@ -1,27 +1,31 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { BrandPreset } from "@cms-ng/shared";
-import { useBrandStore } from "@/store/brand-store";
+import { getBrandSettings } from "@/lib/brand-settings-api";
 import { BrandProvider } from "./brand-provider";
+
+vi.mock("@/lib/brand-settings-api", () => ({
+  getBrandSettings: vi.fn(),
+}));
+
+const initialBrand = {
+  preset: BrandPreset.CONTENT_ENGINE,
+  name: "内容引擎",
+  logoUrl: "/brand-presets/content-engine.png",
+  isCustom: false,
+};
 
 describe("BrandProvider", () => {
   beforeEach(() => {
     document.title = "";
-    document.head.querySelectorAll('link[rel~="icon"]').forEach((node) => node.remove());
-    useBrandStore.setState({
-      brand: {
-        preset: BrandPreset.CONTENT_ENGINE,
-        name: "内容引擎",
-        logoUrl: "/brand-presets/content-engine.png",
-        isCustom: false,
-      },
-      isLoaded: true,
-      isLoading: false,
-    });
+    document.head
+      .querySelectorAll('link[rel~="icon"]')
+      .forEach((node) => node.remove());
+    vi.mocked(getBrandSettings).mockResolvedValue(initialBrand);
   });
 
   it("applies the active name and logo to browser metadata", async () => {
-    render(<BrandProvider>content</BrandProvider>);
+    render(<BrandProvider initialBrand={initialBrand}>content</BrandProvider>);
 
     await waitFor(() => {
       expect(document.title).toContain("内容引擎");

@@ -53,6 +53,7 @@ cd frontend && npx vitest run src/lib/article-api.test.ts   # Single file
 **Test conventions**: Files are `*.test.ts` / `*.test.tsx`. Path alias `@/` resolves to `src/` (configured in `vitest.config.ts` and `tsconfig.json`). Test setup in `src/test/setup.ts` mocks `localStorage`; uses `@testing-library/jest-dom/vitest` matchers.
 
 **i18n conventions**:
+
 - Message catalogs are namespaced JSON files under `frontend/messages/{zh-CN,en}/`, aggregated by `messages/*/index.ts`.
 - Client components: `useTranslations('namespace')` from `next-intl`.
 - Server components: `getTranslations` / `getLocale` from `next-intl/server`.
@@ -107,6 +108,7 @@ Frontend conventions live in `frontend/CLAUDE.md` (which re-exports `frontend/AG
 - **Notifications** (`backend/src/notifications/`): in-app notification bell; best-effort writes after source-of-truth updates.
 - **System Features** (`backend/src/system-features/`): feature gating + SUPER_ADMIN feature switches.
 - **Language Settings** (`backend/src/language-settings/`): publicly readable language values, SUPER_ADMIN updates with private audit metadata, and shared content-language fallback resolution.
+- **Brand Settings** (`backend/src/brand-settings/`): publicly readable active name/logo, three built-in presets, and SUPER_ADMIN-only custom name/logo updates backed by COS.
 - **Video Generation** (`backend/src/video/`): text-to-video pipeline with image/video providers and FFmpeg composition.
 - **Trending Topics** (`backend/src/trending-topics/`): RSS/RSSHub/Newsnow/Google Trends realtime/X/Twitter/Wikipedia adapters via `TopicSourceAdapter`/`TopicSourceCatalog`.
 
@@ -116,7 +118,7 @@ The topic-source extension point is `backend/src/trending-topics/sources/`: ordi
 
 ### API Endpoints
 
-Backend base URL (dev): `http://localhost:3001`. Endpoints require a JWT Bearer token unless explicitly marked public; public routes include login/register, registration status, language defaults, and provider callbacks. Explore the full surface interactively at `/api-docs` (dev only).
+Backend base URL (dev): `http://localhost:3001`. Endpoints require a JWT Bearer token unless explicitly marked public; public routes include login/register, registration status, language defaults, active brand settings, and provider callbacks. Explore the full surface interactively at `/api-docs` (dev only).
 
 ## Environment Setup
 
@@ -143,7 +145,7 @@ MySQL 8 is **external middleware** — it is no longer part of `docker-compose.y
 
 - **Node version**: Node 24 LTS (pinned by `.nvmrc` and the production Dockerfiles). This is still a prose requirement — no `engines` field is set in any `package.json`.
 - **Prisma Client**: Always run `npx prisma generate` after modifying `schema.prisma` before running backend code.
-- **Frontend state**: Zustand (`auth-store`, `toast-store`) is the only state library in use. `@tanstack/react-query` is listed in `frontend/package.json` but is **NOT used** (no `QueryClientProvider`) - data fetching is Axios (`src/lib/api.ts`) inside `useEffect`+`useState`. Don't introduce react-query without first wiring a provider. Full frontend conventions in `frontend/CLAUDE.md` (which re-exports `frontend/AGENTS.md`).
+- **Frontend state**: Zustand stores cover auth, toasts, and system-feature availability. Active branding is hydrated server-side and shared through `BrandProvider` React context. `@tanstack/react-query` is listed in `frontend/package.json` but is **NOT used** (no `QueryClientProvider`) - data fetching otherwise uses Axios (`src/lib/api.ts`) inside `useEffect`+`useState`. Don't introduce react-query without first wiring a provider. Full frontend conventions in `frontend/CLAUDE.md` (which re-exports `frontend/AGENTS.md`).
 - **Codebase memory index**: After modifying `schema.prisma` or large-scale source changes, rebuild the codebase-memory knowledge graph so node/edge data stays accurate. Run `./scripts/reindex-codebase-memory.sh` to check staleness (compares the indexed commit in `.codebase-memory/artifact.json` against HEAD); it prints rebuild guidance when needed. Rebuild via the codebase-memory MCP `index_repository(repo_path=<repo>, mode='full', persistence=true)` (MCP-only, no CLI). The `.codebase-memory/` artifact is **gitignored (local-only)** — the tool auto-reindexes to track HEAD on every MCP query, so it changes constantly and is not suited for version control; teammates rebuild locally via the script.
 - **`AGENTS.md` (root)** is a standalone contributor guide (structure, commands, style, testing, commit/PR conventions) for non-Claude agent tools (Codex/CodeBuddy/etc., per `scripts/agent/`) and human contributors. Deep conventions live here in `CLAUDE.md`; keep both accurate when workflows change.
 - **AI-generated content**: AI never auto-publishes. All AI output requires human editor review and approval before publication.

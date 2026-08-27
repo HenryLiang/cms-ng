@@ -34,7 +34,7 @@ import NotificationBell from '@/components/notification-bell';
 import LocaleSwitcher from '@/components/locale-switcher';
 import { useTranslations } from 'next-intl';
 import BrandLogo from '@/components/brand-logo';
-import { useBrandStore } from '@/store/brand-store';
+import { useBrand } from '@/components/brand-provider';
 
 interface NavItem {
   href: string;
@@ -104,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
   const { user, logout } = useAuthStore();
-  const brand = useBrandStore((state) => state.brand);
+  const { brand } = useBrand();
   const isLoading = useAuthStore((state) => state.isLoading);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const pathname = usePathname();
@@ -166,7 +166,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="max-w-40 truncate text-sm font-semibold text-white">
               {brand.name}
             </div>
-            <div className="text-[10px] tracking-wide text-sidebar-muted">AI CONTENT OS</div>
+            <div className="text-[10px] tracking-wide text-sidebar-muted">{t('brand.tagline')}</div>
           </div>
         </div>
 

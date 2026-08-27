@@ -9,13 +9,13 @@ import { Mail, Lock, Lightbulb, Wand2, Zap, LogIn } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import LocaleSwitcher from '@/components/locale-switcher';
 import BrandLogo from '@/components/brand-logo';
-import { useBrandStore } from '@/store/brand-store';
+import { useBrand } from '@/components/brand-provider';
 
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
   const t = useTranslations('auth');
-  const brand = useBrandStore((state) => state.brand);
+  const { brand } = useBrand();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -83,7 +83,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative text-[11px] text-sidebar-muted">
-          © 2026 {brand.name} · AI CONTENT OS
+          {t('brand.copyrightWithName', { name: brand.name })}
         </div>
       </div>
 

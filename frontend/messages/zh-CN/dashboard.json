@@ -1,4 +1,7 @@
 {
+  "brand": {
+    "tagline": "AI 内容生产系统"
+  },
   "nav": {
     "workspace": "工作区",
     "automation": "自动化",

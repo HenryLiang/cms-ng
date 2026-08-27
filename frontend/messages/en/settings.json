@@ -24,13 +24,10 @@
       "invalidType": "Only PNG, JPG, or WebP images are supported",
       "tooLarge": "The logo image must be 2 MB or smaller"
     },
-    "loading": "Loading brand settings…",
     "save": "Save brand settings",
     "reset": "Reset",
     "saved": "Brand settings saved and applied globally",
-    "saveFailed": "Failed to save brand settings",
-    "lastUpdated": "Last updated by {name} at {time}",
-    "systemOperator": "System"
+    "saveFailed": "Failed to save brand settings"
   },
   "states": {
     "open": "Enabled",

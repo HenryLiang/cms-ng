@@ -52,5 +52,8 @@
   },
   "notifications": {
     "apiError": "Notification API error"
+  },
+  "brandSettings": {
+    "apiError": "Brand settings API error"
   }
 }

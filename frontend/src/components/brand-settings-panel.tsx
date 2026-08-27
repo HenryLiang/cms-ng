@@ -2,20 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ImageUp, RotateCcw, Save } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   BRAND_PRESET_CATALOG,
   BrandPreset,
   type BrandPresetDefinition,
   type BrandSettings,
 } from "@cms-ng/shared";
-import {
-  updateBrandSettings,
-  type SystemBrandSettings,
-} from "@/lib/brand-settings-api";
-import { useBrandStore } from "@/store/brand-store";
+import { updateBrandSettings } from "@/lib/brand-settings-api";
 import { Button, Card } from "@/components/ui";
 import BrandLogo from "./brand-logo";
+import { useBrand } from "./brand-provider";
 
 const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -41,32 +38,7 @@ function apiMessage(error: unknown, fallback: string) {
 
 export default function BrandSettingsPanel() {
   const t = useTranslations("settings.branding");
-  const brand = useBrandStore((state) => state.brand);
-  const isLoaded = useBrandStore((state) => state.isLoaded);
-  const isLoading = useBrandStore((state) => state.isLoading);
-  const load = useBrandStore((state) => state.load);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (!isLoaded) {
-    return <p className="text-sm text-muted">{t("loading")}</p>;
-  }
-
-  return <BrandSettingsForm brand={brand} loading={isLoading} />;
-}
-
-function BrandSettingsForm({
-  brand,
-  loading,
-}: {
-  brand: SystemBrandSettings;
-  loading: boolean;
-}) {
-  const t = useTranslations("settings.branding");
-  const locale = useLocale();
-  const setBrand = useBrandStore((state) => state.setBrand);
+  const { brand, setBrand } = useBrand();
   const [selected, setSelected] = useState(brand.preset);
   const [name, setName] = useState(brand.isCustom ? brand.name : "");
   const [logo, setLogo] = useState<File | null>(null);
@@ -173,7 +145,11 @@ function BrandSettingsForm({
         <p className="mt-1 text-sm text-muted">{t("description")}</p>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label={t("presetsLabel")}>
+      <div
+        className="mt-6 grid gap-3 sm:grid-cols-3"
+        role="radiogroup"
+        aria-label={t("presetsLabel")}
+      >
         {BRAND_PRESET_CATALOG.map((preset) => {
           const active = selected === preset.key;
           return (
@@ -235,8 +211,12 @@ function BrandSettingsForm({
           )}
         </span>
         <span>
-          <span className="block text-sm font-semibold">{t("custom.title")}</span>
-          <span className="mt-1 block text-xs text-muted">{t("custom.description")}</span>
+          <span className="block text-sm font-semibold">
+            {t("custom.title")}
+          </span>
+          <span className="mt-1 block text-xs text-muted">
+            {t("custom.description")}
+          </span>
         </span>
       </button>
 
@@ -269,7 +249,9 @@ function BrandSettingsForm({
               className="block w-full rounded-lg border border-line bg-surface text-sm text-muted file:mr-3 file:border-0 file:border-r file:border-line file:bg-surface-muted file:px-3 file:py-2.5 file:text-sm file:font-medium"
             />
             <p className="text-xs text-muted">
-              {logo ? t("custom.selectedFile", { name: logo.name }) : t("custom.logoHint")}
+              {logo
+                ? t("custom.selectedFile", { name: logo.name })
+                : t("custom.logoHint")}
             </p>
           </div>
         </div>
@@ -284,17 +266,8 @@ function BrandSettingsForm({
         </p>
       )}
 
-      {brand.updatedAt && (
-        <p className="mt-4 text-xs text-subtle">
-          {t("lastUpdated", {
-            name: brand.updatedBy?.name ?? t("systemOperator"),
-            time: new Date(brand.updatedAt).toLocaleString(locale),
-          })}
-        </p>
-      )}
-
       <div className="mt-6 flex gap-2 border-t border-line pt-4">
-        <Button onClick={save} loading={saving || loading} disabled={!customReady}>
+        <Button onClick={save} loading={saving} disabled={!customReady}>
           <Save className="h-4 w-4" />
           {t("save")}
         </Button>

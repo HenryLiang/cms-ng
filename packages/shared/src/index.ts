@@ -274,6 +274,13 @@ export interface BrandSettings {
   isCustom: boolean;
 }
 
+export const DEFAULT_BRAND_SETTINGS: BrandSettings = {
+  preset: DEFAULT_BRAND_PRESET.key,
+  name: DEFAULT_BRAND_PRESET.name,
+  logoUrl: DEFAULT_BRAND_PRESET.logoUrl,
+  isCustom: false,
+};
+
 export function getBrandPresetDefinition(
   preset: BrandPreset,
 ): BrandPresetDefinition | undefined {

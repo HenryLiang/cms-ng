@@ -25,9 +25,14 @@ describe('BrandSettingsController', () => {
       updatedBy: null,
     });
 
-    await expect(controller.get()).resolves.toMatchObject({
+    await expect(controller.get()).resolves.toEqual({
       success: true,
-      data: { name: '01创作大脑' },
+      data: {
+        preset: BrandPreset.CMS_NG,
+        name: '01创作大脑',
+        logoUrl: '/brand-presets/cms-ng.svg',
+        isCustom: false,
+      },
     });
     expect(
       Reflect.getMetadata(IS_PUBLIC_KEY, BrandSettingsController.prototype.get),

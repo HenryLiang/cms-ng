@@ -1,8 +1,8 @@
 "use client";
 
 import type { BrandSettings } from "@cms-ng/shared";
-import { useBrandStore } from "@/store/brand-store";
 import { cn } from "@/components/ui/cn";
+import { useBrand } from "./brand-provider";
 
 export default function BrandLogo({
   brand: explicitBrand,
@@ -13,7 +13,7 @@ export default function BrandLogo({
   className?: string;
   alt?: string;
 }) {
-  const activeBrand = useBrandStore((state) => state.brand);
+  const { brand: activeBrand } = useBrand();
   const brand = explicitBrand ?? activeBrand;
 
   return (
