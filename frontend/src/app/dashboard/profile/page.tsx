@@ -1,16 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
 import { updateUser, changePassword } from '@/lib/users-api';
 import {
   ContentLanguage,
   DEFAULT_CONTENT_LANGUAGE,
+  DEFAULT_DISPLAY_LANGUAGE,
+  type DisplayLanguage,
   UserRole,
 } from '@cms-ng/shared';
 import { Save, Check, KeyRound } from 'lucide-react';
 import { Button, Card, PageHeader, Input } from '@/components/ui';
+import { getLanguageSettings } from '@/lib/language-settings-api';
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from '@/i18n/config';
 
 // 角色/语言存词典 key(roles.* / languages.*),渲染处经 t() 解析
 const languageLabelKeys: Record<ContentLanguage, string> = {
@@ -29,14 +33,32 @@ const roleLabelKeys: Record<UserRole, string> = {
 
 export default function ProfilePage() {
   const t = useTranslations('profile');
+  const locale = useLocale();
   const { user, fetchUser } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     department: user?.department || '',
-    preferredLanguage: user?.preferredLanguage || DEFAULT_CONTENT_LANGUAGE,
+    displayLanguage: user?.displayLanguage || '',
+    preferredLanguage: user?.preferredLanguage || '',
   });
+  const [formUserId, setFormUserId] = useState(user?.id);
+  const [systemDefaults, setSystemDefaults] = useState({
+    displayLanguage: DEFAULT_DISPLAY_LANGUAGE,
+    contentLanguage: DEFAULT_CONTENT_LANGUAGE,
+  });
+
+  useEffect(() => {
+    getLanguageSettings()
+      .then((settings) =>
+        setSystemDefaults({
+          displayLanguage: settings.displayLanguage,
+          contentLanguage: settings.contentLanguage,
+        }),
+      )
+      .catch(() => undefined);
+  }, []);
 
   // 修改密码
   const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -58,9 +80,19 @@ export default function ProfilePage() {
       await updateUser(user.id, {
         name: formData.name,
         department: formData.department || undefined,
-        preferredLanguage: formData.preferredLanguage,
+        displayLanguage: (formData.displayLanguage as DisplayLanguage) || null,
+        preferredLanguage:
+          (formData.preferredLanguage as ContentLanguage) || null,
       });
       await fetchUser();
+      const effectiveDisplayLanguage =
+        (formData.displayLanguage as DisplayLanguage) ||
+        systemDefaults.displayLanguage;
+      document.cookie = `${LOCALE_COOKIE}=${effectiveDisplayLanguage}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; samesite=lax`;
+      if (effectiveDisplayLanguage !== locale) {
+        location.reload();
+        return;
+      }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
@@ -96,6 +128,19 @@ export default function ProfilePage() {
     } finally {
       setPwdSaving(false);
     }
+  }
+
+  // Auth hydration can provide the user after this route first renders. A
+  // guarded render-time adjustment initializes the form once for that user
+  // without an effect-driven cascading render.
+  if (user && formUserId !== user.id) {
+    setFormUserId(user.id);
+    setFormData({
+      name: user.name || '',
+      department: user.department || '',
+      displayLanguage: user.displayLanguage || '',
+      preferredLanguage: user.preferredLanguage || '',
+    });
   }
 
   if (!user) {
@@ -170,10 +215,34 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Preferred Language */}
+          {/* Display Language */}
+          <div>
+            <label htmlFor="displayLanguage" className="mb-2 block text-sm font-medium text-foreground">
+              {t('form.displayLanguage')}
+            </label>
+            <select
+              id="displayLanguage"
+              value={formData.displayLanguage}
+              onChange={(e) => handleChange('displayLanguage', e.target.value)}
+              className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            >
+              <option value="">
+                {t('form.useSystemDefault', {
+                  value: t(`displayLanguages.${systemDefaults.displayLanguage}`),
+                })}
+              </option>
+              <option value="zh-CN">{t('displayLanguages.zh-CN')}</option>
+              <option value="en">{t('displayLanguages.en')}</option>
+            </select>
+            <p className="mt-1.5 text-xs text-muted">
+              {t('form.displayLanguageHint')}
+            </p>
+          </div>
+
+          {/* AI Content Language */}
           <div>
             <label htmlFor="preferredLanguage" className="mb-2 block text-sm font-medium text-foreground">
-              {t('form.language')}
+              {t('form.contentLanguage')}
             </label>
             <select
               id="preferredLanguage"
@@ -181,6 +250,13 @@ export default function ProfilePage() {
               onChange={(e) => handleChange('preferredLanguage', e.target.value)}
               className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
+              <option value="">
+                {t('form.useSystemDefault', {
+                  value: t(
+                    `languages.${languageLabelKeys[systemDefaults.contentLanguage]}`,
+                  ),
+                })}
+              </option>
               {Object.entries(languageLabelKeys).map(([value, labelKey]) => (
                 <option key={value} value={value}>
                   {t(`languages.${labelKey}`)}
@@ -188,7 +264,7 @@ export default function ProfilePage() {
               ))}
             </select>
             <p className="mt-1.5 text-xs text-muted">
-              {t('form.languageHint')}
+              {t('form.contentLanguageHint')}
             </p>
           </div>
 

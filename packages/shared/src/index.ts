@@ -220,6 +220,19 @@ export enum ContentLanguage {
 
 export const DEFAULT_CONTENT_LANGUAGE = ContentLanguage.SIMPLIFIED_CHINESE;
 
+// ===== 页面显示语言 =====
+// 与内容语言正交：这里只描述 CMS 界面本身支持的 locale。
+export const DISPLAY_LANGUAGES = ['zh-CN', 'en'] as const;
+
+export type DisplayLanguage = (typeof DISPLAY_LANGUAGES)[number];
+
+export const DEFAULT_DISPLAY_LANGUAGE: DisplayLanguage = 'zh-CN';
+
+export interface LanguageSettings {
+  displayLanguage: DisplayLanguage;
+  contentLanguage: ContentLanguage;
+}
+
 // ===== AI 初稿文体 =====
 export enum ArticleGenre {
   STRAIGHT_NEWS = 'STRAIGHT_NEWS',
@@ -574,7 +587,8 @@ export interface User {
   role: UserRole;
   department?: string;
   expertise: string[];
-  preferredLanguage?: ContentLanguage;
+  displayLanguage?: DisplayLanguage | null;
+  preferredLanguage?: ContentLanguage | null;
   balance?: number;
   createdAt: Date;
   updatedAt: Date;

@@ -20,7 +20,6 @@ import {
   ArticleStatus,
   UserRole,
   ContentLanguage,
-  DEFAULT_CONTENT_LANGUAGE,
   isAdminRole,
   isEditorRole,
 } from '@cms-ng/shared';
@@ -46,6 +45,7 @@ import {
 } from './dto/ai-operations.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 import {
   SearchService,
   SearchUnavailableException,
@@ -127,6 +127,7 @@ export class ArticlesService {
     private articleAccess: ArticleAccessService,
     private searchService: SearchService,
     private eventEmitter: EventEmitter2,
+    private languageSettings: LanguageSettingsService,
   ) {}
 
   async create(authorId: string, dto: CreateArticleDto) {
@@ -142,8 +143,9 @@ export class ArticlesService {
     const contentLanguage =
       dto.contentLanguage ??
       (story.contentLanguage as ContentLanguage | null) ??
-      user?.preferredLanguage ??
-      DEFAULT_CONTENT_LANGUAGE;
+      (await this.languageSettings.resolveContentLanguage(
+        user?.preferredLanguage as ContentLanguage | null | undefined,
+      ));
 
     const article = await this.prisma.article.create({
       data: serializeArticleInput({
@@ -512,7 +514,7 @@ export class ArticlesService {
         style: dto.style,
         authorSlug: dto.authorSlug,
       },
-      this.resolveContentLanguage(dto.language, article.contentLanguage),
+      await this.resolveContentLanguage(dto.language, article.contentLanguage),
     );
     return { result };
   }
@@ -526,7 +528,7 @@ export class ArticlesService {
     const result = await this.aiService.expandText(user.userId, id, {
       text: dto.text,
       instruction: dto.instruction,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -544,7 +546,7 @@ export class ArticlesService {
     const result = await this.aiService.condenseText(user.userId, id, {
       text: dto.text,
       maxLength: dto.maxLength,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -561,7 +563,7 @@ export class ArticlesService {
     const article = await this.verifyAccessAndGet(id, user);
     const result = await this.aiService.polishText(user.userId, id, {
       text: dto.text,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -581,7 +583,7 @@ export class ArticlesService {
       subtitle: article.subtitle || undefined,
       content: article.content,
       count: dto.count,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -600,7 +602,7 @@ export class ArticlesService {
       title: article.title,
       content: article.content,
       maxLength: dto.maxLength,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -621,7 +623,7 @@ export class ArticlesService {
       {
         title: dto.title?.trim() || article.title,
         content: dto.content ?? article.content,
-        language: this.resolveContentLanguage(
+        language: await this.resolveContentLanguage(
           dto.language,
           article.contentLanguage,
         ),
@@ -677,7 +679,7 @@ export class ArticlesService {
         subtitle: article.subtitle || undefined,
         content: article.content,
       },
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -708,7 +710,7 @@ export class ArticlesService {
       currentTitle: article.title,
       currentSubtitle: article.subtitle || undefined,
       instruction: dto.instruction,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage ?? story.contentLanguage,
       ),
@@ -728,7 +730,7 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -746,7 +748,7 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -764,7 +766,7 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -782,7 +784,7 @@ export class ArticlesService {
       title: article.title,
       subtitle: article.subtitle || undefined,
       content: article.content,
-      language: this.resolveContentLanguage(
+      language: await this.resolveContentLanguage(
         dto.language,
         article.contentLanguage,
       ),
@@ -832,14 +834,12 @@ export class ArticlesService {
     });
   }
 
-  private resolveContentLanguage(
+  private async resolveContentLanguage(
     requested: ContentLanguage | undefined,
     stored: unknown,
-  ): ContentLanguage {
-    return (
-      requested ??
-      (stored as ContentLanguage | null | undefined) ??
-      DEFAULT_CONTENT_LANGUAGE
+  ): Promise<ContentLanguage> {
+    return this.languageSettings.resolveContentLanguage(
+      requested ?? (stored as ContentLanguage | null | undefined),
     );
   }
 

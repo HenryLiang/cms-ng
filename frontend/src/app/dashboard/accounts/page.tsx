@@ -17,7 +17,6 @@ import {
 import {
   UserRole,
   ContentLanguage,
-  DEFAULT_CONTENT_LANGUAGE,
 } from '@cms-ng/shared';
 import { User } from '@/types/auth';
 import {
@@ -302,7 +301,7 @@ function CreateAccountModal({
     name: '',
     role: UserRole.REPORTER as UserRole,
     department: '',
-    preferredLanguage: DEFAULT_CONTENT_LANGUAGE as ContentLanguage,
+    preferredLanguage: '' as ContentLanguage | '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -317,7 +316,7 @@ function CreateAccountModal({
         name: form.name,
         role: form.role,
         department: form.department || undefined,
-        preferredLanguage: form.preferredLanguage,
+        preferredLanguage: form.preferredLanguage || undefined,
       });
       onCreated(user, initialPassword);
     } catch (err: unknown) {
@@ -384,6 +383,7 @@ function CreateAccountModal({
             onChange={(e) => setForm({ ...form, preferredLanguage: e.target.value as ContentLanguage })}
             className={selectClass}
           >
+            <option value="">{t('createForm.systemDefaultLanguage')}</option>
             {Object.entries(languageLabelKeys).map(([value, labelKey]) => (
               <option key={value} value={value}>
                 {t(`languages.${labelKey}`)}

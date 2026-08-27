@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ArticleAccessService } from '../common/article-access.service';
 import { AIService } from '../ai/ai.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   SearchService,
@@ -37,6 +38,7 @@ describe('ArticlesService', () => {
   };
   let searchService: { searchArticles: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
+  let languageSettings: { resolveContentLanguage: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
@@ -55,6 +57,13 @@ describe('ArticlesService', () => {
     };
     searchService = { searchArticles: jest.fn() };
     eventEmitter = { emit: jest.fn() };
+    languageSettings = {
+      resolveContentLanguage: jest
+        .fn()
+        .mockImplementation((value) =>
+          Promise.resolve(value ?? 'SIMPLIFIED_CHINESE'),
+        ),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -64,6 +73,7 @@ describe('ArticlesService', () => {
         { provide: AIService, useValue: aiService },
         { provide: SearchService, useValue: searchService },
         { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: LanguageSettingsService, useValue: languageSettings },
       ],
     }).compile();
 
@@ -124,11 +134,12 @@ describe('ArticlesService', () => {
       });
     });
 
-    it('should default new articles to Simplified Chinese', async () => {
+    it('should inherit the system content language when no nearer preference exists', async () => {
       prisma.story.findUnique.mockResolvedValue({ id: 'story-id' });
       prisma.user.findUnique.mockResolvedValue({ preferredLanguage: null });
+      languageSettings.resolveContentLanguage.mockResolvedValue('ENGLISH');
       prisma.article.create.mockResolvedValue(
-        mockArticle({ contentLanguage: 'SIMPLIFIED_CHINESE' }),
+        mockArticle({ contentLanguage: 'ENGLISH' }),
       );
       prisma.articleVersion.create.mockResolvedValue({ id: 'version-id' });
 
@@ -140,10 +151,13 @@ describe('ArticlesService', () => {
 
       expect(prisma.article.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          contentLanguage: 'SIMPLIFIED_CHINESE',
+          contentLanguage: 'ENGLISH',
         }),
         include: expect.any(Object),
       });
+      expect(languageSettings.resolveContentLanguage).toHaveBeenCalledWith(
+        null,
+      );
     });
 
     it('should create article and first version snapshot', async () => {

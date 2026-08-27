@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LocaleSwitcher from './locale-switcher';
 
 describe('LocaleSwitcher', () => {
@@ -21,7 +21,7 @@ describe('LocaleSwitcher', () => {
     expect(screen.getByRole('button', { name: /English/ })).toBeInTheDocument();
   });
 
-  it('writes NEXT_LOCALE cookie and reloads when switching to English', () => {
+  it('writes NEXT_LOCALE cookie and reloads when switching to English', async () => {
     const reloadSpy = vi.fn();
     Object.defineProperty(window, 'location', {
       value: { ...window.location, reload: reloadSpy },
@@ -31,8 +31,10 @@ describe('LocaleSwitcher', () => {
     fireEvent.click(screen.getByRole('button', { name: '切换界面语言' }));
     fireEvent.click(screen.getByRole('button', { name: /English/ }));
     // cookie 写入:path/max-age 齐全,值 en
-    expect(document.cookie).toContain('NEXT_LOCALE=en');
-    expect(reloadSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(document.cookie).toContain('NEXT_LOCALE=en');
+      expect(reloadSpy).toHaveBeenCalled();
+    });
   });
 
   it('does nothing when clicking the current locale', () => {

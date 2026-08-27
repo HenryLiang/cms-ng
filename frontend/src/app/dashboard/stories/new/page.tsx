@@ -8,7 +8,6 @@ import { useAuthStore } from '@/store/auth-store';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button, Input, buttonClasses } from '@/components/ui';
-import { DEFAULT_CONTENT_LANGUAGE } from '@cms-ng/shared';
 
 export default function NewStoryPage() {
   const router = useRouter();
@@ -33,7 +32,9 @@ export default function NewStoryPage() {
         angle: angle || undefined,
         priority,
         deadline: deadline || undefined,
-        contentLanguage: user?.preferredLanguage ?? DEFAULT_CONTENT_LANGUAGE,
+        // Omit when the account follows the system default; the backend owns
+        // the effective-language resolution.
+        contentLanguage: user?.preferredLanguage ?? undefined,
       });
       router.push('/dashboard');
     } catch (err: unknown) {

@@ -14,7 +14,6 @@ import {
   ArticleGenre,
   ArticleStatus,
   ContentLanguage,
-  DEFAULT_CONTENT_LANGUAGE,
   DEFAULT_DRAFT_WORD_COUNT,
   type DraftGenerationPreferences,
   isAdminRole,
@@ -24,6 +23,7 @@ import {
 import { ResearchKitResult } from '../ai/dto/writing-operations.dto';
 import { safeJsonParse } from '../common/json.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 
 @Injectable()
 export class StoriesService {
@@ -32,6 +32,7 @@ export class StoriesService {
     private aiService: AIService,
     private articlesService: ArticlesService,
     private eventEmitter: EventEmitter2,
+    private languageSettings: LanguageSettingsService,
   ) {}
 
   async create(reporterId: string, dto: CreateStoryDto) {
@@ -41,8 +42,9 @@ export class StoriesService {
     });
     const contentLanguage =
       dto.contentLanguage ??
-      user?.preferredLanguage ??
-      DEFAULT_CONTENT_LANGUAGE;
+      (await this.languageSettings.resolveContentLanguage(
+        user?.preferredLanguage as ContentLanguage | null | undefined,
+      ));
 
     const story = await this.prisma.story.create({
       data: {
@@ -269,7 +271,7 @@ export class StoriesService {
       language:
         language ??
         (story.contentLanguage as ContentLanguage | null) ??
-        DEFAULT_CONTENT_LANGUAGE,
+        (await this.languageSettings.resolveContentLanguage()),
     });
   }
 
@@ -288,7 +290,7 @@ export class StoriesService {
     const contentLanguage =
       preferences.language ??
       (story.contentLanguage as ContentLanguage | null) ??
-      DEFAULT_CONTENT_LANGUAGE;
+      (await this.languageSettings.resolveContentLanguage());
 
     // 1. Generate draft using AI with research kit
     const draft = await this.aiService.generateDraft(userId, undefined, {

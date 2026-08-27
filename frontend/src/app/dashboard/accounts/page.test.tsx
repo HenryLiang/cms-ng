@@ -88,7 +88,7 @@ describe('AccountsPage', () => {
         expect.objectContaining({
           email: 'new@example.com',
           name: '新用户',
-          preferredLanguage: 'SIMPLIFIED_CHINESE',
+          preferredLanguage: undefined,
         }),
       );
     });

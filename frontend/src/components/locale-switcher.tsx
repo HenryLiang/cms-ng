@@ -4,6 +4,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Languages, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { LOCALES, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, LOCALE_LABELS, type Locale } from '@/i18n/config';
+import { useAuthStore } from '@/store/auth-store';
+import { updateUser } from '@/lib/users-api';
 
 /**
  * 界面语言切换器:写 NEXT_LOCALE cookie 后整页刷新。
@@ -15,7 +17,10 @@ export default function LocaleSwitcher({ compact = false }: { compact?: boolean 
   const t = useTranslations('components');
   const [open, setOpen] = useState(false);
   const [pendingLocale, setPendingLocale] = useState<Locale | null>(null);
+  const [saving, setSaving] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const user = useAuthStore((state) => state.user);
+  const fetchUser = useAuthStore((state) => state.fetchUser);
 
   useEffect(() => {
     if (!open) return;
@@ -32,12 +37,23 @@ export default function LocaleSwitcher({ compact = false }: { compact?: boolean 
     location.reload();
   }, [pendingLocale, locale]);
 
-  function switchTo(next: Locale) {
+  async function switchTo(next: Locale) {
     if (next === locale) {
       setOpen(false);
       return;
     }
-    setPendingLocale(next);
+    setSaving(true);
+    try {
+      if (user) {
+        await updateUser(user.id, { displayLanguage: next });
+        await fetchUser();
+      }
+      setPendingLocale(next);
+    } catch {
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -45,6 +61,7 @@ export default function LocaleSwitcher({ compact = false }: { compact?: boolean 
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        disabled={saving}
         aria-label={t('localeSwitcher.label')}
         title={t('localeSwitcher.label')}
         className={`flex items-center gap-1.5 rounded-lg border border-line text-muted transition-colors hover:bg-surface-muted hover:text-foreground ${
@@ -60,7 +77,7 @@ export default function LocaleSwitcher({ compact = false }: { compact?: boolean 
             <button
               key={l}
               type="button"
-              onClick={() => switchTo(l)}
+              onClick={() => void switchTo(l)}
               className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition-colors hover:bg-surface-muted ${
                 l === locale ? 'text-foreground' : 'text-muted'
               }`}

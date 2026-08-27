@@ -6,11 +6,17 @@
  * 采用 next-intl「无 URL 路由」模式:登录后使用的内部系统,无 SEO 需求,
  * 不引入 /[locale] 前缀,避免重构全部路由与链接。
  */
-export const LOCALES = ['zh-CN', 'en'] as const;
+import {
+  DEFAULT_DISPLAY_LANGUAGE,
+  DISPLAY_LANGUAGES,
+  type DisplayLanguage,
+} from '@cms-ng/shared';
 
-export type Locale = (typeof LOCALES)[number];
+export const LOCALES = DISPLAY_LANGUAGES;
 
-export const DEFAULT_LOCALE: Locale = 'zh-CN';
+export type Locale = DisplayLanguage;
+
+export const DEFAULT_LOCALE: Locale = DEFAULT_DISPLAY_LANGUAGE;
 
 /** next-intl 约定的语言 cookie 名。 */
 export const LOCALE_COOKIE = 'NEXT_LOCALE';

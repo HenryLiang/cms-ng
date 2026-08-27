@@ -3,6 +3,7 @@
   "subtitle": "Manage system-level switches",
   "tabs": {
     "registration": "Registration",
+    "languages": "Language Defaults",
     "features": "Feature Availability"
   },
   "states": {
@@ -22,6 +23,31 @@
     "opened": "Registration is now open",
     "closedMessage": "Registration is now closed",
     "saveFailed": "Failed to save"
+  },
+  "languages": {
+    "title": "System language defaults",
+    "description": "These values apply when a user follows the system default or has not chosen a preference. Personal settings take priority, and existing stories and articles are not changed retroactively.",
+    "displayLanguage": "Interface language",
+    "displayHint": "The default CMS language for accounts without a personal interface preference.",
+    "contentLanguage": "AI content language",
+    "contentHint": "The default content language for new stories, articles, and AI writing.",
+    "displayOptions": {
+      "zh-CN": "Simplified Chinese",
+      "en": "English"
+    },
+    "contentOptions": {
+      "SIMPLIFIED_CHINESE": "Simplified Chinese",
+      "TRADITIONAL_CHINESE_HK": "Traditional Chinese (Hong Kong)",
+      "TRADITIONAL_CHINESE_CANTONESE": "Traditional Chinese (Cantonese)",
+      "ENGLISH": "English"
+    },
+    "loading": "Loading language settings…",
+    "loadFailed": "Failed to load language settings",
+    "save": "Save language defaults",
+    "reset": "Reset",
+    "saved": "Language defaults saved",
+    "saveFailed": "Failed to save language defaults",
+    "lastUpdated": "Last updated by {name} at {time}"
   },
   "features": {
     "loadFailed": "Failed to load feature availability",

@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { History, LockKeyhole, Save, X } from "lucide-react";
-import { SystemFeature, UserRole } from "@cms-ng/shared";
+import {
+  ContentLanguage,
+  DEFAULT_CONTENT_LANGUAGE,
+  DEFAULT_DISPLAY_LANGUAGE,
+  SystemFeature,
+  UserRole,
+  type DisplayLanguage,
+} from "@cms-ng/shared";
 import { getRegistrationStatus, toggleRegistration } from "@/lib/auth-api";
 import {
   getSystemFeatureAudit,
@@ -16,8 +23,14 @@ import { getVideoCapability, type VideoCapability } from "@/lib/video-api";
 import { useAuthStore } from "@/store/auth-store";
 import { useSystemFeaturesStore } from "@/store/system-features-store";
 import { Button, Card, PageHeader, Badge } from "@/components/ui";
+import {
+  getLanguageSettings,
+  updateLanguageSettings,
+  type SystemLanguageSettings,
+} from "@/lib/language-settings-api";
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "@/i18n/config";
 
-type SettingsTab = "registration" | "features";
+type SettingsTab = "registration" | "languages" | "features";
 type PendingChange = { feature: SystemFeatureDetail; enabled: boolean };
 
 // 分组存词典 key(features.groups.*),渲染处经 t() 解析
@@ -69,6 +82,18 @@ export default function SettingsPage() {
   );
   const [audit, setAudit] = useState<SystemFeatureAudit[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [languageSettings, setLanguageSettings] =
+    useState<SystemLanguageSettings | null>(null);
+  const [languageDraft, setLanguageDraft] = useState({
+    displayLanguage: DEFAULT_DISPLAY_LANGUAGE as DisplayLanguage,
+    contentLanguage: DEFAULT_CONTENT_LANGUAGE,
+  });
+  const [languageLoading, setLanguageLoading] = useState(isSuperAdmin);
+  const [languageSaving, setLanguageSaving] = useState(false);
+  const [languageMessage, setLanguageMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     getRegistrationStatus()
@@ -105,6 +130,35 @@ export default function SettingsPage() {
       cancelled = true;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- t 仅为词典引用刻意不入 deps
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let cancelled = false;
+    getLanguageSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setLanguageSettings(settings);
+        setLanguageDraft({
+          displayLanguage: settings.displayLanguage,
+          contentLanguage: settings.contentLanguage,
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLanguageMessage({
+            type: "error",
+            text: apiMessage(error, t("languages.loadFailed")),
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLanguageLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch-on-role-change, t 仅为词典引用刻意不入 deps
   }, [isSuperAdmin]);
 
   async function handleSave() {
@@ -171,6 +225,32 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleLanguageSave() {
+    setLanguageSaving(true);
+    setLanguageMessage(null);
+    try {
+      const updated = await updateLanguageSettings(languageDraft);
+      setLanguageSettings(updated);
+      setLanguageDraft({
+        displayLanguage: updated.displayLanguage,
+        contentLanguage: updated.contentLanguage,
+      });
+      if (!user?.displayLanguage && updated.displayLanguage !== locale) {
+        document.cookie = `${LOCALE_COOKIE}=${updated.displayLanguage}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; samesite=lax`;
+        location.reload();
+        return;
+      }
+      setLanguageMessage({ type: "success", text: t("languages.saved") });
+    } catch (error) {
+      setLanguageMessage({
+        type: "error",
+        text: apiMessage(error, t("languages.saveFailed")),
+      });
+    } finally {
+      setLanguageSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -195,6 +275,19 @@ export default function SettingsPage() {
         >
           {t("tabs.registration")}
         </button>
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setTab("languages")}
+            className={`border-b-2 px-3 py-2 text-sm font-medium ${
+              tab === "languages"
+                ? "border-brand text-brand"
+                : "border-transparent text-muted"
+            }`}
+          >
+            {t("tabs.languages")}
+          </button>
+        )}
         {isSuperAdmin && (
           <button
             type="button"
@@ -224,6 +317,24 @@ export default function SettingsPage() {
             setEditOpen(registrationOpen);
             setReason("");
             setMessage(null);
+          }}
+        />
+      ) : tab === "languages" ? (
+        <LanguageDefaultsSettings
+          settings={languageSettings}
+          draft={languageDraft}
+          loading={languageLoading}
+          saving={languageSaving}
+          message={languageMessage}
+          onDraft={setLanguageDraft}
+          onSave={handleLanguageSave}
+          onReset={() => {
+            if (!languageSettings) return;
+            setLanguageDraft({
+              displayLanguage: languageSettings.displayLanguage,
+              contentLanguage: languageSettings.contentLanguage,
+            });
+            setLanguageMessage(null);
           }}
         />
       ) : (
@@ -434,6 +545,126 @@ function RegistrationSettings(props: {
             {t("registration.reset")}
           </Button>
         </div>
+      </div>
+    </Card>
+  );
+}
+
+function LanguageDefaultsSettings(props: {
+  settings: SystemLanguageSettings | null;
+  draft: {
+    displayLanguage: DisplayLanguage;
+    contentLanguage: ContentLanguage;
+  };
+  loading: boolean;
+  saving: boolean;
+  message: { type: "success" | "error"; text: string } | null;
+  onDraft: (value: {
+    displayLanguage: DisplayLanguage;
+    contentLanguage: ContentLanguage;
+  }) => void;
+  onSave: () => void;
+  onReset: () => void;
+}) {
+  const t = useTranslations("settings");
+  const locale = useLocale();
+
+  if (props.loading) {
+    return <p className="text-sm text-muted">{t("languages.loading")}</p>;
+  }
+
+  return (
+    <Card className="max-w-2xl space-y-6 p-6">
+      <div>
+        <h2 className="text-base font-medium">{t("languages.title")}</h2>
+        <p className="mt-1 text-sm text-muted">{t("languages.description")}</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="system-display-language"
+          className="text-sm font-medium"
+        >
+          {t("languages.displayLanguage")}
+        </label>
+        <select
+          id="system-display-language"
+          value={props.draft.displayLanguage}
+          onChange={(event) =>
+            props.onDraft({
+              ...props.draft,
+              displayLanguage: event.target.value as DisplayLanguage,
+            })
+          }
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-brand"
+        >
+          <option value="zh-CN">{t("languages.displayOptions.zh-CN")}</option>
+          <option value="en">{t("languages.displayOptions.en")}</option>
+        </select>
+        <p className="text-xs text-subtle">{t("languages.displayHint")}</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="system-content-language"
+          className="text-sm font-medium"
+        >
+          {t("languages.contentLanguage")}
+        </label>
+        <select
+          id="system-content-language"
+          value={props.draft.contentLanguage}
+          onChange={(event) =>
+            props.onDraft({
+              ...props.draft,
+              contentLanguage: event.target.value as ContentLanguage,
+            })
+          }
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-brand"
+        >
+          {Object.values(ContentLanguage).map((language) => (
+            <option key={language} value={language}>
+              {t(`languages.contentOptions.${language}`)}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-subtle">{t("languages.contentHint")}</p>
+      </div>
+
+      {props.settings?.updatedAt && (
+        <p className="text-xs text-subtle">
+          {t("languages.lastUpdated", {
+            name:
+              props.settings.updatedBy?.name || t("features.systemOperator"),
+            time: new Date(props.settings.updatedAt).toLocaleString(locale),
+          })}
+        </p>
+      )}
+
+      {props.message && (
+        <div
+          className={`rounded-lg px-4 py-2.5 text-sm ${
+            props.message.type === "success"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-600"
+          }`}
+        >
+          {props.message.text}
+        </div>
+      )}
+
+      <div className="flex gap-3 border-t border-line pt-4">
+        <Button loading={props.saving} onClick={props.onSave}>
+          {!props.saving && <Save className="h-4 w-4" />}
+          {t("languages.save")}
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={props.saving}
+          onClick={props.onReset}
+        >
+          {t("languages.reset")}
+        </Button>
       </div>
     </Card>
   );

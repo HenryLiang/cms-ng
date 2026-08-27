@@ -12,14 +12,21 @@
     "traditionalChineseCantonese": "Traditional Chinese (Cantonese)",
     "english": "English"
   },
+  "displayLanguages": {
+    "zh-CN": "Simplified Chinese",
+    "en": "English"
+  },
   "form": {
     "name": "Name",
     "email": "Email",
     "role": "Role",
     "department": "Department",
     "departmentPlaceholder": "Enter department name",
-    "language": "Preferred Language",
-    "languageHint": "Used as the default language for AI content generation and article writing",
+    "displayLanguage": "Interface language",
+    "displayLanguageHint": "Changes the language used by the CMS interface for this account",
+    "contentLanguage": "AI content language",
+    "contentLanguageHint": "Default for new stories, articles, and AI writing; existing content keeps its language",
+    "useSystemDefault": "Use system default ({value})",
     "saving": "Saving...",
     "saved": "Saved",
     "submit": "Save Settings",

@@ -4,12 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ContentLanguage,
-  DEFAULT_CONTENT_LANGUAGE,
-  isAdminRole,
-  UserRole,
-} from '@cms-ng/shared';
+import { ContentLanguage, isAdminRole, UserRole } from '@cms-ng/shared';
 import type { TrendingTopic as TrendingTopicRecord } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 import { safeJsonParse } from '../common/json.utils';
@@ -18,6 +13,7 @@ import { StorySuggestion } from '../ai/dto/story-suggestion.dto';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { TopicSourceCatalog } from './sources/topic-source.catalog';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 
 export interface ImportTopicInput {
   title: string;
@@ -34,6 +30,7 @@ export class TrendingTopicsService {
     private readonly prisma: PrismaService,
     private readonly aiService: AIService,
     private readonly sourceCatalog: TopicSourceCatalog,
+    private readonly languageSettings: LanguageSettingsService,
   ) {}
 
   async create(userId: string, dto: CreateTopicDto) {
@@ -132,8 +129,9 @@ export class TrendingTopicsService {
         department: user.department || undefined,
       },
       recentTopics.map((topic) => topic.title),
-      (user.preferredLanguage as ContentLanguage | null) ??
-        DEFAULT_CONTENT_LANGUAGE,
+      await this.languageSettings.resolveContentLanguage(
+        user.preferredLanguage as ContentLanguage | null,
+      ),
     );
   }
 
@@ -159,9 +157,9 @@ export class TrendingTopicsService {
         status: 'DRAFT',
         priority: topic.heatScore >= 80 ? 2 : topic.heatScore >= 50 ? 1 : 0,
         tags: topic.tags,
-        contentLanguage:
-          (user?.preferredLanguage as ContentLanguage | null) ??
-          DEFAULT_CONTENT_LANGUAGE,
+        contentLanguage: await this.languageSettings.resolveContentLanguage(
+          user?.preferredLanguage as ContentLanguage | null | undefined,
+        ),
         reporterId: userId,
       },
     });

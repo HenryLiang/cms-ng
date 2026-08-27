@@ -16,7 +16,8 @@ model User {
   role              UserRole         @default(REPORTER)
   department        String?
   expertise         String           @default("[]")
-  preferredLanguage ContentLanguage? @default(SIMPLIFIED_CHINESE)
+  displayLanguage   String?          @db.VarChar(16)
+  preferredLanguage ContentLanguage?
   isActive          Boolean          @default(true)
   balance           Decimal          @default(0) @db.Decimal(12, 4)
   lastLoginAt       DateTime?
@@ -38,6 +39,7 @@ model User {
   videoGenerationJobs VideoGenerationJob[]
   featureSwitchUpdates SystemFeatureSwitch[] @relation("SystemFeatureSwitchUpdater")
   featureSwitchAudits  SystemFeatureAudit[]  @relation("SystemFeatureAuditOperator")
+  languageSettingUpdates SystemLanguageSetting[] @relation("SystemLanguageSettingUpdater")
 
   @@index([role, isActive])
   @@map("users")
@@ -566,6 +568,21 @@ model SystemFeatureAudit {
   @@index([feature, createdAt])
   @@index([operatorId])
   @@map("system_feature_audits")
+}
+
+// 页面显示语言与 AI 内容生成语言的系统默认值。用户未设置个人偏好时继承此单例。
+model SystemLanguageSetting {
+  id              String          @id @db.VarChar(32)
+  displayLanguage String          @default("zh-CN") @db.VarChar(16)
+  contentLanguage ContentLanguage @default(SIMPLIFIED_CHINESE)
+  updatedById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  updatedBy User? @relation("SystemLanguageSettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+  @@map("system_language_settings")
 }
 
 // ===== 媒体资源管理 =====
