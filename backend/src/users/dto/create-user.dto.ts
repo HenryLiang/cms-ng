@@ -4,9 +4,15 @@ import {
   MinLength,
   IsEnum,
   IsOptional,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole, ContentLanguage } from '@cms-ng/shared';
+import {
+  UserRole,
+  ContentLanguage,
+  DISPLAY_LANGUAGES,
+  type DisplayLanguage,
+} from '@cms-ng/shared';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -43,6 +49,15 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   department?: string;
+
+  @ApiProperty({
+    description: 'Preferred CMS display language',
+    enum: DISPLAY_LANGUAGES,
+    required: false,
+  })
+  @IsIn(DISPLAY_LANGUAGES)
+  @IsOptional()
+  displayLanguage?: DisplayLanguage;
 
   @ApiProperty({
     description: 'Preferred content language for the user',

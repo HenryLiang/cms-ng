@@ -1,6 +1,10 @@
-import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { ContentLanguage } from '@cms-ng/shared';
+import {
+  ContentLanguage,
+  DISPLAY_LANGUAGES,
+  type DisplayLanguage,
+} from '@cms-ng/shared';
 
 export class UpdateUserDto {
   @ApiProperty({
@@ -22,12 +26,25 @@ export class UpdateUserDto {
   department?: string;
 
   @ApiProperty({
-    description: 'Preferred content language for the user',
+    description:
+      'Preferred CMS display language; null inherits the system default',
+    enum: DISPLAY_LANGUAGES,
+    nullable: true,
+    required: false,
+  })
+  @IsIn(DISPLAY_LANGUAGES)
+  @IsOptional()
+  displayLanguage?: DisplayLanguage | null;
+
+  @ApiProperty({
+    description:
+      'Preferred AI content language; null inherits the system default',
     enum: ContentLanguage,
     example: ContentLanguage.ENGLISH,
+    nullable: true,
     required: false,
   })
   @IsEnum(ContentLanguage)
   @IsOptional()
-  preferredLanguage?: ContentLanguage;
+  preferredLanguage?: ContentLanguage | null;
 }

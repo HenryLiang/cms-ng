@@ -3,6 +3,7 @@
   "subtitle": "管理系统级开关",
   "tabs": {
     "registration": "注册设置",
+    "languages": "语言默认值",
     "features": "功能开放管理"
   },
   "states": {
@@ -22,6 +23,31 @@
     "opened": "已开放注册",
     "closedMessage": "已关闭注册",
     "saveFailed": "保存失败"
+  },
+  "languages": {
+    "title": "系统语言默认值",
+    "description": "当用户选择“跟随系统默认”或尚未设置个人偏好时，使用这里的值。个人设置优先，已有选题和稿件不会被追溯修改。",
+    "displayLanguage": "页面文字显示语言",
+    "displayHint": "决定未设置个人界面语言的账号默认看到的 CMS 语言。",
+    "contentLanguage": "AI 内容生成语言",
+    "contentHint": "作为新选题、新稿件和 AI 创作的默认内容语言。",
+    "displayOptions": {
+      "zh-CN": "简体中文",
+      "en": "English"
+    },
+    "contentOptions": {
+      "SIMPLIFIED_CHINESE": "简体中文",
+      "TRADITIONAL_CHINESE_HK": "繁体中文（香港）",
+      "TRADITIONAL_CHINESE_CANTONESE": "繁体中文（粤语）",
+      "ENGLISH": "English"
+    },
+    "loading": "加载语言设置中…",
+    "loadFailed": "加载语言设置失败",
+    "save": "保存语言默认值",
+    "reset": "重置",
+    "saved": "语言默认值已保存",
+    "saveFailed": "保存语言默认值失败",
+    "lastUpdated": "最近由 {name} 于 {time} 更新"
   },
   "features": {
     "loadFailed": "加载功能开放状态失败",

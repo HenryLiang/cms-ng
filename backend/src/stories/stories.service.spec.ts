@@ -11,16 +11,25 @@ import { ArticlesService } from '../articles/articles.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ArticleGenre } from '@cms-ng/shared';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 
 describe('StoriesService', () => {
   let service: StoriesService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let eventEmitter: { emit: jest.Mock };
+  let languageSettings: { resolveContentLanguage: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrismaService();
     prisma.article.findMany.mockResolvedValue([]);
     eventEmitter = { emit: jest.fn() };
+    languageSettings = {
+      resolveContentLanguage: jest
+        .fn()
+        .mockImplementation((value) =>
+          Promise.resolve(value ?? 'SIMPLIFIED_CHINESE'),
+        ),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -40,6 +49,7 @@ describe('StoriesService', () => {
           },
         },
         { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: LanguageSettingsService, useValue: languageSettings },
       ],
     }).compile();
 
@@ -70,10 +80,11 @@ describe('StoriesService', () => {
   });
 
   describe('create', () => {
-    it('should default new stories to Simplified Chinese', async () => {
+    it('should inherit the system content language when the user has no preference', async () => {
       prisma.user.findUnique.mockResolvedValue({ preferredLanguage: null });
+      languageSettings.resolveContentLanguage.mockResolvedValue('ENGLISH');
       prisma.story.create.mockResolvedValue(
-        mockStory({ contentLanguage: 'SIMPLIFIED_CHINESE' }),
+        mockStory({ contentLanguage: 'ENGLISH' }),
       );
 
       await service.create('user-id', {
@@ -83,10 +94,13 @@ describe('StoriesService', () => {
 
       expect(prisma.story.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          contentLanguage: 'SIMPLIFIED_CHINESE',
+          contentLanguage: 'ENGLISH',
         }),
         include: expect.any(Object),
       });
+      expect(languageSettings.resolveContentLanguage).toHaveBeenCalledWith(
+        null,
+      );
     });
 
     it('should create story with serialized tags', async () => {

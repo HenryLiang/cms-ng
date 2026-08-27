@@ -638,7 +638,7 @@ server {
     }
 
     # 后端 API (路径前缀匹配)
-    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|media|notifications|authors|system-features|video|uploads) {
+    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|media|notifications|authors|system-features|language-settings|video|uploads) {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -660,7 +660,7 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
 
     location / { proxy_pass http://127.0.0.1:3000; /* 同上 proxy_set_header ... */ }
-    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|media|notifications|authors|system-features|video|uploads) {
+    location ~ ^/(users|auth|stories|articles|channels|auto-publish|trending-topics|ai|billing|media|notifications|authors|system-features|language-settings|video|uploads) {
         proxy_pass http://127.0.0.1:3001; /* 同上 proxy_set_header ... */
     }
 }

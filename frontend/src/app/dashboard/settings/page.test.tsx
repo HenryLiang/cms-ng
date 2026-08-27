@@ -11,7 +11,13 @@ vi.mock("@/lib/auth-api", () => ({
 
 vi.mock("@/store/auth-store", () => ({
   useAuthStore: (selector: (state: unknown) => unknown) =>
-    selector({ user: { id: "operator-id", role: mockRole } }),
+    selector({
+      user: {
+        id: "operator-id",
+        role: mockRole,
+        displayLanguage: "zh-CN",
+      },
+    }),
 }));
 
 vi.mock("@/lib/system-features-api", () => ({
@@ -27,16 +33,31 @@ vi.mock("@/lib/video-api", () => ({
   }),
 }));
 
+vi.mock("@/lib/language-settings-api", () => ({
+  getLanguageSettings: vi.fn(),
+  updateLanguageSettings: vi.fn(),
+}));
+
 import SettingsPage from "./page";
 import { getRegistrationStatus, toggleRegistration } from "@/lib/auth-api";
 import {
   getSystemFeatureDetails,
   updateSystemFeature,
 } from "@/lib/system-features-api";
+import {
+  getLanguageSettings,
+  updateLanguageSettings,
+} from "@/lib/language-settings-api";
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockRole = UserRole.ADMIN;
+  vi.mocked(getLanguageSettings).mockResolvedValue({
+    displayLanguage: "zh-CN",
+    contentLanguage: "SIMPLIFIED_CHINESE" as never,
+    updatedAt: null,
+    updatedBy: null,
+  });
 });
 
 describe("SettingsPage - registration switch", () => {
@@ -100,6 +121,9 @@ describe("SettingsPage - registration switch", () => {
     expect(
       screen.queryByRole("button", { name: "功能开放管理" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "语言默认值" }),
+    ).not.toBeInTheDocument();
 
     view.unmount();
     mockRole = UserRole.SUPER_ADMIN;
@@ -109,6 +133,38 @@ describe("SettingsPage - registration switch", () => {
     expect(
       await screen.findByRole("button", { name: "功能开放管理" }),
     ).toBeInTheDocument();
+  });
+
+  it("allows a SUPER_ADMIN to update both system language defaults", async () => {
+    mockRole = UserRole.SUPER_ADMIN;
+    vi.mocked(getRegistrationStatus).mockResolvedValue({
+      registrationOpen: true,
+    });
+    vi.mocked(getSystemFeatureDetails).mockResolvedValue([]);
+    vi.mocked(updateLanguageSettings).mockResolvedValue({
+      displayLanguage: "en",
+      contentLanguage: "ENGLISH" as never,
+      updatedAt: "2026-08-27T01:00:00.000Z",
+      updatedBy: { id: "operator-id", name: "Root", email: "root@example.com" },
+    });
+
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "语言默认值" }));
+
+    fireEvent.change(screen.getByLabelText("页面文字显示语言"), {
+      target: { value: "en" },
+    });
+    fireEvent.change(screen.getByLabelText("AI 内容生成语言"), {
+      target: { value: "ENGLISH" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存语言默认值" }));
+
+    await waitFor(() => {
+      expect(updateLanguageSettings).toHaveBeenCalledWith({
+        displayLanguage: "en",
+        contentLanguage: "ENGLISH",
+      });
+    });
   });
 
   it("requires a reason before closing a feature", async () => {

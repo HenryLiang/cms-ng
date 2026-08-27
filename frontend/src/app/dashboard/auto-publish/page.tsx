@@ -16,6 +16,8 @@ import {
   type CreateTaskInput,
 } from '@/lib/auto-publish-api';
 import { getAuthors } from '@/lib/authors-api';
+import { getLanguageSettings } from '@/lib/language-settings-api';
+import { useAuthStore } from '@/store/auth-store';
 import {
   ContentLanguage,
   DEFAULT_CONTENT_LANGUAGE,
@@ -292,7 +294,14 @@ function CreateTaskForm({
   const [useTrending, setUseTrending] = useState(true);
   const [style, setStyle] = useState('news_brief');
   const [maxLength, setMaxLength] = useState(800);
-  const [language, setLanguage] = useState(DEFAULT_CONTENT_LANGUAGE);
+  const preferredLanguage = useAuthStore(
+    (state) => state.user?.preferredLanguage,
+  );
+  const [selectedLanguage, setSelectedLanguage] =
+    useState<ContentLanguage | null>(null);
+  const [systemLanguage, setSystemLanguage] =
+    useState<ContentLanguage | null>(null);
+  const language = selectedLanguage ?? preferredLanguage ?? systemLanguage ?? '';
   // Author-style persona for auto-published drafts. '' = default generation.
   const [authorSlug, setAuthorSlug] = useState('');
   const [authors, setAuthors] = useState<{ slug: string; name: string }[]>([]);
@@ -310,6 +319,25 @@ function CreateTaskForm({
       })
       .catch(() => setAuthorsAvailable(false));
   }, []);
+
+  useEffect(() => {
+    if (preferredLanguage) return;
+    let cancelled = false;
+    getLanguageSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setSystemLanguage(settings.contentLanguage);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSystemLanguage(DEFAULT_CONTENT_LANGUAGE);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preferredLanguage]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -330,7 +358,7 @@ function CreateTaskForm({
         contentConfig: {
           style,
           maxLength,
-          language,
+          language: language || undefined,
           authorSlug: authorSlug || undefined,
         },
         filterConfig: {
@@ -456,10 +484,15 @@ function CreateTaskForm({
           <select
             value={language}
             onChange={(e) =>
-              setLanguage(e.target.value as ContentLanguage)
+              setSelectedLanguage(e.target.value as ContentLanguage)
             }
             className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
           >
+            {!language && (
+              <option value="" disabled>
+                {tCommon('state.loading')}
+              </option>
+            )}
             <option value="TRADITIONAL_CHINESE_HK">{t('language.TRADITIONAL_CHINESE_HK')}</option>
             <option value="SIMPLIFIED_CHINESE">{t('language.SIMPLIFIED_CHINESE')}</option>
             <option value="TRADITIONAL_CHINESE_CANTONESE">{t('language.TRADITIONAL_CHINESE_CANTONESE')}</option>

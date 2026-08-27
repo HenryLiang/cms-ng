@@ -135,7 +135,7 @@ describe('StoryDetailPage - error handling for getStory', () => {
 });
 
 describe('StoryDetailPage - draft preferences', () => {
-  it('generates drafts in Simplified Chinese when a story has no saved language', async () => {
+  it('uses the account content language when a story has no saved language', async () => {
     const researchKit = {
       timeline: [{ date: '2026-08-26', event: '旧资料' }],
       people: [],
@@ -174,7 +174,7 @@ describe('StoryDetailPage - draft preferences', () => {
         'story-1',
         researchKit,
         expect.objectContaining({
-          language: ContentLanguage.SIMPLIFIED_CHINESE,
+          language: ContentLanguage.TRADITIONAL_CHINESE_HK,
         }),
       );
     });

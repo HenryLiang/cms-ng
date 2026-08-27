@@ -1,6 +1,6 @@
 import { api } from './api';
 import { User } from '@/types/auth';
-import { UserRole, ContentLanguage } from '@cms-ng/shared';
+import { UserRole, ContentLanguage, type DisplayLanguage } from '@cms-ng/shared';
 import type { BillingTransaction } from './billing-api';
 
 export async function getEditors() {
@@ -17,7 +17,8 @@ export async function getUsers(): Promise<User[]> {
 export interface UpdateUserData {
   name?: string;
   department?: string;
-  preferredLanguage?: ContentLanguage;
+  displayLanguage?: DisplayLanguage | null;
+  preferredLanguage?: ContentLanguage | null;
 }
 
 export async function updateUser(id: string, data: UpdateUserData): Promise<User> {
@@ -32,6 +33,7 @@ export interface CreateUserData {
   name: string;
   role?: UserRole;
   department?: string;
+  displayLanguage?: DisplayLanguage;
   preferredLanguage?: ContentLanguage;
 }
 

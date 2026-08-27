@@ -23,6 +23,7 @@ import { MediaModule } from './media/media.module';
 import { VideoModule } from './video/video.module';
 import { SystemFeaturesModule } from './system-features/system-features.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { LanguageSettingsModule } from './language-settings/language-settings.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AuthModule,
     NotificationsModule,
     SystemFeaturesModule,
+    LanguageSettingsModule,
     UsersModule,
     StoriesModule,
     ArticlesModule,

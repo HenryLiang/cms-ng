@@ -51,6 +51,7 @@ const USER_SELECT = {
   role: true,
   department: true,
   expertise: true,
+  displayLanguage: true,
   preferredLanguage: true,
   isActive: true,
   balance: true,
@@ -67,6 +68,7 @@ type SelectedUser = {
   role: string;
   department: string | null;
   expertise: string;
+  displayLanguage: string | null;
   preferredLanguage: string | null;
   isActive: boolean;
   balance: unknown;
@@ -158,6 +160,7 @@ export class UsersService {
         passwordHash,
         role: dto.role,
         department: dto.department,
+        displayLanguage: dto.displayLanguage,
         preferredLanguage: dto.preferredLanguage,
       },
       select: USER_SELECT,
@@ -416,6 +419,7 @@ export class UsersService {
       role: u.role,
       department: u.department,
       expertise: safeJsonParse(u.expertise, []),
+      displayLanguage: u.displayLanguage,
       preferredLanguage: u.preferredLanguage,
       isActive: u.isActive,
       balance: Number(u.balance),

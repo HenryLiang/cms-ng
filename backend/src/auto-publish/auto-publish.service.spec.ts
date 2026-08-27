@@ -5,9 +5,11 @@ import { AutoPublishSchedulerService } from './auto-publish-scheduler.service';
 import { PipelineService } from './pipeline/pipeline.service';
 import { WordPressService } from '../channels/wordpress.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 import {
   AutoTaskStatus,
   ArticleRunStatus,
+  ContentLanguage,
   PublishStatus,
 } from '@cms-ng/shared';
 
@@ -28,6 +30,9 @@ describe('AutoPublishService', () => {
   let _wordpress: WordPressService;
 
   const mockPrisma = {
+    user: {
+      findUnique: jest.fn(),
+    },
     autoPublishTask: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -70,6 +75,12 @@ describe('AutoPublishService', () => {
     deletePost: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockLanguageSettings = {
+    resolveContentLanguage: jest
+      .fn()
+      .mockResolvedValue(ContentLanguage.SIMPLIFIED_CHINESE),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,6 +89,7 @@ describe('AutoPublishService', () => {
         { provide: AutoPublishSchedulerService, useValue: mockScheduler },
         { provide: PipelineService, useValue: mockPipeline },
         { provide: WordPressService, useValue: mockWordPress },
+        { provide: LanguageSettingsService, useValue: mockLanguageSettings },
       ],
     }).compile();
 
@@ -126,6 +138,81 @@ describe('AutoPublishService', () => {
         }),
       });
       expect(result.name).toBe('Test Task');
+    });
+
+    it('resolves and stores the effective language when none is supplied', async () => {
+      const dto = {
+        name: 'Inherited language task',
+        scheduleConfig: { times: ['08:00'], timezone: 'Asia/Hong_Kong' },
+        topicStrategy: { fixedKeywords: ['test'] },
+        contentConfig: { style: 'news', maxLength: 800 },
+        publishConfig: { platform: 'WORDPRESS' },
+      };
+      mockPrisma.user.findUnique.mockResolvedValue({
+        preferredLanguage: null,
+      });
+      mockLanguageSettings.resolveContentLanguage.mockResolvedValue(
+        ContentLanguage.ENGLISH,
+      );
+      mockPrisma.autoPublishTask.create.mockImplementation(({ data }) =>
+        Promise.resolve({ id: 'task-2', ...data }),
+      );
+
+      await service.createTask('user-1', dto as never);
+
+      expect(mockLanguageSettings.resolveContentLanguage).toHaveBeenCalledWith(
+        null,
+      );
+      expect(mockPrisma.autoPublishTask.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          contentConfig: JSON.stringify({
+            ...dto.contentConfig,
+            language: ContentLanguage.ENGLISH,
+          }),
+        }),
+      });
+    });
+  });
+
+  describe('update', () => {
+    it('resolves the creator language when replacement content config omits it', async () => {
+      const existing = {
+        id: 'task-1',
+        createdBy: 'creator-1',
+        status: AutoTaskStatus.PAUSED,
+        scheduleConfig: '{}',
+        topicStrategy: '{}',
+        contentConfig: '{}',
+        filterConfig: '{}',
+        publishConfig: '{}',
+        retryConfig: '{}',
+      };
+      const contentConfig = { style: 'analysis', maxLength: 1200 };
+      mockPrisma.autoPublishTask.findUnique.mockResolvedValue(existing);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        preferredLanguage: ContentLanguage.TRADITIONAL_CHINESE_HK,
+      });
+      mockLanguageSettings.resolveContentLanguage.mockResolvedValue(
+        ContentLanguage.TRADITIONAL_CHINESE_HK,
+      );
+      mockPrisma.autoPublishTask.update.mockImplementation(({ data }) =>
+        Promise.resolve({ ...existing, ...data }),
+      );
+
+      await service.update('task-1', { contentConfig });
+
+      expect(mockLanguageSettings.resolveContentLanguage).toHaveBeenCalledWith(
+        ContentLanguage.TRADITIONAL_CHINESE_HK,
+      );
+      expect(mockPrisma.autoPublishTask.update).toHaveBeenCalledWith({
+        where: { id: 'task-1' },
+        data: {
+          contentConfig: JSON.stringify({
+            ...contentConfig,
+            language: ContentLanguage.TRADITIONAL_CHINESE_HK,
+          }),
+        },
+      });
     });
   });
 

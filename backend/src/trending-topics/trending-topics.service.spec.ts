@@ -14,12 +14,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService } from '../prisma/prisma.service.mock';
 import { TopicSourceCatalog } from './sources/topic-source.catalog';
 import { TrendingTopicsService } from './trending-topics.service';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 
 describe('TrendingTopicsService', () => {
   let service: TrendingTopicsService;
   let prisma: ReturnType<typeof createMockPrismaService>;
   let aiService: { generateStorySuggestions: jest.Mock };
   let sourceCatalog: { fetch: jest.Mock };
+  let languageSettings: { resolveContentLanguage: jest.Mock };
 
   const mockTopic = (override?: Record<string, unknown>) => ({
     id: 'topic-id',
@@ -41,12 +43,20 @@ describe('TrendingTopicsService', () => {
     prisma = createMockPrismaService();
     aiService = { generateStorySuggestions: jest.fn() };
     sourceCatalog = { fetch: jest.fn() };
+    languageSettings = {
+      resolveContentLanguage: jest
+        .fn()
+        .mockImplementation((value) =>
+          Promise.resolve(value ?? 'SIMPLIFIED_CHINESE'),
+        ),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrendingTopicsService,
         { provide: PrismaService, useValue: prisma },
         { provide: AIService, useValue: aiService },
         { provide: TopicSourceCatalog, useValue: sourceCatalog },
+        { provide: LanguageSettingsService, useValue: languageSettings },
       ],
     }).compile();
     service = module.get(TrendingTopicsService);
@@ -125,6 +135,27 @@ describe('TrendingTopicsService', () => {
       expect.objectContaining({ expertise: ['tech'] }),
       ['AI'],
       'TRADITIONAL_CHINESE_HK',
+    );
+  });
+
+  it('uses the system content language for suggestions without a personal preference', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      name: 'Reporter',
+      expertise: '[]',
+      department: null,
+      preferredLanguage: null,
+    });
+    prisma.trendingTopic.findMany.mockResolvedValue([]);
+    aiService.generateStorySuggestions.mockResolvedValue([]);
+    languageSettings.resolveContentLanguage.mockResolvedValue('ENGLISH');
+
+    await service.generateAISuggestions('user-id');
+
+    expect(aiService.generateStorySuggestions).toHaveBeenCalledWith(
+      'user-id',
+      expect.any(Object),
+      [],
+      'ENGLISH',
     );
   });
 

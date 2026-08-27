@@ -1,4 +1,4 @@
-import { UserRole, ContentLanguage } from '@cms-ng/shared';
+import { UserRole, ContentLanguage, type DisplayLanguage } from '@cms-ng/shared';
 
 export interface User {
   id: string;
@@ -7,7 +7,8 @@ export interface User {
   avatar?: string;
   role: UserRole;
   department?: string;
-  preferredLanguage?: ContentLanguage;
+  displayLanguage?: DisplayLanguage | null;
+  preferredLanguage?: ContentLanguage | null;
   isActive?: boolean;
   balance?: number;
   lastLoginAt?: string | null;

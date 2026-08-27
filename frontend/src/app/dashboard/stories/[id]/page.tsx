@@ -35,6 +35,8 @@ import LanguageBadge from '@/components/language-badge';
 import ResearchKitPanel from '@/components/research-kit-panel';
 import DraftPreferencesPanel from '@/components/draft-preferences-panel';
 import { Button, Badge, Card } from '@/components/ui';
+import { useAuthStore } from '@/store/auth-store';
+import { getLanguageSettings } from '@/lib/language-settings-api';
 
 export default function StoryDetailPage() {
   const router = useRouter();
@@ -42,6 +44,9 @@ export default function StoryDetailPage() {
   const storyId = params.id as string;
   const t = useTranslations('stories');
   const tc = useTranslations('common');
+  const preferredLanguage = useAuthStore(
+    (state) => state.user?.preferredLanguage,
+  );
 
   const [story, setStory] = useState<Story | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -71,7 +76,7 @@ export default function StoryDetailPage() {
   const [angle, setAngle] = useState('');
   const [status, setStatus] = useState<Story['status']>('DRAFT');
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(
-    DEFAULT_CONTENT_LANGUAGE,
+    preferredLanguage ?? DEFAULT_CONTENT_LANGUAGE,
   );
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [authorSlug, setAuthorSlug] = useState('');
@@ -107,6 +112,13 @@ export default function StoryDetailPage() {
       setStatus(storyData.status);
       if (storyData.contentLanguage) {
         setContentLanguage(storyData.contentLanguage);
+      } else if (preferredLanguage) {
+        setContentLanguage(preferredLanguage);
+      } else {
+        const defaults = await getLanguageSettings().catch(() => ({
+          contentLanguage: DEFAULT_CONTENT_LANGUAGE,
+        }));
+        setContentLanguage(defaults.contentLanguage);
       }
     } catch (err: unknown) {
       // 401 is handled globally by the api interceptor (redirect to /login).
