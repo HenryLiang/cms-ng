@@ -7,8 +7,8 @@ import type {
 import { api } from "./api";
 
 export interface SystemLanguageSettings extends LanguageSettings {
-  updatedAt: string | null;
-  updatedBy: { id: string; name: string; email: string } | null;
+  updatedAt?: string | null;
+  updatedBy?: { id: string; name: string; email: string } | null;
 }
 
 function unwrap<T>(response: ApiResponse<T>): T {

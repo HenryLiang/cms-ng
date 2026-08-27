@@ -3,6 +3,13 @@
 ALTER TABLE `users`
   ADD COLUMN `displayLanguage` VARCHAR(16) NULL;
 
+-- The previous schema wrote Simplified Chinese into every account by default,
+-- so those legacy values cannot represent an explicit personal choice. Clear
+-- them once so existing accounts can inherit the new system-level default.
+UPDATE `users`
+  SET `preferredLanguage` = NULL
+  WHERE `preferredLanguage` = 'SIMPLIFIED_CHINESE';
+
 ALTER TABLE `users`
   ALTER COLUMN `preferredLanguage` DROP DEFAULT;
 

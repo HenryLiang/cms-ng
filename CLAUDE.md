@@ -106,7 +106,7 @@ Frontend conventions live in `frontend/CLAUDE.md` (which re-exports `frontend/AG
 - **Media Library & Search** (`backend/src/media/`, `backend/src/search/`): COS-backed uploads, AI vision auto-tagging, Elasticsearch full-text search with MySQL `LIKE` fallback.
 - **Notifications** (`backend/src/notifications/`): in-app notification bell; best-effort writes after source-of-truth updates.
 - **System Features** (`backend/src/system-features/`): feature gating + SUPER_ADMIN feature switches.
-- **Language Settings** (`backend/src/language-settings/`): public system language defaults, SUPER_ADMIN updates, and shared content-language fallback resolution.
+- **Language Settings** (`backend/src/language-settings/`): publicly readable language values, SUPER_ADMIN updates with private audit metadata, and shared content-language fallback resolution.
 - **Video Generation** (`backend/src/video/`): text-to-video pipeline with image/video providers and FFmpeg composition.
 - **Trending Topics** (`backend/src/trending-topics/`): RSS/RSSHub/Newsnow/Google Trends realtime/X/Twitter/Wikipedia adapters via `TopicSourceAdapter`/`TopicSourceCatalog`.
 
@@ -116,7 +116,7 @@ The topic-source extension point is `backend/src/trending-topics/sources/`: ordi
 
 ### API Endpoints
 
-Backend base URL (dev): `http://localhost:3001`. All endpoints require a JWT Bearer token **except** `POST /auth/login` and `POST /auth/register`. Explore the full surface interactively at `/api-docs` (dev only).
+Backend base URL (dev): `http://localhost:3001`. Endpoints require a JWT Bearer token unless explicitly marked public; public routes include login/register, registration status, language defaults, and provider callbacks. Explore the full surface interactively at `/api-docs` (dev only).
 
 ## Environment Setup
 

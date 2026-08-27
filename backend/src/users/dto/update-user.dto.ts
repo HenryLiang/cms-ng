@@ -41,6 +41,7 @@ export class UpdateUserDto {
       'Preferred AI content language; null inherits the system default',
     enum: ContentLanguage,
     example: ContentLanguage.ENGLISH,
+    nullable: true,
     required: false,
   })
   @IsEnum(ContentLanguage)

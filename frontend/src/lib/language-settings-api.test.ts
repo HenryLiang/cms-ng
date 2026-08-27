@@ -23,8 +23,6 @@ describe("language-settings-api", () => {
         data: {
           displayLanguage: "zh-CN",
           contentLanguage: ContentLanguage.SIMPLIFIED_CHINESE,
-          updatedAt: null,
-          updatedBy: null,
         },
       },
     });

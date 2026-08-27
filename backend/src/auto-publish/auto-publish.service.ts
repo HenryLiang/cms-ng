@@ -10,6 +10,7 @@ import {
   AutoTaskStatus,
   RunStatus,
   ArticleRunStatus,
+  ContentLanguage,
   PublishStatus,
 } from '@cms-ng/shared';
 import { AutoPublishSchedulerService } from './auto-publish-scheduler.service';
@@ -19,6 +20,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { safeJsonParse } from '../common/json.utils';
 import type { StepTraceEntry } from './pipeline/step.interface';
+import { LanguageSettingsService } from '../language-settings/language-settings.service';
 
 @Injectable()
 export class AutoPublishService {
@@ -29,11 +31,26 @@ export class AutoPublishService {
     private scheduler: AutoPublishSchedulerService,
     private pipeline: PipelineService,
     private wordpress: WordPressService,
+    private languageSettings: LanguageSettingsService,
   ) {}
 
   // ===== Task CRUD =====
 
   async createTask(userId: string, dto: CreateTaskDto) {
+    let contentConfig = dto.contentConfig;
+    if (!contentConfig.language) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferredLanguage: true },
+      });
+      contentConfig = {
+        ...contentConfig,
+        language: await this.languageSettings.resolveContentLanguage(
+          user?.preferredLanguage as ContentLanguage | null | undefined,
+        ),
+      };
+    }
+
     const task = await this.prisma.autoPublishTask.create({
       data: {
         name: dto.name,
@@ -42,7 +59,7 @@ export class AutoPublishService {
         scheduleType: dto.scheduleType || 'FIXED_TIME',
         scheduleConfig: JSON.stringify(dto.scheduleConfig),
         topicStrategy: JSON.stringify(dto.topicStrategy),
-        contentConfig: JSON.stringify(dto.contentConfig),
+        contentConfig: JSON.stringify(contentConfig),
         filterConfig: JSON.stringify(dto.filterConfig || {}),
         publishConfig: JSON.stringify(dto.publishConfig),
         batchSize: dto.batchSize || 1,

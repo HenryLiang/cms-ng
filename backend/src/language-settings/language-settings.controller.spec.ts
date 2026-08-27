@@ -23,9 +23,12 @@ describe('LanguageSettingsController', () => {
       updatedBy: null,
     });
 
-    await expect(controller.get()).resolves.toMatchObject({
+    await expect(controller.get()).resolves.toEqual({
       success: true,
-      data: { displayLanguage: 'zh-CN' },
+      data: {
+        displayLanguage: 'zh-CN',
+        contentLanguage: 'SIMPLIFIED_CHINESE',
+      },
     });
     expect(
       Reflect.getMetadata(

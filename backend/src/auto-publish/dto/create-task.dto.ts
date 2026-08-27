@@ -153,12 +153,15 @@ export class ContentConfigDto {
   maxLength: number;
 
   @ApiProperty({
-    description: 'Language the generated content is written in',
+    description:
+      'Language the generated content is written in; omitted values inherit the creator or system default',
     enum: ContentLanguage,
     example: ContentLanguage.ENGLISH,
+    required: false,
   })
+  @IsOptional()
   @IsEnum(ContentLanguage)
-  language: ContentLanguage;
+  language?: ContentLanguage;
 
   @ApiProperty({
     description:

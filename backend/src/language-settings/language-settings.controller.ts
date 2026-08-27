@@ -5,7 +5,11 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { UserRole, type ApiResponse } from '@cms-ng/shared';
+import {
+  UserRole,
+  type ApiResponse,
+  type LanguageSettings,
+} from '@cms-ng/shared';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/roles.decorator';
@@ -13,7 +17,6 @@ import { UpdateLanguageSettingsDto } from './dto/update-language-settings.dto';
 import { LanguageSettingsService } from './language-settings.service';
 
 @ApiTags('language-settings')
-@ApiBearerAuth('bearer')
 @Controller('language-settings')
 export class LanguageSettingsController {
   constructor(private readonly settings: LanguageSettingsService) {}
@@ -22,14 +25,14 @@ export class LanguageSettingsController {
   @Get()
   @ApiOperation({ summary: 'Get system language defaults' })
   @ApiOkResponse({ description: 'System language defaults in ApiResponse' })
-  async get(): Promise<
-    ApiResponse<Awaited<ReturnType<LanguageSettingsService['get']>>>
-  > {
-    return { success: true, data: await this.settings.get() };
+  async get(): Promise<ApiResponse<LanguageSettings>> {
+    const { displayLanguage, contentLanguage } = await this.settings.get();
+    return { success: true, data: { displayLanguage, contentLanguage } };
   }
 
   @Patch()
   @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Update system language defaults (super admin only)',
   })

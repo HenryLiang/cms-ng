@@ -134,7 +134,7 @@ export interface CreateTaskInput {
   contentConfig: {
     style: string;
     maxLength: number;
-    language: string;
+    language?: string;
     systemPrompt?: string;
     authorSlug?: string;
   };
