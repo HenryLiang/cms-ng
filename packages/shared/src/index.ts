@@ -233,6 +233,61 @@ export interface LanguageSettings {
   contentLanguage: ContentLanguage;
 }
 
+// ===== 系统品牌 =====
+export enum BrandPreset {
+  CMS_NG = 'CMS_NG',
+  SMART_MEDIA_HUB = 'SMART_MEDIA_HUB',
+  CONTENT_ENGINE = 'CONTENT_ENGINE',
+  CUSTOM = 'CUSTOM',
+}
+
+export interface BrandPresetDefinition {
+  key: Exclude<BrandPreset, BrandPreset.CUSTOM>;
+  name: string;
+  logoUrl: string;
+}
+
+export const BRAND_PRESET_CATALOG: readonly BrandPresetDefinition[] = [
+  {
+    key: BrandPreset.CMS_NG,
+    name: '01创作大脑',
+    logoUrl: '/brand-presets/cms-ng.svg',
+  },
+  {
+    key: BrandPreset.SMART_MEDIA_HUB,
+    name: '智媒中枢',
+    logoUrl: '/brand-presets/smart-media-hub.png',
+  },
+  {
+    key: BrandPreset.CONTENT_ENGINE,
+    name: '内容引擎',
+    logoUrl: '/brand-presets/content-engine.png',
+  },
+] as const;
+
+export const DEFAULT_BRAND_PRESET = BRAND_PRESET_CATALOG[0];
+
+export interface BrandSettings {
+  preset: BrandPreset;
+  name: string;
+  logoUrl: string;
+  isCustom: boolean;
+}
+
+export const DEFAULT_BRAND_SETTINGS: BrandSettings = {
+  preset: DEFAULT_BRAND_PRESET.key,
+  name: DEFAULT_BRAND_PRESET.name,
+  logoUrl: DEFAULT_BRAND_PRESET.logoUrl,
+  isCustom: false,
+};
+
+export function getBrandPresetDefinition(
+  preset: BrandPreset,
+): BrandPresetDefinition | undefined {
+  if (preset === BrandPreset.CUSTOM) return undefined;
+  return BRAND_PRESET_CATALOG.find((item) => item.key === preset);
+}
+
 // ===== AI 初稿文体 =====
 export enum ArticleGenre {
   STRAIGHT_NEWS = 'STRAIGHT_NEWS',

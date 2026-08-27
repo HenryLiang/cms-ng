@@ -40,6 +40,7 @@ model User {
   featureSwitchUpdates SystemFeatureSwitch[] @relation("SystemFeatureSwitchUpdater")
   featureSwitchAudits  SystemFeatureAudit[]  @relation("SystemFeatureAuditOperator")
   languageSettingUpdates SystemLanguageSetting[] @relation("SystemLanguageSettingUpdater")
+  brandSettingUpdates SystemBrandSetting[] @relation("SystemBrandSettingUpdater")
 
   @@index([role, isActive])
   @@map("users")
@@ -583,6 +584,23 @@ model SystemLanguageSetting {
 
   @@index([updatedById])
   @@map("system_language_settings")
+}
+
+// 系统全局品牌。内置预设只保存 preset，logoUrl/logoKey 仅供自定义品牌使用。
+model SystemBrandSetting {
+  id          String   @id @db.VarChar(32)
+  preset      String   @default("CMS_NG") @db.VarChar(32)
+  name        String   @db.VarChar(40)
+  logoUrl     String?  @db.VarChar(500)
+  logoKey     String?  @db.VarChar(500)
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User? @relation("SystemBrandSettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+  @@map("system_brand_settings")
 }
 
 // ===== 媒体资源管理 =====

@@ -29,8 +29,9 @@ import {
   type SystemLanguageSettings,
 } from "@/lib/language-settings-api";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "@/i18n/config";
+import BrandSettingsPanel from "@/components/brand-settings-panel";
 
-type SettingsTab = "registration" | "languages" | "features";
+type SettingsTab = "registration" | "branding" | "languages" | "features";
 type PendingChange = { feature: SystemFeatureDetail; enabled: boolean };
 
 // 分组存词典 key(features.groups.*),渲染处经 t() 解析
@@ -278,6 +279,19 @@ export default function SettingsPage() {
         {isSuperAdmin && (
           <button
             type="button"
+            onClick={() => setTab("branding")}
+            className={`border-b-2 px-3 py-2 text-sm font-medium ${
+              tab === "branding"
+                ? "border-brand text-brand"
+                : "border-transparent text-muted"
+            }`}
+          >
+            {t("tabs.branding")}
+          </button>
+        )}
+        {isSuperAdmin && (
+          <button
+            type="button"
             onClick={() => setTab("languages")}
             className={`border-b-2 px-3 py-2 text-sm font-medium ${
               tab === "languages"
@@ -319,6 +333,8 @@ export default function SettingsPage() {
             setMessage(null);
           }}
         />
+      ) : tab === "branding" ? (
+        <BrandSettingsPanel />
       ) : tab === "languages" ? (
         <LanguageDefaultsSettings
           settings={languageSettings}

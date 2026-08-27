@@ -1,4 +1,7 @@
 {
+  "brand": {
+    "tagline": "AI Content Production System"
+  },
   "nav": {
     "workspace": "Workspace",
     "automation": "Automation",

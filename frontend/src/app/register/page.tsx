@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
-import { Mail, Lock, User, BrainCircuit, Lightbulb, Wand2, Zap, UserPlus } from 'lucide-react';
+import { Mail, Lock, User, Lightbulb, Wand2, Zap, UserPlus } from 'lucide-react';
 import { getRegistrationStatus } from '@/lib/auth-api';
 import { Button, Input } from '@/components/ui';
 import LocaleSwitcher from '@/components/locale-switcher';
+import BrandLogo from '@/components/brand-logo';
+import { useBrand } from '@/components/brand-provider';
 
 export default function RegisterPage() {
   const router = useRouter();
   const register = useAuthStore((state) => state.register);
   const t = useTranslations('auth');
+  const { brand } = useBrand();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,10 +78,8 @@ export default function RegisterPage() {
       <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
         <div className="w-full max-w-md space-y-6 rounded-2xl border border-line bg-surface p-8 shadow-card">
           <div className="text-center">
-            <div className="brand-gradient-strong mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl">
-              <BrainCircuit className="h-5 w-5 text-white" />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight">{t('brand.name')}</h1>
+            <BrandLogo className="mx-auto mb-3 h-10 w-10" />
+            <h1 className="text-2xl font-semibold tracking-tight">{brand.name}</h1>
             <p className="mt-2 text-sm text-muted">{t('register.closed.title')}</p>
           </div>
           <div className="rounded-lg border border-line bg-surface-muted px-4 py-3 text-sm text-muted">
@@ -105,10 +106,8 @@ export default function RegisterPage() {
       <div className="glow-panel relative hidden w-1/2 flex-col justify-between overflow-hidden p-12 lg:flex">
         <div className="grid-overlay absolute inset-0 opacity-60" />
         <div className="relative flex items-center gap-3">
-          <div className="brand-gradient-strong flex h-10 w-10 items-center justify-center rounded-xl shadow-lg shadow-blue-500/30">
-            <BrainCircuit className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-lg font-semibold text-white">{t('brand.name')}</span>
+          <BrandLogo className="h-10 w-10" />
+          <span className="text-lg font-semibold text-white">{brand.name}</span>
         </div>
 
         <div className="relative">
@@ -139,16 +138,16 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="relative text-[11px] text-sidebar-muted">{t('brand.copyright')}</div>
+        <div className="relative text-[11px] text-sidebar-muted">
+          {t('brand.copyrightWithName', { name: brand.name })}
+        </div>
       </div>
 
       {/* 右：表单 */}
       <div className="flex w-full flex-col justify-center bg-canvas p-8 lg:w-1/2">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 lg:hidden">
-            <div className="brand-gradient-strong mb-4 flex h-10 w-10 items-center justify-center rounded-xl">
-              <BrainCircuit className="h-5 w-5 text-white" />
-            </div>
+            <BrandLogo className="mb-4 h-10 w-10" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">{t('register.title')}</h1>
           <p className="mt-2 text-sm text-muted">{t('register.subtitle')}</p>

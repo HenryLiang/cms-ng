@@ -3,8 +3,31 @@
   "subtitle": "管理系统级开关",
   "tabs": {
     "registration": "注册设置",
+    "branding": "品牌设置",
     "languages": "语言默认值",
     "features": "功能开放管理"
+  },
+  "branding": {
+    "title": "系统品牌",
+    "description": "选择一套内置品牌，或上传自己的 Logo 并设置系统名称。保存后登录页、注册页、侧栏、浏览器标题与图标会统一更新。",
+    "presetsLabel": "内置品牌",
+    "currentPreset": "当前默认品牌",
+    "custom": {
+      "title": "自定义品牌",
+      "description": "使用组织自己的名称和 Logo",
+      "nameLabel": "系统名称",
+      "namePlaceholder": "例如：我的编辑部",
+      "nameHint": "2–40 个字符",
+      "logoLabel": "上传 Logo",
+      "logoHint": "PNG、JPG 或 WebP，最大 2 MB；建议使用透明方形图片",
+      "selectedFile": "已选择：{name}",
+      "invalidType": "仅支持 PNG、JPG 或 WebP 图片",
+      "tooLarge": "Logo 图片不能超过 2 MB"
+    },
+    "save": "保存品牌设置",
+    "reset": "重置",
+    "saved": "品牌设置已保存并全局生效",
+    "saveFailed": "保存品牌设置失败"
   },
   "states": {
     "open": "开放",

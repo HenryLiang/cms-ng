@@ -52,5 +52,8 @@
   },
   "notifications": {
     "apiError": "通知接口返回异常"
+  },
+  "brandSettings": {
+    "apiError": "品牌设置接口返回异常"
   }
 }

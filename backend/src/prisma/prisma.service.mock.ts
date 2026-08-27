@@ -122,6 +122,10 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
       findUnique: jest.fn(),
       upsert: jest.fn(),
     },
+    systemBrandSetting: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
     $connect: jest.fn(),
     $disconnect: jest.fn(),
     $queryRaw: jest.fn().mockResolvedValue([]),

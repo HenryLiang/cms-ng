@@ -4,6 +4,8 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { BrandProvider } from "@/components/brand-provider";
+import { getServerBrandSettings } from "@/lib/brand-settings-server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,10 +19,14 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  const t = await getTranslations({ locale, namespace: "meta" });
+  const [t, brand] = await Promise.all([
+    getTranslations({ locale, namespace: "meta" }),
+    getServerBrandSettings(),
+  ]);
   return {
-    title: t("title"),
+    title: t("titleWithName", { name: brand.name }),
     description: t("description"),
+    icons: { icon: brand.logoUrl },
   };
 }
 
@@ -29,7 +35,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
+  const [locale, brand] = await Promise.all([
+    getLocale(),
+    getServerBrandSettings(),
+  ]);
   return (
     <html
       lang={locale}
@@ -37,7 +46,9 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-canvas text-foreground">
         <NextIntlClientProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <BrandProvider initialBrand={brand}>
+            <AuthProvider>{children}</AuthProvider>
+          </BrandProvider>
         </NextIntlClientProvider>
       </body>
     </html>

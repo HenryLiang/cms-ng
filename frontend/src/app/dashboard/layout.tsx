@@ -25,7 +25,6 @@ import {
   Search,
   Radar,
   SlidersHorizontal,
-  BrainCircuit,
   type LucideIcon,
 } from 'lucide-react';
 import ToastHost from '@/components/toast-host';
@@ -34,6 +33,8 @@ import { FeatureUnavailable } from '@/components/feature-unavailable';
 import NotificationBell from '@/components/notification-bell';
 import LocaleSwitcher from '@/components/locale-switcher';
 import { useTranslations } from 'next-intl';
+import BrandLogo from '@/components/brand-logo';
+import { useBrand } from '@/components/brand-provider';
 
 interface NavItem {
   href: string;
@@ -103,6 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
   const { user, logout } = useAuthStore();
+  const { brand } = useBrand();
   const isLoading = useAuthStore((state) => state.isLoading);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const pathname = usePathname();
@@ -159,12 +161,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-text">
         {/* Logo */}
         <div className="flex h-14 items-center gap-3 border-b border-sidebar-border px-5">
-          <div className="brand-gradient-strong flex h-8 w-8 items-center justify-center rounded-lg shadow-lg shadow-blue-500/20">
-            <BrainCircuit className="h-4 w-4 text-white" />
-          </div>
+          <BrandLogo className="h-8 w-8" />
           <div className="leading-tight">
-            <div className="text-sm font-semibold text-white">01创作大脑</div>
-            <div className="text-[10px] tracking-wide text-sidebar-muted">CMS · NG</div>
+            <div className="max-w-40 truncate text-sm font-semibold text-white">
+              {brand.name}
+            </div>
+            <div className="text-[10px] tracking-wide text-sidebar-muted">{t('brand.tagline')}</div>
           </div>
         </div>
 

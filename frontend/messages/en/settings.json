@@ -3,8 +3,31 @@
   "subtitle": "Manage system-level switches",
   "tabs": {
     "registration": "Registration",
+    "branding": "Branding",
     "languages": "Language Defaults",
     "features": "Feature Availability"
+  },
+  "branding": {
+    "title": "System brand",
+    "description": "Choose a built-in brand or upload your own logo and system name. Login, registration, navigation, browser title, and favicon update together.",
+    "presetsLabel": "Built-in brands",
+    "currentPreset": "Current default brand",
+    "custom": {
+      "title": "Custom brand",
+      "description": "Use your organization's own name and logo",
+      "nameLabel": "System name",
+      "namePlaceholder": "e.g. My Newsroom",
+      "nameHint": "2–40 characters",
+      "logoLabel": "Upload logo",
+      "logoHint": "PNG, JPG, or WebP, up to 2 MB; a transparent square image works best",
+      "selectedFile": "Selected: {name}",
+      "invalidType": "Only PNG, JPG, or WebP images are supported",
+      "tooLarge": "The logo image must be 2 MB or smaller"
+    },
+    "save": "Save brand settings",
+    "reset": "Reset",
+    "saved": "Brand settings saved and applied globally",
+    "saveFailed": "Failed to save brand settings"
   },
   "states": {
     "open": "Enabled",
