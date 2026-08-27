@@ -16,7 +16,7 @@ import {
 import { AutoPublishSchedulerService } from './auto-publish-scheduler.service';
 import { PipelineService } from './pipeline/pipeline.service';
 import { WordPressService } from '../channels/wordpress.service';
-import { CreateTaskDto } from './dto/create-task.dto';
+import { ContentConfigDto, CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { safeJsonParse } from '../common/json.utils';
 import type { StepTraceEntry } from './pipeline/step.interface';
@@ -37,19 +37,10 @@ export class AutoPublishService {
   // ===== Task CRUD =====
 
   async createTask(userId: string, dto: CreateTaskDto) {
-    let contentConfig = dto.contentConfig;
-    if (!contentConfig.language) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { preferredLanguage: true },
-      });
-      contentConfig = {
-        ...contentConfig,
-        language: await this.languageSettings.resolveContentLanguage(
-          user?.preferredLanguage as ContentLanguage | null | undefined,
-        ),
-      };
-    }
+    const contentConfig = await this.resolveContentConfig(
+      userId,
+      dto.contentConfig,
+    );
 
     const task = await this.prisma.autoPublishTask.create({
       data: {
@@ -131,8 +122,11 @@ export class AutoPublishService {
       data.scheduleConfig = JSON.stringify(dto.scheduleConfig);
     if (dto.topicStrategy)
       data.topicStrategy = JSON.stringify(dto.topicStrategy);
-    if (dto.contentConfig)
-      data.contentConfig = JSON.stringify(dto.contentConfig);
+    if (dto.contentConfig) {
+      data.contentConfig = JSON.stringify(
+        await this.resolveContentConfig(existing.createdBy, dto.contentConfig),
+      );
+    }
     if (dto.filterConfig) data.filterConfig = JSON.stringify(dto.filterConfig);
     if (dto.publishConfig)
       data.publishConfig = JSON.stringify(dto.publishConfig);
@@ -424,6 +418,26 @@ export class AutoPublishService {
   }
 
   // ===== Helpers =====
+
+  private async resolveContentConfig(
+    userId: string,
+    contentConfig: ContentConfigDto,
+  ): Promise<ContentConfigDto & { language: ContentLanguage }> {
+    if (contentConfig.language) {
+      return { ...contentConfig, language: contentConfig.language };
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferredLanguage: true },
+    });
+    return {
+      ...contentConfig,
+      language: await this.languageSettings.resolveContentLanguage(
+        user?.preferredLanguage as ContentLanguage | null | undefined,
+      ),
+    };
+  }
 
   private formatTask(task: AutoPublishTask) {
     return {

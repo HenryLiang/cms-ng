@@ -174,6 +174,48 @@ describe('AutoPublishService', () => {
     });
   });
 
+  describe('update', () => {
+    it('resolves the creator language when replacement content config omits it', async () => {
+      const existing = {
+        id: 'task-1',
+        createdBy: 'creator-1',
+        status: AutoTaskStatus.PAUSED,
+        scheduleConfig: '{}',
+        topicStrategy: '{}',
+        contentConfig: '{}',
+        filterConfig: '{}',
+        publishConfig: '{}',
+        retryConfig: '{}',
+      };
+      const contentConfig = { style: 'analysis', maxLength: 1200 };
+      mockPrisma.autoPublishTask.findUnique.mockResolvedValue(existing);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        preferredLanguage: ContentLanguage.TRADITIONAL_CHINESE_HK,
+      });
+      mockLanguageSettings.resolveContentLanguage.mockResolvedValue(
+        ContentLanguage.TRADITIONAL_CHINESE_HK,
+      );
+      mockPrisma.autoPublishTask.update.mockImplementation(({ data }) =>
+        Promise.resolve({ ...existing, ...data }),
+      );
+
+      await service.update('task-1', { contentConfig });
+
+      expect(mockLanguageSettings.resolveContentLanguage).toHaveBeenCalledWith(
+        ContentLanguage.TRADITIONAL_CHINESE_HK,
+      );
+      expect(mockPrisma.autoPublishTask.update).toHaveBeenCalledWith({
+        where: { id: 'task-1' },
+        data: {
+          contentConfig: JSON.stringify({
+            ...contentConfig,
+            language: ContentLanguage.TRADITIONAL_CHINESE_HK,
+          }),
+        },
+      });
+    });
+  });
+
   describe('manualRun', () => {
     it('should trigger pipeline run for existing task', async () => {
       const mockTask = { id: 'task-1', status: AutoTaskStatus.ACTIVE };
