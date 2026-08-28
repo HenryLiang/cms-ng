@@ -17,7 +17,8 @@
     "billing": "计费管理",
     "accounts": "账号管理",
     "settings": "系统设置",
-    "profile": "个人资料"
+    "profile": "个人资料",
+    "publishCenter": "发布中心"
   },
   "roles": {
     "reporter": "记者",

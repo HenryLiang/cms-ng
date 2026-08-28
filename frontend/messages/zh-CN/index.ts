@@ -13,6 +13,7 @@ import dashboard from './dashboard.json';
 import stories from './stories.json';
 import articles from './articles.json';
 import review from './review.json';
+import publishCenter from './publish-center.json';
 import media from './media.json';
 import video from './video.json';
 import hotTopics from './hot-topics.json';
@@ -33,6 +34,7 @@ const messages = {
   stories,
   articles,
   review,
+  publishCenter,
   media,
   video,
   hotTopics,

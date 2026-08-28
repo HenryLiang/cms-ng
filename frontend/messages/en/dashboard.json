@@ -17,7 +17,8 @@
     "billing": "Billing",
     "accounts": "Accounts",
     "settings": "Settings",
-    "profile": "Profile"
+    "profile": "Profile",
+    "publishCenter": "Publish Center"
   },
   "roles": {
     "reporter": "Reporter",

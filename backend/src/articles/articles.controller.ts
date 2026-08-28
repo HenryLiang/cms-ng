@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArticlesService } from './articles.service';
@@ -31,7 +32,12 @@ import {
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import { SystemFeature, UserRole } from '@cms-ng/shared';
+import {
+  ArticleStatus,
+  SystemFeature,
+  UserRole,
+  isEditorRole,
+} from '@cms-ng/shared';
 import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('articles')
@@ -90,6 +96,17 @@ export class ArticlesController {
     @Body() dto: UpdateArticleDto,
   ) {
     await this.articlesService.verifyAccess(id, user);
+    // 发布状态推进是编辑决策:仅 EDITOR/ADMIN/SUPER_ADMIN 可将稿件置为已发布,
+    // 防止作者(REPORTER)绕过发布中心 UI 直接 PATCH 把内容推上公开站。
+    if (
+      (dto.status === ArticleStatus.PUBLISHED ||
+        dto.status === ArticleStatus.AUTO_PUBLISHED) &&
+      !isEditorRole(user.role)
+    ) {
+      throw new ForbiddenException(
+        'Only editors and admins can publish articles',
+      );
+    }
     return this.articlesService.update(id, dto);
   }
 

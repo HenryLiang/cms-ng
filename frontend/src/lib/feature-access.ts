@@ -21,6 +21,7 @@ const DASHBOARD_FEATURE_PATHS: ReadonlyArray<
   ['/dashboard/media', SystemFeature.MEDIA],
   ['/dashboard/video', SystemFeature.VIDEO],
   ['/dashboard/review', SystemFeature.REVIEW],
+  ['/dashboard/publish-center', SystemFeature.ARTICLES],
   ['/dashboard/stories', SystemFeature.STORIES],
   ['/dashboard/hot-topics', SystemFeature.HOT_TOPICS],
   ['/dashboard/auto-publish', SystemFeature.AUTO_PUBLISH],

@@ -1,0 +1,27 @@
+{
+  "title": "发布中心",
+  "subtitle": "审核已通过、可发布到 newsweb 读者站的稿件清单",
+  "list": {
+    "columns": {
+      "title": "标题",
+      "story": "选题",
+      "author": "作者",
+      "tags": "标签",
+      "updatedAt": "更新时间"
+    },
+    "empty": "暂无待发布稿件",
+    "emptyHint": "稿件审核通过（已审核状态）后会出现在这里",
+    "summary": "共 {total} 篇待发布 · 第 {page}/{totalPages} 页",
+    "goToArticles": "前往稿件管理",
+    "loadError": "加载待发布稿件失败，请重试"
+  },
+  "actions": {
+    "publish": "发布",
+    "publishConfirm": "确定将《{title}》发布到 newsweb 读者站？",
+    "publishing": "发布中…"
+  },
+  "toast": {
+    "published": "已发布：《{title}》",
+    "publishFailed": "发布失败，请稍后重试"
+  }
+}

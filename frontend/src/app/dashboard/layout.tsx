@@ -7,7 +7,7 @@ import { useProtectedRoute } from '@/hooks/use-protected-route';
 import { useRoleGuard } from '@/hooks/use-role-guard';
 import { useAuthStore } from '@/store/auth-store';
 import { getVideoCapability } from '@/lib/video-api';
-import { SystemFeature, UserRole } from '@cms-ng/shared';
+import { SystemFeature, UserRole, hasRequiredRole } from '@cms-ng/shared';
 import { useSystemFeaturesStore } from '@/store/system-features-store';
 import { canUseFeature, featureForPath } from '@/lib/feature-access';
 import {
@@ -16,6 +16,7 @@ import {
   FileText,
   Lightbulb,
   ClipboardCheck,
+  Send,
   Zap,
   Wallet,
   Users,
@@ -42,6 +43,8 @@ interface NavItem {
   labelKey: string;
   icon: LucideIcon;
   feature: SystemFeature;
+  /** 额外角色限制：与 feature 角色取交集；缺省沿用 feature 角色。 */
+  roles?: UserRole[];
   badge?: number;
 }
 
@@ -55,6 +58,8 @@ const NAV_GROUPS: { labelKey: string; items: NavItem[] }[] = [
       // 文生视频(PRD: docs/PRD-text-to-video.md);能力关闭时由 videoEnabled 过滤隐藏
       { href: '/dashboard/video', labelKey: 'nav.video', icon: Clapperboard, feature: SystemFeature.VIDEO },
       { href: '/dashboard/review', labelKey: 'nav.review', icon: ClipboardCheck, feature: SystemFeature.REVIEW },
+      // 发布到公开站是编辑/管理员职责(与 use-role-guard.ts 的 ROLE_ROUTE_MAP 保持一致),避免 REPORTER 看到点了又被弹回
+      { href: '/dashboard/publish-center', labelKey: 'nav.publishCenter', icon: Send, feature: SystemFeature.ARTICLES, roles: [UserRole.EDITOR, UserRole.ADMIN] },
       { href: '/dashboard/stories', labelKey: 'nav.stories', icon: Lightbulb, feature: SystemFeature.STORIES },
       { href: '/dashboard/hot-topics', labelKey: 'nav.hotTopics', icon: Radar, feature: SystemFeature.HOT_TOPICS },
     ],
@@ -133,6 +138,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     items: group.items.filter(
       (item) =>
         canUseFeature(item.feature, role, statuses) &&
+        (!item.roles || hasRequiredRole(role, item.roles)) &&
         (item.href !== '/dashboard/video' || videoEnabled),
     ),
   })).filter((group) => group.items.length > 0);

@@ -1416,10 +1416,17 @@ describe('ArticlesService', () => {
       method: 'update' | 'submitReview' = 'update',
     ) => {
       if (method === 'update') {
-        prisma.article.findUnique.mockResolvedValue(
-          mockArticle({ status: from }),
-        );
-        prisma.article.update.mockResolvedValue(mockArticle({ status: to }));
+        // 首次进入 PUBLISHED/AUTO_PUBLISHED 走 CAS(updateMany)路径:
+        // 抢占成功(count>0)后再 findUnique 读取最新状态。
+        const isFirstPublish = to === 'PUBLISHED' || to === 'AUTO_PUBLISHED';
+        prisma.article.findUnique
+          .mockResolvedValueOnce(mockArticle({ status: from }))
+          .mockResolvedValue(mockArticle({ status: to }));
+        if (isFirstPublish) {
+          prisma.article.updateMany.mockResolvedValue({ count: 1 });
+        } else {
+          prisma.article.update.mockResolvedValue(mockArticle({ status: to }));
+        }
         const result = await service.update('article-id', {
           status: to,
         } as never);
