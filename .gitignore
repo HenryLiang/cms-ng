@@ -118,3 +118,6 @@ soft-copyright/
 
 # WorkBuddy local workspace data
 .workbuddy/
+
+# Docs: kept local-only (untracked from repo; files remain on disk)
+docs/
