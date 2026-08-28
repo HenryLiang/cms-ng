@@ -112,3 +112,9 @@ plans/
 # Local codebase knowledge graph (rebuilt per workspace)
 .codebase-memory/
 .ua/
+
+# Local soft-copyright data (generated per workspace)
+soft-copyright/
+
+# WorkBuddy local workspace data
+.workbuddy/
