@@ -59,6 +59,8 @@ export interface ArticleSearchQuery {
   role: string;
   search: string;
   storyId?: string;
+  /** 状态过滤(如 APPROVED/PUBLISHED)，同样在 ES 分页前应用，避免 total 虚高与空页。 */
+  status?: string;
   page: number;
   pageSize: number;
 }

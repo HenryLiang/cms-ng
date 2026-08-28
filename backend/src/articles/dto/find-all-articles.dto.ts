@@ -59,4 +59,13 @@ export class FindAllArticlesDto {
   @IsOptional()
   @IsString()
   storyId?: string;
+
+  @ApiProperty({
+    description: 'Filter results by article status (e.g. APPROVED, PUBLISHED)',
+    example: 'APPROVED',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

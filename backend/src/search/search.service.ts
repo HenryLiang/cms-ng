@@ -397,6 +397,8 @@ export class SearchService implements OnModuleInit {
     ];
     const filter: estypes.QueryDslQueryContainer[] = [];
     if (params.storyId) filter.push({ term: { storyId: params.storyId } });
+    // 状态过滤与权限条件同级:先于 from/size 分页命中,保证 total 与分页窗口准确。
+    if (params.status) filter.push({ term: { status: params.status } });
 
     if ((params.role as UserRole) === UserRole.REPORTER) {
       filter.push({ term: { authorId: params.userId } });

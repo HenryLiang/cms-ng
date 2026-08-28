@@ -1,7 +1,19 @@
 import { api } from './api';
 import { ContentLanguage } from '@cms-ng/shared';
 
-export type ArticleStatus = 'DRAFT' | 'WRITING' | 'AI_OPTIMIZING' | 'PENDING_REVIEW' | 'IN_REVIEW' | 'REVISION' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+// 与 @cms-ng/shared 的 ArticleStatus 枚举保持一致，含自动发布与管道失败态。
+export type ArticleStatus =
+  | 'DRAFT'
+  | 'WRITING'
+  | 'AI_OPTIMIZING'
+  | 'PENDING_REVIEW'
+  | 'IN_REVIEW'
+  | 'REVISION'
+  | 'APPROVED'
+  | 'PUBLISHED'
+  | 'ARCHIVED'
+  | 'PIPELINE_FAILED'
+  | 'AUTO_PUBLISHED';
 
 export interface Article {
   id: string;
@@ -56,6 +68,8 @@ export interface PaginatedResponse<T> {
 export interface GetArticlesParams {
   storyId?: string;
   search?: string;
+  /** 按状态过滤（如 APPROVED/PUBLISHED），发布中心等场景使用。 */
+  status?: string;
   page?: number;
   pageSize?: number;
 }
@@ -84,6 +98,15 @@ export async function updateArticle(id: string, data: UpdateArticleInput): Promi
 
 export async function deleteArticle(id: string): Promise<void> {
   await api.delete(`/articles/${id}`);
+}
+
+/**
+ * 将稿件状态推进到已发布（PUBLISHED）。
+ * 后端状态机 APPROVED → PUBLISHED 合法，首次发布自动写入 publishedAt，
+ * 并触发 article.updated 事件 → newsweb 即时刷新。
+ */
+export async function publishArticle(id: string): Promise<Article> {
+  return updateArticle(id, { status: 'PUBLISHED' });
 }
 
 // ===== Version History =====

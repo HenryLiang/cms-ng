@@ -25,6 +25,8 @@ import { SystemFeaturesModule } from './system-features/system-features.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LanguageSettingsModule } from './language-settings/language-settings.module';
 import { BrandSettingsModule } from './brand-settings/brand-settings.module';
+import { PublicModule } from './public/public.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -82,6 +84,8 @@ import { BrandSettingsModule } from './brand-settings/brand-settings.module';
     AuthorStyleModule,
     MediaModule,
     VideoModule,
+    PublicModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [

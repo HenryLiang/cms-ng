@@ -1,0 +1,27 @@
+{
+  "title": "Publish Center",
+  "subtitle": "Approved drafts ready to publish to the newsweb reader site",
+  "list": {
+    "columns": {
+      "title": "Title",
+      "story": "Story",
+      "author": "Author",
+      "tags": "Tags",
+      "updatedAt": "Updated"
+    },
+    "empty": "No drafts awaiting publication",
+    "emptyHint": "Approved articles (status: Approved) will appear here",
+    "summary": "{total} awaiting publication · Page {page}/{totalPages}",
+    "goToArticles": "Go to Articles",
+    "loadError": "Failed to load drafts awaiting publication. Please retry"
+  },
+  "actions": {
+    "publish": "Publish",
+    "publishConfirm": "Publish \"{title}\" to the newsweb reader site?",
+    "publishing": "Publishing…"
+  },
+  "toast": {
+    "published": "Published: \"{title}\"",
+    "publishFailed": "Publish failed. Please try again later"
+  }
+}

@@ -215,6 +215,12 @@ export class ArticlesService {
       where = { ...where, storyId };
     }
 
+    // Optional status filter (发布中心列出已审核 APPROVED 待发布稿件等场景)。
+    // 与 search 分支的 AND 合并互不冲突（ES 回表与 MySQL LIKE 均会叠加此条件）。
+    if (query.status) {
+      where = { ...where, status: query.status as ArticleStatus };
+    }
+
     const search = query.search?.trim();
     if (search) {
       try {
@@ -223,6 +229,7 @@ export class ArticlesService {
           role: user.role,
           search,
           storyId,
+          status: query.status,
           page,
           pageSize,
         });
@@ -334,28 +341,61 @@ export class ArticlesService {
       this.validateStateTransition(existing.status, dto.status);
     }
 
+    // 首次进入已发布状态时写入 publishedAt（newsweb 等下游按发布时间排序/展示）。
+    // 已发布的稿件再次更新不覆盖原发布时间。
+    const transitioningToPublished =
+      (dto.status === ArticleStatus.PUBLISHED ||
+        dto.status === ArticleStatus.AUTO_PUBLISHED) &&
+      (existing.status as ArticleStatus) !== dto.status &&
+      !existing.publishedAt;
+
     const newVersion = existing.version + 1;
 
-    const article = await this.prisma.article.update({
-      where: { id },
-      data: serializeArticleInput({
-        title: dto.title,
-        subtitle: dto.subtitle,
-        content: dto.content,
-        excerpt: dto.excerpt,
-        status: dto.status,
-        editorId: dto.editorId,
-        coverImage: dto.coverImage,
-        tags: dto.tags,
-        contentLanguage: dto.contentLanguage,
-        version: newVersion,
-      }),
-      include: {
-        author: { select: { id: true, name: true, email: true } },
-        editor: { select: { id: true, name: true, email: true } },
-        story: { select: { id: true, title: true } },
-      },
+    const include = {
+      author: { select: { id: true, name: true, email: true } },
+      editor: { select: { id: true, name: true, email: true } },
+      story: { select: { id: true, title: true } },
+    };
+
+    const input = serializeArticleInput({
+      title: dto.title,
+      subtitle: dto.subtitle,
+      content: dto.content,
+      excerpt: dto.excerpt,
+      status: dto.status,
+      editorId: dto.editorId,
+      coverImage: dto.coverImage,
+      tags: dto.tags,
+      contentLanguage: dto.contentLanguage,
+      version: newVersion,
+      publishedAt: transitioningToPublished ? new Date() : undefined,
     });
+
+    // 首次发布是原子比较交换:并发双击/双端同时发布时,只有 status 仍为原状态
+    // 的请求能推进;后到者读取最新状态直接返回,不重复 bump 版本、不重复触发
+    // article.updated 事件(避免 newsweb 收到重复刷新通知)。
+    let article: Prisma.ArticleGetPayload<{ include: typeof include }> | null;
+    if (transitioningToPublished) {
+      const cas = await this.prisma.article.updateMany({
+        where: { id, status: existing.status },
+        data: input,
+      });
+      article =
+        cas.count > 0
+          ? await this.prisma.article.findUnique({ where: { id }, include })
+          : null;
+    } else {
+      article = await this.prisma.article.update({
+        where: { id },
+        data: input,
+        include,
+      });
+    }
+
+    if (!article) {
+      // 并发下另一请求已抢先发布,直接返回最新状态,不再重复发事件
+      return this.findOne(id);
+    }
 
     if (dto.content || dto.title) {
       await this.prisma.articleVersion.create({
