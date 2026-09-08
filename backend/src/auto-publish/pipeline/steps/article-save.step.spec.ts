@@ -11,6 +11,7 @@ describe('ArticleSaveStep', () => {
         create: jest.fn(),
       },
       article: { create: jest.fn() },
+      articleStatusAudit: { create: jest.fn() },
       articleVersion: { create: jest.fn() },
       autoPublishArticle: { update: jest.fn() },
     } as unknown as jest.Mocked<PrismaService>;
@@ -54,5 +55,14 @@ describe('ArticleSaveStep', () => {
         }),
       }),
     );
+    expect(prisma.articleStatusAudit.create).toHaveBeenCalledWith({
+      data: {
+        articleId: 'article-1',
+        fromStatus: 'DRAFT',
+        toStatus: 'AUTO_PUBLISHED',
+        operatorId: 'user-1',
+        reason: '自动发布流程',
+      },
+    });
   });
 });

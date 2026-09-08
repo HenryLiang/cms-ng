@@ -545,6 +545,20 @@ describe('SearchService', () => {
       });
     });
 
+    it('filters article searches by multiple publication statuses', async () => {
+      mockClient.search.mockResolvedValue(hitsResp([], 0));
+
+      await service.searchArticles({
+        ...baseArticleQuery,
+        statuses: ['PUBLISHED', 'AUTO_PUBLISHED'],
+      });
+
+      const [body] = mockClient.search.mock.calls[0];
+      expect(body.query.bool.filter).toContainEqual({
+        terms: { status: ['PUBLISHED', 'AUTO_PUBLISHED'] },
+      });
+    });
+
     it('deletes article projections idempotently', async () => {
       await service.deleteArticle('article-1');
       expect(mockClient.delete).toHaveBeenCalledWith(

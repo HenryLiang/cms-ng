@@ -39,6 +39,7 @@ model User {
   videoGenerationJobs VideoGenerationJob[]
   featureSwitchUpdates SystemFeatureSwitch[] @relation("SystemFeatureSwitchUpdater")
   featureSwitchAudits  SystemFeatureAudit[]  @relation("SystemFeatureAuditOperator")
+  articleStatusAudits  ArticleStatusAudit[]  @relation("ArticleStatusAuditOperator")
   languageSettingUpdates SystemLanguageSetting[] @relation("SystemLanguageSettingUpdater")
   brandSettingUpdates SystemBrandSetting[] @relation("SystemBrandSettingUpdater")
 
@@ -97,6 +98,7 @@ model Article {
   aiOperations        AIOperation[]
   platformPublishes   PlatformPublish[]
   billingTransactions BillingTransaction[]
+  statusAudits        ArticleStatusAudit[]
 
   @@map("articles")
 }
@@ -137,6 +139,23 @@ model ArticleVersion {
   article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@map("article_versions")
+}
+
+model ArticleStatusAudit {
+  id         String        @id @default(uuid())
+  articleId  String
+  fromStatus ArticleStatus
+  toStatus   ArticleStatus
+  operatorId String?
+  reason     String?       @db.Text
+  createdAt  DateTime      @default(now())
+
+  article  Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  operator User?   @relation("ArticleStatusAuditOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([articleId, createdAt])
+  @@index([operatorId])
+  @@map("article_status_audits")
 }
 
 model AIOperation {

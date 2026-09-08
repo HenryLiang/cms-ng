@@ -43,6 +43,7 @@ import {
 } from '@cms-ng/shared';
 import { getEditors } from '@/lib/users-api';
 import { uploadMedia } from '@/lib/media-api';
+import { useAuthStore } from '@/store/auth-store';
 import RichTextEditor, { type RichTextEditorRef } from '@/components/rich-text-editor';
 import { MediaPicker } from '@/components/media-picker';
 import FactCheckPanel from '@/components/fact-check-panel';
@@ -84,7 +85,9 @@ export default function ArticleEditorPage() {
   const articleId = params.id as string;
   const t = useTranslations('articles');
   const tCommon = useTranslations('common');
+  const tDashboard = useTranslations('dashboard');
   const locale = useLocale();
+  const canManagePublication = useAuthStore((state) => state.isEditor());
 
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
@@ -650,6 +653,9 @@ export default function ArticleEditorPage() {
   }
 
   const wordCount = content.replace(/<[^>]+>/g, '').trim().length;
+  const publicationManaged = ['PUBLISHED', 'AUTO_PUBLISHED', 'ARCHIVED'].includes(
+    article.status,
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -739,17 +745,33 @@ export default function ArticleEditorPage() {
           <Button variant="secondary" size="sm" loading={saving} onClick={() => handleSave()}>
             {tCommon('actions.save')}
           </Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleOpenSubmitModal}>
-            <Send className="h-4 w-4" />
-            {t('editor.submitForReview')}
-          </Button>
-          <button
-            onClick={handleDelete}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50"
-            title={t('editor.deleteTooltip')}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {publicationManaged && canManagePublication ? (
+            <Link
+              href="/dashboard/publish-center"
+              className={buttonClasses({ variant: 'primary', size: 'sm' })}
+            >
+              {tDashboard('nav.publishCenter')}
+            </Link>
+          ) : !publicationManaged ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={saving}
+                onClick={handleOpenSubmitModal}
+              >
+                <Send className="h-4 w-4" />
+                {t('editor.submitForReview')}
+              </Button>
+              <button
+                onClick={handleDelete}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50"
+                title={t('editor.deleteTooltip')}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -1252,13 +1274,15 @@ export default function ArticleEditorPage() {
                   <Clapperboard className="h-4 w-4" />
                   {t('quickActions.videoGenerate')}
                 </Link>
-                <button
-                  onClick={() => handleSave('DRAFT')}
-                  className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground hover:bg-surface-muted"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  {t('quickActions.revertToDraft')}
-                </button>
+                {!publicationManaged && (
+                  <button
+                    onClick={() => handleSave('DRAFT')}
+                    className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-foreground hover:bg-surface-muted"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {t('quickActions.revertToDraft')}
+                  </button>
+                )}
               </div>
             </div>
 

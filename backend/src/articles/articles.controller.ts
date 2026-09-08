@@ -7,13 +7,17 @@ import {
   Body,
   Param,
   Query,
-  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArticlesService } from './articles.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { FindAllArticlesDto } from './dto/find-all-articles.dto';
+import {
+  ArchiveArticleDto,
+  RepublishArticleDto,
+} from './dto/article-publication-action.dto';
 import {
   RewriteTextDto,
   ExpandTextDto,
@@ -32,12 +36,7 @@ import {
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import {
-  ArticleStatus,
-  SystemFeature,
-  UserRole,
-  isEditorRole,
-} from '@cms-ng/shared';
+import { ArticleStatus, SystemFeature, UserRole } from '@cms-ng/shared';
 import { RequiresSystemFeature } from '../system-features/system-feature.decorator';
 
 @ApiTags('articles')
@@ -77,6 +76,52 @@ export class ArticlesController {
     return this.articlesService.getReviewQueue(editorId);
   }
 
+  @Get(':id/status-history')
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get the publication status audit trail' })
+  async getStatusHistory(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.getStatusHistory(id);
+  }
+
+  @Post(':id/publish')
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Publish an approved article to newsweb' })
+  async publish(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+  ) {
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.publish(id, user.userId);
+  }
+
+  @Post(':id/archive')
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Take a published article offline' })
+  async archive(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+    @Body() dto: ArchiveArticleDto,
+  ) {
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.archive(id, user.userId, dto.reason);
+  }
+
+  @Post(':id/republish')
+  @Roles(UserRole.EDITOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Put an archived article back online' })
+  async republish(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: string },
+    @Body() dto: RepublishArticleDto,
+  ) {
+    await this.articlesService.verifyAccess(id, user);
+    return this.articlesService.republish(id, user.userId, dto.reason);
+  }
+
   @Get(':id')
   @RequiresSystemFeature(SystemFeature.ARTICLES, SystemFeature.REVIEW)
   @ApiOperation({ summary: 'Get an article by id (with access check)' })
@@ -96,15 +141,16 @@ export class ArticlesController {
     @Body() dto: UpdateArticleDto,
   ) {
     await this.articlesService.verifyAccess(id, user);
-    // 发布状态推进是编辑决策:仅 EDITOR/ADMIN/SUPER_ADMIN 可将稿件置为已发布,
-    // 防止作者(REPORTER)绕过发布中心 UI 直接 PATCH 把内容推上公开站。
     if (
-      (dto.status === ArticleStatus.PUBLISHED ||
-        dto.status === ArticleStatus.AUTO_PUBLISHED) &&
-      !isEditorRole(user.role)
+      dto.status &&
+      [
+        ArticleStatus.PUBLISHED,
+        ArticleStatus.AUTO_PUBLISHED,
+        ArticleStatus.ARCHIVED,
+      ].includes(dto.status)
     ) {
-      throw new ForbiddenException(
-        'Only editors and admins can publish articles',
+      throw new BadRequestException(
+        '请使用发布中心执行发布、下架或重新上架操作',
       );
     }
     return this.articlesService.update(id, dto);
@@ -117,7 +163,7 @@ export class ArticlesController {
     @CurrentUser() user: { userId: string; role: string },
   ) {
     await this.articlesService.verifyAccess(id, user);
-    return this.articlesService.remove(id);
+    return this.articlesService.remove(id, user.role);
   }
 
   @Get(':id/versions')

@@ -120,7 +120,7 @@
     "noTopic": "未选题",
     "failedAt": "失败于 {step}: {message}",
     "withdraw": "撤回",
-    "withdrawConfirm": "确定从 WordPress 撤回这篇文章？",
+    "withdrawConfirm": "确定撤回这篇文章？操作会删除 WordPress 内容，并将关联的 newsweb 文章下架。",
     "retryTriggered": "重试已触发",
     "collapseTrace": "收起执行详情",
     "expandTrace": "查看执行详情",

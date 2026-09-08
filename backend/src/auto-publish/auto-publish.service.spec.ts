@@ -6,6 +6,7 @@ import { PipelineService } from './pipeline/pipeline.service';
 import { WordPressService } from '../channels/wordpress.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LanguageSettingsService } from '../language-settings/language-settings.service';
+import { ArticlesService } from '../articles/articles.service';
 import {
   AutoTaskStatus,
   ArticleRunStatus,
@@ -28,6 +29,7 @@ describe('AutoPublishService', () => {
   let _scheduler: AutoPublishSchedulerService;
   let _pipeline: PipelineService;
   let _wordpress: WordPressService;
+  let _articles: ArticlesService;
 
   const mockPrisma = {
     user: {
@@ -81,6 +83,10 @@ describe('AutoPublishService', () => {
       .mockResolvedValue(ContentLanguage.SIMPLIFIED_CHINESE),
   };
 
+  const mockArticles = {
+    archive: jest.fn().mockResolvedValue({ status: 'ARCHIVED' }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -90,6 +96,7 @@ describe('AutoPublishService', () => {
         { provide: PipelineService, useValue: mockPipeline },
         { provide: WordPressService, useValue: mockWordPress },
         { provide: LanguageSettingsService, useValue: mockLanguageSettings },
+        { provide: ArticlesService, useValue: mockArticles },
       ],
     }).compile();
 
@@ -100,6 +107,7 @@ describe('AutoPublishService', () => {
     );
     _pipeline = module.get<PipelineService>(PipelineService);
     _wordpress = module.get<WordPressService>(WordPressService);
+    _articles = module.get<ArticlesService>(ArticlesService);
 
     jest.clearAllMocks();
   });
@@ -266,6 +274,7 @@ describe('AutoPublishService', () => {
         id: 'article-1',
         status: ArticleRunStatus.PUBLISHED,
         platformPublishId: 'publish-1',
+        articleId: 'cms-article-1',
       };
       const mockPublish = {
         id: 'publish-1',
@@ -278,7 +287,7 @@ describe('AutoPublishService', () => {
       mockPrisma.platformPublish.update.mockResolvedValue({});
       mockPrisma.autoPublishArticle.update.mockResolvedValue({});
 
-      const result = await service.withdrawArticle('article-1');
+      const result = await service.withdrawArticle('article-1', 'editor-id');
 
       expect(mockWordPress.deletePost).toHaveBeenCalledWith(
         'https://example.com/?p=123',
@@ -288,6 +297,11 @@ describe('AutoPublishService', () => {
         where: { id: 'publish-1' },
         data: { status: PublishStatus.FAILED, notes: 'Withdrawn by user' },
       });
+      expect(mockArticles.archive).toHaveBeenCalledWith(
+        'cms-article-1',
+        'editor-id',
+        '自动发布任务撤回',
+      );
       expect(result).toEqual({ withdrawn: true });
     });
 
@@ -300,17 +314,17 @@ describe('AutoPublishService', () => {
 
       mockPrisma.autoPublishArticle.findUnique.mockResolvedValue(mockRecord);
 
-      await expect(service.withdrawArticle('article-1')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.withdrawArticle('article-1', 'editor-id'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException for non-existent article', async () => {
       mockPrisma.autoPublishArticle.findUnique.mockResolvedValue(null);
 
-      await expect(service.withdrawArticle('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.withdrawArticle('non-existent', 'editor-id'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

@@ -61,8 +61,9 @@ export class FindAllArticlesDto {
   storyId?: string;
 
   @ApiProperty({
-    description: 'Filter results by article status (e.g. APPROVED, PUBLISHED)',
-    example: 'APPROVED',
+    description:
+      'Filter results by one or more comma-separated article statuses',
+    example: 'PUBLISHED,AUTO_PUBLISHED',
     required: false,
   })
   @IsOptional()

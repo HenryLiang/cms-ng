@@ -3,7 +3,7 @@ jest.mock('https-proxy-agent', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ArticlesController } from './articles.controller';
 import { ArticlesService } from './articles.service';
 
@@ -14,6 +14,10 @@ describe('ArticlesController', () => {
     findAll: jest.Mock;
     findOne: jest.Mock;
     update: jest.Mock;
+    publish: jest.Mock;
+    archive: jest.Mock;
+    republish: jest.Mock;
+    getStatusHistory: jest.Mock;
     remove: jest.Mock;
     verifyAccess: jest.Mock;
     getReviewQueue: jest.Mock;
@@ -39,6 +43,10 @@ describe('ArticlesController', () => {
       findAll: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
+      publish: jest.fn(),
+      archive: jest.fn(),
+      republish: jest.fn(),
+      getStatusHistory: jest.fn(),
       remove: jest.fn(),
       verifyAccess: jest.fn(),
       getReviewQueue: jest.fn(),
@@ -196,6 +204,86 @@ describe('ArticlesController', () => {
       });
       expect(result.title).toBe('Updated');
     });
+
+    it.each(['PUBLISHED', 'AUTO_PUBLISHED', 'ARCHIVED'])(
+      'rejects direct %s transitions in favor of audited publication endpoints',
+      async (status) => {
+        articlesService.verifyAccess.mockResolvedValue(undefined);
+
+        await expect(
+          controller.update(mockAdmin, 'article-id', { status } as never),
+        ).rejects.toThrow(BadRequestException);
+        expect(articlesService.update).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('publication management', () => {
+    it('publishes through the audited service with the operator identity', async () => {
+      articlesService.publish.mockResolvedValue(
+        mockArticle({ status: 'PUBLISHED' }),
+      );
+
+      const result = await controller.publish('article-id', mockAdmin);
+
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockAdmin,
+      );
+      expect(articlesService.publish).toHaveBeenCalledWith(
+        'article-id',
+        'admin-id',
+      );
+      expect(result.status).toBe('PUBLISHED');
+    });
+
+    it('archives through the audited service with a required reason', async () => {
+      articlesService.archive.mockResolvedValue(
+        mockArticle({ status: 'ARCHIVED' }),
+      );
+
+      const result = await controller.archive('article-id', mockAdmin, {
+        reason: '需要更正',
+      });
+
+      expect(articlesService.archive).toHaveBeenCalledWith(
+        'article-id',
+        'admin-id',
+        '需要更正',
+      );
+      expect(result.status).toBe('ARCHIVED');
+    });
+
+    it('republishes through the audited service', async () => {
+      articlesService.republish.mockResolvedValue(
+        mockArticle({ status: 'PUBLISHED' }),
+      );
+
+      await controller.republish('article-id', mockAdmin, {
+        reason: '更正完成',
+      });
+
+      expect(articlesService.republish).toHaveBeenCalledWith(
+        'article-id',
+        'admin-id',
+        '更正完成',
+      );
+    });
+
+    it('returns the status history after verifying article access', async () => {
+      articlesService.getStatusHistory.mockResolvedValue([{ id: 'audit-id' }]);
+
+      const result = await controller.getStatusHistory('article-id', mockAdmin);
+
+      expect(articlesService.verifyAccess).toHaveBeenCalledWith(
+        'article-id',
+        mockAdmin,
+      );
+      expect(articlesService.getStatusHistory).toHaveBeenCalledWith(
+        'article-id',
+      );
+      expect(result).toHaveLength(1);
+    });
   });
 
   describe('remove', () => {
@@ -209,7 +297,10 @@ describe('ArticlesController', () => {
         'article-id',
         mockUser,
       );
-      expect(articlesService.remove).toHaveBeenCalledWith('article-id');
+      expect(articlesService.remove).toHaveBeenCalledWith(
+        'article-id',
+        'REPORTER',
+      );
       expect(result.success).toBe(true);
     });
   });

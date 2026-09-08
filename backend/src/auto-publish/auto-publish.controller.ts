@@ -110,8 +110,11 @@ export class AutoPublishController {
   @Post('articles/:id/withdraw')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Withdraw a single auto-publish article' })
-  async withdrawArticle(@Param('id') id: string) {
-    return this.service.withdrawArticle(id);
+  async withdrawArticle(
+    @Param('id') id: string,
+    @Request() req: { user: { userId: string } },
+  ) {
+    return this.service.withdrawArticle(id, req.user.userId);
   }
 
   @Post('articles/:id/retry')

@@ -1,27 +1,71 @@
 {
   "title": "Publish Center",
-  "subtitle": "Approved drafts ready to publish to the newsweb reader site",
+  "subtitle": "Manage articles that are ready, live, or archived on newsweb",
+  "tabs": {
+    "ready": "Ready",
+    "live": "Published",
+    "archived": "Archived"
+  },
   "list": {
     "columns": {
       "title": "Title",
       "story": "Story",
       "author": "Author",
       "tags": "Tags",
-      "updatedAt": "Updated"
+      "updatedAt": "Updated",
+      "actions": "Actions"
     },
-    "empty": "No drafts awaiting publication",
-    "emptyHint": "Approved articles (status: Approved) will appear here",
-    "summary": "{total} awaiting publication · Page {page}/{totalPages}",
+    "empty": {
+      "ready": "No drafts awaiting publication",
+      "live": "No published articles",
+      "archived": "No archived articles"
+    },
+    "emptyHint": {
+      "ready": "Approved articles will appear here",
+      "live": "Articles published to newsweb will appear here",
+      "archived": "Articles removed from newsweb stay here and can be republished"
+    },
+    "summary": "{total} articles · Page {page}/{totalPages}",
     "goToArticles": "Go to Articles",
-    "loadError": "Failed to load drafts awaiting publication. Please retry"
+    "loadError": "Failed to load publication data. Please retry"
   },
   "actions": {
     "publish": "Publish",
     "publishConfirm": "Publish \"{title}\" to the newsweb reader site?",
-    "publishing": "Publishing…"
+    "publishing": "Publishing…",
+    "archive": "Archive",
+    "republish": "Republish",
+    "history": "Publication history"
+  },
+  "dialogs": {
+    "archive": {
+      "title": "Archive article",
+      "description": "After \"{title}\" is archived, it will no longer be available on the reader site.",
+      "reasonLabel": "Archive reason",
+      "reasonPlaceholder": "Enter a reason (at least 2 characters)",
+      "confirm": "Confirm archive"
+    },
+    "republish": {
+      "title": "Republish article",
+      "description": "\"{title}\" will return to its previous published status and reappear on the reader site.",
+      "reasonLabel": "Republish note (optional)",
+      "reasonPlaceholder": "Optionally explain why this article is being republished",
+      "confirm": "Confirm republish"
+    }
+  },
+  "history": {
+    "title": "Publication history",
+    "empty": "No publication history",
+    "system": "System",
+    "noReason": "No note provided"
   },
   "toast": {
     "published": "Published: \"{title}\"",
-    "publishFailed": "Publish failed. Please try again later"
+    "publishFailed": "Publish failed. Please try again later",
+    "archived": "Article archived",
+    "archiveFailed": "Archive failed. Please try again later",
+    "republished": "Article republished",
+    "republishFailed": "Republish failed. Please try again later",
+    "historyFailed": "Failed to load publication history. Please try again later"
   }
 }

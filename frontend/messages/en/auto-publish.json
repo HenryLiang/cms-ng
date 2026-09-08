@@ -120,7 +120,7 @@
     "noTopic": "No topic selected",
     "failedAt": "Failed at {step}: {message}",
     "withdraw": "Withdraw",
-    "withdrawConfirm": "Withdraw this article from WordPress?",
+    "withdrawConfirm": "Withdraw this article? This removes it from WordPress and archives the linked newsweb article.",
     "retryTriggered": "Retry triggered",
     "collapseTrace": "Collapse execution details",
     "expandTrace": "View execution details",

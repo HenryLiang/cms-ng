@@ -37,6 +37,16 @@ export interface Article {
   publishedAt?: string;
 }
 
+export interface ArticleStatusAudit {
+  id: string;
+  articleId: string;
+  fromStatus: ArticleStatus;
+  toStatus: ArticleStatus;
+  reason?: string | null;
+  createdAt: string;
+  operator?: { id: string; name: string; email: string } | null;
+}
+
 export interface CreateArticleInput {
   storyId: string;
   title: string;
@@ -102,11 +112,34 @@ export async function deleteArticle(id: string): Promise<void> {
 
 /**
  * 将稿件状态推进到已发布（PUBLISHED）。
- * 后端状态机 APPROVED → PUBLISHED 合法，首次发布自动写入 publishedAt，
- * 并触发 article.updated 事件 → newsweb 即时刷新。
+ * 专用端点校验编辑权限与 APPROVED 前置状态，记录审计并刷新 newsweb。
  */
 export async function publishArticle(id: string): Promise<Article> {
-  return updateArticle(id, { status: 'PUBLISHED' });
+  const res = await api.post(`/articles/${id}/publish`);
+  return res.data;
+}
+
+export async function archiveArticle(
+  id: string,
+  reason: string,
+): Promise<Article> {
+  const res = await api.post(`/articles/${id}/archive`, { reason });
+  return res.data;
+}
+
+export async function republishArticle(
+  id: string,
+  reason?: string,
+): Promise<Article> {
+  const res = await api.post(`/articles/${id}/republish`, { reason });
+  return res.data;
+}
+
+export async function getArticleStatusHistory(
+  id: string,
+): Promise<ArticleStatusAudit[]> {
+  const res = await api.get(`/articles/${id}/status-history`);
+  return res.data;
 }
 
 // ===== Version History =====

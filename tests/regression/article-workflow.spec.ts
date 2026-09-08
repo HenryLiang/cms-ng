@@ -2,9 +2,8 @@
  * 01 创作大脑 (CMS-NG) — Article Workflow + safeJsonParse 回归测试
  * 覆盖：docs/qa/full-regression-v1.md §8 (TC-ART-*) + §13 (TC-SJP-*) + 部分 §6 (TC-REV-*)
  *
- * 关键发现（实施前侦察）：
- *  1. 状态机：后端无显式 transition 校验。状态变更走 PATCH /articles/:id { status: ... }
- *     — 任意 (from, to) 状态对都能写入（隐式状态机 / "自由状态机"）。
+ * 关键机制：
+ *  1. 编辑状态走 PATCH /articles/:id；发布、下架和重新上架走专用端点并写审计记录。
  *  2. 审核工作流：PATCH /articles/:id/review { decision: 'APPROVE' | 'REVISION', comment? }
  *     — 仅 EDITOR/ADMIN 可调，REPORTER 必 403。
  *  3. 指派编辑：PATCH /articles/:id/assign-editor { editorId } — 仅 EDITOR/ADMIN。
@@ -178,7 +177,7 @@ test.describe('§8.1 正常路径 — 11 个状态', () => {
 
   test('TC-ART-005: IN_REVIEW → APPROVED（走 review 端点）', async ({ api }) => {
     const reporterTok = (await loginByApi('reporter-sc')).token;
-    const editorTok = (await loginByApi('editor')).token;
+    const editorTok = (await loginByApi('admin')).token;
     const storyId = await bootstrapStory(reporterTok, 'qa-art-005');
     const id = await createArticle(reporterTok, storyId, 'qa-art-005 APP', 'IN_REVIEW');
 
@@ -193,13 +192,11 @@ test.describe('§8.1 正常路径 — 11 个状态', () => {
 
   test('TC-ART-006: APPROVED → PUBLISHED', async ({ api }) => {
     const reporterTok = (await loginByApi('reporter-sc')).token;
-    const editorTok = (await loginByApi('editor')).token;
+    const editorTok = (await loginByApi('admin')).token;
     const storyId = await bootstrapStory(reporterTok, 'qa-art-006');
     const id = await createArticle(reporterTok, storyId, 'qa-art-006 PUB', 'APPROVED');
-    // editor 复核（可省），直接 author 切 PUBLISHED
-    const r = await api.patch(`/articles/${id}`, {
-      headers: { Authorization: `Bearer ${reporterTok}` },
-      data: { status: 'PUBLISHED' },
+    const r = await api.post(`/articles/${id}/publish`, {
+      headers: { Authorization: `Bearer ${editorTok}` },
     });
     expect(r.ok()).toBeTruthy();
     const after = await getArticle(reporterTok, id);
@@ -207,15 +204,20 @@ test.describe('§8.1 正常路径 — 11 个状态', () => {
   });
 
   test('TC-ART-007: PUBLISHED → ARCHIVED', async ({ api }) => {
-    const { token } = await loginByApi('reporter-sc');
-    const storyId = await bootstrapStory(token, 'qa-art-007');
-    const id = await createArticle(token, storyId, 'qa-art-007 ARC', 'PUBLISHED');
-    const r = await api.patch(`/articles/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { status: 'ARCHIVED' },
+    const reporterTok = (await loginByApi('reporter-sc')).token;
+    const editorTok = (await loginByApi('admin')).token;
+    const storyId = await bootstrapStory(reporterTok, 'qa-art-007');
+    const id = await createArticle(reporterTok, storyId, 'qa-art-007 ARC', 'APPROVED');
+    const published = await api.post(`/articles/${id}/publish`, {
+      headers: { Authorization: `Bearer ${editorTok}` },
+    });
+    expect(published.ok()).toBeTruthy();
+    const r = await api.post(`/articles/${id}/archive`, {
+      headers: { Authorization: `Bearer ${editorTok}` },
+      data: { reason: '回归测试下架' },
     });
     expect(r.ok()).toBeTruthy();
-    const after = await getArticle(token, id);
+    const after = await getArticle(editorTok, id);
     expect(after.status).toBe('ARCHIVED');
   });
 });
@@ -303,7 +305,7 @@ test.describe('§8.3 自动发布新状态', () => {
     expect(after.status).toBe('PIPELINE_FAILED');
   });
 
-  test('TC-ART-011: 可写入 AUTO_PUBLISHED 状态', async ({ api }) => {
+  test('TC-ART-011: 通用更新端点不可绕过发布流程', async ({ api }) => {
     const { token } = await loginByApi('admin');
     const reporterTok = (await loginByApi('reporter-sc')).token;
     const storyId = await bootstrapStory(reporterTok, 'qa-art-011');
@@ -312,9 +314,9 @@ test.describe('§8.3 自动发布新状态', () => {
       headers: { Authorization: `Bearer ${reporterTok}` },
       data: { status: 'AUTO_PUBLISHED' },
     });
-    expect(r.ok()).toBeTruthy();
+    expect(r.status()).toBe(400);
     const after = await getArticle(token, id);
-    expect(after.status).toBe('AUTO_PUBLISHED');
+    expect(after.status).toBe('DRAFT');
   });
 });
 
@@ -325,26 +327,26 @@ test.describe('§8.3 自动发布新状态', () => {
 // 但 DRAFT 仍必须经 WRITING 才能进 PENDING_REVIEW。
 // ===========================================================================
 
-// 显式允许的转换对（白名单之外的转换应返回 400）
+// 通用 PATCH 只允许编辑状态转换；发布状态必须走专用端点。
 const LEGAL_TRANSITIONS: Record<string, ReadonlySet<string>> = {
-  DRAFT: new Set(['WRITING', 'ARCHIVED']),
-  WRITING: new Set(['AI_OPTIMIZING', 'PENDING_REVIEW', 'DRAFT', 'ARCHIVED']),
+  DRAFT: new Set(['WRITING']),
+  WRITING: new Set(['AI_OPTIMIZING', 'PENDING_REVIEW', 'DRAFT']),
   AI_OPTIMIZING: new Set(['PENDING_REVIEW', 'WRITING', 'DRAFT']),
   PENDING_REVIEW: new Set(['IN_REVIEW', 'REVISION', 'DRAFT']),
   IN_REVIEW: new Set(['APPROVED', 'REVISION', 'PENDING_REVIEW']),
-  APPROVED: new Set(['PUBLISHED', 'REVISION', 'IN_REVIEW']),
-  PUBLISHED: new Set(['ARCHIVED']),
+  APPROVED: new Set(['REVISION', 'IN_REVIEW']),
+  PUBLISHED: new Set([]),
   ARCHIVED: new Set([]),
-  REVISION: new Set(['WRITING', 'PENDING_REVIEW', 'DRAFT', 'ARCHIVED']),
-  AUTO_PUBLISHED: new Set(['ARCHIVED', 'PUBLISHED']),
-  PIPELINE_FAILED: new Set(['DRAFT', 'ARCHIVED']),
+  REVISION: new Set(['WRITING', 'PENDING_REVIEW', 'DRAFT']),
+  AUTO_PUBLISHED: new Set([]),
+  PIPELINE_FAILED: new Set(['DRAFT']),
 };
 
-test.describe('§8.4 状态机合法/非法跳转枚举（11×11=121 对）', () => {
+test.describe('§8.4 通用编辑状态机合法/非法跳转枚举', () => {
   // 为节省时间，对每个 from 状态各创建一个 article，逐个尝试所有 to
   const FROM_STATUSES: ArticleStatus[] = [
     'DRAFT', 'WRITING', 'AI_OPTIMIZING', 'PENDING_REVIEW', 'IN_REVIEW',
-    'REVISION', 'APPROVED', 'PUBLISHED', 'ARCHIVED', 'PIPELINE_FAILED', 'AUTO_PUBLISHED',
+    'REVISION', 'APPROVED', 'PIPELINE_FAILED',
   ];
 
   for (const from of FROM_STATUSES) {
@@ -361,7 +363,8 @@ test.describe('§8.4 状态机合法/非法跳转枚举（11×11=121 对）', ()
           data: { status: to },
         }));
         const body = await r.json().catch(() => null);
-        const isLegal = from === to || legal.has(to); // 同状态自迁 = no-op, 后端视为合法
+        const isPublicationStatus = ['PUBLISHED', 'AUTO_PUBLISHED', 'ARCHIVED'].includes(to);
+        const isLegal = !isPublicationStatus && (from === to || legal.has(to));
         const expectedStatus = isLegal ? 200 : 400;
         // 记录实际行为
         test.info().annotations.push({

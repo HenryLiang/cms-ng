@@ -77,7 +77,18 @@ export class ArticleSaveStep implements PipelineStep {
     // Overwrite the temp articleId with the real CMS article ID
     ctx.savedArticleId = article.id;
 
-    // 3. Create ArticleVersion
+    // 3. Record the automated publication in the same audit trail as manual publishing.
+    await this.prisma.articleStatusAudit.create({
+      data: {
+        articleId: article.id,
+        fromStatus: ArticleStatus.DRAFT,
+        toStatus: ArticleStatus.AUTO_PUBLISHED,
+        operatorId: ctx.userId,
+        reason: '自动发布流程',
+      },
+    });
+
+    // 4. Create ArticleVersion
     await this.prisma.articleVersion.create({
       data: {
         title: article.title,
@@ -87,7 +98,7 @@ export class ArticleSaveStep implements PipelineStep {
       },
     });
 
-    // 4. Update the tracking record
+    // 5. Update the tracking record
     await this.prisma.autoPublishArticle.update({
       where: { id: ctx.articleId },
       data: { articleId: article.id },
