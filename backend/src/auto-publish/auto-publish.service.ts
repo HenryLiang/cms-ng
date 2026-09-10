@@ -21,6 +21,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { safeJsonParse } from '../common/json.utils';
 import type { StepTraceEntry } from './pipeline/step.interface';
 import { LanguageSettingsService } from '../language-settings/language-settings.service';
+import { ArticlesService } from '../articles/articles.service';
 
 @Injectable()
 export class AutoPublishService {
@@ -32,6 +33,7 @@ export class AutoPublishService {
     private pipeline: PipelineService,
     private wordpress: WordPressService,
     private languageSettings: LanguageSettingsService,
+    private articles: ArticlesService,
   ) {}
 
   // ===== Task CRUD =====
@@ -305,7 +307,7 @@ export class AutoPublishService {
     };
   }
 
-  async withdrawArticle(id: string) {
+  async withdrawArticle(id: string, operatorId: string) {
     const record = await this.prisma.autoPublishArticle.findUnique({
       where: { id },
     });
@@ -331,6 +333,14 @@ export class AutoPublishService {
           `WordPress deletion failed for ${publish.publishedUrl}: ${(error as Error).message}`,
         );
       }
+    }
+
+    if (record.articleId) {
+      await this.articles.archive(
+        record.articleId,
+        operatorId,
+        '自动发布任务撤回',
+      );
     }
 
     // Update PlatformPublish status

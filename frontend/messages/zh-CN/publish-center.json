@@ -1,27 +1,71 @@
 {
   "title": "发布中心",
-  "subtitle": "审核已通过、可发布到 newsweb 读者站的稿件清单",
+  "subtitle": "统一管理待发布、已上线和已下架的 newsweb 文章",
+  "tabs": {
+    "ready": "待发布",
+    "live": "已发布",
+    "archived": "已下架"
+  },
   "list": {
     "columns": {
       "title": "标题",
       "story": "选题",
       "author": "作者",
       "tags": "标签",
-      "updatedAt": "更新时间"
+      "updatedAt": "更新时间",
+      "actions": "操作"
     },
-    "empty": "暂无待发布稿件",
-    "emptyHint": "稿件审核通过（已审核状态）后会出现在这里",
-    "summary": "共 {total} 篇待发布 · 第 {page}/{totalPages} 页",
+    "empty": {
+      "ready": "暂无待发布稿件",
+      "live": "暂无已发布文章",
+      "archived": "暂无已下架文章"
+    },
+    "emptyHint": {
+      "ready": "稿件审核通过后会出现在这里",
+      "live": "发布到 newsweb 的文章会出现在这里",
+      "archived": "从 newsweb 下架的文章会保留在这里，可随时重新上架"
+    },
+    "summary": "共 {total} 篇 · 第 {page}/{totalPages} 页",
     "goToArticles": "前往稿件管理",
-    "loadError": "加载待发布稿件失败，请重试"
+    "loadError": "加载发布数据失败，请重试"
   },
   "actions": {
     "publish": "发布",
     "publishConfirm": "确定将《{title}》发布到 newsweb 读者站？",
-    "publishing": "发布中…"
+    "publishing": "发布中…",
+    "archive": "下架",
+    "republish": "重新上架",
+    "history": "操作记录"
+  },
+  "dialogs": {
+    "archive": {
+      "title": "下架文章",
+      "description": "下架《{title}》后，读者站将无法再访问该文章。",
+      "reasonLabel": "下架原因",
+      "reasonPlaceholder": "请填写下架原因（至少 2 个字符）",
+      "confirm": "确认下架"
+    },
+    "republish": {
+      "title": "重新上架文章",
+      "description": "《{title}》将恢复为下架前的发布状态，并重新出现在读者站。",
+      "reasonLabel": "重新上架说明（可选）",
+      "reasonPlaceholder": "可填写重新上架的说明",
+      "confirm": "确认重新上架"
+    }
+  },
+  "history": {
+    "title": "发布状态记录",
+    "empty": "暂无发布状态记录",
+    "system": "系统",
+    "noReason": "未填写说明"
   },
   "toast": {
     "published": "已发布：《{title}》",
-    "publishFailed": "发布失败，请稍后重试"
+    "publishFailed": "发布失败，请稍后重试",
+    "archived": "文章已下架",
+    "archiveFailed": "下架失败，请稍后重试",
+    "republished": "文章已重新上架",
+    "republishFailed": "重新上架失败，请稍后重试",
+    "historyFailed": "加载操作记录失败，请稍后重试"
   }
 }

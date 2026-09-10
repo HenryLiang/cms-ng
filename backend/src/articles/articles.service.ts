@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -51,6 +52,24 @@ import {
   SearchUnavailableException,
 } from '../search/search.service';
 
+const ARTICLE_STATUS_VALUES = new Set<string>(Object.values(ArticleStatus));
+
+function parseStatusFilter(value?: string): ArticleStatus[] {
+  if (!value) return [];
+  const statuses = Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((status) => status.trim())
+        .filter(Boolean),
+    ),
+  );
+  if (statuses.some((status) => !ARTICLE_STATUS_VALUES.has(status))) {
+    throw new BadRequestException('Invalid article status filter');
+  }
+  return statuses as ArticleStatus[];
+}
+
 @Injectable()
 export class ArticlesService {
   /**
@@ -62,12 +81,11 @@ export class ArticlesService {
   // (two distinct TypeScript enum types with identical runtime values).
   private static readonly VALID_TRANSITIONS: Record<string, readonly string[]> =
     {
-      [ArticleStatus.DRAFT]: [ArticleStatus.WRITING, ArticleStatus.ARCHIVED],
+      [ArticleStatus.DRAFT]: [ArticleStatus.WRITING],
       [ArticleStatus.WRITING]: [
         ArticleStatus.AI_OPTIMIZING,
         ArticleStatus.PENDING_REVIEW,
         ArticleStatus.DRAFT,
-        ArticleStatus.ARCHIVED,
       ],
       [ArticleStatus.AI_OPTIMIZING]: [
         ArticleStatus.PENDING_REVIEW,
@@ -85,26 +103,18 @@ export class ArticlesService {
         ArticleStatus.PENDING_REVIEW,
       ],
       [ArticleStatus.APPROVED]: [
-        ArticleStatus.PUBLISHED,
         ArticleStatus.REVISION,
         ArticleStatus.IN_REVIEW,
       ],
-      [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
+      [ArticleStatus.PUBLISHED]: [],
       [ArticleStatus.ARCHIVED]: [],
       [ArticleStatus.REVISION]: [
         ArticleStatus.WRITING,
         ArticleStatus.PENDING_REVIEW,
         ArticleStatus.DRAFT,
-        ArticleStatus.ARCHIVED,
       ],
-      [ArticleStatus.AUTO_PUBLISHED]: [
-        ArticleStatus.ARCHIVED,
-        ArticleStatus.PUBLISHED,
-      ],
-      [ArticleStatus.PIPELINE_FAILED]: [
-        ArticleStatus.DRAFT,
-        ArticleStatus.ARCHIVED,
-      ],
+      [ArticleStatus.AUTO_PUBLISHED]: [],
+      [ArticleStatus.PIPELINE_FAILED]: [ArticleStatus.DRAFT],
     };
 
   /**
@@ -131,6 +141,19 @@ export class ArticlesService {
   ) {}
 
   async create(authorId: string, dto: CreateArticleDto) {
+    if (
+      dto.status &&
+      [
+        ArticleStatus.PUBLISHED,
+        ArticleStatus.AUTO_PUBLISHED,
+        ArticleStatus.ARCHIVED,
+      ].includes(dto.status)
+    ) {
+      throw new BadRequestException(
+        'Published and archived articles must use the publication workflow',
+      );
+    }
+
     const story = await this.prisma.story.findUnique({
       where: { id: dto.storyId },
     });
@@ -187,6 +210,7 @@ export class ArticlesService {
   ): Promise<PaginatedResponse<ReturnType<typeof deserializeArticle>>> {
     const { storyId } = query;
     const { page, pageSize } = parsePaginationParams(query);
+    const statusFilter = parseStatusFilter(query.status);
 
     let where: Prisma.ArticleWhereInput = {};
 
@@ -217,8 +241,10 @@ export class ArticlesService {
 
     // Optional status filter (发布中心列出已审核 APPROVED 待发布稿件等场景)。
     // 与 search 分支的 AND 合并互不冲突（ES 回表与 MySQL LIKE 均会叠加此条件）。
-    if (query.status) {
-      where = { ...where, status: query.status as ArticleStatus };
+    if (statusFilter.length === 1) {
+      where = { ...where, status: statusFilter[0] };
+    } else if (statusFilter.length > 1) {
+      where = { ...where, status: { in: statusFilter } };
     }
 
     const search = query.search?.trim();
@@ -229,7 +255,7 @@ export class ArticlesService {
           role: user.role,
           search,
           storyId,
-          status: query.status,
+          ...(statusFilter.length ? { statuses: statusFilter } : {}),
           page,
           pageSize,
         });
@@ -333,6 +359,19 @@ export class ArticlesService {
   }
 
   async update(id: string, dto: UpdateArticleDto) {
+    if (
+      dto.status &&
+      [
+        ArticleStatus.PUBLISHED,
+        ArticleStatus.AUTO_PUBLISHED,
+        ArticleStatus.ARCHIVED,
+      ].includes(dto.status)
+    ) {
+      throw new BadRequestException(
+        'Published and archived articles must use the publication workflow',
+      );
+    }
+
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
 
@@ -340,14 +379,6 @@ export class ArticlesService {
     if (dto.status && dto.status !== (existing.status as ArticleStatus)) {
       this.validateStateTransition(existing.status, dto.status);
     }
-
-    // 首次进入已发布状态时写入 publishedAt（newsweb 等下游按发布时间排序/展示）。
-    // 已发布的稿件再次更新不覆盖原发布时间。
-    const transitioningToPublished =
-      (dto.status === ArticleStatus.PUBLISHED ||
-        dto.status === ArticleStatus.AUTO_PUBLISHED) &&
-      (existing.status as ArticleStatus) !== dto.status &&
-      !existing.publishedAt;
 
     const newVersion = existing.version + 1;
 
@@ -368,34 +399,12 @@ export class ArticlesService {
       tags: dto.tags,
       contentLanguage: dto.contentLanguage,
       version: newVersion,
-      publishedAt: transitioningToPublished ? new Date() : undefined,
     });
-
-    // 首次发布是原子比较交换:并发双击/双端同时发布时,只有 status 仍为原状态
-    // 的请求能推进;后到者读取最新状态直接返回,不重复 bump 版本、不重复触发
-    // article.updated 事件(避免 newsweb 收到重复刷新通知)。
-    let article: Prisma.ArticleGetPayload<{ include: typeof include }> | null;
-    if (transitioningToPublished) {
-      const cas = await this.prisma.article.updateMany({
-        where: { id, status: existing.status },
-        data: input,
-      });
-      article =
-        cas.count > 0
-          ? await this.prisma.article.findUnique({ where: { id }, include })
-          : null;
-    } else {
-      article = await this.prisma.article.update({
-        where: { id },
-        data: input,
-        include,
-      });
-    }
-
-    if (!article) {
-      // 并发下另一请求已抢先发布,直接返回最新状态,不再重复发事件
-      return this.findOne(id);
-    }
+    const article = await this.prisma.article.update({
+      where: { id },
+      data: input,
+      include,
+    });
 
     if (dto.content || dto.title) {
       await this.prisma.articleVersion.create({
@@ -413,9 +422,151 @@ export class ArticlesService {
     return deserializeArticle(article);
   }
 
-  async remove(id: string) {
+  async publish(id: string, operatorId: string) {
+    return this.transitionPublicationStatus({
+      id,
+      operatorId,
+      allowedFrom: [ArticleStatus.APPROVED],
+      targetStatus: ArticleStatus.PUBLISHED,
+      reason: null,
+    });
+  }
+
+  async archive(id: string, operatorId: string, reason: string) {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) {
+      throw new BadRequestException('下架原因不能为空');
+    }
+    return this.transitionPublicationStatus({
+      id,
+      operatorId,
+      allowedFrom: [ArticleStatus.PUBLISHED, ArticleStatus.AUTO_PUBLISHED],
+      targetStatus: ArticleStatus.ARCHIVED,
+      reason: normalizedReason,
+    });
+  }
+
+  async republish(id: string, operatorId: string, reason?: string) {
+    const latestArchive = await this.prisma.articleStatusAudit.findFirst({
+      where: {
+        articleId: id,
+        toStatus: ArticleStatus.ARCHIVED,
+        fromStatus: {
+          in: [ArticleStatus.PUBLISHED, ArticleStatus.AUTO_PUBLISHED],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { fromStatus: true },
+    });
+    const targetStatus =
+      latestArchive?.fromStatus === ArticleStatus.AUTO_PUBLISHED
+        ? ArticleStatus.AUTO_PUBLISHED
+        : ArticleStatus.PUBLISHED;
+
+    return this.transitionPublicationStatus({
+      id,
+      operatorId,
+      allowedFrom: [ArticleStatus.ARCHIVED],
+      targetStatus,
+      reason: reason?.trim() || null,
+    });
+  }
+
+  async getStatusHistory(id: string) {
+    return this.prisma.articleStatusAudit.findMany({
+      where: { articleId: id },
+      include: {
+        operator: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private async transitionPublicationStatus(params: {
+    id: string;
+    operatorId: string;
+    allowedFrom: readonly ArticleStatus[];
+    targetStatus: ArticleStatus;
+    reason: string | null;
+  }) {
+    const include = {
+      author: { select: { id: true, name: true, email: true } },
+      editor: { select: { id: true, name: true, email: true } },
+      story: { select: { id: true, title: true } },
+    } satisfies Prisma.ArticleInclude;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.article.findUnique({
+        where: { id: params.id },
+        include,
+      });
+      if (!existing) throw new NotFoundException('Article not found');
+      const currentStatus = existing.status as ArticleStatus;
+
+      if (currentStatus === params.targetStatus) {
+        return { article: existing, changed: false };
+      }
+      if (!params.allowedFrom.includes(currentStatus)) {
+        throw new BadRequestException(
+          `Invalid article status transition: ${existing.status} → ${params.targetStatus}`,
+        );
+      }
+
+      const transitioningToLive = [
+        ArticleStatus.PUBLISHED,
+        ArticleStatus.AUTO_PUBLISHED,
+      ].includes(params.targetStatus);
+      const changed = await tx.article.updateMany({
+        where: { id: params.id, status: existing.status },
+        data: {
+          status: params.targetStatus,
+          publishedAt:
+            transitioningToLive && !existing.publishedAt
+              ? new Date()
+              : undefined,
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException('稿件状态已变化，请刷新后重试');
+      }
+
+      const article = await tx.article.findUnique({
+        where: { id: params.id },
+        include,
+      });
+      if (!article) throw new NotFoundException('Article not found');
+
+      await tx.articleStatusAudit.create({
+        data: {
+          articleId: params.id,
+          fromStatus: existing.status,
+          toStatus: params.targetStatus,
+          operatorId: params.operatorId,
+          reason: params.reason,
+        },
+      });
+      return { article, changed: true };
+    });
+
+    if (result.changed) {
+      this.eventEmitter.emit('article.updated', { articleId: params.id });
+    }
+    return deserializeArticle(result.article);
+  }
+
+  async remove(id: string, actorRole: string) {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
+    const status = existing.status as ArticleStatus;
+    if (
+      status === ArticleStatus.PUBLISHED ||
+      status === ArticleStatus.AUTO_PUBLISHED
+    ) {
+      throw new BadRequestException('已发布稿件必须先下架，不能直接删除');
+    }
+    if (status === ArticleStatus.ARCHIVED && !isAdminRole(actorRole)) {
+      throw new ForbiddenException('只有管理员可以永久删除已下架稿件');
+    }
     await this.prisma.article.delete({ where: { id } });
     this.eventEmitter.emit('article.deleted', { articleId: id });
     return { success: true };

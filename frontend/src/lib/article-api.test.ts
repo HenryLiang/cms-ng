@@ -5,7 +5,11 @@ import {
   aiFactCheck,
   aiTag,
   aiReviewReport,
+  archiveArticle,
+  getArticleStatusHistory,
   getArticles,
+  publishArticle,
+  republishArticle,
   type FactCheckResult,
   type ReviewReportResult,
 } from './article-api';
@@ -38,6 +42,48 @@ describe('article-api', () => {
         params: { search: 'carbon' },
       });
       expect(result).toEqual(response.data);
+    });
+  });
+
+  describe('publication management', () => {
+    it('uses dedicated audited endpoints for publication state changes', async () => {
+      const published = { id: 'article-1', status: 'PUBLISHED' };
+      const archived = { id: 'article-1', status: 'ARCHIVED' };
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({ data: published })
+        .mockResolvedValueOnce({ data: archived })
+        .mockResolvedValueOnce({ data: published });
+
+      await publishArticle('article-1');
+      await archiveArticle('article-1', '事实信息需要更正');
+      await republishArticle('article-1', '更正已经完成');
+
+      expect(api.post).toHaveBeenNthCalledWith(
+        1,
+        '/articles/article-1/publish',
+      );
+      expect(api.post).toHaveBeenNthCalledWith(
+        2,
+        '/articles/article-1/archive',
+        { reason: '事实信息需要更正' },
+      );
+      expect(api.post).toHaveBeenNthCalledWith(
+        3,
+        '/articles/article-1/republish',
+        { reason: '更正已经完成' },
+      );
+    });
+
+    it('loads the article publication audit trail', async () => {
+      const audits = [{ id: 'audit-1', toStatus: 'ARCHIVED' }];
+      vi.mocked(api.get).mockResolvedValue({ data: audits });
+
+      await expect(getArticleStatusHistory('article-1')).resolves.toEqual(
+        audits,
+      );
+      expect(api.get).toHaveBeenCalledWith(
+        '/articles/article-1/status-history',
+      );
     });
   });
 

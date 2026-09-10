@@ -40,6 +40,12 @@ export function createMockPrismaService(): jest.Mocked<PrismaService> {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    articleStatusAudit: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      count: jest.fn(),
+    },
     aIOperation: {
       findUnique: jest.fn(),
       findMany: jest.fn(),

@@ -107,6 +107,22 @@ describe('ArticlesService', () => {
   });
 
   describe('create', () => {
+    it.each(['PUBLISHED', 'AUTO_PUBLISHED', 'ARCHIVED'])(
+      'should reject creating an article directly as %s',
+      async (status) => {
+        await expect(
+          service.create('author-id', {
+            storyId: 'story-id',
+            title: 'Test Article',
+            content: 'Content',
+            status: status as never,
+          }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(prisma.article.create).not.toHaveBeenCalled();
+      },
+    );
+
     it('should inherit the parent story language when none is requested', async () => {
       prisma.story.findUnique.mockResolvedValue({
         id: 'story-id',
@@ -379,6 +395,34 @@ describe('ArticlesService', () => {
       );
     });
 
+    it('should filter publication management by multiple live statuses', async () => {
+      prisma.article.findMany.mockResolvedValue([]);
+      prisma.article.count.mockResolvedValue(0);
+
+      await service.findAll(
+        { userId: 'admin-id', role: 'ADMIN' },
+        { status: 'PUBLISHED,AUTO_PUBLISHED' },
+      );
+
+      expect(prisma.article.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            status: { in: ['PUBLISHED', 'AUTO_PUBLISHED'] },
+          },
+        }),
+      );
+    });
+
+    it('should reject unknown statuses instead of passing them to Prisma', async () => {
+      await expect(
+        service.findAll(
+          { userId: 'admin-id', role: 'ADMIN' },
+          { status: 'PUBLISHED,NOT_A_STATUS' },
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.article.findMany).not.toHaveBeenCalled();
+    });
+
     it('should restrict reporter to own articles', async () => {
       prisma.article.findMany.mockResolvedValue([mockArticle()]);
       prisma.article.count.mockResolvedValue(0);
@@ -503,7 +547,7 @@ describe('ArticlesService', () => {
       prisma.article.findUnique.mockResolvedValue(mockArticle());
       prisma.article.delete.mockResolvedValue(mockArticle());
 
-      const result = await service.remove('article-id');
+      const result = await service.remove('article-id', 'REPORTER');
 
       expect(prisma.article.delete).toHaveBeenCalledWith({
         where: { id: 'article-id' },
@@ -517,9 +561,160 @@ describe('ArticlesService', () => {
     it('should throw NotFoundException when article not found', async () => {
       prisma.article.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(
+      await expect(service.remove('nonexistent', 'REPORTER')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should require published articles to be archived before deletion', async () => {
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ status: 'PUBLISHED' }),
+      );
+
+      await expect(service.remove('article-id', 'ADMIN')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.article.delete).not.toHaveBeenCalled();
+    });
+
+    it('should only allow administrators to permanently delete archived articles', async () => {
+      prisma.article.findUnique.mockResolvedValue(
+        mockArticle({ status: 'ARCHIVED' }),
+      );
+
+      await expect(service.remove('article-id', 'EDITOR')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.article.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('publication lifecycle', () => {
+    it('archives a live article and records who did it and why', async () => {
+      const existing = mockArticle({
+        status: 'PUBLISHED',
+        publishedAt: new Date('2026-09-01T00:00:00Z'),
+      });
+      prisma.article.findUnique
+        .mockResolvedValueOnce(existing)
+        .mockResolvedValueOnce(
+          mockArticle({ ...existing, status: 'ARCHIVED' }),
+        );
+      prisma.article.updateMany.mockResolvedValue({ count: 1 });
+      prisma.articleStatusAudit.create.mockResolvedValue({ id: 'audit-id' });
+
+      const result = await service.archive(
+        'article-id',
+        'editor-id',
+        '事实信息需要更正',
+      );
+
+      expect(prisma.article.updateMany).toHaveBeenCalledWith({
+        where: { id: 'article-id', status: 'PUBLISHED' },
+        data: { status: 'ARCHIVED', publishedAt: undefined },
+      });
+      expect(prisma.articleStatusAudit.create).toHaveBeenCalledWith({
+        data: {
+          articleId: 'article-id',
+          fromStatus: 'PUBLISHED',
+          toStatus: 'ARCHIVED',
+          operatorId: 'editor-id',
+          reason: '事实信息需要更正',
+        },
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('article.updated', {
+        articleId: 'article-id',
+      });
+      expect(result.status).toBe('ARCHIVED');
+    });
+
+    it('rejects an archive reason containing only whitespace', async () => {
+      await expect(
+        service.archive('article-id', 'editor-id', '   '),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.article.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('restores an archived auto-published article to its previous live status', async () => {
+      prisma.article.findUnique
+        .mockResolvedValueOnce(
+          mockArticle({ status: 'ARCHIVED', publishedAt: new Date() }),
+        )
+        .mockResolvedValueOnce(
+          mockArticle({ status: 'AUTO_PUBLISHED', publishedAt: new Date() }),
+        );
+      prisma.articleStatusAudit.findFirst.mockResolvedValue({
+        fromStatus: 'AUTO_PUBLISHED',
+      });
+      prisma.article.updateMany.mockResolvedValue({ count: 1 });
+      prisma.articleStatusAudit.create.mockResolvedValue({ id: 'audit-id-2' });
+
+      const result = await service.republish(
+        'article-id',
+        'editor-id',
+        '更正已经完成',
+      );
+
+      expect(prisma.article.updateMany).toHaveBeenCalledWith({
+        where: { id: 'article-id', status: 'ARCHIVED' },
+        data: { status: 'AUTO_PUBLISHED', publishedAt: undefined },
+      });
+      expect(prisma.articleStatusAudit.create).toHaveBeenCalledWith({
+        data: {
+          articleId: 'article-id',
+          fromStatus: 'ARCHIVED',
+          toStatus: 'AUTO_PUBLISHED',
+          operatorId: 'editor-id',
+          reason: '更正已经完成',
+        },
+      });
+      expect(result.status).toBe('AUTO_PUBLISHED');
+    });
+
+    it('publishes an approved article through the audited publication endpoint', async () => {
+      prisma.article.findUnique
+        .mockResolvedValueOnce(
+          mockArticle({ status: 'APPROVED', publishedAt: null }),
+        )
+        .mockResolvedValueOnce(
+          mockArticle({ status: 'PUBLISHED', publishedAt: new Date() }),
+        );
+      prisma.article.updateMany.mockResolvedValue({ count: 1 });
+      prisma.articleStatusAudit.create.mockResolvedValue({ id: 'audit-id-3' });
+
+      const result = await service.publish('article-id', 'editor-id');
+
+      expect(prisma.article.updateMany).toHaveBeenCalledWith({
+        where: { id: 'article-id', status: 'APPROVED' },
+        data: { status: 'PUBLISHED', publishedAt: expect.any(Date) },
+      });
+      expect(prisma.articleStatusAudit.create).toHaveBeenCalledWith({
+        data: {
+          articleId: 'article-id',
+          fromStatus: 'APPROVED',
+          toStatus: 'PUBLISHED',
+          operatorId: 'editor-id',
+          reason: null,
+        },
+      });
+      expect(result.status).toBe('PUBLISHED');
+    });
+
+    it('returns the publication audit trail newest first', async () => {
+      prisma.articleStatusAudit.findMany.mockResolvedValue([
+        { id: 'audit-id', toStatus: 'ARCHIVED' },
+      ]);
+
+      const result = await service.getStatusHistory('article-id');
+
+      expect(prisma.articleStatusAudit.findMany).toHaveBeenCalledWith({
+        where: { articleId: 'article-id' },
+        include: {
+          operator: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result).toHaveLength(1);
     });
   });
 
@@ -1491,11 +1686,9 @@ describe('ArticlesService', () => {
     describe('update() should accept legal transitions', () => {
       it.each([
         ['DRAFT', 'WRITING'],
-        ['DRAFT', 'ARCHIVED'],
         ['WRITING', 'AI_OPTIMIZING'],
         ['WRITING', 'PENDING_REVIEW'],
         ['WRITING', 'DRAFT'],
-        ['WRITING', 'ARCHIVED'],
         ['AI_OPTIMIZING', 'PENDING_REVIEW'],
         ['AI_OPTIMIZING', 'WRITING'],
         ['AI_OPTIMIZING', 'DRAFT'],
@@ -1505,22 +1698,26 @@ describe('ArticlesService', () => {
         ['IN_REVIEW', 'APPROVED'],
         ['IN_REVIEW', 'REVISION'],
         ['IN_REVIEW', 'PENDING_REVIEW'],
-        ['APPROVED', 'PUBLISHED'],
         ['APPROVED', 'REVISION'],
         ['APPROVED', 'IN_REVIEW'],
-        ['PUBLISHED', 'ARCHIVED'],
         ['REVISION', 'WRITING'],
         ['REVISION', 'PENDING_REVIEW'],
         ['REVISION', 'DRAFT'],
-        ['REVISION', 'ARCHIVED'],
-        ['AUTO_PUBLISHED', 'ARCHIVED'],
-        ['AUTO_PUBLISHED', 'PUBLISHED'],
         ['PIPELINE_FAILED', 'DRAFT'],
-        ['PIPELINE_FAILED', 'ARCHIVED'],
       ])('should accept %s -> %s', async (from, to) => {
         await expectValidTransition(from, to, 'update');
       });
     });
+
+    it.each(['PUBLISHED', 'AUTO_PUBLISHED', 'ARCHIVED'])(
+      'should require the publication workflow for %s',
+      async (status) => {
+        await expect(
+          service.update('article-id', { status } as never),
+        ).rejects.toThrow('publication workflow');
+        expect(prisma.article.findUnique).not.toHaveBeenCalled();
+      },
+    );
 
     it('should not validate transition when status field is not being updated', async () => {
       prisma.article.findUnique.mockResolvedValue(
@@ -1554,12 +1751,12 @@ describe('ArticlesService', () => {
       );
 
       try {
-        await service.update('article-id', { status: 'PUBLISHED' } as never);
+        await service.update('article-id', { status: 'APPROVED' } as never);
         fail('expected BadRequestException');
       } catch (err) {
         expect(err).toBeInstanceOf(BadRequestException);
         expect((err as BadRequestException).message).toContain('DRAFT');
-        expect((err as BadRequestException).message).toContain('PUBLISHED');
+        expect((err as BadRequestException).message).toContain('APPROVED');
       }
     });
 
