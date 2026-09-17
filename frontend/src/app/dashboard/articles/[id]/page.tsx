@@ -52,6 +52,8 @@ import SEOPanel from '@/components/seo-panel';
 import GEOPanel from '@/components/geo-panel';
 import ChannelPanel from '@/components/channels/channel-panel';
 import ArticleTagsEditor from '@/components/article-tags-editor';
+import DraftPreview from './draft-preview';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { Badge, Button, StatusBadge, buttonClasses } from '@/components/ui';
 import {
   ArrowLeft,
@@ -500,9 +502,9 @@ export default function ArticleEditorPage() {
     if (mode === 'replace') {
       setTitle(draftResult.title);
       setSubtitle(draftResult.subtitle || '');
-      setContent(draftResult.content);
+      setContent(sanitizeHtml(draftResult.content));
     } else {
-      setContent((prev) => prev + '\n\n' + draftResult.content);
+      setContent((prev) => prev + '\n\n' + sanitizeHtml(draftResult.content));
     }
     setTags((current) =>
       Array.from(new Set([...current, ...(draftResult.tags ?? [])])),
@@ -1552,19 +1554,6 @@ export default function ArticleEditorPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function DraftPreview({ content }: { content: string }) {
-  const sanitized = content
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<(?!\/?(?:p|h2|h3|ul|ol|li|blockquote|strong|em|br)\b)[^>]*>/gi, '');
-  return (
-    <div
-      className="prose prose-slate max-w-none mt-1 rounded-lg border border-line bg-canvas p-4"
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-    />
   );
 }
 
