@@ -12,7 +12,9 @@
     "totalTopUps": "Total top-ups",
     "currentBalance": "Current balance",
     "recentTransactions": "Recent transactions",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "manageSubscription": "Manage subscription",
+    "portalError": "Subscription management unavailable: no subscription found or Paddle is not configured"
   },
   "config": {
     "title": "Billing Configuration",

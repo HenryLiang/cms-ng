@@ -25,23 +25,23 @@ model User {
   updatedAt         DateTime         @updatedAt
 
   // Relations
-  stories             Story[]              @relation("ReporterStories")
-  editedStories       Story[]              @relation("EditorStories")
-  articles            Article[]            @relation("AuthorArticles")
-  editedArticles      Article[]            @relation("EditorArticles")
-  aiOperations        AIOperation[]
-  autoPublishTasks    AutoPublishTask[]
-  topUpRecords        TopUpRecord[]
-  billingTransactions BillingTransaction[]
-  notifications       Notification[]
-  balanceAlert        BalanceAlert?
-  mediaAssets         MediaAsset[]
-  videoGenerationJobs VideoGenerationJob[]
-  featureSwitchUpdates SystemFeatureSwitch[] @relation("SystemFeatureSwitchUpdater")
-  featureSwitchAudits  SystemFeatureAudit[]  @relation("SystemFeatureAuditOperator")
-  articleStatusAudits  ArticleStatusAudit[]  @relation("ArticleStatusAuditOperator")
+  stories                Story[]                 @relation("ReporterStories")
+  editedStories          Story[]                 @relation("EditorStories")
+  articles               Article[]               @relation("AuthorArticles")
+  editedArticles         Article[]               @relation("EditorArticles")
+  aiOperations           AIOperation[]
+  autoPublishTasks       AutoPublishTask[]
+  topUpRecords           TopUpRecord[]
+  billingTransactions    BillingTransaction[]
+  notifications          Notification[]
+  balanceAlert           BalanceAlert?
+  mediaAssets            MediaAsset[]
+  videoGenerationJobs    VideoGenerationJob[]
+  featureSwitchUpdates   SystemFeatureSwitch[]   @relation("SystemFeatureSwitchUpdater")
+  featureSwitchAudits    SystemFeatureAudit[]    @relation("SystemFeatureAuditOperator")
+  articleStatusAudits    ArticleStatusAudit[]    @relation("ArticleStatusAuditOperator")
   languageSettingUpdates SystemLanguageSetting[] @relation("SystemLanguageSettingUpdater")
-  brandSettingUpdates SystemBrandSetting[] @relation("SystemBrandSettingUpdater")
+  brandSettingUpdates    SystemBrandSetting[]    @relation("SystemBrandSettingUpdater")
 
   @@index([role, isActive])
   @@map("users")
@@ -88,12 +88,12 @@ model Article {
   publishedAt      DateTime?
 
   // Relations
-  storyId           String?
-  story             Story?            @relation(fields: [storyId], references: [id], onDelete: SetNull)
-  authorId          String
-  author            User              @relation("AuthorArticles", fields: [authorId], references: [id])
-  editorId          String?
-  editor            User?             @relation("EditorArticles", fields: [editorId], references: [id])
+  storyId             String?
+  story               Story?               @relation(fields: [storyId], references: [id], onDelete: SetNull)
+  authorId            String
+  author              User                 @relation("AuthorArticles", fields: [authorId], references: [id])
+  editorId            String?
+  editor              User?                @relation("EditorArticles", fields: [editorId], references: [id])
   versions            ArticleVersion[]
   aiOperations        AIOperation[]
   platformPublishes   PlatformPublish[]
@@ -431,7 +431,7 @@ model TopUpRecord {
   user            User              @relation(fields: [userId], references: [id])
   amount          Decimal           @db.Decimal(12, 4)
   creditsAdded    Decimal           @db.Decimal(12, 4)
-  bonusCredits    Decimal           @db.Decimal(12, 4) @default(0)
+  bonusCredits    Decimal           @default(0) @db.Decimal(12, 4)
   paymentMethod   PaymentMethod
   externalOrderId String?           @db.VarChar(255)
   status          TransactionStatus @default(PENDING)
@@ -650,44 +650,44 @@ enum MediaTagStatus {
 }
 
 model MediaAsset {
-  id            String           @id @default(uuid())
+  id                String           @id @default(uuid())
   // 存储
-  storageKey    String           // COS key（相对 bucket 根，不含前导 /）
-  url           String           // 公网访问 URL（含 CDN）
-  previewStorageKey String?      // 上传图片的 WebP 预览对象 key；GIF/历史/AI 生图可为空
-  thumbnailUrl  String?          // 列表/搜索使用的预览 URL；为空时前端回退原图
+  storageKey        String // COS key（相对 bucket 根，不含前导 /）
+  url               String // 公网访问 URL（含 CDN）
+  previewStorageKey String? // 上传图片的 WebP 预览对象 key；GIF/历史/AI 生图可为空
+  thumbnailUrl      String? // 列表/搜索使用的预览 URL；为空时前端回退原图
   // 文件元数据
-  fileName      String           // 展示用文件名（上传原文件名 / AI 生成命名）
-  mimeType      String           // image/jpeg | image/png | image/webp | image/gif | video/mp4
-  size          Int              // 字节数
-  width         Int?             // 像素
-  height        Int?             // 像素
-  duration      Int?             // 视频时长(秒);图片为 null
+  fileName          String // 展示用文件名（上传原文件名 / AI 生成命名）
+  mimeType          String // image/jpeg | image/png | image/webp | image/gif | video/mp4
+  size              Int // 字节数
+  width             Int? // 像素
+  height            Int? // 像素
+  duration          Int? // 视频时长(秒);图片为 null
   // 来源
-  source        MediaSource      @default(UPLOAD)
-  sourceRef     String?          // AI: 关联 aiOperationId；UPLOAD: null
-  prompt        String?          @db.Text // AI 生成时的 prompt
+  source            MediaSource      @default(UPLOAD)
+  sourceRef         String? // AI: 关联 aiOperationId；UPLOAD: null
+  prompt            String?          @db.Text // AI 生成时的 prompt
   // 元信息
-  altText       String?
-  title         String?
-  description   String?          @db.Text
-  tags          String           @default("[]") @db.VarChar(1000) // 人工标签（JSON string 数组，用 safeJsonParse 解析）
+  altText           String?
+  title             String?
+  description       String?          @db.Text
+  tags              String           @default("[]") @db.VarChar(1000) // 人工标签（JSON string 数组，用 safeJsonParse 解析）
   // AI 自动打标
-  aiTags        String           @default("[]") @db.VarChar(1000) // AI 标签（JSON string 数组，同惯例）
-  tagStatus     MediaTagStatus   @default(NONE)
-  taggedAt      DateTime?
-  tagError      String?          @db.VarChar(500)
-  tagRetryCount Int              @default(0)
+  aiTags            String           @default("[]") @db.VarChar(1000) // AI 标签（JSON string 数组，同惯例）
+  tagStatus         MediaTagStatus   @default(NONE)
+  taggedAt          DateTime?
+  tagError          String?          @db.VarChar(500)
+  tagRetryCount     Int              @default(0)
   // 归属
-  ownerId       String           // 上传者 / 生成者 userId
-  owner         User             @relation(fields: [ownerId], references: [id])
-  libraryType   MediaLibraryType @default(PERSONAL)
-  teamId        String?          // 团队库归属（libraryType=TEAM 时必填，本期不启用）
+  ownerId           String // 上传者 / 生成者 userId
+  owner             User             @relation(fields: [ownerId], references: [id])
+  libraryType       MediaLibraryType @default(PERSONAL)
+  teamId            String? // 团队库归属（libraryType=TEAM 时必填，本期不启用）
   // 状态
-  status        MediaStatus      @default(ACTIVE)
+  status            MediaStatus      @default(ACTIVE)
   // 时间
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@index([ownerId, createdAt])
   @@index([source])
@@ -718,43 +718,82 @@ enum VideoJobStatus {
 }
 
 model VideoGenerationJob {
-  id             String              @id @default(uuid())
-  mode           VideoGenerationMode @default(TEXT_TO_CLIP)
-  status         VideoJobStatus      @default(PENDING)
-  failedStep     String?             @db.VarChar(50)
+  id               String              @id @default(uuid())
+  mode             VideoGenerationMode @default(TEXT_TO_CLIP)
+  status           VideoJobStatus      @default(PENDING)
+  failedStep       String?             @db.VarChar(50)
   // 输入
-  prompt         String              @db.Text
-  articleId      String?             // L2 来源文章,仅溯源引用(无外键);L1 为空
+  prompt           String              @db.Text
+  articleId        String? // L2 来源文章,仅溯源引用(无外键);L1 为空
   // provider 选择(任务级可追溯)
-  provider       String              @db.VarChar(20) // 'volcengine' | 'minimax'
-  providerTaskId String?             @db.VarChar(100) // provider 侧异步任务 ID
+  provider         String              @db.VarChar(20) // 'volcengine' | 'minimax'
+  providerTaskId   String?             @db.VarChar(100) // provider 侧异步任务 ID
   // 生成参数
-  durationSec    Int?
-  resolution     String?             @db.VarChar(10) // '480P' | '720P'
-  aspectRatio    String?             @db.VarChar(10) // '16:9' | '9:16' | '1:1'
-  generateAudio  Boolean?            // L1 原生音频开关(Seedance 1.5+/2.x);null/false 静默
+  durationSec      Int?
+  resolution       String?             @db.VarChar(10) // '480P' | '720P'
+  aspectRatio      String?             @db.VarChar(10) // '16:9' | '9:16' | '1:1'
+  generateAudio    Boolean? // L1 原生音频开关(Seedance 1.5+/2.x);null/false 静默
   // L1 可选提交参数(PRD §18):{ references:[{role,url}], seed?, draft?, returnLastFrame? } JSON 字符串
-  submitOptions  String?             @db.Text
+  submitOptions    String?             @db.Text
   // P1(L2 稿件一键成片)checkpoint:JSON 字符串(仓库零 Json 字段惯例,用 safeJsonParse 解析)
-  script         String?             @db.Text // 口播脚本(LLM 产出)
-  storyboard     String?             @db.Text // 分镜 JSON(含每镜素材/配音/字幕 checkpoint)
-  ttsProvider    String?             @db.VarChar(20) // 配音通道:'native' 原生音频 | 'none' 无配音(历史值 volcengine/minimax 为已移除的 TTS)
+  script           String?             @db.Text // 口播脚本(LLM 产出)
+  storyboard       String?             @db.Text // 分镜 JSON(含每镜素材/配音/字幕 checkpoint)
+  ttsProvider      String?             @db.VarChar(20) // 配音通道:'native' 原生音频 | 'none' 无配音(历史值 volcengine/minimax 为已移除的 TTS)
   // 成本
-  costEstimate   Float?
-  costActual     Float?
+  costEstimate     Float?
+  costActual       Float?
   // 产出
-  resultAssetId  String?             // 成片 MediaAsset.id,仅溯源引用(无外键)
-  lastFrameAssetId String?           // returnLastFrame 尾帧图 MediaAsset.id(续拍链),无外键
-  error          String?             @db.Text
-  retryCount     Int                 @default(0)
+  resultAssetId    String? // 成片 MediaAsset.id,仅溯源引用(无外键)
+  lastFrameAssetId String? // returnLastFrame 尾帧图 MediaAsset.id(续拍链),无外键
+  error            String?             @db.Text
+  retryCount       Int                 @default(0)
   // 归属
-  userId         String
-  user           User                @relation(fields: [userId], references: [id])
+  userId           String
+  user             User                @relation(fields: [userId], references: [id])
   // 时间
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@index([userId, createdAt])
   @@index([status, updatedAt])
   @@map("video_generation_jobs")
+}
+
+// ===== Paddle 订阅镜像 =====
+// 由 Paddle webhook 事件驱动的只读镜像（subscription-sync）。
+// 与本应用的联系走 email 桥（用户注册邮箱 = Paddle 客户邮箱），不与 User 建外键。
+// 注意：webhook 至少投递一次且可能乱序，所有写入必须是按 Paddle ID 的 upsert。
+
+model PaddleCustomer {
+  // 镜像主键即 Paddle customer id（"ctm_..."），不做二次映射
+  customerId String   @id @map("customer_id") @db.VarChar(64)
+  // customer.created/updated 事件填充；subscription 事件先到时先插空串占位行
+  email      String   @default("") @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  subscriptions PaddleSubscription[]
+
+  @@index([email])
+  @@map("paddle_customers")
+}
+
+model PaddleSubscription {
+  subscriptionId        String    @id @map("subscription_id") @db.VarChar(64)
+  customerId            String    @map("customer_id") @db.VarChar(64)
+  // active | trialing | past_due | paused | canceled
+  status                String    @db.VarChar(16)
+  priceId               String    @map("price_id") @db.VarChar(64)
+  productId             String    @map("product_id") @db.VarChar(64)
+  // 计划中的变更（期末取消/暂停）：status 仍为 active，只作展示提示，不影响访问判定
+  scheduledChangeAction String?   @map("scheduled_change_action") @db.VarChar(16)
+  scheduledChangeAt     DateTime? @map("scheduled_change_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  customer PaddleCustomer @relation(fields: [customerId], references: [customerId])
+
+  @@index([customerId])
+  @@index([status])
+  @@map("paddle_subscriptions")
 }

@@ -25,6 +25,7 @@ import settings from './settings.json';
 import components from './components.json';
 import panels from './panels.json';
 import lib from './lib.json';
+import pricing from './pricing.json';
 
 const messages = {
   common,
@@ -46,6 +47,7 @@ const messages = {
   components,
   panels,
   lib,
+  pricing,
 };
 
 export default messages;

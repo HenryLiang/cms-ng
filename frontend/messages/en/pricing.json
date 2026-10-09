@@ -1,0 +1,15 @@
+{
+  "title": "Choose your plan",
+  "subtitle": "Every plan starts with a 7-day free trial. Cancel anytime.",
+  "monthly": "Monthly",
+  "yearly": "Yearly",
+  "perMonth": "month",
+  "perYear": "year",
+  "mostPopular": "Most popular",
+  "subscribe": "Subscribe",
+  "trialNote": "You won't be charged during the trial. Renews automatically at the selected interval afterwards.",
+  "previewFailed": "Failed to load prices",
+  "welcomeTitle": "Welcome aboard!",
+  "welcomeSubtitle": "Your subscription is active. Enjoy the full feature set.",
+  "goToDashboard": "Go to dashboard"
+}
