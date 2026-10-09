@@ -121,3 +121,6 @@ soft-copyright/
 
 # Docs: kept local-only (untracked from repo; files remain on disk)
 docs/
+
+# Mimosa security plugin local state (hook baselines, scan reports)
+.mimosa/
