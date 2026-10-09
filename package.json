@@ -24,6 +24,7 @@
     "packages/*"
   ],
   "devDependencies": {
+    "@paddle/paddle-node-sdk": "^3.10.0",
     "@playwright/test": "^1.60.0",
     "turbo": "^2.5.0"
   },

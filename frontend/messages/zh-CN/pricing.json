@@ -1,0 +1,15 @@
+{
+  "title": "选择适合你的套餐",
+  "subtitle": "所有套餐均含 7 天免费试用，随时可取消。",
+  "monthly": "按月付费",
+  "yearly": "按年付费",
+  "perMonth": "月",
+  "perYear": "年",
+  "mostPopular": "最受欢迎",
+  "subscribe": "立即订阅",
+  "trialNote": "试用期内不扣费，试用结束后按所选周期自动续费。",
+  "previewFailed": "价格加载失败",
+  "welcomeTitle": "订阅成功，欢迎加入！",
+  "welcomeSubtitle": "你的订阅已生效，现在可以开始使用全部功能了。",
+  "goToDashboard": "进入工作台"
+}

@@ -27,6 +27,7 @@ import { LanguageSettingsModule } from './language-settings/language-settings.mo
 import { BrandSettingsModule } from './brand-settings/brand-settings.module';
 import { PublicModule } from './public/public.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { PaddleModule } from './paddle/paddle.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     VideoModule,
     PublicModule,
     WebhooksModule,
+    PaddleModule,
   ],
   controllers: [AppController],
   providers: [

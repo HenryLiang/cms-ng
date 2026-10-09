@@ -12,7 +12,9 @@
     "totalTopUps": "充值总额",
     "currentBalance": "当前余额",
     "recentTransactions": "最近交易",
-    "viewAll": "查看全部"
+    "viewAll": "查看全部",
+    "manageSubscription": "管理订阅",
+    "portalError": "订阅管理暂时不可用：未找到订阅记录或 Paddle 未配置"
   },
   "config": {
     "title": "计费配置",

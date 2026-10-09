@@ -14,6 +14,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import BalanceCard from '@/components/billing/balance-card';
+import { ManageSubscriptionButton } from '@/components/billing/manage-subscription-button';
 import {
   getBalance,
   getTransactions,
@@ -114,6 +115,7 @@ export default function BillingPage() {
       <PageHeader
         title={t('overview.title')}
         subtitle={t('overview.subtitle')}
+        actions={<ManageSubscriptionButton />}
       />
 
       {/* 支付宝支付返回横幅 */}
