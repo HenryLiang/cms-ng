@@ -132,14 +132,14 @@ describe('AIModule — Provider Factory', () => {
       expect((provider as any).resolveTemperature(0.5)).toBe(1);
     });
 
-    it('should not force temperature for non-k2.6 Kimi models', () => {
+    it('should force temperature=1 for non-k2.6 Kimi models too (coding endpoint rejects other values)', () => {
       const provider = createChatProvider({
         AI_PROVIDER: 'kimi',
         KIMI_MODEL: 'kimi-for-coding',
       }) as KimiProvider;
 
-      expect((provider as any).defaultTemperature).toBeUndefined();
-      expect((provider as any).resolveTemperature(0.5)).toBe(0.5);
+      expect((provider as any).defaultTemperature).toBe(1);
+      expect((provider as any).resolveTemperature(0.5)).toBe(1);
     });
 
     it('should use caller temperature for DeepSeek', () => {

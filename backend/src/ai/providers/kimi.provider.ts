@@ -12,7 +12,7 @@ import type { ProviderOverrides } from './provider-overrides';
 /**
  * Kimi provider — OpenAI-compatible API with built-in web search support.
  * Supports the proprietary `builtin_function: $web_search` tool type.
- * Models: kimi-for-coding, kimi-k2.6 (k2.6 forces temperature=1).
+ * Models: kimi-for-coding, kimi-k2.6 (temperature is always forced to 1).
  */
 export class KimiProvider extends OpenAICompatibleProvider {
   readonly providerName = 'kimi';
@@ -20,16 +20,24 @@ export class KimiProvider extends OpenAICompatibleProvider {
   constructor(config: ConfigService, overrides?: ProviderOverrides) {
     const model =
       overrides?.model || config.get<string>('KIMI_MODEL') || 'kimi-for-coding';
-    const defaultTemp = model === 'kimi-k2.6' ? 1 : undefined;
     super(
       config.get<string>('KIMI_API_KEY') || '',
       overrides?.apiBase ||
         config.get<string>('KIMI_API_BASE') ||
         'https://api.kimi.com/coding/v1',
       model,
-      defaultTemp,
+      1,
       overrides?.requestTimeoutMs,
     );
+  }
+
+  /**
+   * The Kimi coding endpoint only accepts temperature=1 and rejects any other
+   * value with 400 invalid_request_error, so callers' temperature preferences
+   * are clamped away here instead of failing the whole request.
+   */
+  protected prepareRequestBody(body: Record<string, any>): Record<string, any> {
+    return { ...body, temperature: 1 };
   }
 
   /**
